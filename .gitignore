@@ -1,3 +1,4 @@
+
 # --------------------------------------
 #  Go Build Artifacts
 # --------------------------------------
@@ -29,7 +30,7 @@
 # --------------------------------------
 # Editor & Tool Configs
 # --------------------------------------
-.vscode/
+
 .idea/
 *.swp
 *.swo
@@ -37,7 +38,6 @@
 # --------------------------------------
 #  OS & Temp Files
 # --------------------------------------
-.DS_Store
 Thumbs.db
 *.log
 *.tmp
@@ -62,3 +62,16 @@ out/
 # --------------------------------------
 coverage/
 testdata/
+
+# Environment variables
+.env
+
+# Build outputs
+dist/
+build/
+out/
+
+# Editor directories and files
+.idea/
+.vscode/
+.DS_Store
