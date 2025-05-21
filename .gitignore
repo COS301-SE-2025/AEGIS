@@ -1,0 +1,64 @@
+# --------------------------------------
+#  Go Build Artifacts
+# --------------------------------------
+/bin/
+/build/
+/dist/
+/out/
+*.exe
+*.test
+*.out
+*.a
+*.o
+*.so
+
+# Go workspace cache
+/pkg/
+*.dll
+*.dylib
+
+# Go coverage files
+*.coverprofile
+*.cov
+
+# Dependency lock files — KEEP go.mod & go.sum
+# (These should NOT be ignored!)
+# !go.mod
+# !go.sum
+
+# --------------------------------------
+# Editor & Tool Configs
+# --------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --------------------------------------
+#  OS & Temp Files
+# --------------------------------------
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+
+# --------------------------------------
+# Node.js / Frontend (optional)
+# --------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+.env
+.env.*
+.cache/
+.next/
+out/
+
+# --------------------------------------
+#  Testing
+# --------------------------------------
+coverage/
+testdata/
