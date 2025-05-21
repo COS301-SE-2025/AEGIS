@@ -1,17 +1,28 @@
-package main    
+
+package main
 
 import (
-	"log"
+	"fmt"
+	_ "github.com/gofiber/fiber/v2"
 	"net/http"
-	"aegis-registration/services/registration"
-    "aegis-backend/router"
 )
+
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, err := fmt.Fprintf(w, `{"status": "UP"}`)
+	if err != nil {
+		return
+	}
+}
+
 func main() {
+	http.HandleFunc("/health", healthCheckHandler)
+	port := ":8080"
+	fmt.Printf("Listening on port %s...\n", port)
 
-   db := registration.InitDB()
-	repo := registration.NewGormUserRepository(db)
-	service := registration.NewRegistrationService(repo)
-
-router.StartServer()
+	err := http.ListenAndServe(port, nil)
+	if err != nil {
+		fmt.Printf("Error starting server: %s\n", err)
+	}
 
 }
