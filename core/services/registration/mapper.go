@@ -16,8 +16,8 @@ func RegistrationRequestToModel(req RegistrationRequest, hash string) UserModel 
 }
 
 
-func ModelToEntity(model UserModel, id string) UserEntity {
-	return UserEntity{
+func ModelToEntity(model UserModel, id string) User {
+	return User{
 		ID:           id,
 		Name:         model.Name,
 		Surname:      model.Surname,
@@ -27,7 +27,7 @@ func ModelToEntity(model UserModel, id string) UserEntity {
 	}
 }
 
-func EntityToResponse(entity UserEntity) UserResponse {
+func EntityToResponse(entity User) UserResponse {
 	return UserResponse{
 		ID:       entity.ID,
 		FullName: entity.Name + " " + entity.Surname,

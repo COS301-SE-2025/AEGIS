@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"aegis-backend/services/registration"
+	"aegis-api/services/registration"
 )
 
 func TestRegisterHandler_Success(t *testing.T) {

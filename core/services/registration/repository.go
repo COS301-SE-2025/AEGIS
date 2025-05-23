@@ -11,10 +11,10 @@ import (
 // ----------------------
 
 type UserRepository interface {
-	CreateUser(user *UserEntity) error
-	GetUserByEmail(email string) (*UserEntity, error)
-	GetUserByToken(token string) (*UserEntity, error)
-	UpdateUser(user *UserEntity) error
+	CreateUser(user *User) error
+	GetUserByEmail(email string) (*User, error)
+	UpdateUser(user *User) error
+	GetUserByToken(token string) (*User, error) 
 }
 
 //
@@ -24,16 +24,16 @@ type UserRepository interface {
 //
 
 type InMemoryUserRepository struct {
-	users map[string]*UserEntity
+	users map[string]*User
 }
 
 func NewInMemoryUserRepository() *InMemoryUserRepository {
 	return &InMemoryUserRepository{
-		users: make(map[string]*UserEntity),
+		users: make(map[string]*User),
 	}
 }
 
-func (r *InMemoryUserRepository) CreateUser(user *UserEntity) error {
+func (r *InMemoryUserRepository) CreateUser(user *User) error {
 	if _, exists := r.users[user.Email]; exists {
 		return errors.New("user already exists")
 	}
@@ -41,7 +41,7 @@ func (r *InMemoryUserRepository) CreateUser(user *UserEntity) error {
 	return nil
 }
 
-func (r *InMemoryUserRepository) GetUserByEmail(email string) (*UserEntity, error) {
+func (r *InMemoryUserRepository) GetUserByEmail(email string) (*User, error) {
 	user, exists := r.users[email]
 	if !exists {
 		return nil, errors.New("user not found")
@@ -63,7 +63,7 @@ func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
 	return &GormUserRepository{db: db}
 }
 
-func (r *GormUserRepository) CreateUser(user *UserEntity) error {
+func (r *GormUserRepository) CreateUser(user *User) error {
 	err := r.db.Create(user).Error
 	if err != nil {
 		// Detect uniqueness constraint violation
@@ -75,11 +75,22 @@ func (r *GormUserRepository) CreateUser(user *UserEntity) error {
 }
 
 
-func (r *GormUserRepository) GetUserByEmail(email string) (*UserEntity, error) {
-	var user UserEntity
+func (r *GormUserRepository) GetUserByEmail(email string) (*User, error) {
+	var user User
 	result := r.db.Where("email = ?", email).First(&user)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 	return &user, nil
+}
+
+// 2. Implement in GormUserRepository
+func (r *GormUserRepository) GetUserByToken(token string) (*User, error) {
+	var user User
+	result := r.db.Where("verification_token = ?", token).First(&user)
+	return &user, result.Error
+}
+func (r *GormUserRepository) UpdateUser(user *User) error {
+	result := r.db.Save(user)
+	return result.Error
 }

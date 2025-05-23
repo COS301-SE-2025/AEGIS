@@ -24,11 +24,11 @@ func NewRegistrationService(repo UserRepository) *RegistrationService {
 
 // Register takes in a RegistrationRequest DTO, hashes the password,
 // builds a domain model, converts it to an entity, and saves it via the repository.
-func (s *RegistrationService) Register(req RegistrationRequest) (UserEntity, error) {
+func (s *RegistrationService) Register(req RegistrationRequest) (User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Printf(" Registration failed (hash error) for %s: %v", req.Email, err)
-		return UserEntity{}, err
+		return User{}, err
 	}
 
 	model := NewUserModel(req, string(hash))
@@ -42,7 +42,7 @@ func (s *RegistrationService) Register(req RegistrationRequest) (UserEntity, err
 	err = s.repo.CreateUser(&entity)
 	if err != nil {
 		log.Printf(" Registration failed (duplicate?) for %s: %v", req.Email, err)
-		return UserEntity{}, err
+		return User{}, err
 	}
 
 	log.Printf("✅ Registered new user: %s (%s %s)", entity.Email, entity.Name, entity.Surname)

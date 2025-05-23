@@ -17,7 +17,7 @@ func generateToken() string {
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
-func (r *InMemoryUserRepository) GetUserByToken(token string) (*UserEntity, error) {
+func (r *InMemoryUserRepository) GetUserByToken(token string) (*User, error) {
 	for _, user := range r.users {
 		if user.VerificationToken == token {
 			return user, nil
@@ -25,7 +25,7 @@ func (r *InMemoryUserRepository) GetUserByToken(token string) (*UserEntity, erro
 	}
 	return nil, errors.New("token not found")
 }
-func (r *InMemoryUserRepository) UpdateUser(user *UserEntity) error {
+func (r *InMemoryUserRepository) UpdateUser(user *User) error {
 	if _, exists := r.users[user.Email]; !exists {
 		return errors.New("user does not exist")
 	}

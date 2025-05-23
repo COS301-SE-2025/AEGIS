@@ -6,7 +6,7 @@ import (
 // This struct is saved in or loaded from the database. 
 // It should contain the same fields as the DB table.
 
-type UserEntity struct {
+type User struct {
 	ID           string    `gorm:"primaryKey"`
 	Name         string
 	Surname      string

@@ -3,7 +3,7 @@ package registration_test
 import (
 	"testing"
 
-	"aegis-backend/services/registration"
+	"aegis-api/services/registration"
 )
 
 func TestRegistrationService_Register(t *testing.T) {

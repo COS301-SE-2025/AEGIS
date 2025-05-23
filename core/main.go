@@ -1,28 +1,31 @@
-
 package main
 
 import (
 	"fmt"
-	_ "github.com/gofiber/fiber/v2"
+	"log"
 	"net/http"
+	//"aegis-api/router"
+	database "aegis-api/db"
+
 )
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	_, err := fmt.Fprintf(w, `{"status": "UP"}`)
-	if err != nil {
-		return
-	}
+	_, _ = fmt.Fprintf(w, `{"status": "UP"}`)
 }
 
 func main() {
-	http.HandleFunc("/health", healthCheckHandler)
-	port := ":8080"
-	fmt.Printf("Listening on port %s...\n", port)
-
-	err := http.ListenAndServe(port, nil)
-	if err != nil {
-		fmt.Printf("Error starting server: %s\n", err)
+	// 🔌 Initialize DB connection
+	if err := database.InitDB(); err != nil {
+		log.Fatalf("Database connection failed: %v", err)
 	}
 
+	http.HandleFunc("/health", healthCheckHandler)
+	
+	//router.StartServer()
+	// 🚀 Start server
+	fmt.Println("✅ Server running on http://localhost:8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		log.Fatalf("❌ Server failed: %v", err)
+	}
 }

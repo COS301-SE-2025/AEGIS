@@ -1,26 +1,38 @@
-package registration
+package db
 
 import (
+	"fmt"
+	"log"
+	"os"
+	"github.com/joho/godotenv"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"log"
 )
 
-func InitDB() *gorm.DB {
-	// DSN = Data Source Name
-	dsn := "host=localhost user=postgres password=your_password dbname=usersdb port=5432 sslmode=disable TimeZone=Africa/Johannesburg"
+var DB *gorm.DB
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+func InitDB() error {
+		if err := godotenv.Load(); err != nil {
+		log.Println("Warning: .env file not loaded")
+	}
+	
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_NAME"),
+		os.Getenv("DB_PORT"),
+	)
+
+
+	var err error
+	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("failed to connect to database:", err)
+		return err
 	}
 
-	// Auto-create the users table if not exists
-	db.AutoMigrate(&UserEntity{})
-
-	db.AutoMigrate(&registration.UserEntity{}) // ensures unique index is created
-
-
-	return db
+	log.Println("✅ Connected to the database!")
+	return nil
 }
- 

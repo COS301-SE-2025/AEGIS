@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"aegis-backend/services/registration"
+	"aegis-api/services/registration"
 )
 
 func TestRegistrationRequestToModel(t *testing.T) {

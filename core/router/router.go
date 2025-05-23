@@ -1,17 +1,21 @@
-package router
+// package router
 
-import (
-	"log"
-	"net/http"
+// import (
+// 	"log"
+// 	"net/http"
+//  	"aegis-api/services/registration"
+// 	"aegis-api/services/login/auth"
+// 	"aegis-api/db"
+// )
 
-	"AEGIS/core/services/registration"
-)
+// func StartServer() {
+// repo := registration.NewGormUserRepository(db.DB)
+// service := registration.NewRegistrationService(repo)
+// 	http.HandleFunc("/register", registration.RegisterHandler(service))
+// 	http.HandleFunc("/verify", registration.VerifyHandler(repo))
 
-func StartServer() {
-	
-	http.HandleFunc("/api/register", registration.RegisterHandler(service))
-	http.HandleFunc("/verify", registration.VerifyHandler(repo))
+// 	http.HandleFunc("/login", auth.LoginHandler)
 
-	log.Println("Server running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
+// 	log.Println("Server running on http://localhost:8080")
+// 	log.Fatal(http.ListenAndServe(":8080", nil))
+// }

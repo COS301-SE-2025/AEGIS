@@ -3,6 +3,7 @@ package registration
 import (
 	"encoding/json"
 	"net/http"
+
 )
 
 // RegisterHandler handles HTTP POST requests for user registration.
@@ -62,6 +63,6 @@ func VerifyHandler(repo UserRepository) http.HandlerFunc {
 		repo.UpdateUser(user)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("✅ Email verified successfully"))
+		w.Write([]byte(" Email verified successfully"))
 	}
 }
