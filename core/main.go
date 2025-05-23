@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-//	"aegis-api/router"
+	"aegis-api/router"
 	database "aegis-api/db"
 
 )
@@ -22,7 +22,7 @@ func main() {
 
 	http.HandleFunc("/health", healthCheckHandler)
 	
-	//router.StartServer()
+	router.StartServer()
 	// 🚀 Start server
 	fmt.Println("✅ Server running on http://localhost:8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
