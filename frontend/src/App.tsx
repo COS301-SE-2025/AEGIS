@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { LoginPage } from "./screens/LoginPage";
 import { RegistrationPage } from "./screens/RegistrationPage";
+import ResetPasswordPage from "./screens/ResetPasswordPage";
 
 export default function App() {
   return (
@@ -8,7 +9,8 @@ export default function App() {
       <Route path="/" element={<LoginPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegistrationPage />} />
-      
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+
     </Routes>
   );
 }
