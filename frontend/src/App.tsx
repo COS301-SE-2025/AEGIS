@@ -3,6 +3,7 @@ import { LoginPage } from "./screens/LoginPage";
 import { RegistrationPage } from "./screens/RegistrationPage";
 import ResetPasswordPage from "./screens/ResetPasswordPage";
 import { CaseManagementPage } from "./screens/CaseManagementPage";
+import { SecureChatPage } from "./screens/SecureChatPage";
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
       <Route path="/register" element={<RegistrationPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/case-management" element={<CaseManagementPage />} />
+      <Route path="/secure-chat" element={<SecureChatPage />} />
 
     </Routes>
   );
