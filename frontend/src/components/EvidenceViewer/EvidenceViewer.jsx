@@ -11,9 +11,11 @@ import {
   MessageSquare,
   Search,
   Settings,
-  share2,
-  plus,
-  house
+  Share2,
+  Plus,
+  House,
+  SlidersHorizontal,
+  ArrowUpDown
 } from "lucide-react";
 
 import logo from './images/logo.png';
@@ -24,7 +26,7 @@ function EvidenceViewer() {
       <aside className="sidebar">
         <nav className="nav-links">
           <div className="nav-item">
-            <house className="icon" />
+            <House className="icon" />
             Dashboard
           </div>
           <div className="nav-item">
@@ -78,6 +80,26 @@ function EvidenceViewer() {
             <div className="case-files-panel">
               <div className="case-files-header">
                 <h3>Case files</h3>
+              </div>
+              <div className="case-files-controls">
+                <div className="search-container">
+                  <Search className="search-icon" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search Evidence" 
+                    className="evidence-search"
+                  />
+                </div>
+                <div className="control-buttons">
+                  <button className="control-btn">
+                    <SlidersHorizontal size={16} />
+                    filter
+                  </button>
+                  <button className="control-btn">
+                    <ArrowUpDown size={16} />
+                    sort
+                  </button>
+                </div>
               </div>
               <div className="case-file-item">
                 <FaFile className="icon" />
