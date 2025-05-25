@@ -6,7 +6,7 @@ import { CaseManagementPage } from "./screens/CaseManagementPage";
 import { SecureChatPage } from "./screens/SecureChatPage";
 import {SettingsPage} from "./screens/SettingsPage";
 import { ProfilePage } from "./screens/ProfilePage";
-
+import { DashBoardPage } from "./screens/DashboardPage";
 
 
 export default function App() {
@@ -20,8 +20,7 @@ export default function App() {
       <Route path="/secure-chat" element={<SecureChatPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
-      {/* Add more routes as needed */}
-
+      <Route path="/dashboard" element={<DashBoardPage />} />
     </Routes>
   );
 }

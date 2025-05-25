@@ -84,7 +84,7 @@ export const CaseManagementPage = () => {
         <nav className="flex-1 space-y-2">
           <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors cursor-pointer">
             <Home className="w-6 h-6" />
-            <span className="text-lg">Dashboard</span>
+           <Link to="/dashboard"> <span className="text-lg">Dashboard</span></Link>
           </div>
 
           <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
@@ -125,9 +125,9 @@ export const CaseManagementPage = () => {
           <div className="flex items-center justify-between">
             {/* Navigation Tabs */}
             <div className="flex items-center gap-6">
-              <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+              <Link to="/dashboard"> <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
                 Dashboard
-              </button>
+              </button></Link>
               <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
                 Evidence Viewer
               </button>

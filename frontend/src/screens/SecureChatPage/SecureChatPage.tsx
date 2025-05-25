@@ -41,10 +41,10 @@ export  const SecureChatPage = (): JSX.Element => {
 
           {/* Navigation */}
           <nav className="space-y-4">
-        <button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-gray-800 rounded-lg">
+        <Link to="/dashboard"> <button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-gray-800 rounded-lg">
             <Home className="w-5 h-5" />
             Dashboard
-        </button>
+        </button></Link>
         <Link
             to="/case-management"
             className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-gray-800 rounded-lg"
