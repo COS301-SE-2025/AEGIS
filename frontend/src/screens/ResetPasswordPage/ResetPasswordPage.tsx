@@ -9,7 +9,7 @@ import { Label } from "../../components/ui/label";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 
-export function ResetPasswordPage(): JSX.Element {
+export const ResetPasswordPage= (): JSX.Element =>  {
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
       {/* Background Grid of 6 Image Tiles */}
