@@ -12,10 +12,10 @@ import (
 )
 
 type RegistrationRequest struct {
-	Name    string `json:"name"`
-	Surname string `json:"surname"`
+	FullName string `json:"full_name"`
 	Email   string `json:"email"`
 	Password string `json:"password"`
+	Role     string `json:"role"`
 	/*
 Password is required to be hashed.
 From client side, password is sent in plain text.
@@ -33,12 +33,11 @@ type UserResponse struct {
 
 
 func (r RegistrationRequest) Validate() error {
-	if strings.TrimSpace(r.Name) == "" {
-		return errors.New("name is required")
+	if strings.TrimSpace(r.FullName) == "" {
+		return errors.New("Full name is required")
 	}
-	if strings.TrimSpace(r.Surname) == "" {
-		return errors.New("surname is required")
-	}
+	
+	
 	matched, _ := regexp.MatchString(`^[\w\.-]+@[\w\.-]+\.\w+$`, r.Email)
 	if !matched {
 		return errors.New("invalid email address format")
@@ -49,6 +48,18 @@ func (r RegistrationRequest) Validate() error {
 	}
 	if !isStrongPassword(r.Password) {
 		return errors.New("password must contain uppercase, lowercase, and a digit")
+	}
+		if matched, _ := regexp.MatchString(`^[\w\.-]+@[\w\.-]+\.\w+$`, r.Email); !matched {
+		return errors.New("invalid email address format")
+	}
+		// Validate ENUM role
+	validRoles := map[string]bool{
+		"Incident Responder": true, "Forensic Analyst": true, "Malware Analyst": true,
+		"Threat Intelligent Analyst": true, "DFIR Manager": true, "Legal/Compliance Liaison": true,
+		"Detection Engineer": true, "Generic user": true,
+	}
+	if _, ok := validRoles[r.Role]; !ok {
+		return errors.New("invalid user role")
 	}
 	return nil
 }

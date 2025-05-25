@@ -32,7 +32,7 @@ func TestGetAllCases(t *testing.T) {
 func TestGetCasesByUser(t *testing.T) {
 	service := ListCases.NewListCasesService()
 
-	userID := "ded0a1b3-4712-46b5-8d01-fafbaf3f8236"
+	userID := "8fb89568-3c52-4535-af33-d2f1266def52"
 	cases, err := service.GetCasesByUser(userID)
 	if err != nil {
 		t.Fatalf("Failed to get user cases: %v", err)

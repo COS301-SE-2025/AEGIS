@@ -21,7 +21,7 @@ func TestCreateValidCase(t *testing.T) {
 		Status:             "open",
 		Priority:           "high",
 		InvestigationStage: "analysis",
-		CreatedBy:          "ded0a1b3-4712-46b5-8d01-fafbaf3f8236", // existing user UUID
+		CreatedBy:          "8fb89568-3c52-4535-af33-d2f1266def52", // existing user UUID
 	}
 
 	newCase, err := service.CreateCase(req)
@@ -40,7 +40,7 @@ func TestCreateCaseMissingTitle(t *testing.T) {
 		Description:        "Missing title field.",
 		Priority:           "medium",
 		InvestigationStage: "research",
-		CreatedBy:          "ded0a1b3-4712-46b5-8d01-fafbaf3f8236",
+		CreatedBy:          "8fb89568-3c52-4535-af33-d2f1266def52",
 	}
 
 	// You can add explicit validation if you implement it

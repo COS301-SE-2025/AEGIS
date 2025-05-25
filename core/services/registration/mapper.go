@@ -8,10 +8,10 @@ import (
 
 func RegistrationRequestToModel(req RegistrationRequest, hash string) UserModel {
 	return UserModel{
-		Name:         req.Name,
-		Surname:      req.Surname,
+		FullName:     req.FullName,
 		Email:        req.Email,
 		PasswordHash: hash,
+		Role:         req.Role,
 	}
 }
 
@@ -19,10 +19,10 @@ func RegistrationRequestToModel(req RegistrationRequest, hash string) UserModel 
 func ModelToEntity(model UserModel, id string) User {
 	return User{
 		ID:           id,
-		Name:         model.Name,
-		Surname:      model.Surname,
+		FullName:     model.FullName,
 		Email:        model.Email,
 		PasswordHash: model.PasswordHash,
+		Role:         model.Role, 
 		CreatedAt:    time.Now(),
 	}
 }
@@ -30,7 +30,7 @@ func ModelToEntity(model UserModel, id string) User {
 func EntityToResponse(entity User) UserResponse {
 	return UserResponse{
 		ID:       entity.ID,
-		FullName: entity.Name + " " + entity.Surname,
+		FullName: entity.FullName,
 		Email:    entity.Email,
 	}
 }

@@ -45,7 +45,7 @@ func (s *RegistrationService) Register(req RegistrationRequest) (User, error) {
 		return User{}, err
 	}
 
-	log.Printf("✅ Registered new user: %s (%s %s)", entity.Email, entity.Name, entity.Surname)
+	log.Printf("✅ Registered new user: %s (%s %s)", entity.Email, entity.FullName, entity.Role)
 
 	sendVerificationEmail(entity.Email, token)
 
