@@ -1,4 +1,4 @@
-# core/Dockerfile
+# api/Dockerfile
 
 # Use Go base image
 FROM golang:1.24.3
