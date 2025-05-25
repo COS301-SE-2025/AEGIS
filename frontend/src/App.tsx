@@ -4,6 +4,7 @@ import { RegistrationPage } from "./screens/RegistrationPage";
 import ResetPasswordPage from "./screens/ResetPasswordPage";
 import { CaseManagementPage } from "./screens/CaseManagementPage";
 import { SecureChatPage } from "./screens/SecureChatPage";
+import { DashBoardPage } from "./screens/DashboardPage/DashboardPage";
 
 export default function App() {
   return (
@@ -14,7 +15,7 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/case-management" element={<CaseManagementPage />} />
       <Route path="/secure-chat" element={<SecureChatPage />} />
-
+      <Route path = "/Dashboard" element={<DashBoardPage />} />
     </Routes>
   );
 }
