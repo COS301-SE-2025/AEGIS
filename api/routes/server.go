@@ -9,7 +9,15 @@ import (
 // mock service structs
 func SetUpRouter() *gin.Engine {
 	router := gin.Default()
-	h := handlers.NewHandler()
+	//h := handlers.NewHandler()
+
+	h := handlers.NewHandler(
+		handlers.MockAdminService{},
+		handlers.MockAuthService{},
+		handlers.MockCaseService{},
+		handlers.MockEvidenceService{},
+		handlers.MockUserService{},
+	)
 
 	// Debug: Print all routes
 	router.Use(func(c *gin.Context) {
@@ -42,12 +50,12 @@ func SetUpRouter() *gin.Engine {
 
 		case_ := admin.Group("/cases")
 		{
-			case_.GET("/", h.CaseService.GetCases)
-			case_.POST("/", h.CaseService.CreateCase)
-			case_.GET("/:id", h.CaseService.GetCase)
+			case_.GET("", h.CaseService.GetCases) //get all* the cases on the system - access??????
+			case_.POST("", h.CaseService.CreateCase)
+			//case_.GET("/:id", h.CaseService.GetCase) //get a specific case by id
 			case_.PUT("/:id", h.CaseService.UpdateCase)
 			//case_.DELETE("/:id", h.CaseService.DeleteCase)
-			case_.GET("/:id/collaborators", h.CaseService.GetCollaborators)
+			//case_.GET("/:id/collaborators", h.CaseService.GetCollaborators)
 			case_.POST("/:id/collaborators", h.CaseService.CreateCollaborator)
 		}
 	}
@@ -70,18 +78,20 @@ func SetUpRouter() *gin.Engine {
 		// auth.POST("/refresh-token", authService.refreshToken)
 	}
 
+	//api.GET("/cases", h.CaseService.GetCases)
+
 	//cases
 	cases := api.Group("/cases")
 	{
-		cases.GET("/", h.CaseService.GetCases) //support for pagination, filtering, etc.
-		cases.POST("/", h.CaseService.CreateCase)
+		cases.GET("", h.CaseService.GetCases) //support for pagination, filtering, etc.
+		//cases.POST("/", h.CaseService.CreateCase)
 
 		//case-specific routes
 		singleCase := cases.Group("/:id")
 		{
 			// ?case_id
-			singleCase.GET("/", h.CaseService.GetCase)
-			singleCase.PUT("/", h.CaseService.UpdateCase)
+			singleCase.GET("", h.CaseService.GetCase)
+			singleCase.PUT("", h.CaseService.UpdateCase)
 
 			//collaborators
 			singleCase.GET("/collaborators", h.CaseService.GetCollaborators)
@@ -90,14 +100,14 @@ func SetUpRouter() *gin.Engine {
 
 			evidence := singleCase.Group("/evidence")
 			{
-				evidence.GET("/", h.EvidenceService.GetEvidence) //evidence under a specific case
-				evidence.POST("/", h.EvidenceService.UploadEvidence)
+				evidence.GET("", h.EvidenceService.GetEvidence) //evidence under a specific case
+				evidence.POST("", h.EvidenceService.UploadEvidence)
 				//evidence.GET("/user") get evidence uploaded by a specific user
 
 				//evidence specific to a single case
 				evidenceItem := evidence.Group("/:e_id")
 				{
-					evidenceItem.GET("/", h.EvidenceService.GetEvidenceItem)
+					evidenceItem.GET("", h.EvidenceService.GetEvidenceItem)
 					evidenceItem.GET("/preview", h.EvidenceService.PreviewEvidence)
 					//evidenceItem.POST("/annotations", h.EvidenceService.AddAnnotation)
 					//evidenceItem.GET("/annotations", h.EvidenceService.GetAnnotations)
@@ -110,7 +120,6 @@ func SetUpRouter() *gin.Engine {
 	{
 		user.GET("/me", h.UserService.GetUserInfo)
 		user.PUT("/me", h.UserService.UpdateUserInfo)
-		user.GET("/me/cases", h.UserService.GetUserCases)
 	}
 
 	return router
