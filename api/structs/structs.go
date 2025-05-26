@@ -23,13 +23,19 @@ type User struct {
 }
 
 type Case struct {
-	ID            string    `json:"id"`
-	Title         string    `json:"title"`
-	Description   string    `json:"description"`
-	Status        string    `json:"status"`
-	CreatedBy     string    `json:"created_by"`
-	CreatedAt     time.Time `json:"created_at"`
-	Collaborators []string  `json:"collaborators"`
+	ID            string             `json:"id"`
+	Title         string             `json:"title"`
+	Description   string             `json:"description"`
+	Status        string             `json:"status"`
+	CreatedBy     string             `json:"created_by"`
+	CreatedAt     time.Time          `json:"created_at"`
+	Collaborators []CollaboratorInfo `json:"collaborators"`
+}
+
+type CollaboratorInfo struct {
+	ID       string `json:"id"`
+	FullName string `json:"full_name"`
+	Role     string `json:"role"` // optional
 }
 
 type CreateCaseRequest struct {
