@@ -144,7 +144,7 @@ export const DashBoardPage = () => {
 
           <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors cursor-pointer">
             <FileText className="w-6 h-6" />
-            <span className="text-lg font-semibold">Case Management</span>
+            <Link to="/case-management"><span className="text-lg font-semibold">Case Management</span></Link>
           </div>
 
           <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors cursor-pointer">
@@ -164,7 +164,7 @@ export const DashBoardPage = () => {
         <div className="border-t border-gray-700 pt-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-medium">AU</span>
+              <Link to="/profile" ><span className="text-white font-medium">AU</span></Link>
             </div>
             <div>
               <p className="font-semibold text-white">Agent User</p>
@@ -186,10 +186,10 @@ export const DashBoardPage = () => {
               <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
                 Evidence Viewer
               </button>
-              <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+              <Link to="/case-management"><button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
 
                 Case Management
-              </button>
+              </button></Link>
               <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
                 <Link to="/secure-chat">Secure Chat</Link>
               </button>
@@ -206,11 +206,11 @@ export const DashBoardPage = () => {
               <button className="p-2 text-gray-400 hover:text-white transition-colors">
                 <Bell className="w-6 h-6" />
               </button>
-              <button className="p-2 text-gray-400 hover:text-white transition-colors">
+              <Link to="/settings" ><button className="p-2 text-gray-400 hover:text-white transition-colors">
                 <Settings className="w-6 h-6" />
-              </button>
+              </button></Link>
               <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-medium text-sm">AU</span>
+                <Link to="/profile" ><span className="text-white font-medium text-sm">AU</span></Link>
               </div>
             </div>
           </div>

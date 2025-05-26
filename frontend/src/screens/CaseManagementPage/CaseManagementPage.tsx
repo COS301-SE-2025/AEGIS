@@ -84,7 +84,7 @@ export const CaseManagementPage = () => {
         <nav className="flex-1 space-y-2">
           <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors cursor-pointer">
             <Home className="w-6 h-6" />
-            <span className="text-lg">Dashboard</span>
+           <Link to="/dashboard"> <span className="text-lg">Dashboard</span></Link>
           </div>
 
           <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
@@ -108,7 +108,7 @@ export const CaseManagementPage = () => {
         <div className="border-t border-gray-700 pt-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-medium">AT</span>
+             <Link to="/profile" > <span className="text-white font-medium">AT</span></Link>
             </div>
             <div>
               <p className="font-semibold text-white">Agent Tshire</p>
@@ -125,9 +125,9 @@ export const CaseManagementPage = () => {
           <div className="flex items-center justify-between">
             {/* Navigation Tabs */}
             <div className="flex items-center gap-6">
-              <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+              <Link to="/dashboard"> <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
                 Dashboard
-              </button>
+              </button></Link>
               <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
                 Evidence Viewer
               </button>
@@ -153,10 +153,10 @@ export const CaseManagementPage = () => {
                 <Bell className="w-6 h-6" />
               </button>
               <button className="p-2 text-gray-400 hover:text-white transition-colors">
-                <Settings className="w-6 h-6" />
+               <Link to="/settings" > <Settings className="w-6 h-6" /></Link>
               </button>
               <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-medium text-sm">AT</span>
+                <Link to="/profile" ><span className="text-white font-medium text-sm">AT</span></Link>
               </div>
             </div>
           </div>
