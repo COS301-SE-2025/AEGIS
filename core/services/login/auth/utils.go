@@ -21,3 +21,9 @@ func GenerateJWT(userID string) (string, error) {
     token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
     return token.SignedString(jwtSecret)
 }
+
+// HashPassword hashes a plain-text password using bcrypt.
+func HashPassword(password string) (string, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(hashed), err
+}

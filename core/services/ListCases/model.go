@@ -18,6 +18,14 @@ type Case struct {
 	CreatedBy           uuid.UUID
 	CreatedAt           time.Time `gorm:"autoCreateTime"`
 }
+type CaseFilter struct {
+	Status     string
+	Priority   string
+	CreatedBy  string
+	TitleTerm  string
+	SortBy     string
+	SortOrder  string
+}
 
 func (Case) TableName() string {
 	return "cases"

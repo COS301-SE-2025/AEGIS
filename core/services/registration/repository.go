@@ -23,31 +23,31 @@ type UserRepository interface {
 // ─────────────────────────────────────────────────────────────────────
 //
 
-type InMemoryUserRepository struct {
-	users map[string]*User
-}
+// type InMemoryUserRepository struct {
+// 	users map[string]*User
+// }
 
-func NewInMemoryUserRepository() *InMemoryUserRepository {
-	return &InMemoryUserRepository{
-		users: make(map[string]*User),
-	}
-}
+// func NewInMemoryUserRepository() *InMemoryUserRepository {
+// 	return &InMemoryUserRepository{
+// 		users: make(map[string]*User),
+// 	}
+// }
 
-func (r *InMemoryUserRepository) CreateUser(user *User) error {
-	if _, exists := r.users[user.Email]; exists {
-		return errors.New("user already exists")
-	}
-	r.users[user.Email] = user
-	return nil
-}
+// func (r *InMemoryUserRepository) CreateUser(user *User) error {
+// 	if _, exists := r.users[user.Email]; exists {
+// 		return errors.New("user already exists")
+// 	}
+// 	r.users[user.Email] = user
+// 	return nil
+// }
 
-func (r *InMemoryUserRepository) GetUserByEmail(email string) (*User, error) {
-	user, exists := r.users[email]
-	if !exists {
-		return nil, errors.New("user not found")
-	}
-	return user, nil
-}
+// func (r *InMemoryUserRepository) GetUserByEmail(email string) (*User, error) {
+// 	user, exists := r.users[email]
+// 	if !exists {
+// 		return nil, errors.New("user not found")
+// 	}
+// 	return user, nil
+// }
 
 //
 // ─────────────────────────────────────────────────────────────────────

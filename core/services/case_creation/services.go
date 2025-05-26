@@ -2,14 +2,17 @@ package case_creation
 
 import (
 	"fmt"
+
 	"github.com/google/uuid"
-	"aegis-api/db"
 )
 
-type CaseService struct{}
+type CaseService struct {
+	repo CaseRepository
+}
 
-func NewCaseService() *CaseService {
-	return &CaseService{}
+// NewCaseService injects a repository (can be real or mock)
+func NewCaseService(repo CaseRepository) *CaseService {
+	return &CaseService{repo: repo}
 }
 
 func (s *CaseService) CreateCase(req CreateCaseRequest) (Case, error) {
@@ -19,6 +22,7 @@ func (s *CaseService) CreateCase(req CreateCaseRequest) (Case, error) {
 	}
 
 	newCase := Case{
+		ID:                 uuid.New(),
 		Title:              req.Title,
 		Description:        req.Description,
 		Status:             req.Status,
@@ -27,7 +31,8 @@ func (s *CaseService) CreateCase(req CreateCaseRequest) (Case, error) {
 		CreatedBy:          createdByUUID,
 	}
 
-	if err := db.DB.Create(&newCase).Error; err != nil {
+	// Save to repository
+	if err := s.repo.CreateCase(&newCase); err != nil {
 		return Case{}, err
 	}
 

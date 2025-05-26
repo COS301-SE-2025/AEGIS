@@ -5,7 +5,9 @@ import (
 	"aegis-api/services/registration"
 	"aegis-api/db"
 )
-
+type UserRepository interface {
+	GetUserByEmail(email string) (*registration.User, error)
+}
 func GetUserByEmail(email string) (*registration.User, error) {
 	var user registration.User
 
@@ -16,3 +18,4 @@ func GetUserByEmail(email string) (*registration.User, error) {
 
 	return &user, nil
 }
+
