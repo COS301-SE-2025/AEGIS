@@ -301,9 +301,9 @@ export const DashBoardPage = () => {
             Archived Cases (4)
           </button>
         </div>
-        <button className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700">
+        <Link to="/create-case"><button className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700">
           Create Case
-        </button>
+        </button></Link>
       </div>
 
       <div className="flex flex-wrap gap-6">

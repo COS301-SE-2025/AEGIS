@@ -111,7 +111,7 @@ const handleSubmit = (e: CreateCaseFormSubmitEvent) => {
             type="button"
             variant="outline"
             className="bg-zinc-800 border-cyan-500 text-cyan-400 hover:bg-cyan-800"
-            onClick={() => window.location.href = "/assign-members"}>
+            onClick={() => window.location.href = "/assign-case-members"}>
             Assign Case Members
           </Button>
 
