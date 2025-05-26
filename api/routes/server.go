@@ -39,6 +39,17 @@ func SetUpRouter() *gin.Engine {
 		admin.GET("/roles", h.AdminService.GetRoles)
 		//admin.GET("/audit-logs", h.AdminService.getAuditLogs)
 		//dashboard stuff
+
+		case_ := admin.Group("/cases")
+		{
+			case_.GET("/", h.CaseService.GetCases)
+			case_.POST("/", h.CaseService.CreateCase)
+			case_.GET("/:id", h.CaseService.GetCase)
+			case_.PUT("/:id", h.CaseService.UpdateCase)
+			//case_.DELETE("/:id", h.CaseService.DeleteCase)
+			case_.GET("/:id/collaborators", h.CaseService.GetCollaborators)
+			case_.POST("/:id/collaborators", h.CaseService.CreateCollaborator)
+		}
 	}
 
 	//auth
@@ -71,15 +82,11 @@ func SetUpRouter() *gin.Engine {
 			// ?case_id
 			singleCase.GET("/", h.CaseService.GetCase)
 			singleCase.PUT("/", h.CaseService.UpdateCase)
-			//singleCase.DELETE("/", h.CaseService.DeleteCase)
-			singleCase.POST("/assign", h.CaseService.AssignCase) //admin only? create collaborator
 
 			//collaborators
 			singleCase.GET("/collaborators", h.CaseService.GetCollaborators)
 
-			singleCase.DELETE("/collaborators/:user", h.CaseService.RemoveCollaborator)
-
-			//singleCase.GET("/timeline", h.CaseService.GetTimeline) later?
+			//singleCase.GET("/timeline", h.CaseService.GetTimeline) later
 
 			evidence := singleCase.Group("/evidence")
 			{
