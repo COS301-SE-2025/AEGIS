@@ -4,6 +4,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"fmt"
 	"log"
+	"gorm.io/gorm"
 
 )
 
@@ -25,6 +26,16 @@ func NewRegistrationService(repo UserRepository) *RegistrationService {
 // Register takes in a RegistrationRequest DTO, hashes the password,
 // builds a domain model, converts it to an entity, and saves it via the repository.
 func (s *RegistrationService) Register(req RegistrationRequest) (User, error) {
+	//  Check for existing user first
+	existingUser, err := s.repo.GetUserByEmail(req.Email)
+	if err == nil && existingUser != nil {
+		return User{}, fmt.Errorf("user already exists")
+	}
+	// Only allow continue if error is "not found"
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return User{}, err
+	}
+	
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Printf(" Registration failed (hash error) for %s: %v", req.Email, err)

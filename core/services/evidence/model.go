@@ -20,6 +20,14 @@ type Evidence struct {
 	Tags       []Tag             `gorm:"many2many:evidence_tags;constraint:OnDelete:CASCADE"` // Association
 }
 
+type EvidenceFile struct {
+	Filename string
+	FileType string
+	IpfsCID  string
+	Content  []byte
+}
+
+
 func (Evidence) TableName() string {
 	return "evidence"
 }

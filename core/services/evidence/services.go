@@ -1,7 +1,7 @@
 package evidence
 
 import (
-	"aegis-api/db"
+	//"aegis-api/db"
 	"fmt"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -9,24 +9,52 @@ import (
 	"time"
 )
 
-type Service struct{}
-
-func NewEvidenceService() *Service {
-	return &Service{}
+type Service struct {
+	ipfs   IPFSClient
+	repo   EvidenceRepository
+	logger EvidenceLogger
 }
+
+type IPFSClient interface {
+	Upload(path string) (string, error)
+	Download(cid string) ([]byte, error) 
+}
+
+
+type EvidenceRepository interface {
+	SaveEvidence(e *Evidence) error
+	AttachTags(e *Evidence, tags []string) error
+	FindByID(id uuid.UUID) (*Evidence, error)
+	DeleteByID(id uuid.UUID) error
+	FindByCase(caseID uuid.UUID) ([]Evidence, error) 
+	FindByUser(userID uuid.UUID) ([]Evidence, error)
+	PreloadMetadata(id uuid.UUID) (*Evidence, error)
+}
+
+
+
+type EvidenceLogger interface {
+	Log(userID, evidenceID, filename string) error
+}
+
+
+func NewEvidenceService(ipfs IPFSClient, repo EvidenceRepository, logger EvidenceLogger) *Service {
+	return &Service{ipfs: ipfs, repo: repo, logger: logger}
+}
+
+
 
 func (s *Service) UploadEvidence(req UploadEvidenceRequest) (*Evidence, error) {
 	caseID, err := uuid.Parse(req.CaseID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid case ID: %w", err)
 	}
-
 	userID, err := uuid.Parse(req.UploadedBy)
 	if err != nil {
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	evidence := Evidence{
+	e := &Evidence{
 		CaseID:     caseID,
 		UploadedBy: userID,
 		Filename:   req.Filename,
@@ -37,33 +65,17 @@ func (s *Service) UploadEvidence(req UploadEvidenceRequest) (*Evidence, error) {
 		Metadata:   req.Metadata,
 	}
 
-	// First insert the evidence
-	if err := db.DB.Create(&evidence).Error; err != nil {
-		return nil, fmt.Errorf("failed to store evidence: %w", err)
+	if err := s.repo.SaveEvidence(e); err != nil {
+		return nil, err
 	}
-
-	// Handle tags
-	if len(req.Tags) > 0 {
-		var tags []Tag
-		for _, tagName := range req.Tags {
-			tag := Tag{Name: tagName}
-			// Insert or fetch existing tag
-			if err := db.DB.FirstOrCreate(&tag, Tag{Name: tagName}).Error; err != nil {
-				return nil, fmt.Errorf("failed to store tag: %w", err)
-			}
-			tags = append(tags, tag)
-		}
-		if err := db.DB.Model(&evidence).Association("Tags").Append(&tags); err != nil {
-			return nil, fmt.Errorf("failed to link tags: %w", err)
-		}
+	if err := s.repo.AttachTags(e, req.Tags); err != nil {
+		return nil, err
 	}
-		// Log the upload to MongoDB
-	err = LogEvidenceUpload(userID.String(), evidence.ID.String(), evidence.Filename)
-	if err != nil {
+	if err := s.logger.Log(userID.String(), e.ID.String(), e.Filename); err != nil {
 		fmt.Printf("⚠️ Failed to log upload: %v\n", err)
 	}
 
-	return &evidence, nil
+	return e, nil
 }
 
 func (s *Service) ListEvidenceByCase(caseID string) ([]Evidence, error) {
@@ -72,12 +84,7 @@ func (s *Service) ListEvidenceByCase(caseID string) ([]Evidence, error) {
 		return nil, fmt.Errorf("invalid case ID: %w", err)
 	}
 
-	var results []Evidence
-	if err := db.DB.Where("case_id = ?", id).Find(&results).Error; err != nil {
-		return nil, err
-	}
-
-	return results, nil
+	return s.repo.FindByCase(id)
 }
 
 func (s *Service) ListEvidenceByUser(userID string) ([]Evidence, error) {
@@ -86,13 +93,9 @@ func (s *Service) ListEvidenceByUser(userID string) ([]Evidence, error) {
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	var results []Evidence
-	if err := db.DB.Where("uploaded_by = ?", id).Find(&results).Error; err != nil {
-		return nil, err
-	}
-
-	return results, nil
+	return s.repo.FindByUser(id)
 }
+
 
 func (s *Service) GetEvidenceByID(evidenceID string) (*Evidence, error) {
 	id, err := uuid.Parse(evidenceID)
@@ -100,32 +103,31 @@ func (s *Service) GetEvidenceByID(evidenceID string) (*Evidence, error) {
 		return nil, fmt.Errorf("invalid evidence ID: %w", err)
 	}
 
-	var ev Evidence
-	if err := db.DB.First(&ev, "id = ?", id).Error; err != nil {
+	ev, err := s.repo.FindByID(id) // 
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("evidence not found")
 		}
 		return nil, err
 	}
 
-	return &ev, nil
+	return ev, nil
 }
+
 func (s *Service) DeleteEvidenceByID(evidenceID string) error {
 	id, err := uuid.Parse(evidenceID)
 	if err != nil {
 		return fmt.Errorf("invalid evidence ID: %w", err)
 	}
 
-	result := db.DB.Delete(&Evidence{}, "id = ?", id)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("evidence not found")
+	err = s.repo.DeleteByID(id) // now using mockable interface
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
+
 
 func (s *Service) GetEvidenceMetadata(evidenceID string) (*EvidenceMetadata, error) {
 	id, err := uuid.Parse(evidenceID)
@@ -133,10 +135,12 @@ func (s *Service) GetEvidenceMetadata(evidenceID string) (*EvidenceMetadata, err
 		return nil, fmt.Errorf("invalid evidence ID: %w", err)
 	}
 
-	var ev Evidence
-	if err := db.DB.Preload("Tags").First(&ev, "id = ?", id).Error; err != nil {
-		return nil, fmt.Errorf("evidence not found")
-	}
+	ev, err := s.repo.PreloadMetadata(id)
+
+	if err != nil {
+	return nil, fmt.Errorf("evidence not found")
+}
+
 
 	var tagNames []string
 	for _, tag := range ev.Tags {
@@ -158,4 +162,36 @@ func (s *Service) GetEvidenceMetadata(evidenceID string) (*EvidenceMetadata, err
 	}
 
 	return metadata, nil
+}
+func (s *Service) DownloadEvidenceByUser(userID string) ([]EvidenceFile, error) {
+    // 1) Parse the incoming string
+    id, err := uuid.Parse(userID)
+    if err != nil {
+        return nil, fmt.Errorf("invalid user ID: %w", err)
+    }
+
+    // 2) Fetch metadata records from Postgres
+    records, err := s.repo.FindByUser(id)
+    if err != nil {
+        return nil, err
+    }
+
+    // 3) For each record, download from IPFS
+    var out []EvidenceFile
+    for _, ev := range records {
+        blob, err := s.ipfs.Download(ev.IpfsCID)
+        if err != nil {
+            // optional: log and skip
+            _ = s.logger.Log(userID, ev.ID.String(), "ipfs download failed")
+            continue
+        }
+        out = append(out, EvidenceFile{
+            Filename: ev.Filename,
+            FileType: ev.FileType,
+            IpfsCID:  ev.IpfsCID,
+            Content:  blob,
+        })
+    }
+
+    return out, nil
 }
