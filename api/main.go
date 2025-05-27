@@ -1,7 +1,7 @@
 package main
 
 import (
-	database "aegis-ap
+	database "aegis-api/db"
 	"aegis-api/routes"
 	"log"
 )
