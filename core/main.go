@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"log"
 	"net/http"
 	//"aegis-api/router"
@@ -11,7 +12,8 @@ import (
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, `{"status": "UP"}`)
+
+	//_, _ = fmt.Fprintf(w, `{"status": "UP"}`)
 }
 
 func main() {
@@ -27,5 +29,6 @@ func main() {
 	fmt.Println("✅ Server running on http://localhost:8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("❌ Server failed: %v", err)
+
 	}
 }

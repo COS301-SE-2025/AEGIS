@@ -2,6 +2,7 @@ module aegis-api
 
 go 1.24.3
 
+
 require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
@@ -68,5 +69,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/mysql v1.5.6 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
+
 
 )

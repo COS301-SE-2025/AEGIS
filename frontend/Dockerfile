@@ -1,4 +1,5 @@
-# core/Dockerfile
+
+# frontend/Dockerfile
 
 
 # Use Node image
@@ -14,8 +15,9 @@ RUN npm install
 # Copy entire project
 COPY . .
 
-# Start the dev server
-CMD ["npm", "start"]
+# Start Vite dev server
+CMD ["npm", "run", "dev"]
 
-# Expose port 3000
-EXPOSE 3000
+# Expose Vite's default port
+EXPOSE 5173
+
