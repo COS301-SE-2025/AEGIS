@@ -41,7 +41,6 @@ type CaseServiceInterface interface {
 	CreateCase(c *gin.Context)
 	GetCase(c *gin.Context)
 	UpdateCase(c *gin.Context)
-	AssignCase(c *gin.Context)
 	GetCollaborators(c *gin.Context)
 	CreateCollaborator(c *gin.Context)
 	RemoveCollaborator(c *gin.Context)
@@ -579,42 +578,6 @@ func (m MockCaseService) UpdateCase(c *gin.Context) {
 	})
 }
 
-func (m MockCaseService) AssignCase(c *gin.Context) {
-	caseID := c.Param("id")
-	if caseID == "" {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "Case ID is required",
-		})
-		return
-	}
-
-	var req structs.AssignCaseRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "Invalid assignment data",
-			Details: err.Error(),
-		})
-		return
-	}
-
-	//err := m.caseService.AssignCase(caseID, req)
-	//if err != nil {
-	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-	//		Error:   "assignment_failed",
-	//		Message: "Could not assign case",
-	//		Details: err.Error(),
-	//	})
-	//	return
-	//}
-
-	c.JSON(http.StatusOK, structs.SuccessResponse{
-		Success: true,
-		Message: "Case assigned successfully",
-	})
-}
-
 func (m MockCaseService) GetCollaborators(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
@@ -672,7 +635,7 @@ func (m MockCaseService) CreateCollaborator(c *gin.Context) {
 		return
 	}
 
-	//err := m.caseService.AddCollaborator(caseID, req)
+	//err := m.caseService.AddCollaborator(caseID, req) //or assignCase
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 	//		Error:   "collaborator_creation_failed",

@@ -47,17 +47,6 @@ func SetUpRouter() *gin.Engine {
 		admin.GET("/roles", h.AdminService.GetRoles)
 		//admin.GET("/audit-logs", h.AdminService.getAuditLogs)
 		//dashboard stuff
-
-		case_ := admin.Group("/cases")
-		{
-			case_.GET("", h.CaseService.GetCases) //get all* the cases on the system - access??????
-			case_.POST("", h.CaseService.CreateCase)
-			//case_.GET("/:id", h.CaseService.GetCase) //get a specific case by id
-			case_.PUT("/:id", h.CaseService.UpdateCase)
-			//case_.DELETE("/:id", h.CaseService.DeleteCase)
-			//case_.GET("/:id/collaborators", h.CaseService.GetCollaborators)
-			case_.POST("/:id/collaborators", h.CaseService.CreateCollaborator)
-		}
 	}
 
 	//auth
@@ -83,15 +72,20 @@ func SetUpRouter() *gin.Engine {
 	//cases
 	cases := api.Group("/cases")
 	{
-		cases.GET("", h.CaseService.GetCases) //support for pagination, filtering, etc.
-		//cases.POST("/", h.CaseService.CreateCase)
+		cases.GET("", h.CaseService.GetCases)    //support for pagination, filtering, etc.
+		cases.POST("", h.CaseService.CreateCase) //admin only
 
 		//case-specific routes
 		singleCase := cases.Group("/:id")
 		{
 			// ?case_id
-			singleCase.GET("", h.CaseService.GetCase)
-			singleCase.PUT("", h.CaseService.UpdateCase)
+			singleCase.GET("", h.CaseService.GetCase)    //get a specific case by id
+			singleCase.PUT("", h.CaseService.UpdateCase) //admin only
+
+			//cases.DELETE("", h.CaseService.DeleteCase)
+
+			cases.POST("/collaborators", h.CaseService.CreateCollaborator)
+			cases.DELETE("/collaborators/:collaborator_id", h.CaseService.RemoveCollaborator)
 
 			//collaborators
 			singleCase.GET("/collaborators", h.CaseService.GetCollaborators)
@@ -102,7 +96,6 @@ func SetUpRouter() *gin.Engine {
 			{
 				evidence.GET("", h.EvidenceService.GetEvidence) //evidence under a specific case
 				evidence.POST("", h.EvidenceService.UploadEvidence)
-				//evidence.GET("/user") get evidence uploaded by a specific user
 
 				//evidence specific to a single case
 				evidenceItem := evidence.Group("/:e_id")
