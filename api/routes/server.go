@@ -2,6 +2,7 @@ package routes
 
 import (
 	"aegis-core/handlers"
+	"aegis-core/middleware"
 	"fmt"
 	"github.com/gin-gonic/gin"
 )
@@ -10,6 +11,10 @@ import (
 func SetUpRouter() *gin.Engine {
 	router := gin.Default()
 	//h := handlers.NewHandler()
+
+	router.Use(gin.Logger()) //middleware for logging requests
+	fmt.Println()
+	//router.Use(gin.Recovery())              //middleware for recovering from panics
 
 	h := handlers.NewHandler(
 		handlers.MockAdminService{},
@@ -34,21 +39,6 @@ func SetUpRouter() *gin.Engine {
 	//routes group
 	api := router.Group("/api/v1")
 
-	//admin
-	admin := api.Group("/admin")
-	{
-		admin.POST("/users", h.AdminService.RegisterUser)
-		admin.GET("/users", h.AdminService.ListUsers)
-		admin.GET("/users/:user_id", h.AdminService.GetUserActivity)
-		admin.PUT("/users/:user_id", h.AdminService.UpdateUserRole)
-		admin.DELETE("/users/:user_id", h.AdminService.DeleteUser)
-
-		// roles
-		admin.GET("/roles", h.AdminService.GetRoles)
-		//admin.GET("/audit-logs", h.AdminService.getAuditLogs)
-		//dashboard stuff
-	}
-
 	//auth
 	auth := api.Group("/auth")
 	{
@@ -67,53 +57,71 @@ func SetUpRouter() *gin.Engine {
 		// auth.POST("/refresh-token", authService.refreshToken)
 	}
 
-	//api.GET("/cases", h.CaseService.GetCases)
-
-	//cases
-	cases := api.Group("/cases")
+	protected := api.Group("")
+	protected.Use(middleware.AuthMiddleware())
 	{
-		cases.GET("", h.CaseService.GetCases)    //support for pagination, filtering, etc.
-		cases.POST("", h.CaseService.CreateCase) //admin only
-
-		//case-specific routes
-		singleCase := cases.Group("/:id")
+		//admin (protected)
+		admin := protected.Group("/admin")
+		admin.Use(middleware.RequireRole("Admin"))
 		{
-			// ?case_id
-			singleCase.GET("", h.CaseService.GetCase)    //get a specific case by id
-			singleCase.PUT("", h.CaseService.UpdateCase) //admin only
+			admin.POST("/users", h.AdminService.RegisterUser)
+			admin.GET("/users", h.AdminService.ListUsers)
+			admin.GET("/users/:user_id", h.AdminService.GetUserActivity)
+			admin.PUT("/users/:user_id", h.AdminService.UpdateUserRole)
+			admin.DELETE("/users/:user_id", h.AdminService.DeleteUser)
 
-			//cases.DELETE("", h.CaseService.DeleteCase)
+			// roles
+			admin.GET("/roles", h.AdminService.GetRoles)
+			//admin.GET("/audit-logs", h.AdminService.getAuditLogs)
+			//dashboard stuff
+		}
 
-			cases.POST("/collaborators", h.CaseService.CreateCollaborator)
-			cases.DELETE("/collaborators/:collaborator_id", h.CaseService.RemoveCollaborator)
+		user := protected.Group("/user")
+		{
+			user.GET("/me", h.UserService.GetUserInfo)
+			user.PUT("/me", h.UserService.UpdateUserInfo)
+		}
 
-			//collaborators
-			singleCase.GET("/collaborators", h.CaseService.GetCollaborators)
+		//cases
+		cases := protected.Group("/cases")
+		{
+			cases.GET("", h.CaseService.GetCases)                                     //support for pagination, filtering, etc.
+			cases.POST("", middleware.RequireRole("Admin"), h.CaseService.CreateCase) //admin only --adjust***
 
-			//singleCase.GET("/timeline", h.CaseService.GetTimeline) later
-
-			evidence := singleCase.Group("/evidence")
+			//case-specific routes
+			singleCase := cases.Group("/:id")
 			{
-				evidence.GET("", h.EvidenceService.GetEvidence) //evidence under a specific case
-				evidence.POST("", h.EvidenceService.UploadEvidence)
+				// ?case_id
+				singleCase.GET("", h.CaseService.GetCase)                                     //get a specific case by id
+				singleCase.PUT("", middleware.RequireRole("Admin"), h.CaseService.UpdateCase) //admin only
 
-				//evidence specific to a single case
-				evidenceItem := evidence.Group("/:e_id")
+				//cases.DELETE("", h.CaseService.DeleteCase)
+
+				singleCase.POST("/collaborators", middleware.RequireRole("Admin"), h.CaseService.CreateCollaborator)
+				singleCase.DELETE("/collaborators/:user", middleware.RequireRole("Admin"), h.CaseService.RemoveCollaborator)
+
+				//collaborators
+				singleCase.GET("/collaborators", h.CaseService.GetCollaborators)
+
+				//singleCase.GET("/timeline", h.CaseService.GetTimeline) later
+
+				evidence := singleCase.Group("/evidence")
 				{
-					evidenceItem.GET("", h.EvidenceService.GetEvidenceItem)
-					evidenceItem.GET("/preview", h.EvidenceService.PreviewEvidence)
-					//evidenceItem.POST("/annotations", h.EvidenceService.AddAnnotation)
-					//evidenceItem.GET("/annotations", h.EvidenceService.GetAnnotations)
+					evidence.GET("", h.EvidenceService.GetEvidence) //evidence under a specific case
+					evidence.POST("", h.EvidenceService.UploadEvidence)
+
+					//evidence specific to a single case
+					evidenceItem := evidence.Group("/:e_id")
+					{
+						evidenceItem.GET("", h.EvidenceService.GetEvidenceItem)
+						evidenceItem.GET("/preview", h.EvidenceService.PreviewEvidence)
+						//evidenceItem.POST("/annotations", h.EvidenceService.AddAnnotation)
+						//evidenceItem.GET("/annotations", h.EvidenceService.GetAnnotations)
+					}
 				}
 			}
 		}
-	}
 
-	user := api.Group("/user")
-	{
-		user.GET("/me", h.UserService.GetUserInfo)
-		user.PUT("/me", h.UserService.UpdateUserInfo)
 	}
-
 	return router
 }
