@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
 	"aegis-api/mock"
 	"aegis-api/models"
 	"aegis-api/services/Evidence_Viewer"
