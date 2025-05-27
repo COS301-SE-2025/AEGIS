@@ -4,6 +4,9 @@ import (
 	"time"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
+	//"errors"
+
 )
 
 type Evidence struct {
@@ -27,6 +30,12 @@ type EvidenceFile struct {
 	Content  []byte
 }
 
+func (e *Evidence) BeforeCreate(tx *gorm.DB) error {
+    if e.ID == uuid.Nil {
+        e.ID = uuid.New()
+    }
+    return nil
+}
 
 func (Evidence) TableName() string {
 	return "evidence"

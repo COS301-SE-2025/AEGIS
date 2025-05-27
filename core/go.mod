@@ -12,6 +12,7 @@ require (
 	golang.org/x/crypto v0.37.0
 	gorm.io/datatypes v1.2.5
 	gorm.io/driver/postgres v1.5.11
+	gorm.io/driver/sqlite v1.4.3
 	gorm.io/gorm v1.26.1
 )
 
@@ -38,6 +39,7 @@ require (
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p v0.26.3 // indirect
+	github.com/mattn/go-sqlite3 v1.14.15 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
