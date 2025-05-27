@@ -1,6 +1,6 @@
 package router
 
-import (
+/*import (
 	"log"
 	"net/http"
  	"aegis-api/services/registration"
@@ -9,7 +9,7 @@ import (
 
 	"aegis-api/db"
 
-)
+)*/
 
 func StartServer() {
 	
