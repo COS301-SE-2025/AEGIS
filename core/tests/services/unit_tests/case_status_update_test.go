@@ -1,4 +1,4 @@
-package case_status_update_test
+package unit_tests
 
 import (
 	"errors"
