@@ -1,4 +1,6 @@
+
 # frontend/Dockerfile
+
 
 # Use Node image
 FROM node:18
@@ -18,3 +20,4 @@ CMD ["npm", "run", "dev"]
 
 # Expose Vite's default port
 EXPOSE 5173
+

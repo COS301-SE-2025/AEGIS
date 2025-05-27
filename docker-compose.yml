@@ -1,8 +1,13 @@
+
+version: "3.8"
+
+
 services:
   frontend:
     build:
       context: ./frontend
     ports:
+
       - "3001:5173"
     volumes:
       - ./frontend:/app
@@ -10,7 +15,7 @@ services:
     environment:
       - NODE_ENV=development
       - VITE_API_URL=http://localhost:8080
-    depends_on:
+
       - backend
 
   backend:
@@ -66,4 +71,6 @@ volumes:
   postgres_data:
   mongo_data:
   ipfs_data:
+
   frontend_node_modules:
+
