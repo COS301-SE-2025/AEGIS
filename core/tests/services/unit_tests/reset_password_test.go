@@ -15,7 +15,7 @@ import (
 // ─────────────────────────────────────────────
 
 type MockTokenRepo struct{ mock.Mock }
-type MockUserRepo struct{ mock.Mock }
+//type MockUserRepo struct{ mock.Mock }
 type MockEmailSender struct{ mock.Mock }
 
 func (m *MockTokenRepo) CreateToken(userID uuid.UUID, token string, expiresAt time.Time) error {
