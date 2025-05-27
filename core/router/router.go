@@ -1,5 +1,13 @@
 package router
 
+
+/*import (
+	"log"
+	"net/http"
+ 	"aegis-api/services/registration"
+	"aegis-api/services/login/auth"
+	"aegis-api/services/case_creation"
+
 // import (
 // 	"log"
 // 	"net/http"
@@ -7,9 +15,14 @@ package router
 // 	"aegis-api/services/login/auth"
 // 	"aegis-api/services/case_creation"
 
+
 // 	"aegis-api/db"
 
+
+)*/
+
 // )
+
 
 // func StartServer() {
 	
