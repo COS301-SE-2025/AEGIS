@@ -10,3 +10,5 @@ out/
 .idea/
 .vscode/
 .DS_Store
+
+/api/docs/

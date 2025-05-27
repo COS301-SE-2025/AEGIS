@@ -1,10 +1,13 @@
 package routes
 
 import (
+	_ "aegis-core/docs"
 	"aegis-core/handlers"
 	"aegis-core/middleware"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // mock service structs
@@ -123,5 +126,7 @@ func SetUpRouter() *gin.Engine {
 		}
 
 	}
+
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	return router
 }
