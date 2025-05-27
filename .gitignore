@@ -76,7 +76,6 @@ out/
 # Editor directories and files
 .idea/
 .vscode/
-
 .DS_Store
 
-
+/api/docs/

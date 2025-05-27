@@ -77,6 +77,16 @@ func NewHandler(
 
 type MockAdminService struct{}
 
+// @Summary Register a new user
+// @Description Registers a new user with the provided details. Only users with 'Admin' role can perform this action.
+// @Tags Admin
+// @Accept  json
+// @Produce  json
+// @Param   request body structs.RegisterUserRequest true "User Registration Request"
+// @Success 201 {object} structs.SuccessResponse{data=structs.User} "User registered successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/admin/users [post]
 func (m MockAdminService) RegisterUser(c *gin.Context) {
 	//struct to hold user data
 	//binding and validation
@@ -117,6 +127,19 @@ func (m MockAdminService) RegisterUser(c *gin.Context) {
 	})
 }
 
+// @Summary List all users
+// @Description Retrieves a list of all registered users. Supports filtering by role, status, and creation date range.
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param role query string false "Filter users by role (e.g., 'Forensic Analyst')"
+// @Param status query string false "Filter users by status (e.g., 'active', 'inactive')"
+// @Param start_date query string false "Filter users created after this date (YYYY-MM-DD)"
+// @Param end_date query string false "Filter users created before this date (YYYY-MM-DD)"
+// @Success 200 {object} structs.SuccessResponse{data=[]structs.User} "Users retrieved successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid query parameters"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/admin/users [get]
 func (m MockAdminService) ListUsers(c *gin.Context) {
 	//binding and validation
 	var req structs.UserFilter
@@ -164,6 +187,16 @@ func (m MockAdminService) ListUsers(c *gin.Context) {
 	})
 }
 
+// @Summary Get user activity
+// @Description Retrieves the activity log for a specific user.
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param user_id path string true "User ID"
+// @Success 200 {object} structs.SuccessResponse{data=[]structs.UserActivity} "User activity retrieved successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing user ID)"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/admin/users/{user_id} [get]
 func (m MockAdminService) GetUserActivity(c *gin.Context) {
 	// Get user ID from URL parameter
 	userID := c.Param("user_id")
@@ -210,6 +243,17 @@ func (m MockAdminService) GetUserActivity(c *gin.Context) {
 	})
 }
 
+// @Summary Update a user's role
+// @Description Updates the role of a specific user. Only 'Admin' can perform this action.
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param user_id path string true "User ID"
+// @Param request body structs.UpdateUserRoleRequest true "User Role Update Request"
+// @Success 200 {object} structs.SuccessResponse "User role updated successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload or user ID"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/admin/users/{user_id} [put]
 func (m MockAdminService) UpdateUserRole(c *gin.Context) {
 	userID := c.Param("user_id")
 	if userID == "" {
@@ -246,6 +290,16 @@ func (m MockAdminService) UpdateUserRole(c *gin.Context) {
 	})
 }
 
+// @Summary Delete a user
+// @Description Deletes a specific user from the system. Only 'Admin' can perform this action.
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param user_id path string true "User ID"
+// @Success 200 {object} structs.SuccessResponse "User deleted successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing user ID)"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/admin/users/{user_id} [delete]
 func (m MockAdminService) DeleteUser(c *gin.Context) {
 	// Get user ID from URL parameter
 	userID := c.Param("user_id")
@@ -273,6 +327,14 @@ func (m MockAdminService) DeleteUser(c *gin.Context) {
 	})
 }
 
+// @Summary Get all user roles
+// @Description Retrieves a list of all available user roles and their associated permissions.
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Success 200 {object} structs.SuccessResponse{data=[]structs.UserRole} "Roles retrieved successfully"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/admin/roles [get]
 func (m MockAdminService) GetRoles(c *gin.Context) {
 	//roles, err := m.adminService.GetRoles()
 	//if err != nil {
@@ -300,6 +362,16 @@ func (m MockAdminService) GetRoles(c *gin.Context) {
 
 type MockAuthService struct{}
 
+// @Summary User login
+// @Description Authenticates a user and returns a token upon successful login.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body structs.LoginRequest true "User Login Credentials"
+// @Success 200 {object} structs.SuccessResponse{data=structs.LoginResponse} "Login successful"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload or credentials"
+// @Failure 401 {object} structs.ErrorResponse "Authentication failed (invalid credentials)"
+// @Router /api/v1/auth/login [post]
 func (m MockAuthService) Login(c *gin.Context) {
 	var req structs.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -338,6 +410,16 @@ func (m MockAuthService) Login(c *gin.Context) {
 	})
 }
 
+// @Summary User logout
+// @Description Logs out the currently authenticated user by invalidating their session or token. Requires authentication.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse "Logged out successfully"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized (user not authenticated)"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/auth/logout [post]
 func (m MockAuthService) Logout(c *gin.Context) {
 	_, exists := c.Get("userID") //_ -> userID
 	if !exists {
@@ -364,6 +446,16 @@ func (m MockAuthService) Logout(c *gin.Context) {
 	})
 }
 
+// @Summary Request password reset
+// @Description Initiates the password reset process by sending a reset email to the user's registered email address.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body structs.ResetPasswordRequest true "Password Reset Request"
+// @Success 200 {object} structs.SuccessResponse "Password reset email sent successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload (e.g., malformed email)"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/auth/password-reset [post]
 func (m MockAuthService) ResetPassword(c *gin.Context) {
 	var req structs.ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -393,6 +485,22 @@ func (m MockAuthService) ResetPassword(c *gin.Context) {
 
 type MockCaseService struct{}
 
+// @Summary Get all cases
+// @Description Retrieves a paginated and filterable list of security cases.
+// @Tags Cases
+// @Accept json
+// @Produce json
+// @Param status query string false "Filter cases by status (e.g., 'open', 'closed')"
+// @Param start_date query string false "Filter cases created after this date (YYYY-MM-DD)"
+// @Param end_date query string false "Filter cases created before this date (YYYY-MM-DD)"
+// @Param page query int false "Page number for pagination (default: 1)" default(1)
+// @Param page_size query int false "Number of items per page (default: 10, max: 100)" default(10)
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse{data=[]structs.Case} "Cases retrieved successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid query parameters"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases [get]
 func (m MockCaseService) GetCases(c *gin.Context) {
 	var filter structs.CaseFilter
 	if err := c.ShouldBindQuery(&filter); err != nil {
@@ -459,6 +567,19 @@ func (m MockCaseService) GetCases(c *gin.Context) {
 	})
 }
 
+// @Summary Create a new case
+// @Description Creates a new security case. Requires 'Admin' role.
+// @Tags Cases
+// @Accept json
+// @Produce json
+// @Param request body structs.CreateCaseRequest true "Case Creation Request"
+// @Security ApiKeyAuth
+// @Success 201 {object} structs.SuccessResponse{data=structs.Case} "Case created successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden (insufficient role)"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases [post]
 func (m MockCaseService) CreateCase(c *gin.Context) {
 	var req structs.CreateCaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -506,6 +627,19 @@ func (m MockCaseService) CreateCase(c *gin.Context) {
 	})
 }
 
+// @Summary Get a specific case
+// @Description Retrieves details of a single security case by its ID.
+// @Tags Cases
+// @Accept json
+// @Produce json
+// @Param id path string true "Case ID"
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse{data=structs.Case} "Case retrieved successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing case ID)"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 404 {object} structs.ErrorResponse "Case not found"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/{id} [get]
 func (m MockCaseService) GetCase(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
@@ -542,6 +676,21 @@ func (m MockCaseService) GetCase(c *gin.Context) {
 	})
 }
 
+// @Summary Update a case
+// @Description Updates the details of an existing security case. Requires 'Admin' role.
+// @Tags Cases
+// @Accept json
+// @Produce json
+// @Param id path string true "Case ID"
+// @Param request body structs.UpdateCaseRequest true "Case Update Request"
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse "Case updated successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload or case ID"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden (insufficient role)"
+// @Failure 404 {object} structs.ErrorResponse "Case not found"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/{id} [put]
 func (m MockCaseService) UpdateCase(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
@@ -578,6 +727,19 @@ func (m MockCaseService) UpdateCase(c *gin.Context) {
 	})
 }
 
+// @Summary Get case collaborators
+// @Description Retrieves a list of users collaborating on a specific case.
+// @Tags Cases
+// @Accept json
+// @Produce json
+// @Param id path string true "Case ID"
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse{data=[]structs.User} "Collaborators retrieved successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing case ID)"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 404 {object} structs.ErrorResponse "Case not found"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/{id}/collaborators [get]
 func (m MockCaseService) GetCollaborators(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
@@ -615,6 +777,21 @@ func (m MockCaseService) GetCollaborators(c *gin.Context) {
 	})
 }
 
+// @Summary Add a collaborator to a case
+// @Description Adds a user as a collaborator to a specific case. Requires 'Admin' role.
+// @Tags Cases
+// @Accept json
+// @Produce json
+// @Param id path string true "Case ID"
+// @Param request body structs.User true "Collaborator Details"
+// @Security ApiKeyAuth
+// @Success 201 {object} structs.SuccessResponse "Collaborator added successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload or case ID"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden (insufficient role)"
+// @Failure 404 {object} structs.ErrorResponse "Case not found"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/{id}/collaborators [post]
 func (m MockCaseService) CreateCollaborator(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
@@ -651,6 +828,21 @@ func (m MockCaseService) CreateCollaborator(c *gin.Context) {
 	})
 }
 
+// @Summary Remove a collaborator from a case
+// @Description Removes a user from the list of collaborators on a specific case. Requires 'Admin' role.
+// @Tags Cases
+// @Accept json
+// @Produce json
+// @Param id path string true "Case ID"
+// @Param user path string true "User ID of the collaborator to remove"
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse "Collaborator removed successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing IDs)"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden (insufficient role)"
+// @Failure 404 {object} structs.ErrorResponse "Case or user not found"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/{id}/collaborators/{user} [delete]
 func (m MockCaseService) RemoveCollaborator(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
@@ -688,6 +880,23 @@ func (m MockCaseService) RemoveCollaborator(c *gin.Context) {
 
 type MockEvidenceService struct{}
 
+// @Summary Get evidence for a case
+// @Description Retrieves a list of evidence items associated with a specific security case. Supports filtering.
+// @Tags Evidence
+// @Accept json
+// @Produce json
+// @Param id path string true "Case ID"
+// @Param type query string false "Filter evidence by type (e.g., 'image', 'document', 'application/pdf')"
+// @Param uploaded_by query string false "Filter evidence by the user who uploaded it (User ID)"
+// @Param start_date query string false "Filter evidence uploaded after this date (YYYY-MM-DD)"
+// @Param end_date query string false "Filter evidence uploaded before this date (YYYY-MM-DD)"
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse{data=[]structs.EvidenceItem} "Evidence retrieved successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request parameters (e.g., missing case ID, invalid query)"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 404 {object} structs.ErrorResponse "Case not found"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/{id}/evidence [get]
 func (m MockEvidenceService) GetEvidence(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
@@ -736,6 +945,21 @@ func (m MockEvidenceService) GetEvidence(c *gin.Context) {
 	})
 }
 
+// @Summary Upload evidence to a case
+// @Description Uploads a new evidence file to a specified security case.
+// @Tags Evidence
+// @Accept mpfd
+// @Produce json
+// @Param id path string true "Case ID"
+// @Param file formData file true "Evidence file to upload (max 10GB)"
+// @Param description formData string false "Optional description for the evidence file"
+// @Security ApiKeyAuth
+// @Success 201 {object} structs.SuccessResponse{data=structs.EvidenceItem} "Evidence uploaded successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing file, invalid case ID, file too large)"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden (insufficient role)"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/{id}/evidence [post]
 func (m MockEvidenceService) UploadEvidence(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
@@ -799,6 +1023,20 @@ func (m MockEvidenceService) UploadEvidence(c *gin.Context) {
 	})
 }
 
+// @Summary Get a specific evidence item
+// @Description Retrieves details of a single evidence item by its ID within a specific case.
+// @Tags Evidence
+// @Accept json
+// @Produce json
+// @Param id path string true "Case ID"
+// @Param e_id path string true "Evidence Item ID"
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse{data=structs.EvidenceItem} "Evidence item retrieved successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing IDs)"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 404 {object} structs.ErrorResponse "Case or evidence item not found"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/{id}/evidence/{e_id} [get]
 func (m MockEvidenceService) GetEvidenceItem(c *gin.Context) {
 	caseID := c.Param("id")
 	evidenceID := c.Param("e_id")
@@ -836,6 +1074,20 @@ func (m MockEvidenceService) GetEvidenceItem(c *gin.Context) {
 	})
 }
 
+// @Summary Get evidence preview
+// @Description Generates a preview for a specific evidence item.
+// @Tags Evidence
+// @Accept json
+// @Produce json
+// @Param id path string true "Case ID"
+// @Param e_id path string true "Evidence Item ID"
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse{data=structs.EvidencePreview} "Evidence preview generated successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing IDs)"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 404 {object} structs.ErrorResponse "Case or evidence item not found"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/{id}/evidence/{e_id}/preview [get]
 func (m MockEvidenceService) PreviewEvidence(c *gin.Context) {
 	caseID := c.Param("id")
 	evidenceID := c.Param("e_id")
@@ -874,6 +1126,16 @@ func (m MockEvidenceService) PreviewEvidence(c *gin.Context) {
 
 type MockUserService struct{}
 
+// @Summary Get current user's information
+// @Description Retrieves the detailed profile information for the authenticated user.
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse{data=structs.User} "User information retrieved successfully"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized (user not authenticated)"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/user/info [get]
 func (m MockUserService) GetUserInfo(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
@@ -909,6 +1171,18 @@ func (m MockUserService) GetUserInfo(c *gin.Context) {
 	})
 }
 
+// @Summary Update current user's information
+// @Description Updates the profile details (e.g., name, email) for the authenticated user.
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param request body structs.UpdateUserInfoRequest true "User Info Update Request"
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse "User information updated successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/user/info [put]
 func (m MockUserService) UpdateUserInfo(c *gin.Context) {
 	_, exists := c.Get("userID") // _ -> userID
 	if !exists {
@@ -945,6 +1219,16 @@ func (m MockUserService) UpdateUserInfo(c *gin.Context) {
 	})
 }
 
+// @Summary Get cases assigned to the current user
+// @Description Retrieves a list of security cases that the authenticated user is involved in.
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} structs.SuccessResponse{data=[]structs.Case} "User cases retrieved successfully"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/user/cases [get]
 func (m MockUserService) GetUserCases(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
