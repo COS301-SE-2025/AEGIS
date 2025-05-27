@@ -1,7 +1,7 @@
 package services
 
 //stub service layer functions
-import "aegis-core/structs"
+import "aegis-api/structs"
 
 // AuthService handles authentication operations
 type AuthService interface {

@@ -1,9 +1,9 @@
 package routes
 
 import (
-	_ "aegis-core/docs"
-	"aegis-core/handlers"
-	"aegis-core/middleware"
+	_ "aegis-api/docs"
+	"aegis-api/handlers"
+	"aegis-api/middleware"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"

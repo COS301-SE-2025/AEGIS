@@ -4,7 +4,7 @@ import (
 	//"strconv"
 
 	//"aegis-core/services"
-	"aegis-core/structs"
+	"aegis-api/structs"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"time"

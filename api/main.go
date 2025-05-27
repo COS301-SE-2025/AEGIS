@@ -1,7 +1,8 @@
 package main
 
 import (
-	"aegis-core/routes"
+	database "aegis-ap
+	"aegis-api/routes"
 	"log"
 )
 
@@ -17,6 +18,10 @@ import (
 // @in                          header
 // @name                        Authorization
 func main() {
+
+	if err := database.InitDB(); err != nil {
+		log.Fatalf("Database connection failed: %v", err)
+	}
 	router := routes.SetUpRouter()
 
 	log.Println("Starting AEGIS server on :8080...")
