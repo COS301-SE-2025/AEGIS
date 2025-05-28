@@ -355,7 +355,7 @@ export const DashBoardPage = () => {
                 </div>
 
                  {/* Recent Activities Card */}
-            <div className="w-[550px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6 overflow-auto">
+            <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6 overflow-auto">
               <h2 className="font-bold text-white text-lg mb-4">Recent Activities</h2>
               <ul className="space-y-4">
                 {recentActivities.map((activity, index) => {
@@ -380,7 +380,7 @@ export const DashBoardPage = () => {
             </div>
           </div>
          
-          <div className="w-[1126px] h-[1700px] bg-[#19191F] border-[3px] border-[#393D47] rounded-[8px] mt-[30px] p-6">
+          <div className="w-[1105px] h-[1700px] bg-[#19191F] border-[3px] border-[#393D47] rounded-[8px] mt-[30px] p-6">
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-2">
           <button
