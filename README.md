@@ -58,3 +58,4 @@
     <td>- Contact us at <a href="mailto:bytesquad.capstone@gmail.com">capstone.incidentintel@gmail.com</a>.</td>
   </tr>
 </table> -->
+**A capstone project for Tyto Insights**
