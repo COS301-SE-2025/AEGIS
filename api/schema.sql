@@ -19,7 +19,7 @@ CREATE TYPE user_role AS ENUM (
     'Legal/Compliance Liaison', 
     'Detection Engineer', 
     'Generic user',
-    'Admin',
+    'Admin'
 );
 
 CREATE TYPE case_status AS ENUM ('open', 'under_review', 'closed');

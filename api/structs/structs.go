@@ -1,6 +1,9 @@
 package structs
 
-import "time"
+import (
+	"time"
+	"github.com/google/uuid"
+)
 
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
@@ -38,9 +41,21 @@ type CollaboratorInfo struct {
 	Role     string `json:"role"` // optional
 }
 
+// type CreateCaseRequest struct {
+// 	Title       string `json:"title" binding:"required"`
+// 	Description string `json:"description"`
+// }
+
+
+// CreateCaseRequest is what your handler will bind from JSON.
 type CreateCaseRequest struct {
-	Title       string `json:"title" binding:"required"`
-	Description string `json:"description"`
+    Title              string `json:"title" binding:"required"`
+    Description        string `json:"description"`
+    Status             string `json:"status"`
+    Priority           string `json:"priority"`
+    InvestigationStage string `json:"investigationStage"`
+    CreatedBy          string `json:"createdBy" binding:"required,uuid"`
+    TeamName           string `json:"teamName" binding:"required"`
 }
 
 type UpdateCaseRequest struct {
@@ -133,6 +148,11 @@ type CaseFilter struct {
 	EndDate   string `form:"end_date"`
 	Page      string `form:"page"`
 	PageSize  string `form:"page_size"`
+}
+type ResetTokenRepository interface {
+	CreateToken(userID uuid.UUID, token string, expiresAt time.Time) error
+	GetUserIDByToken(token string) (uuid.UUID, time.Time, error)
+	MarkTokenUsed(token string) error
 }
 
 // Error response structure

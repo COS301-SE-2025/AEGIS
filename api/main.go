@@ -12,6 +12,12 @@ import (
     "aegis-api/services/ListUsers"
     "aegis-api/services/update_user_role"
     "aegis-api/services/delete_user"
+	"aegis-api/services/login/auth"
+	"aegis-api/services/reset_password"
+    "aegis-api/services/case_creation"
+    //"aegis-api/middleware"
+   // "github.com/gin-gonic/gin"
+    "aegis-api/services/case_assign"
 )
 
 // @title AEGIS Platform API
@@ -26,56 +32,54 @@ import (
 // @in                          header
 // @name                        Authorization
 func main() {
-if err := database.InitDB(); err != nil {
-	log.Fatalf("Database connection failed: %v", err)
-}
+    if err := database.InitDB(); err != nil {
+        log.Fatalf("Database connection failed: %v", err)
+    }
 
-// Now database.DB should be initialized and non-nil
+    // Create repos
+    regRepo := registration.NewGormUserRepository(database.DB)
+    listUserRepo := ListUsers.NewUserRepository(database.DB)
+    updateRoleRepo := update_user_role.NewGormUserRepo(database.DB)
+    deleteUserRepo := delete_user.NewGormUserRepository(database.DB)
 
-// ...
+    resetTokenRepo := reset_password.NewGormResetTokenRepository(database.DB)
+    userRepo := registration.NewGormUserRepository(database.DB)
+    emailSender := reset_password.NewMockEmailSender()
 
-	  // 2. Build repositories
-    // ↳ Make sure these constructors exist in their packages!
-    regRepo         := registration.NewGormUserRepository(database.DB)         // or NewGormUserRepo
-    listUserRepo    := ListUsers.NewUserRepository(database.DB)
-    updateRoleRepo  := update_user_role.NewGormUserRepo(database.DB)
-    deleteUserRepo  := delete_user.NewGormUserRepository(database.DB)
-
-    // 3. Build services
-    regService      := registration.NewRegistrationService(regRepo)
+    // Services
+    regService := registration.NewRegistrationService(regRepo)
     listUserService := ListUsers.NewListUserService(listUserRepo)
-    updateRoleSvc   := update_user_role.NewUserService(updateRoleRepo)
-    deleteUserSvc   := delete_user.NewUserDeleteService(deleteUserRepo)
+    updateRoleService := update_user_role.NewUserService(updateRoleRepo)
+    deleteUserService := delete_user.NewUserDeleteService(deleteUserRepo)
 
-    // 4. Build your AdminService (implements AdminServiceInterface)
-    adminSvc := handlers.NewAdminService(
-        regService,
-        listUserService,
-        updateRoleSvc,
-        deleteUserSvc,
-    )
+    resetService := reset_password.NewPasswordResetService(resetTokenRepo, userRepo, emailSender)
+    authService := auth.NewAuthService(userRepo)
 
-    // 5. Build the other (mock or real) services
-    authSvc := &handlers.MockAuthService{}
-    caseSvc := &handlers.MockCaseService{}
-    evidSvc := &handlers.MockEvidenceService{}
-    userSvc := &handlers.MockUserService{}
+    adminService := handlers.NewAdminService(regService, listUserService, updateRoleService, deleteUserService)
+    authHandler := handlers.NewAuthHandler(authService, resetService)
 
-    // 6. Assemble the top-level Handler
-    handler := handlers.NewHandler(
-        adminSvc,
-        authSvc,
-        caseSvc,
-        evidSvc,
-        userSvc,
-    )
+    // Case repos and services
+    caseRepo := case_creation.NewGormCaseRepository(database.DB)
+    caseService := case_creation.NewCaseService(caseRepo)
 
-    // 7. Wire it into your router
+    caseAssignRepo := case_assign.NewGormCaseAssignmentRepo(database.DB)
+    caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo)
+
+    caseHandler := handlers.NewCaseHandler(caseService, caseAssignService)
+
+    evidenceService := &handlers.MockEvidenceService{}
+    userService := &handlers.MockUserService{}
+
+    // Build main handler struct
+    handler := handlers.NewHandler(adminService, authHandler, caseHandler, evidenceService, userService)
+
+    // Setup router from your routes package
     router := routes.SetUpRouter(handler)
-	log.Println("Starting AEGIS server on :8080...")
-	log.Println("Docs available at http://localhost:8080/swagger/index.html")
 
-	if err := router.Run(":8080"); err != nil {
-		log.Fatal("Failed to start server:", err)
-	}
+    log.Println("Starting AEGIS server on :8080...")
+    log.Println("Docs available at http://localhost:8080/swagger/index.html")
+
+    if err := router.Run(":8080"); err != nil {
+        log.Fatal("Failed to start server:", err)
+    }
 }

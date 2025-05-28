@@ -9,6 +9,10 @@ import (
 	//swaggerFiles "github.com/swaggo/files"
 		"aegis-api/handlers"
 	//ginSwagger "github.com/swaggo/gin-swagger"
+	"aegis-api/middleware"
+	"aegis-api/services/case_assign"
+	database "aegis-api/db"
+	"aegis-api/services/case_creation"
 )
 
 
@@ -30,6 +34,37 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
         admin.PUT("/users/:user_id", h.AdminService.UpdateUserRole)
         admin.DELETE("/users/:user_id", h.AdminService.DeleteUser)
     }
+
+		// 	admin.POST("/users", middleware.RequireRole("Admin"), h.AdminService.RegisterUser)
+		// admin.GET("/users", middleware.RequireRole("Admin"), h.AdminService.ListUsers)
+		// admin.PUT("/users/:user_id", middleware.RequireRole("Admin"), h.AdminService.UpdateUserRole)
+		// admin.DELETE("/users/:user_id", middleware.RequireRole("Admin"), h.AdminService.DeleteUser)
+	auth := api.Group("/auth")
+	{
+		auth.POST("/login", h.AuthService.LoginHandler)
+
+		//auth.POST("/logout", middleware.AuthMiddleware(), h.AuthService.LogoutHandler)
+		auth.POST("/password-reset", h.AuthService.ResetPasswordHandler)
+		// add logout, reset-password etc.
+	}
+caseRepo := case_creation.NewGormCaseRepository(database.DB)
+caseService := case_creation.NewCaseService(caseRepo)
+
+caseAssignmentRepo := case_assign.NewGormCaseAssignmentRepo(database.DB) // implement repo for case assignment
+caseAssignmentService := case_assign.NewCaseAssignmentService(caseAssignmentRepo)
+
+caseHandler := handlers.NewCaseHandler(caseService, caseAssignmentService)
+
+
+	  cases := api.Group("/cases", middleware.AuthMiddleware())
+    {
+        // POST /api/v1/cases → CreateCase handler
+        cases.POST("", h.CaseService.CreateCase)
+		cases.POST("/:case_id/collaborators", middleware.AuthMiddleware(), caseHandler.CreateCollaborator)
+
+    }
+
+		
 
 
 	return r
