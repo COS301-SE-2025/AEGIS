@@ -3,8 +3,10 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Link } from "react-router-dom";
-
+// @ts-ignore
+import useLoginForm from "./login";
 export const LoginPage = (): JSX.Element => {
+   const { formData, handleChange, handleSubmit, errors } = useLoginForm();
   const formFields = [
     {
       id: "email",
@@ -62,7 +64,7 @@ export const LoginPage = (): JSX.Element => {
                 </p>
 
                 {/* Form */}
-                <form className="w-full space-y-6">
+                <form className="w-full space-y-6"  onSubmit={handleSubmit}>
                   {formFields.map((field) => (
                     <div key={field.id} className="space-y-2 text-white">
                       <label
@@ -75,10 +77,17 @@ export const LoginPage = (): JSX.Element => {
                         id={field.id}
                         type={field.type}
                         placeholder={field.placeholder}
+                        value={formData[field.id]}
+                        onChange={handleChange}
                         className="h-[50px] rounded-[10px] border-white/40 bg-white/50 text-white placeholder-white/80"
                       />
+                      {errors[field.id] && (
+                        <p className="text-red-400 text-sm">{errors[field.id]}</p>)}
                     </div>
                   ))}
+                  {errors.general && (
+                    <p className="text-red-400 text-sm text-center">{errors.general}</p>
+                  )}
 
                   {/* Forgot password */}
                   <div className="flex justify-end">

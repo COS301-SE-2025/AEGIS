@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { ShieldPlus, UploadCloud } from "lucide-react";
+import axios from "axios";
+
 
 export function UploadEvidenceForm(): JSX.Element {
   const [files, setFiles] = useState<File[]>([]);
@@ -29,11 +31,26 @@ export function UploadEvidenceForm(): JSX.Element {
     setIsDragging(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const formData = new FormData();
+
+    formData.append("file", files[0]); // Assuming first selected file
+    formData.append("case_id", "123e4567-e89b-12d3-a456-426614174000"); 
+    formData.append("uploaded_by", "789e4567-e89b-12d3-a456-426614174111");
+
+    try {
+        const response = await axios.post("http://localhost:8080/api/v1", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+
+        console.log("Uploading files:", files);
+        console.log("Upload success:", response.data);
+    } catch (error) {
+        console.error("Upload error:", error);
+    }
+
     
-    // TODO: Upload logic
-    console.log("Uploading files:", files);
   };
 
   return (

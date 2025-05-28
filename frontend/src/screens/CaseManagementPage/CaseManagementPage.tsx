@@ -94,7 +94,7 @@ export const CaseManagementPage = () => {
 
           <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors cursor-pointer">
             <Folder className="w-6 h-6" />
-            <span className="text-lg">Evidence Viewer</span>
+            <Link to="/evidence-viewer"><span className="text-lg">Evidence Viewer</span></Link>
           </div>
 
       
@@ -128,9 +128,9 @@ export const CaseManagementPage = () => {
               <Link to="/dashboard"> <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
                 Dashboard
               </button></Link>
-              <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+              <Link to="/evidence-viewer"><button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
                 Evidence Viewer
-              </button>
+              </button></Link>
               <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
                 Case Management
               </button>
