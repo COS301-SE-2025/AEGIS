@@ -20,18 +20,18 @@
 # Documentation Links:
 | Document | Description | 
 |----------|-------------|
-| [SRS](https://github.com/COS301-SE-2025/AEGIS) | Requirements Specifications | 
+| [SRS]([https://github.com/COS301-SE-2025/AEGIS](https://drive.google.com/file/d/1LLRsSdq3H41LNusd_-dtyn_8qX1n6f0x/view?usp=drive_link)) | Requirements Specifications | 
 
 # Demos:
 | Demo | Demo Slides | Demo Video |
 |------|--------|------|
-| Demo 1 | [Slides 1]() | [Video 1]() |
+| Demo 1 | [Slides 1](https://www.canva.com/design/DAGokHxWRMc/CcAMEt2TOs7UyCsaF5az5Q/edit?utm_content=DAGokHxWRMc&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton) | [Video 1]() |
 
 
 # Project Management:
 | Project board |  
 |----------|
-| [Github Project Board](https://github.com/COS301-SE-2025/AEGIS) | 
+| [Github Project Board](https://github.com/orgs/COS301-SE-2025/projects/135/views/1?filterQuery=) | 
 
 
 <!-- when needed, uncomment
@@ -58,6 +58,7 @@
     <td>- Contact us at <a href="mailto:bytesquad.capstone@gmail.com">capstone.incidentintel@gmail.com</a>.</td>
   </tr>
 </table> -->
+
 <div align="center">
 
 
@@ -125,3 +126,6 @@
   <img src="./assets/client-logo.png" alt="Client Logo" width="200">
   <img src="./assets/team-logo.png" alt="Team Logo" width="200">
 </div>
+
+**A capstone project for Tyto Insights**
+
