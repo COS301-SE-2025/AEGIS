@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"gorm.io/gorm"
+	"github.com/google/uuid"
 
 )
 
@@ -67,4 +68,11 @@ func sendVerificationEmail(email string, token string) {
 	// TODO: Replace with real SMTP integration
 	fmt.Printf("📧 Send verification link to %s:\n", email)
 	fmt.Printf("👉 http://localhost:8080/verify?token=%s\n", token)
+}
+func (r *GormUserRepository) UpdatePassword(userID uuid.UUID, hashedPassword string) error {
+    return r.db.
+        Model(&User{}).
+        Where("id = ?", userID).
+        Update("password_hash", hashedPassword).
+        Error
 }

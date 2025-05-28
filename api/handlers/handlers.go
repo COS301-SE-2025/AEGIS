@@ -6,9 +6,21 @@ import (
 	//"aegis-core/services"
 	"aegis-api/structs"
 	"github.com/gin-gonic/gin"
-	"net/http"
 	"time"
-	//"net/http"
+	"aegis-api/services/registration"
+	"aegis-api/services/ListUsers"
+	"aegis-api/services/update_user_role"
+	"aegis-api/services/delete_user"
+	"context"
+	"net/http"
+	"strings"
+	"log"
+	"aegis-api/services/login/auth"
+	"github.com/google/uuid"
+	"aegis-api/services/reset_password"
+	"aegis-api/services/case_creation"
+	"aegis-api/services/case_assign"
+	
 )
 
 type Handler struct {
@@ -24,27 +36,455 @@ type Handler struct {
 type AdminServiceInterface interface {
 	RegisterUser(c *gin.Context)
 	ListUsers(c *gin.Context)
-	GetUserActivity(c *gin.Context)
+	//GetUserActivity(c *gin.Context)// I cant Find the Implementation
 	UpdateUserRole(c *gin.Context)
 	DeleteUser(c *gin.Context)
-	GetRoles(c *gin.Context)
+	//GetRoles(c *gin.Context)//I cant find implementation
+
+
+}
+type AuthServiceInterface interface {
+    LoginHandler(c *gin.Context)
+   // LogoutHandler(c *gin.Context)
+    ResetPasswordHandler(c *gin.Context)
 }
 
-type AuthServiceInterface interface {
-	Login(c *gin.Context)
-	Logout(c *gin.Context)
-	ResetPassword(c *gin.Context)
+type AdminService struct {
+	registrationService *registration.RegistrationService
+	listUserService     ListUsers.ListUserService
+	userService         *update_user_role.UserService
+	userDeleteService *delete_user.UserDeleteService
+}
+
+
+//constructor for your AdminService. It’s used to create a new instance of AdminService with its dependencies properly injected
+// NewAdminService constructs an AdminService with required dependencies.
+func NewAdminService(
+    regService *registration.RegistrationService,
+    listUserSvc ListUsers.ListUserService,
+    userService *update_user_role.UserService,
+    userDeleteService *delete_user.UserDeleteService,
+) *AdminService {
+    return &AdminService{
+        registrationService: regService,
+        listUserService:     listUserSvc,
+        userService:         userService,
+        userDeleteService:   userDeleteService,
+    }
+}
+/*
+**
+**----------------- RegisterUser -----
+**
+*/
+
+
+
+
+//Registration
+func (s *AdminService) RegisterUser(c *gin.Context) {
+	var req registration.RegistrationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	user, err := s.registrationService.Register(req)
+	if err != nil {
+		log.Printf("Registration error: %v", err)
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "registration_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, structs.SuccessResponse{
+		Success: true,
+		Message: "User registered successfully",
+		Data:    user,
+	})
+}
+
+
+
+
+/*
+**
+**----------------- ListUsers -----
+**
+*/
+
+
+func (s *AdminService) ListUsers(c *gin.Context) {
+	users, err := s.listUserService.ListUsers(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "list_users_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "Users retrieved successfully",
+		Data:    users,
+	})
+}
+
+
+
+
+
+
+
+
+
+/*
+**
+**----------------- updateUserRole -----
+**
+*/
+
+
+func (s *AdminService) UpdateUserRole(c *gin.Context) {
+	userID := c.Param("user_id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "User ID is required",
+		})
+		return
+	}
+
+	var req structs.UpdateUserRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := s.userService.UpdateUserRole(userID, req.Role); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "update_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "User role updated successfully",
+	})
+}
+
+
+
+
+
+/*
+**
+**----------------- DeleteUser -----
+**
+*/
+
+
+
+
+
+// DeleteUser handles HTTP DELETE /admin/users/:user_id
+func (s *AdminService) DeleteUser(c *gin.Context) {
+	// Bind URI parameter into your common structs type
+	var reqStruct structs.DeleteUserRequest
+	if err := c.ShouldBindUri(&reqStruct); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	// Extract requester role from context
+	reqRoleIface, exists := c.Get("userRole")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "User role missing",
+		})
+		return
+	}
+
+	reqRole, ok := reqRoleIface.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Invalid user role in context",
+		})
+		return
+	}
+
+	// Convert to service package's request type
+	serviceReq := delete_user.DeleteUserRequest{UserID: reqStruct.UserID}
+
+	// Call delete service
+	err := s.userDeleteService.DeleteUser(serviceReq, reqRole)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "unauthorized") {
+			status = http.StatusForbidden
+		}
+		c.JSON(status, structs.ErrorResponse{
+			Error:   "deletion_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	// Successful deletion
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "User deleted successfully",
+	})
+}
+
+
+
+
+
+
+
+
+/*
+**
+**----------------- Login -----
+**
+*/
+
+type AuthHandler struct {
+	authService           *auth.AuthService
+	passwordResetService  *reset_password.PasswordResetService
+}
+type EmailSender interface {
+	SendPasswordResetEmail(email string, token string) error
+}
+
+// NewAuthHandler constructs an AuthHandler with required dependencies
+
+func NewAuthHandler(authService *auth.AuthService, resetService *reset_password.PasswordResetService) *AuthHandler {
+    return &AuthHandler{
+        authService: authService,
+        passwordResetService: resetService,
+    }
+}
+
+
+func (h *AuthHandler) LoginHandler(c *gin.Context) {
+	var req struct {
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	resp, err := h.authService.Login(req.Email, req.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "authentication_failed",
+			Message: "Invalid email or password",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "Login successful",
+		Data:    resp,
+	})
+}
+
+
+
+// LogoutHandler handles POST /auth/logout
+// func (h *AuthHandler) LogoutHandler(c *gin.Context) {
+// 	// Assume userID is set in context by middleware
+// 	userID, exists := c.Get("userID")
+// 	if !exists {
+// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "User not authenticated"})
+// 		return
+// 	}
+
+// 	uid, ok := userID.(uuid.UUID)
+// 	if !ok {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Invalid user ID"})
+// 		return
+// 	}
+
+// 	if err := h.authService.Logout(uid); err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "logout_failed", "message": err.Error()})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Logged out successfully"})
+// }
+
+
+
+//ResetPasswordHandler handles POST /auth/password-reset
+func (h *AuthHandler) ResetPasswordHandler(c *gin.Context) {
+	var req struct {
+		Email       string `json:"email" binding:"required,email"`
+		NewPassword string `json:"newPassword" binding:"required"`
+		Token       string `json:"token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+
+	err := h.passwordResetService.ResetPassword(req.Token, req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "reset_failed", "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Password reset successfully"})
 }
 
 type CaseServiceInterface interface {
-	GetCases(c *gin.Context)
+	//GetCases(c *gin.Context)
 	CreateCase(c *gin.Context)
-	GetCase(c *gin.Context)
-	UpdateCase(c *gin.Context)
-	GetCollaborators(c *gin.Context)
+	//GetCase(c *gin.Context)
+	//UpdateCase(c *gin.Context)
+	//GetCollaborators(c *gin.Context)
 	CreateCollaborator(c *gin.Context)
-	RemoveCollaborator(c *gin.Context)
+	//RemoveCollaborator(c *gin.Context)
 }
+
+type CaseHandler struct {
+    caseService *case_creation.Service
+	  caseAssignmentService *case_assign.CaseAssignmentService
+	      service *case_creation.Service
+}
+
+func NewCaseHandler(
+    service *case_creation.Service, 
+    caseAssignService *case_assign.CaseAssignmentService,
+) *CaseHandler {
+    return &CaseHandler{
+        caseService: service,
+        caseAssignmentService: caseAssignService,
+    }
+}
+// func NewCaseHandler(caseService case_creation.ServiceInterface, caseAssignService *case_assign.CaseAssignmentService) *CaseHandler {
+//     return &CaseHandler{
+//         caseService:           caseService,
+//         caseAssignmentService: caseAssignService,
+//     }
+// }
+// CreateCase handles POST /api/v1/cases
+func (h *CaseHandler) CreateCase(c *gin.Context) {
+    var req case_creation.CreateCaseRequest
+
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+            Error:   "invalid_request",
+            Message: "Invalid case data",
+            Details: err.Error(),
+        })
+        return
+    }
+
+    newCase, err := h.service.CreateCase(req)
+    if err != nil {
+        log.Printf("CreateCase error: %v", err)
+        c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+            Error:   "creation_failed",
+            Message: err.Error(),
+        })
+        return
+    }
+
+    c.JSON(http.StatusCreated, structs.SuccessResponse{
+        Success: true,
+        Message: "Case created successfully",
+        Data:    newCase,
+    })
+}
+
+
+func (h *CaseHandler) CreateCollaborator(c *gin.Context) {
+    caseIDStr := c.Param("case_id")
+    if caseIDStr == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Case ID is required"})
+        return
+    }
+
+    var req struct {
+        UserID string `json:"user_id" binding:"required,uuid"`
+        Role   string `json:"role" binding:"required"`
+    }
+
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+        return
+    }
+
+    // Parse UUIDs
+    caseID, err := uuid.Parse(caseIDStr)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Invalid case ID"})
+        return
+    }
+
+    assigneeID, err := uuid.Parse(req.UserID)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Invalid user ID"})
+        return
+    }
+
+    // Get assigner ID from context (set by middleware)
+    assignerIDStr, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "User ID missing from context"})
+        return
+    }
+
+    assignerID, err := uuid.Parse(assignerIDStr.(string))
+    if err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "Invalid assigner user ID"})
+        return
+    }
+
+    // Call service to assign collaborator (role)
+    err = h.caseAssignmentService.AssignUserToCase(assignerID, assigneeID, caseID, req.Role)
+    if err != nil {
+        if strings.Contains(err.Error(), "forbidden") {
+            c.JSON(http.StatusForbidden, gin.H{"error": "forbidden", "message": err.Error()})
+            return
+        }
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "assignment_failed", "message": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "success": true,
+        "message": "Collaborator assigned successfully",
+    })
+}
+
+
 
 type EvidenceServiceInterface interface {
 	GetEvidence(c *gin.Context)
@@ -60,20 +500,21 @@ type UserServiceInterface interface {
 }
 
 func NewHandler(
-	admin AdminServiceInterface,
-	auth AuthServiceInterface,
-	caseSvc CaseServiceInterface,
-	evidence EvidenceServiceInterface,
-	user UserServiceInterface,
+    adminSvc AdminServiceInterface,
+    authSvc AuthServiceInterface,
+    caseSvc CaseServiceInterface,
+    evidenceSvc EvidenceServiceInterface,
+    userSvc UserServiceInterface,
 ) *Handler {
-	return &Handler{
-		AdminService:    admin,
-		AuthService:     auth,
-		CaseService:     caseSvc,
-		EvidenceService: evidence,
-		UserService:     user,
-	}
+    return &Handler{
+        AdminService:    adminSvc,
+        AuthService:     authSvc,
+        CaseService:     caseSvc,
+        EvidenceService: evidenceSvc,
+        UserService:     userSvc,
+    }
 }
+
 
 type MockAdminService struct{}
 

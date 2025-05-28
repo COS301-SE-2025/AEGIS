@@ -3,7 +3,21 @@ package main
 import (
 	database "aegis-api/db"
 	"aegis-api/routes"
+	"aegis-api/handlers"
 	"log"
+
+
+	// services & repos
+    "aegis-api/services/registration"
+    "aegis-api/services/ListUsers"
+    "aegis-api/services/update_user_role"
+    "aegis-api/services/delete_user"
+	"aegis-api/services/login/auth"
+	"aegis-api/services/reset_password"
+    "aegis-api/services/case_creation"
+    //"aegis-api/middleware"
+   // "github.com/gin-gonic/gin"
+    "aegis-api/services/case_assign"
 )
 
 // @title AEGIS Platform API
@@ -18,16 +32,54 @@ import (
 // @in                          header
 // @name                        Authorization
 func main() {
+    if err := database.InitDB(); err != nil {
+        log.Fatalf("Database connection failed: %v", err)
+    }
 
-	if err := database.InitDB(); err != nil {
-		log.Fatalf("Database connection failed: %v", err)
-	}
-	router := routes.SetUpRouter()
+    // Create repos
+    regRepo := registration.NewGormUserRepository(database.DB)
+    listUserRepo := ListUsers.NewUserRepository(database.DB)
+    updateRoleRepo := update_user_role.NewGormUserRepo(database.DB)
+    deleteUserRepo := delete_user.NewGormUserRepository(database.DB)
 
-	log.Println("Starting AEGIS server on :8080...")
-	log.Println("Docs available at http://localhost:8080/swagger/index.html")
+    resetTokenRepo := reset_password.NewGormResetTokenRepository(database.DB)
+    userRepo := registration.NewGormUserRepository(database.DB)
+    emailSender := reset_password.NewMockEmailSender()
 
-	if err := router.Run(":8080"); err != nil {
-		log.Fatal("Failed to start server:", err)
-	}
+    // Services
+    regService := registration.NewRegistrationService(regRepo)
+    listUserService := ListUsers.NewListUserService(listUserRepo)
+    updateRoleService := update_user_role.NewUserService(updateRoleRepo)
+    deleteUserService := delete_user.NewUserDeleteService(deleteUserRepo)
+
+    resetService := reset_password.NewPasswordResetService(resetTokenRepo, userRepo, emailSender)
+    authService := auth.NewAuthService(userRepo)
+
+    adminService := handlers.NewAdminService(regService, listUserService, updateRoleService, deleteUserService)
+    authHandler := handlers.NewAuthHandler(authService, resetService)
+
+    // Case repos and services
+    caseRepo := case_creation.NewGormCaseRepository(database.DB)
+    caseService := case_creation.NewCaseService(caseRepo)
+
+    caseAssignRepo := case_assign.NewGormCaseAssignmentRepo(database.DB)
+    caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo)
+
+    caseHandler := handlers.NewCaseHandler(caseService, caseAssignService)
+
+    evidenceService := &handlers.MockEvidenceService{}
+    userService := &handlers.MockUserService{}
+
+    // Build main handler struct
+    handler := handlers.NewHandler(adminService, authHandler, caseHandler, evidenceService, userService)
+
+    // Setup router from your routes package
+    router := routes.SetUpRouter(handler)
+
+    log.Println("Starting AEGIS server on :8080...")
+    log.Println("Docs available at http://localhost:8080/swagger/index.html")
+
+    if err := router.Run(":8080"); err != nil {
+        log.Fatal("Failed to start server:", err)
+    }
 }

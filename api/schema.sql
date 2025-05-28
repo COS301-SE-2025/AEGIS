@@ -18,7 +18,8 @@ CREATE TYPE user_role AS ENUM (
     'DFIR Manager', 
     'Legal/Compliance Liaison', 
     'Detection Engineer', 
-    'Generic user'
+    'Generic user',
+    'Admin'
 );
 
 CREATE TYPE case_status AS ENUM ('open', 'under_review', 'closed');
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS cases (
     status case_status DEFAULT 'open',
     investigation_stage investigation_stage DEFAULT 'analysis',
     priority case_priority DEFAULT 'medium',
+    TeamName TEXT NOT NULL,
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

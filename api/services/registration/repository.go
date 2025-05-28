@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings" 
 	"gorm.io/gorm"
+	"log"
 )
 
 // ----------------------
@@ -60,8 +61,12 @@ type GormUserRepository struct {
 }
 
 func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
-	return &GormUserRepository{db: db}
+    if db == nil {
+        log.Fatal("DB is nil in NewGormUserRepository")
+    }
+    return &GormUserRepository{db: db}
 }
+
 
 func (r *GormUserRepository) CreateUser(user *User) error {
 	err := r.db.Create(user).Error
