@@ -10,6 +10,9 @@ jobs:
   lint-backend:
     name: Go Lint
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./api
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,8 +29,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          working-directory: ./api
-
+    
 
   lint-frontend:
     runs-on: ubuntu-latest
