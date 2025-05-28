@@ -17,32 +17,32 @@ export const CaseManagementPage = () => {
   // Timeline event data
   const timelineEvents = [
     {
-      date: "2023-10-25",
+      date: "2025-05-25",
       time: "23:30",
       description: "Initial Access via Phishing Email",
     },
     {
-      date: "2023-10-26",
+      date: "2025-05-26",
       time: "00:05",
       description: "Lateral Movement Attempt detected",
     },
     {
-      date: "2023-10-26",
+      date: "2025-05-26",
       time: "01:10",
       description: "System Compromise (Server B)",
     },
     {
-      date: "2023-10-26",
+      date: "2025-05-26",
       time: "02:45",
       description: "Data Staging Identified",
     },
     {
-      date: "2023-10-26",
+      date: "2025-05-26",
       time: "09:00",
       description: "Data Exfiltration Commenced",
     },
     {
-      date: "2023-10-26",
+      date: "2025-05-26",
       time: "09:00",
       description: "Case Initiated- Operation ShadowBroker",
     },
@@ -59,8 +59,8 @@ export const CaseManagementPage = () => {
 
   // Evidence data
   const evidenceItems = [
-    { name: "Malware Sample (Shadow.exe...)", id: 1 },
-    { name: "Network traffic (PCAP)", id: 2 },
+    { name: "System logs (Shadow.exe...)", id: 1 },
+    { name: "Malware Sample", id: 2 },
   ];
 
   return (

@@ -1,4 +1,5 @@
 // src/pages/EvidenceViewer.tsx
+import { useState } from "react";
 import {
   Bell,
   File,
@@ -16,7 +17,45 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+// Define file structure
+interface FileItem {
+  id: string;
+  name: string;
+  type: 'executable' | 'log' | 'image' | 'document';
+  content?: string;
+  imageUrl?: string;
+}
+
 export const EvidenceViewer = () => {
+  // Sample files data
+  const files: FileItem[] = [
+    {
+      id: '1',
+      name: 'system_logs.exe',
+      type: 'executable',
+      content: 'This is a system executable file. Binary content cannot be displayed in text format.'
+    },
+    {
+      id: '2',
+      name: 'malware_sample.exe',
+      type: 'executable',
+      content: 'This is a malware sample file. Handle with extreme caution. Binary content cannot be displayed in text format.'
+    },
+    {
+      id: '3',
+      name: 'screenshot_evidence.png',
+      type: 'image',
+      content: 'Screenshot taken from suspect\'s computer showing suspicious activity.',
+      imageUrl: 'https://images.unsplash.com/photo-1516110833967-0b5716ca1387?w=800&h=600&fit=crop'
+    }
+  ];
+
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+
+  const handleFileClick = (file: FileItem) => {
+    setSelectedFile(file);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white flex">
       {/* Sidebar */}
@@ -124,7 +163,7 @@ export const EvidenceViewer = () => {
           </div>
         </div>
 
-        {/* Evidence Viewer Placeholder */}
+        {/* Evidence Viewer Content */}
         <div className="p-8">
           <h1 className="text-3xl font-semibold mb-6">Evidence Viewer</h1>
 
@@ -145,20 +184,63 @@ export const EvidenceViewer = () => {
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center gap-2 p-2 bg-gray-800 rounded-md">
-                  <File className="w-5 h-5 text-blue-500" />
-                  <span>system_logs.exe</span>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-gray-800 rounded-md">
-                  <File className="w-5 h-5 text-blue-500" />
-                  <span>malware_sample.exe</span>
-                </div>
+                {files.map((file) => (
+                  <button
+                    key={file.id}
+                    onClick={() => handleFileClick(file)}
+                    className={`w-full flex items-center gap-2 p-2 rounded-md transition-colors cursor-pointer ${
+                      selectedFile?.id === file.id
+                        ? 'bg-[#636AE8] text-white'
+                        : 'bg-gray-800 hover:bg-gray-700'
+                    }`}
+                  >
+                    {file.type === 'image' ? (
+                      <ImageIcon className="w-5 h-5 text-green-500" />
+                    ) : (
+                      <File className="w-5 h-5 text-blue-500" />
+                    )}
+                    <span className="text-left">{file.name}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Viewer panel */}
-            <div className="w-2/3 h-[400px] border border-gray-700 rounded-lg flex items-center justify-center text-gray-400 bg-gray-900">
-              Select a file to view
+            <div className="w-2/3 h-[400px] border border-gray-700 rounded-lg bg-gray-900">
+              {selectedFile ? (
+                <div className="p-4 h-full flex flex-col">
+                  <div className="border-b border-gray-700 pb-2 mb-4">
+                    <h3 className="text-lg font-semibold text-white">{selectedFile.name}</h3>
+                    <p className="text-sm text-gray-400 capitalize">{selectedFile.type} file</p>
+                  </div>
+                  <div className="flex-1 overflow-auto">
+                    {selectedFile.type === 'image' && selectedFile.imageUrl ? (
+                      <div className="space-y-4">
+                        <div className="flex justify-center">
+                          <img
+                            src={selectedFile.imageUrl}
+                            alt={selectedFile.name}
+                            className="max-w-full max-h-64 object-contain rounded-lg border border-gray-600"
+                          />
+                        </div>
+                        {selectedFile.content && (
+                          <div className="text-gray-300 text-sm">
+                            <strong>Description:</strong> {selectedFile.content}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-gray-300 whitespace-pre-wrap">
+                        {selectedFile.content}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center text-gray-400">
+                  Select a file to view
+                </div>
+              )}
             </div>
           </div>
 

@@ -11,10 +11,10 @@ import { Label } from "../../components/ui/label";
 import { Link } from "react-router-dom";
 // @ts-ignore
 
-import useRegisterForm from "./register";
+import useRegistrationForm from "./register";
 
 export const RegistrationPage = (): JSX.Element => {
-const { formData, errors, handleChange, handleSubmit } = useRegisterForm();
+const { formData, errors, handleChange, handleSubmit } = useRegistrationForm();
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
