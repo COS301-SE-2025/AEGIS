@@ -33,10 +33,32 @@ const handleChange =
 interface CreateCaseFormSubmitEvent extends React.FormEvent<HTMLFormElement> {}
 
 const handleSubmit = (e: CreateCaseFormSubmitEvent) => {
-    e.preventDefault();
-    // TODO: Submit logic
-    console.log("Creating case:", form);
+  e.preventDefault();
+
+  // Load existing cases from localStorage or initialize empty array
+  const stored = localStorage.getItem("cases");
+  const cases = stored ? JSON.parse(stored) : [];
+
+  // Optional: generate a unique ID based on existing cases
+  const newId = cases.length > 0 ? Math.max(...cases.map((c: any) => c.id || 0)) + 1 : 1;
+
+  // Create the new case
+  const newCase = {
+    id: newId,
+    ...form,
+    lastActivity: new Date().toISOString().split("T")[0],
+    progress: 0,
+    image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7", // default image or use an <input> if needed
+  };
+
+  // Save the updated list to localStorage
+  cases.push(newCase);
+  localStorage.setItem("cases", JSON.stringify(cases));
+
+  // Redirect to dashboard
+  window.location.href = "/dashboard";
 };
+
 
   return (
  <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center p-6">

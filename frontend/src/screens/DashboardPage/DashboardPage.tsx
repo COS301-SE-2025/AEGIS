@@ -239,7 +239,7 @@ export const DashBoardPage = () => {
             {/* Extra spacing before next row */}
                 <div className="mt-[100px] flex gap-6">
                 {/* Threat Landscape Card */}
-                <div className="w-[613px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6">
+                <div className="w-[550px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6">
                     <h2 className="font-bold text-white text-lg mb-2">Threat Landscape</h2>
                     <p className="text-gray-400 text-sm mb-4">Global incident trends, and a picture:</p>
                     <img
@@ -250,7 +250,7 @@ export const DashBoardPage = () => {
                 </div>
 
                  {/* Recent Activities Card */}
-            <div className="w-[613px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6 overflow-auto">
+            <div className="w-[550px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6 overflow-auto">
               <h2 className="font-bold text-white text-lg mb-4">Recent Activities</h2>
               <ul className="space-y-4">
                 {recentActivities.map((activity, index) => {
@@ -266,7 +266,7 @@ export const DashBoardPage = () => {
                         </div>
                       </div>
                       {index < recentActivities.length - 1 && (
-                        <hr className="w-[578px] border-t-[2px] border-[#8C8D8B] transform rotate-[0.053deg]" />
+                        <hr className="w-[500px] border-t-[2px] border-[#8C8D8B] transform rotate-[0.053deg]" />
                       )}
                     </li>
                   );
@@ -275,7 +275,7 @@ export const DashBoardPage = () => {
             </div>
           </div>
          
-          <div className="w-[1250px] h-[989px] bg-[#19191F] border-[3px] border-[#393D47] rounded-[8px] mt-[30px] p-6">
+          <div className="w-[1126px] h-[1700px] bg-[#19191F] border-[3px] border-[#393D47] rounded-[8px] mt-[30px] p-6">
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-2">
           <button
@@ -310,7 +310,7 @@ export const DashBoardPage = () => {
         {caseCards.map((card, index) => (
           <div
             key={index}
-            className="flex flex-col justify-between items-center w-[352px] h-[370px] p-4 bg-[#19191F] border border-[#393D47] rounded-[8px]"
+            className="flex flex-col justify-between items-center w-[440px] h-[370px] p-4 bg-[#19191F] border border-[#393D47] rounded-[8px]"
           >
             <img
             src={card.image}

@@ -11,6 +11,7 @@ import { DashBoardPage } from "./screens/DashboardPage";
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
 import { UploadEvidenceForm } from "./screens/UploadEvidencePage/UploadEvidencePage";
 import {AssignCaseMembersForm} from "./screens/AssignCaseMembersPage/AssignCaseMembersPage";
+import { EvidenceViewer } from "./screens/EvidenceViewer";
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
       <Route path="/create-case" element={<CreateCaseForm />} />
       <Route path ="/upload-evidence" element={<UploadEvidenceForm />} />
       <Route path = "/assign-case-members" element={<AssignCaseMembersForm />} />
+      <Route path="/evidence-viewer" element={<EvidenceViewer />} />
     </Routes>
   );
 }
