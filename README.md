@@ -4,9 +4,10 @@
 # AEGIS
 
   ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/COS301-SE-2025/AEGIS)
- <!-- ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/COS301-SE-2025/AEGIS/lint.yml)
-
-  ![Codecov](https://img.shields.io/codecov/c/github/COS301-SE-2025/AEGIS) -->
+  ![Build](https://github.com/COS301-SE-2025/AEGIS/actions/workflows/lint.yml/badge.svg)
+  ![Git Structure: Monorepo](https://img.shields.io/badge/Git%20Structure-Monorepo-blue)
+  ![Branching: Git Flow](https://img.shields.io/badge/Branching-Git%20Flow-green)
+ 
 
 
 
