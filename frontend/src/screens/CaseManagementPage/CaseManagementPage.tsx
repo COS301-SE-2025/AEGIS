@@ -61,6 +61,8 @@ export const CaseManagementPage = () => {
   const evidenceItems = [
     { name: "System logs (Shadow.exe...)", id: 1 },
     { name: "Malware Sample", id: 2 },
+    { name: "screenshot_evidence", id: 3 },
+
   ];
 
   return (
@@ -192,10 +194,10 @@ export const CaseManagementPage = () => {
                 {/* Case Title and Threat Level */}
                 <div className="flex justify-between items-start mb-6">
                   <h2 className="text-xl font-bold text-white">
-                    Operation ShadowBroker<br />Malware Analysis
+                    <br />Malware
                   </h2>
                   <span className="bg-red-900/30 text-red-400 border border-red-400 rounded-full px-3 py-1 text-sm">
-                    High Threat
+                    Critical
                   </span>
                 </div>
 
@@ -244,7 +246,11 @@ export const CaseManagementPage = () => {
 
                 {/* Associated Evidence */}
                 <div>
-                  <h3 className="text-gray-400 mb-4">Associated Evidence:</h3>
+              <Link to="/evidence-viewer" className="block">
+                <h3 className="text-gray-400 mb-4 hover:text-gray-300 cursor-pointer transition-colors">
+                  Associated Evidence:
+                </h3>
+              </Link>
                   <div className="space-y-3">
                     {evidenceItems.map((item) => (
                       <div key={item.id} className="flex items-center gap-3">

@@ -462,9 +462,11 @@ export const DashBoardPage = () => {
               className="w-full h-3 bg-gray-800 mb-3 [&>div]:bg-green-500"
               />
 
-              <button className="bg-[#633ae8] text-white text-sm px-14 py-2 rounded hover:bg-gray-800">
-                View Details
-              </button>
+              <Link to="/case-management">
+                <button className="bg-[#633ae8] text-white text-sm px-14 py-2 rounded hover:bg-gray-800">
+                  View Details
+                </button>
+              </Link>
             </div>
           ))}
         </div>
