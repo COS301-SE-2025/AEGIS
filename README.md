@@ -25,7 +25,7 @@
 # Demos:
 | Demo | Demo Slides | Demo Video |
 |------|--------|------|
-| Demo 1 | [Slides 1]() | [Video 1]() |
+| Demo 1 | [Slides 1](https://www.canva.com/design/DAGokHxWRMc/CcAMEt2TOs7UyCsaF5az5Q/edit?utm_content=DAGokHxWRMc&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton) | [Video 1]() |
 
 
 # Project Management:
