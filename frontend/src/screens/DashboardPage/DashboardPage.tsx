@@ -41,6 +41,7 @@ const metricCards = [
     icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
   },
 ];
+
 const recentActivities = [
   {
     icon: File,
@@ -58,63 +59,43 @@ const recentActivities = [
     time: "3 hours ago",
   },
 ];
-const caseCards = [
+
+// Default fallback cases (only used if localStorage is empty)
+const defaultCaseCards = [
   {
-    title: "Malware infection analysis",
-    status: "Reporting",
-    severity: "Critical",
+    id: 1,
+    creator: "System",
     team: "Team Gamma",
+    priority: "critical",
+    attackType: "Malware infection analysis",
+    description: "System malware detected",
     lastActivity: "Yesterday",
     progress: 45,
     image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
   },
   {
-    title: "Data breach investigation",
-    status: "Active",
-    severity: "High",
+    id: 2,
+    creator: "System",
     team: "Team Alpha",
+    priority: "high",
+    attackType: "Data breach investigation",
+    description: "Unauthorized data access detected",
     lastActivity: "2 hours ago",
     progress: 72,
     image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
   },
   {
-    title: "Phishing campaign analysis",
-    status: "Review",
-    severity: "Medium",
+    id: 3,
+    creator: "System",
     team: "Team Beta",
+    priority: "mid",
+    attackType: "Phishing campaign analysis",
+    description: "Suspicious email campaign identified",
     lastActivity: "Today",
     progress: 88,
     image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
   },
-  {
-    title: "Network intrusion detection",
-    status: "Investigation",
-    severity: "Critical",
-    team: "Team Delta",
-    lastActivity: "1 hour ago",
-    progress: 23,
-    image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
-  },
-  {
-    title: "Ransomware incident response",
-    status: "Containment",
-    severity: "Critical",
-    team: "Team Gamma",
-    lastActivity: "Today",
-    progress: 67,
-    image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
-  },
-  {
-    title: "Insider threat assessment",
-    status: "Analysis",
-    severity: "Low",
-    team: "Team Alpha",
-    lastActivity: "Yesterday",
-    progress: 34,
-    image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
-  },
 ];
-
 
 interface CaseCard {
   id: number;
@@ -134,12 +115,21 @@ export default function Dashboard() {
   useEffect(() => {
     // Load cases from localStorage
     const stored = localStorage.getItem("cases");
-    console.log("Loaded from localStorage:", stored); // <-- DEBUG
+    console.log("Loaded from localStorage:", stored);
 
     if (stored) {
-      const parsedCases: CaseCard[] = JSON.parse(stored);
-      console.log("Parsed Cases:", parsedCases); // <-- Check contents
-      setCaseCards(parsedCases.reverse()); // Show newest first
+      try {
+        const parsedCases: CaseCard[] = JSON.parse(stored);
+        console.log("Parsed Cases:", parsedCases);
+        setCaseCards(parsedCases.reverse()); // Show newest first
+      } catch (error) {
+        console.error("Error parsing stored cases:", error);
+        setCaseCards(defaultCaseCards);
+      }
+    } else {
+      // Use default cases if nothing in localStorage
+      console.log("No cases in localStorage, using defaults");
+      setCaseCards(defaultCaseCards);
     }
   }, []);
 
@@ -147,70 +137,93 @@ export default function Dashboard() {
     <div className="p-8">
       <h1 className="text-3xl font-bold text-white mb-6">Dashboard</h1>
 
-      <div className="flex flex-wrap gap-6">
-        {caseCards.map((card, index) => (
-          <div
-            key={card.id}
-            className="flex flex-col justify-between items-center w-[440px] h-[370px] p-4 bg-[#19191F] border border-[#393D47] rounded-[8px]"
-          >
-            <img
-              src={card.image}
-              alt={card.description}
-              width={331}
-              height={180}
-              className="rounded-md mb-3"
-            />
+      {caseCards.length === 0 ? (
+        <div className="text-center text-gray-400 py-8">
+          <p>No cases found. Create your first case to get started!</p>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-6">
+          {caseCards.map((card) => (
+            <div
+              key={card.id}
+              className="flex flex-col justify-between items-center w-[440px] h-[370px] p-4 bg-[#19191F] border border-[#393D47] rounded-[8px]"
+            >
+              <img
+                src={card.image}
+                alt={card.description}
+                width={331}
+                height={180}
+                className="rounded-md mb-3"
+              />
 
-            <h3 className="text-white text-lg font-bold text-center mb-1">
-              {card.attackType || "Untitled Case"}
-            </h3>
+              <h3 className="text-white text-lg font-bold text-center mb-1">
+                {card.attackType || "Untitled Case"}
+              </h3>
 
-            <div className="text-sm text-gray-400 text-center mb-2">
-              Team: {card.team} | Last Activity: {card.lastActivity}
-            </div>
-
-            <div className="flex justify-between items-center w-full text-xs mb-1">
-              <div className="flex items-center gap-1">
-                <span
-                  className={cn(
-                    "w-2 h-2 rounded-full",
-                    card.priority === "critical"
-                      ? "bg-red-500"
-                      : card.priority === "high"
-                      ? "bg-orange-400"
-                      : card.priority === "mid"
-                      ? "bg-yellow-400"
-                      : "bg-green-400"
-                  )}
-                ></span>
-                <span className="text-gray-300">{card.priority}</span>
+              <div className="text-sm text-gray-400 text-center mb-2">
+                Team: {card.team} | Last Activity: {card.lastActivity}
               </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                <span className="text-gray-300">Ongoing</span>
+
+              <div className="flex justify-between items-center w-full text-xs mb-1">
+                <div className="flex items-center gap-1">
+                  <span
+                    className={cn(
+                      "w-2 h-2 rounded-full",
+                      card.priority === "critical"
+                        ? "bg-red-500"
+                        : card.priority === "high"
+                        ? "bg-orange-400"
+                        : card.priority === "mid"
+                        ? "bg-yellow-400"
+                        : "bg-green-400"
+                    )}
+                  ></span>
+                  <span className="text-gray-300 capitalize">{card.priority}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                  <span className="text-gray-300">Ongoing</span>
+                </div>
               </div>
+
+              <Progress
+                value={card.progress}
+                className="w-full h-3 bg-gray-800 mb-3 [&>div]:bg-green-500"
+              />
+
+              <button className="bg-[#633ae8] text-white text-sm px-14 py-2 rounded hover:bg-gray-800">
+                View Details
+              </button>
             </div>
-
-            <Progress
-              value={card.progress}
-              className="w-full h-3 bg-gray-800 mb-3 [&>div]:bg-green-500"
-            />
-
-            <button className="bg-[#633ae8] text-white text-sm px-14 py-2 rounded hover:bg-gray-800">
-              View Details
-            </button>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-
-
-
 export const DashBoardPage = () => {
   const [activeTab, setActiveTab] = useState("active");
+  const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
+
+  useEffect(() => {
+    // Load cases from localStorage for the main dashboard page too
+    const stored = localStorage.getItem("cases");
+    console.log("DashboardPage - Loaded from localStorage:", stored);
+
+    if (stored) {
+      try {
+        const parsedCases: CaseCard[] = JSON.parse(stored);
+        console.log("DashboardPage - Parsed Cases:", parsedCases);
+        setCaseCards(parsedCases.reverse()); // Show newest first
+      } catch (error) {
+        console.error("Error parsing stored cases:", error);
+        setCaseCards(defaultCaseCards);
+      }
+    } else {
+      setCaseCards(defaultCaseCards);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -280,7 +293,6 @@ export const DashBoardPage = () => {
                 Evidence Viewer
               </button></Link>
               <Link to="/case-management"><button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
-
                 Case Management
               </button></Link>
               <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
@@ -380,7 +392,7 @@ export const DashBoardPage = () => {
                 : "bg-gray-900 text-gray-400 border border-gray-700"
             )}
           >
-            Active Cases (6)
+            Active Cases ({caseCards.length})
           </button>
           <button
             onClick={() => setActiveTab("archived")}
@@ -391,7 +403,7 @@ export const DashBoardPage = () => {
                 : "bg-gray-900 text-gray-400 border border-gray-700"
             )}
           >
-            Archived Cases (4)
+            Archived Cases (0)
           </button>
         </div>
         <Link to="/create-case"><button className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700">
@@ -399,62 +411,67 @@ export const DashBoardPage = () => {
         </button></Link>
       </div>
 
-      <div className="flex flex-wrap gap-6">
-        {caseCards.map((card, index) => (
-          <div
-            key={index}
-            className="flex flex-col justify-between items-center w-[440px] h-[370px] p-4 bg-[#19191F] border border-[#393D47] rounded-[8px]"
-          >
-            <img
-            src={card.image}
-            alt={card.title}
-            width={331}
-            height={180}
-            className="rounded-md mb-3"
-            />
+      {caseCards.length === 0 ? (
+        <div className="text-center text-gray-400 py-8">
+          <p>No cases found. Create your first case to get started!</p>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-6">
+          {caseCards.map((card) => (
+            <div
+              key={card.id}
+              className="flex flex-col justify-between items-center w-[440px] h-[370px] p-4 bg-[#19191F] border border-[#393D47] rounded-[8px]"
+            >
+              <img
+              src={card.image}
+              alt={card.attackType}
+              width={331}
+              height={180}
+              className="rounded-md mb-3"
+              />
 
-            <h3 className="text-white text-lg font-bold text-center mb-1">
-              {card.title}
-            </h3>
-            <div className="text-sm text-gray-400 text-center mb-2">
-              Team: {card.team} | Last Activity: {card.lastActivity}
-            </div>
-            <div className="flex justify-between items-center w-full text-xs mb-1">
-              <div className="flex items-center gap-1">
-                <span
-                  className={cn(
-                    "w-2 h-2 rounded-full",
-                    card.severity === "Critical"
-                      ? "bg-red-500"
-                      : card.severity === "High"
-                      ? "bg-orange-400"
-                      : card.severity === "Medium"
-                      ? "bg-yellow-400"
-                      : "bg-green-400"
-                  )}
-                ></span>
-                <span className="text-gray-300">{card.severity}</span>
+              <h3 className="text-white text-lg font-bold text-center mb-1">
+                {card.attackType || "Untitled Case"}
+              </h3>
+              <div className="text-sm text-gray-400 text-center mb-2">
+                Team: {card.team} | Last Activity: {card.lastActivity}
               </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                <span className="text-gray-300">{card.status}</span>
+              <div className="flex justify-between items-center w-full text-xs mb-1">
+                <div className="flex items-center gap-1">
+                  <span
+                    className={cn(
+                      "w-2 h-2 rounded-full",
+                      card.priority === "critical"
+                        ? "bg-red-500"
+                        : card.priority === "high"
+                        ? "bg-orange-400"
+                        : card.priority === "mid"
+                        ? "bg-yellow-400"
+                        : "bg-green-400"
+                    )}
+                  ></span>
+                  <span className="text-gray-300 capitalize">{card.priority}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                  <span className="text-gray-300">Ongoing</span>
+                </div>
               </div>
-            </div>
-            <Progress
-            value={card.progress}
-            className="w-full h-3 bg-gray-800 mb-3 [&>div]:bg-green-500"
-            />
+              <Progress
+              value={card.progress}
+              className="w-full h-3 bg-gray-800 mb-3 [&>div]:bg-green-500"
+              />
 
-            <button className="bg-[#633ae8] text-white text-sm px-14 py-2 rounded hover:bg-gray-800">
-              View Details
-            </button>
-          </div>
-        ))}
-      </div>
+              <button className="bg-[#633ae8] text-white text-sm px-14 py-2 rounded hover:bg-gray-800">
+                View Details
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
         </main>
       </div>
     </div>
   );
 };
-
