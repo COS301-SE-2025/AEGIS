@@ -1,3 +1,4 @@
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
@@ -19,6 +20,7 @@
 }
 
 @keyframes logo-spin {
+
   from {
     transform: rotate(0deg);
   }
@@ -40,3 +42,4 @@
 .read-the-docs {
   color: #888;
 }
+

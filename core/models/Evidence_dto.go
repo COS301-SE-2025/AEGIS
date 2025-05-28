@@ -14,3 +14,6 @@ type EvidenceDTO struct {
     Metadata   string `json:"metadata"`  
     UploadedAt string `json:"uploaded_at"`
 }
+
+
+
