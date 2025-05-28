@@ -127,5 +127,4 @@
   <img src="./assets/team-logo.png" alt="Team Logo" width="200">
 </div>
 
-**A capstone project for Tyto Insights**
 
