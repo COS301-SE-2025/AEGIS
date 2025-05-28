@@ -6,9 +6,16 @@ import (
 	//"aegis-core/services"
 	"aegis-api/structs"
 	"github.com/gin-gonic/gin"
-	"net/http"
 	"time"
-	//"net/http"
+	"aegis-api/services/registration"
+	"aegis-api/services/ListUsers"
+	"aegis-api/services/update_user_role"
+	"aegis-api/services/delete_user"
+	"context"
+	"net/http"
+	"strings"
+	"log"
+	
 )
 
 type Handler struct {
@@ -24,17 +31,230 @@ type Handler struct {
 type AdminServiceInterface interface {
 	RegisterUser(c *gin.Context)
 	ListUsers(c *gin.Context)
-	GetUserActivity(c *gin.Context)
+	//GetUserActivity(c *gin.Context)// I cant Find the Implementation
 	UpdateUserRole(c *gin.Context)
 	DeleteUser(c *gin.Context)
-	GetRoles(c *gin.Context)
+	//GetRoles(c *gin.Context)//I cant find implementation
 }
+
+type AdminService struct {
+	registrationService *registration.RegistrationService
+	listUserService     ListUsers.ListUserService
+	userService         *update_user_role.UserService
+	userDeleteService *delete_user.UserDeleteService
+}
+
+
+//constructor for your AdminService. It’s used to create a new instance of AdminService with its dependencies properly injected
+// NewAdminService constructs an AdminService with required dependencies.
+func NewAdminService(
+    regService *registration.RegistrationService,
+    listUserSvc ListUsers.ListUserService,
+    userService *update_user_role.UserService,
+    userDeleteService *delete_user.UserDeleteService,
+) *AdminService {
+    return &AdminService{
+        registrationService: regService,
+        listUserService:     listUserSvc,
+        userService:         userService,
+        userDeleteService:   userDeleteService,
+    }
+}
+/*
+**
+**----------------- RegisterUser -----
+**
+*/
+
+
+
+
+//Registration
+func (s *AdminService) RegisterUser(c *gin.Context) {
+	var req registration.RegistrationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	user, err := s.registrationService.Register(req)
+	if err != nil {
+		log.Printf("Registration error: %v", err)
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "registration_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, structs.SuccessResponse{
+		Success: true,
+		Message: "User registered successfully",
+		Data:    user,
+	})
+}
+
+
+
+
+/*
+**
+**----------------- ListUsers -----
+**
+*/
+
+
+func (s *AdminService) ListUsers(c *gin.Context) {
+	users, err := s.listUserService.ListUsers(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "list_users_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "Users retrieved successfully",
+		Data:    users,
+	})
+}
+
+
+
+
+
+
+
+
+
+/*
+**
+**----------------- updateUserRole -----
+**
+*/
+
+
+func (s *AdminService) UpdateUserRole(c *gin.Context) {
+	userID := c.Param("user_id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "User ID is required",
+		})
+		return
+	}
+
+	var req structs.UpdateUserRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := s.userService.UpdateUserRole(userID, req.Role); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "update_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "User role updated successfully",
+	})
+}
+
+
+
+
+
+/*
+**
+**----------------- DeleteUser -----
+**
+*/
+
+
+
+
+
+// DeleteUser handles HTTP DELETE /admin/users/:user_id
+func (s *AdminService) DeleteUser(c *gin.Context) {
+	// Bind URI parameter into your common structs type
+	var reqStruct structs.DeleteUserRequest
+	if err := c.ShouldBindUri(&reqStruct); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	// Extract requester role from context
+	reqRoleIface, exists := c.Get("userRole")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "User role missing",
+		})
+		return
+	}
+
+	reqRole, ok := reqRoleIface.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Invalid user role in context",
+		})
+		return
+	}
+
+	// Convert to service package's request type
+	serviceReq := delete_user.DeleteUserRequest{UserID: reqStruct.UserID}
+
+	// Call delete service
+	err := s.userDeleteService.DeleteUser(serviceReq, reqRole)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "unauthorized") {
+			status = http.StatusForbidden
+		}
+		c.JSON(status, structs.ErrorResponse{
+			Error:   "deletion_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	// Successful deletion
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "User deleted successfully",
+	})
+}
+
+
+
 
 type AuthServiceInterface interface {
 	Login(c *gin.Context)
 	Logout(c *gin.Context)
 	ResetPassword(c *gin.Context)
 }
+
+
+
+
+
+
 
 type CaseServiceInterface interface {
 	GetCases(c *gin.Context)
