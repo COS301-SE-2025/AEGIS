@@ -170,21 +170,24 @@ func TestUserService_GetUserRoles_Success(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
+
+
+
+
 func TestUserService_GetUserRoles_Error(t *testing.T) {
-	mockRepo := &mocks.MockUserRepo{}
-	service :=GetUpdate_Users.NewUserService(mockRepo)
-	
+	mockRepo := new(mocks.MockUserRepo)
+	service := GetUpdate_Users.NewUserService(mockRepo)
+
 	expectedError := errors.New("roles query failed")
-	mockRepo.On("GetUserRoles", "123").Return(nil, expectedError)
-	
+
+	// 👇 Ensure nil is typed correctly to match the expected return type
+	mockRepo.On("GetUserRoles", "123").Return(([]string)(nil), expectedError)
+
 	result, err := service.GetUserRoles("123")
-	
+
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Equal(t, expectedError, err)
+
 	mockRepo.AssertExpectations(t)
 }
-
-
-
-

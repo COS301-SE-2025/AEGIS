@@ -4,6 +4,7 @@ package mocks
 import (
 	"github.com/stretchr/testify/mock"
 	"aegis-api/models"
+	"errors"
 )
 
 type MockUserRepo struct {
@@ -31,7 +32,18 @@ func (m *MockUserRepo) GetUserByEmail(email string) (*models.UserDTO, error) {
 	return nil, args.Error(1)
 }
 
+// func (m *MockUserRepo) GetUserRoles(userID string) ([]string, error) {
+// 	args := m.Called(userID)
+// 	return args.Get(0).([]string), args.Error(1)
+// }
+
 func (m *MockUserRepo) GetUserRoles(userID string) ([]string, error) {
-	args := m.Called(userID)
-	return args.Get(0).([]string), args.Error(1)
+    args := m.Called(userID)
+
+    roles, ok := args.Get(0).([]string)
+    if !ok {
+        return nil, errors.New("failed type assertion: expected []string")
+    }
+
+    return roles, args.Error(1)
 }
