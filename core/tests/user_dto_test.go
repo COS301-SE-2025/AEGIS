@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
-
+	"aegis-api/models"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUserDTO_JSONSerialization(t *testing.T) {
 	now := time.Now()
-	user := UserDTO{
+	user :=models.UserDTO{
 		ID:                "123",
 		FullName:          "John Doe",
 		Email:             "john@example.com",
@@ -47,7 +47,7 @@ func TestUserDTO_JSONDeserialization(t *testing.T) {
 		"created_at": "2023-01-01T12:00:00Z"
 	}`
 	
-	var user UserDTO
+	var user models.UserDTO
 	err := json.Unmarshal([]byte(jsonStr), &user)
 	assert.NoError(t, err)
 	
@@ -61,7 +61,7 @@ func TestUserDTO_JSONDeserialization(t *testing.T) {
 }
 
 func TestUserDTO_EmptyVerificationToken(t *testing.T) {
-	user := UserDTO{
+	user := models.UserDTO{
 		ID:                "123",
 		FullName:          "John Doe",
 		Email:             "john@example.com",

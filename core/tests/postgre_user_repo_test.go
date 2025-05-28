@@ -3,11 +3,11 @@ package tests
 
 import (
 	"database/sql"
-	"database/sql/driver"
+	
 	"testing"
 	"time"
+	"aegis-api/services/GetUpdate_Users"
 
-	"aegis-api/models"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,7 +17,7 @@ func TestNewPostgresUserRepository(t *testing.T) {
 	assert.NoError(t, err)
 	defer db.Close()
 	
-	repo := NewPostgresUserRepository(db)
+	repo := GetUpdate_Users.NewPostgresUserRepository(db)
 	
 	assert.NotNil(t, repo)
 	assert.Equal(t, db, repo.DB)
@@ -28,7 +28,7 @@ func TestPostgresUserRepository_GetUserByID_Success(t *testing.T) {
 	assert.NoError(t, err)
 	defer db.Close()
 	
-	repo := NewPostgresUserRepository(db)
+	repo := GetUpdate_Users.NewPostgresUserRepository(db)
 	
 	now := time.Now()
 	rows := sqlmock.NewRows([]string{
@@ -62,7 +62,7 @@ func TestPostgresUserRepository_GetUserByID_NotFound(t *testing.T) {
 	assert.NoError(t, err)
 	defer db.Close()
 	
-	repo := NewPostgresUserRepository(db)
+	repo :=GetUpdate_Users.NewPostgresUserRepository(db)
 	
 	mock.ExpectQuery(`SELECT id, full_name, email, password_hash, role, is_verified, verification_token, created_at FROM users WHERE id = \$1`).
 		WithArgs("123").
@@ -81,7 +81,7 @@ func TestPostgresUserRepository_GetUserByEmail_Success(t *testing.T) {
 	assert.NoError(t, err)
 	defer db.Close()
 	
-	repo := NewPostgresUserRepository(db)
+	repo :=GetUpdate_Users.NewPostgresUserRepository(db)
 	
 	now := time.Now()
 	rows := sqlmock.NewRows([]string{
@@ -109,7 +109,7 @@ func TestPostgresUserRepository_UpdateUser_Success(t *testing.T) {
 	assert.NoError(t, err)
 	defer db.Close()
 	
-	repo := NewPostgresUserRepository(db)
+	repo :=GetUpdate_Users.NewPostgresUserRepository(db)
 	
 	updates := map[string]interface{}{
 		"full_name": "Jane Doe",
@@ -131,7 +131,7 @@ func TestPostgresUserRepository_UpdateUser_EmptyUpdates(t *testing.T) {
 	assert.NoError(t, err)
 	defer db.Close()
 	
-	repo := NewPostgresUserRepository(db)
+	repo := GetUpdate_Users.NewPostgresUserRepository(db)
 	
 	updates := map[string]interface{}{}
 	
@@ -146,7 +146,7 @@ func TestPostgresUserRepository_GetUserRoles_Success(t *testing.T) {
 	assert.NoError(t, err)
 	defer db.Close()
 	
-	repo := NewPostgresUserRepository(db)
+	repo :=GetUpdate_Users.NewPostgresUserRepository(db)
 	
 	rows := sqlmock.NewRows([]string{"role"}).
 		AddRow("admin").
@@ -168,7 +168,7 @@ func TestPostgresUserRepository_GetUserRoles_NoRoles(t *testing.T) {
 	assert.NoError(t, err)
 	defer db.Close()
 	
-	repo := NewPostgresUserRepository(db)
+	repo :=GetUpdate_Users.NewPostgresUserRepository(db)
 	
 	rows := sqlmock.NewRows([]string{"role"})
 	

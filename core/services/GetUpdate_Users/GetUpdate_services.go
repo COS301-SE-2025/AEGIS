@@ -43,3 +43,7 @@ func (s *UserService) Authenticate(email, password string) (*models.UserDTO, err
 func (s *UserService) GetUserRoles(userID string) ([]string, error) {
 	return s.repo.GetUserRoles(userID)
 }
+
+func (s *UserService) GetRepo() UserRepository {
+    return s.repo
+}

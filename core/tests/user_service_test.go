@@ -2,61 +2,29 @@
 package tests
 
 import (
+	mocks "aegis-api/mock"
+	"aegis-api/models"
+	"aegis-api/services/GetUpdate_Users"
 	"errors"
 	"testing"
-	"time"
+	
 
-	"aegis-api/models"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	
 )
-
-// MockUserRepository is a mock implementation of UserRepository
-type MockUserRepository struct {
-	mock.Mock
-}
-
-func (m *MockUserRepository) GetUserByID(userID string) (*models.UserDTO, error) {
-	args := m.Called(userID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.UserDTO), args.Error(1)
-}
-
-func (m *MockUserRepository) GetUserByEmail(email string) (*models.UserDTO, error) {
-	args := m.Called(email)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.UserDTO), args.Error(1)
-}
-
-func (m *MockUserRepository) UpdateUser(userID string, updates map[string]interface{}) error {
-	args := m.Called(userID, updates)
-	return args.Error(0)
-}
-
-func (m *MockUserRepository) GetUserRoles(userID string) ([]string, error) {
-	args := m.Called(userID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]string), args.Error(1)
-}
 
 // Test UserService
 func TestNewUserService(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service := GetUpdate_Users.NewUserService(mockRepo)
 	
 	assert.NotNil(t, service)
-	assert.Equal(t, mockRepo, service.repo)
+	assert.Equal(t, mockRepo, service.GetRepo())
 }
 
 func TestUserService_GetProfile_Success(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service := GetUpdate_Users.NewUserService(mockRepo)
 	
 	expectedUser := &models.UserDTO{
 		ID:       "123",
@@ -75,8 +43,8 @@ func TestUserService_GetProfile_Success(t *testing.T) {
 }
 
 func TestUserService_GetProfile_UserNotFound(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service := GetUpdate_Users.NewUserService(mockRepo)
 	
 	mockRepo.On("GetUserByID", "123").Return(nil, nil)
 	
@@ -89,8 +57,8 @@ func TestUserService_GetProfile_UserNotFound(t *testing.T) {
 }
 
 func TestUserService_GetProfile_RepositoryError(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service :=GetUpdate_Users.NewUserService(mockRepo)
 	
 	expectedError := errors.New("database error")
 	mockRepo.On("GetUserByID", "123").Return(nil, expectedError)
@@ -104,8 +72,8 @@ func TestUserService_GetProfile_RepositoryError(t *testing.T) {
 }
 
 func TestUserService_UpdateProfile_Success(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service := GetUpdate_Users.NewUserService(mockRepo)
 	
 	updates := map[string]interface{}{
 		"full_name": "Jane Doe",
@@ -121,8 +89,8 @@ func TestUserService_UpdateProfile_Success(t *testing.T) {
 }
 
 func TestUserService_UpdateProfile_Error(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service := GetUpdate_Users.NewUserService(mockRepo)
 	
 	updates := map[string]interface{}{
 		"full_name": "Jane Doe",
@@ -139,8 +107,8 @@ func TestUserService_UpdateProfile_Error(t *testing.T) {
 }
 
 func TestUserService_Authenticate_Success(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service :=GetUpdate_Users.NewUserService(mockRepo)
 	
 	expectedUser := &models.UserDTO{
 		ID:           "123",
@@ -160,8 +128,8 @@ func TestUserService_Authenticate_Success(t *testing.T) {
 }
 
 func TestUserService_Authenticate_UserNotFound(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service := GetUpdate_Users.NewUserService(mockRepo)
 	
 	mockRepo.On("GetUserByEmail", "john@example.com").Return(nil, nil)
 	
@@ -174,8 +142,8 @@ func TestUserService_Authenticate_UserNotFound(t *testing.T) {
 }
 
 func TestUserService_Authenticate_RepositoryError(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service := GetUpdate_Users.NewUserService(mockRepo)
 	
 	expectedError := errors.New("database error")
 	mockRepo.On("GetUserByEmail", "john@example.com").Return(nil, expectedError)
@@ -189,8 +157,8 @@ func TestUserService_Authenticate_RepositoryError(t *testing.T) {
 }
 
 func TestUserService_GetUserRoles_Success(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service := GetUpdate_Users.NewUserService(mockRepo)
 	
 	expectedRoles := []string{"admin", "user"}
 	mockRepo.On("GetUserRoles", "123").Return(expectedRoles, nil)
@@ -203,8 +171,8 @@ func TestUserService_GetUserRoles_Success(t *testing.T) {
 }
 
 func TestUserService_GetUserRoles_Error(t *testing.T) {
-	mockRepo := &MockUserRepository{}
-	service := NewUserService(mockRepo)
+	mockRepo := &mocks.MockUserRepo{}
+	service :=GetUpdate_Users.NewUserService(mockRepo)
 	
 	expectedError := errors.New("roles query failed")
 	mockRepo.On("GetUserRoles", "123").Return(nil, expectedError)
@@ -220,4 +188,3 @@ func TestUserService_GetUserRoles_Error(t *testing.T) {
 
 
 
-/
