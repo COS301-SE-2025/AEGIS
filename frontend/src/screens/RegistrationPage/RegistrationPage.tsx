@@ -9,10 +9,13 @@ import {
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Link } from "react-router-dom";
-//@ts-ignore
-import useRegistrationForm from "./register";
+// @ts-ignore
+
+import useRegisterForm from "./register";
 
 export const RegistrationPage = (): JSX.Element => {
+const { formData, errors, handleChange, handleSubmit } = useRegisterForm();
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
       {/* Background Grid of 6 Image Tiles */}
@@ -53,7 +56,7 @@ export const RegistrationPage = (): JSX.Element => {
           </CardHeader>
 
           <CardContent className="p-0 space-y-6">
-            <form className="w-full space-y-6">
+            <form className="w-full space-y-6" onSubmit={handleSubmit}>
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-lg font-medium">
                   Name
@@ -61,8 +64,12 @@ export const RegistrationPage = (): JSX.Element => {
                 <Input
                   id="name"
                   placeholder="Enter your Full Name"
+                  value={formData.name}
+                  onChange={handleChange}
                   className="h-[50px] rounded-[10px] border-white/30 bg-white/50 text-white placeholder-white/80"
                 />
+                  {errors.name && <p className="text-red-300 text-sm">{errors.name}</p>}
+
               </div>
 
               <div className="space-y-2">
@@ -73,8 +80,12 @@ export const RegistrationPage = (): JSX.Element => {
                   id="email"
                   type="email"
                   placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={handleChange}
                   className="h-[50px] rounded-[10px] border-white/30 bg-white/50 text-white placeholder-white/80"
                 />
+                {errors.email && <p className="text-red-300 text-sm">{errors.email}</p>}
+
               </div>
 
               <div className="space-y-2">
@@ -85,8 +96,13 @@ export const RegistrationPage = (): JSX.Element => {
                   id="password"
                   type="password"
                   placeholder="Create a password"
+                  value={formData.password}
+                  onChange={handleChange}
                   className="h-[50px] rounded-[10px] border-white/30 bg-white/50 text-white placeholder-white/80"
                 />
+                 {errors.password && (
+                <p className="text-red-300 text-sm">{errors.password}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -95,6 +111,8 @@ export const RegistrationPage = (): JSX.Element => {
               </Label>
               <select
                 id="role"
+                value={formData.role}
+                onChange={handleChange}
                 className="h-[50px] rounded-[10px] border-white/30 bg-white/50 text-white placeholder-white/80 px-4 focus:outline-none"
                 defaultValue=""
               >
@@ -108,7 +126,12 @@ export const RegistrationPage = (): JSX.Element => {
                 <option className="text-black">DFIR Manager</option>
                 <option className="text-black">Legal/Compliance Liaison</option>
               </select>
+              {errors.role && <p className="text-red-300 text-sm">{errors.role}</p>}
+
             </div>
+            {errors.general && (
+      <p className="text-center text-red-400 text-sm">{errors.general}</p>
+    )}
 
 
 

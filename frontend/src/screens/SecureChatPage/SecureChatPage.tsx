@@ -52,10 +52,10 @@ export  const SecureChatPage = (): JSX.Element => {
             <Folder className="w-5 h-5" />
             Case Management
             </Link>
-        <button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-gray-800 rounded-lg">
+        <Link to="/evidence-viewer"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-gray-800 rounded-lg">
             <FileText className="w-5 h-5" />
             Evidence Viewer
-        </button>
+        </button></Link>
         <button className="w-full flex items-center gap-3 text-left px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg">
             <MessageSquare className="w-5 h-5" />
             Secure Chat
