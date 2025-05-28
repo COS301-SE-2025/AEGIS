@@ -16,6 +16,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
+import { useEffect } from "react";
 
 const metricCards = [
   {
@@ -113,6 +114,98 @@ const caseCards = [
     image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
   },
 ];
+
+
+interface CaseCard {
+  id: number;
+  creator: string;
+  team: string;
+  priority: string;
+  attackType: string;
+  description: string;
+  lastActivity: string;
+  progress: number;
+  image: string;
+}
+
+export default function Dashboard() {
+  const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
+
+  useEffect(() => {
+    // Load cases from localStorage
+    const stored = localStorage.getItem("cases");
+    console.log("Loaded from localStorage:", stored); // <-- DEBUG
+
+    if (stored) {
+      const parsedCases: CaseCard[] = JSON.parse(stored);
+      console.log("Parsed Cases:", parsedCases); // <-- Check contents
+      setCaseCards(parsedCases.reverse()); // Show newest first
+    }
+  }, []);
+
+  return (
+    <div className="p-8">
+      <h1 className="text-3xl font-bold text-white mb-6">Dashboard</h1>
+
+      <div className="flex flex-wrap gap-6">
+        {caseCards.map((card, index) => (
+          <div
+            key={card.id}
+            className="flex flex-col justify-between items-center w-[440px] h-[370px] p-4 bg-[#19191F] border border-[#393D47] rounded-[8px]"
+          >
+            <img
+              src={card.image}
+              alt={card.description}
+              width={331}
+              height={180}
+              className="rounded-md mb-3"
+            />
+
+            <h3 className="text-white text-lg font-bold text-center mb-1">
+              {card.attackType || "Untitled Case"}
+            </h3>
+
+            <div className="text-sm text-gray-400 text-center mb-2">
+              Team: {card.team} | Last Activity: {card.lastActivity}
+            </div>
+
+            <div className="flex justify-between items-center w-full text-xs mb-1">
+              <div className="flex items-center gap-1">
+                <span
+                  className={cn(
+                    "w-2 h-2 rounded-full",
+                    card.priority === "critical"
+                      ? "bg-red-500"
+                      : card.priority === "high"
+                      ? "bg-orange-400"
+                      : card.priority === "mid"
+                      ? "bg-yellow-400"
+                      : "bg-green-400"
+                  )}
+                ></span>
+                <span className="text-gray-300">{card.priority}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                <span className="text-gray-300">Ongoing</span>
+              </div>
+            </div>
+
+            <Progress
+              value={card.progress}
+              className="w-full h-3 bg-gray-800 mb-3 [&>div]:bg-green-500"
+            />
+
+            <button className="bg-[#633ae8] text-white text-sm px-14 py-2 rounded hover:bg-gray-800">
+              View Details
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 
 
@@ -364,3 +457,4 @@ export const DashBoardPage = () => {
     </div>
   );
 };
+

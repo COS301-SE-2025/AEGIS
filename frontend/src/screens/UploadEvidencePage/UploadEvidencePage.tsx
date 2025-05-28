@@ -31,6 +31,7 @@ export function UploadEvidenceForm(): JSX.Element {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
     // TODO: Upload logic
     console.log("Uploading files:", files);
   };
