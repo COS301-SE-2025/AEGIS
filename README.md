@@ -47,9 +47,9 @@
 
 | Member             | Role | Links |
 |--------------------|--------------|--------------|
-| **Ofentse Modika** |*Services Engineer, Data Engineer* | [![LinkedIn](https://skillicons.dev/icons?i=linkedin&size=20)](https://linkedin.com) [![GitHub](https://skillicons.dev/icons?i=github&size=20)](https://github.com) |
+| **Ofentse Modika** |*Services Engineer, Data Engineer, Integration Engineer* | [![LinkedIn](https://skillicons.dev/icons?i=linkedin&size=20)](https://linkedin.com) [![GitHub](https://skillicons.dev/icons?i=github&size=20)](https://github.com) |
 | **Onthatile Molebaloa** |*Services Engineer, UI Engineer* | [![LinkedIn](https://skillicons.dev/icons?i=linkedin&size=20)](https://linkedin.com) [![GitHub](https://skillicons.dev/icons?i=github&size=20)](https://github.com) |
-| **Lwando Msindo** | *Integration Engineer, & DevOps* | [![LinkedIn](https://skillicons.dev/icons?i=linkedin&size=20)](https://linkedin.com) [![GitHub](https://skillicons.dev/icons?i=github&size=20)](https://github.com) |
+| **Lwando Msindo** | *Integration Engineer, DevOps* | [![LinkedIn](https://skillicons.dev/icons?i=linkedin&size=20)](https://linkedin.com) [![GitHub](https://skillicons.dev/icons?i=github&size=20)](https://github.com) |
 | **Tshireletso Sebake** |*Services Engineer, UI Engineer* | [![LinkedIn](https://skillicons.dev/icons?i=linkedin&size=20)](https://linkedin.com) [![GitHub](https://skillicons.dev/icons?i=github&size=20)](https://github.com) |
 | **Retshepile Nkwana** |*UI Engineer, Services Engineer* | [![LinkedIn](https://skillicons.dev/icons?i=linkedin&size=20)](https://linkedin.com) [![GitHub](https://skillicons.dev/icons?i=github&size=20)](https://github.com) |
 <!-- later 
