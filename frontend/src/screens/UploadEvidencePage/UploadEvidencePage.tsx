@@ -38,6 +38,7 @@ export function UploadEvidenceForm(): JSX.Element {
     formData.append("file", files[0]); // Assuming first selected file
     formData.append("case_id", "123e4567-e89b-12d3-a456-426614174000"); 
     formData.append("uploaded_by", "789e4567-e89b-12d3-a456-426614174111");
+    alert("Evidence Uploaded!")
 
     try {
         const response = await axios.post("http://localhost:8080/api/v1", formData, {
@@ -109,6 +110,7 @@ export function UploadEvidenceForm(): JSX.Element {
 
             <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white">
               Done
+              
             </Button>
           </div>
         </form>
