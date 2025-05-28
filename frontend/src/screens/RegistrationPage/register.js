@@ -47,22 +47,8 @@ const useRegistrationForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
-
-    try {
-      const response = await fetch("http://localhost:8080/api/v1/admin/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        navigate("/login");
-      } else {
-        console.error("Registration failed");
-      }
-    } catch (error) {
-      console.error("Error submitting form:", error);
-    }
+      navigate("/login");
+  
   };
 
   return { formData, handleChange, handleSubmit, errors };

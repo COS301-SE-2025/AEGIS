@@ -37,25 +37,7 @@ const useLoginForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
-
-    try {
-      const response = await fetch("http://localhost:4000/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        sessionStorage.setItem("user", JSON.stringify(formData));
         navigate("/dashboard");
-      } else {
-        const data = await response.json();
-        setErrors({ general: data.message || "Login failed" });
-      }
-    } catch (error) {
-      console.error("Login error:", error);
-      setErrors({ general: "Unexpected error occurred" });
-    }
   };
 
   return { formData, handleChange, handleSubmit, errors };
