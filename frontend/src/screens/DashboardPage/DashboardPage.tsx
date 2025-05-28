@@ -124,7 +124,7 @@ export const DashBoardPage = () => {
       {/* Sidebar */}
       <div className="fixed left-0 top-0 h-full w-80 bg-black border-r border-gray-800 p-6 flex flex-col z-10">
         {/* Logo */}
-        <div className="flex items-center gap-3 mb-8">
+        <div className=" flex items-center gap-3 mb-8">
           <div className="w-14 h-14 rounded-lg overflow-hidden">
             <img
               src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"

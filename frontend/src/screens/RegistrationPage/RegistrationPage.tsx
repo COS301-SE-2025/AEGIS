@@ -119,6 +119,7 @@ const { formData, errors, handleChange, handleSubmit } = useRegisterForm();
                 <option value="" disabled hidden className="text-gray-400">
                   Select your role
                 </option>
+                <option className="text-black">Admin</option>
                 <option className="text-black">Incident Responder</option>
                 <option className="text-black">Forensics Analyst</option>
                 <option className="text-black">Malware Analyst</option>
