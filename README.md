@@ -31,7 +31,7 @@
 # Project Management:
 | Project board |  
 |----------|
-| [Github Project Board](https://github.com/COS301-SE-2025/AEGIS) | 
+| [Github Project Board](https://github.com/orgs/COS301-SE-2025/projects/135/views/1?filterQuery=) | 
 
 
 <!-- when needed, uncomment
