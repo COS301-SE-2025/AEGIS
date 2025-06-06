@@ -38,6 +38,14 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Reset password tokens table
+CREATE TABLE password_reset_tokens (
+    token TEXT PRIMARY KEY,
+    user_id UUID NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE
+);
+
 -- Cases table
 CREATE TABLE IF NOT EXISTS cases (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

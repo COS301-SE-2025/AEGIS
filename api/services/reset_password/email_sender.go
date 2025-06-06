@@ -1,7 +1,9 @@
-
 package reset_password
 
-import "log"
+import (
+	"fmt"
+	"log"
+)
 
 type MockEmailSender struct{}
 
@@ -16,6 +18,10 @@ func NewMockEmailSender() *MockEmailSender {
 // }
 
 func (m *MockEmailSender) SendPasswordResetEmail(email string, token string) error {
-    log.Printf("📧 [MOCK] Sending reset link to %s: token=%s", email, token)
-    return nil
+	resetURL := fmt.Sprintf("http://localhost:8080/reset-password?token=%s", token)
+
+	log.Printf("📧 [DEV] Simulated reset email to %s", email)
+	log.Printf("🔗 [DEV] Reset Password Link: %s", resetURL)
+
+	return nil
 }
