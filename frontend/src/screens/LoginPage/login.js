@@ -6,7 +6,6 @@ const useLoginForm = () => {
     email: "",
     password: "",
   });
-
   const [errors, setErrors] = useState({});
   const navigate = useNavigate();
 
@@ -37,7 +36,30 @@ const useLoginForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
+
+    try {
+      const res = await fetch("http://localhost:8080/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const payload = await res.json();
+
+      if (res.ok && payload.success && payload.data?.token) {
+        // Store the real token
+        sessionStorage.setItem("authToken", payload.data.token);
+        sessionStorage.setItem(
+          "user",
+          JSON.stringify({ email: payload.data.email, id: payload.data.id })
+        );
         navigate("/dashboard");
+      } else {
+        // Use general so your UI reads errors.general
+        setErrors({ general: payload.message || "Login failed" });
+      }
+    } catch (err) {
+      setErrors({ general: err.message || "Network error" });
+    }
   };
 
   return { formData, handleChange, handleSubmit, errors };
