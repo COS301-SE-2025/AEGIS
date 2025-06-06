@@ -2,9 +2,10 @@ package registration
 
 import (
 	"errors"
-	"strings" 
-	"gorm.io/gorm"
 	"log"
+	"strings"
+
+	"gorm.io/gorm"
 )
 
 // ----------------------
@@ -15,58 +16,20 @@ type UserRepository interface {
 	CreateUser(user *User) error
 	GetUserByEmail(email string) (*User, error)
 	UpdateUser(user *User) error
-	GetUserByToken(token string) (*User, error) 
+	GetUserByToken(token string) (*User, error)
+	GetUserByFullName(fullName string) (*User, error)
 }
-
-//
-// ─────────────────────────────────────────────────────────────────────
-//   In-Memory Repository (Dev / Testing)
-// ─────────────────────────────────────────────────────────────────────
-//
-
-// type InMemoryUserRepository struct {
-// 	users map[string]*User
-// }
-
-// func NewInMemoryUserRepository() *InMemoryUserRepository {
-// 	return &InMemoryUserRepository{
-// 		users: make(map[string]*User),
-// 	}
-// }
-
-// func (r *InMemoryUserRepository) CreateUser(user *User) error {
-// 	if _, exists := r.users[user.Email]; exists {
-// 		return errors.New("user already exists")
-// 	}
-// 	r.users[user.Email] = user
-// 	return nil
-// }
-
-// func (r *InMemoryUserRepository) GetUserByEmail(email string) (*User, error) {
-// 	user, exists := r.users[email]
-// 	if !exists {
-// 		return nil, errors.New("user not found")
-// 	}
-// 	return user, nil
-// }
-
-//
-// ─────────────────────────────────────────────────────────────────────
-//   GORM Repository (Production)
-// ─────────────────────────────────────────────────────────────────────
-//
 
 type GormUserRepository struct {
 	db *gorm.DB
 }
 
 func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
-    if db == nil {
-        log.Fatal("DB is nil in NewGormUserRepository")
-    }
-    return &GormUserRepository{db: db}
+	if db == nil {
+		log.Fatal("DB is nil in NewGormUserRepository")
+	}
+	return &GormUserRepository{db: db}
 }
-
 
 func (r *GormUserRepository) CreateUser(user *User) error {
 	err := r.db.Create(user).Error
@@ -78,7 +41,6 @@ func (r *GormUserRepository) CreateUser(user *User) error {
 	}
 	return err
 }
-
 
 func (r *GormUserRepository) GetUserByEmail(email string) (*User, error) {
 	var user User
@@ -98,4 +60,14 @@ func (r *GormUserRepository) GetUserByToken(token string) (*User, error) {
 func (r *GormUserRepository) UpdateUser(user *User) error {
 	result := r.db.Save(user)
 	return result.Error
+}
+
+// GetUserByFullName fetches a user by full name.
+func (r *GormUserRepository) GetUserByFullName(fullName string) (*User, error) {
+	var user User
+	result := r.db.Where("full_name = ?", fullName).First(&user)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &user, nil
 }
