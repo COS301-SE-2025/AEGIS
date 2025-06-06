@@ -1,4 +1,5 @@
 package registration
+
 //Web Layer
 // This layer is responsible for handling HTTP requests and responses.
 // It decodes incoming requests, calls the service layer, and encodes the responses.
@@ -13,31 +14,28 @@ import (
 
 type RegistrationRequest struct {
 	FullName string `json:"full_name"`
-	Email   string `json:"email"`
+	Email    string `json:"email"`
 	Password string `json:"password"`
 	Role     string `json:"role"`
 	/*
-Password is required to be hashed.
-From client side, password is sent in plain text.
-On the server side, it is hashed using bcrypt before storage.
-*/
+		Password is required to be hashed.
+		From client side, password is sent in plain text.
+		On the server side, it is hashed using bcrypt before storage.
+	*/
 
 }
 
 type UserResponse struct {
-	ID      string `json:"id"`
+	ID       string `json:"id"`
 	FullName string `json:"full_name"`
-	Email   string `json:"email"`
+	Email    string `json:"email"`
 }
-
-
 
 func (r RegistrationRequest) Validate() error {
 	if strings.TrimSpace(r.FullName) == "" {
-		return errors.New("Full name is required")
+		return errors.New("full name is required")
 	}
-	
-	
+
 	matched, _ := regexp.MatchString(`^[\w\.-]+@[\w\.-]+\.\w+$`, r.Email)
 	if !matched {
 		return errors.New("invalid email address format")
@@ -49,10 +47,10 @@ func (r RegistrationRequest) Validate() error {
 	if !isStrongPassword(r.Password) {
 		return errors.New("password must contain uppercase, lowercase, and a digit")
 	}
-		if matched, _ := regexp.MatchString(`^[\w\.-]+@[\w\.-]+\.\w+$`, r.Email); !matched {
+	if matched, _ := regexp.MatchString(`^[\w\.-]+@[\w\.-]+\.\w+$`, r.Email); !matched {
 		return errors.New("invalid email address format")
 	}
-		// Validate ENUM role
+	// Validate ENUM role
 	validRoles := map[string]bool{
 		"Incident Responder": true, "Forensic Analyst": true, "Malware Analyst": true,
 		"Threat Intelligent Analyst": true, "DFIR Manager": true, "Legal/Compliance Liaison": true,

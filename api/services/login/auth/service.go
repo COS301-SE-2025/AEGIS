@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 )
+
 type AuthService struct {
 	repo UserRepository
 }
@@ -14,8 +15,6 @@ type AuthService struct {
 func NewAuthService(repo UserRepository) *AuthService {
 	return &AuthService{repo: repo}
 }
-
-
 
 func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 	user, err := s.repo.GetUserByEmail(email)
@@ -28,8 +27,9 @@ func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 	}
 
 	return &LoginResponse{
-		ID:    user.ID,
-		Email: user.Email,
-		Token: user.VerificationToken, // Later replace with JWT
+		ID:         user.ID,
+		Email:      user.Email,
+		Token:      user.VerificationToken, // Later replace with JWT
+		IsVerified: user.IsVerified,
 	}, nil
 }
