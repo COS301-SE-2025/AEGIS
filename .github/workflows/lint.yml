@@ -2,7 +2,7 @@ name: Lint
 
 on:
   push:
-    branches: [ ci-workflows ] #for testing purposes
+    branches: [ ci-workflows ] #for testing purposes | to do: use the branches full name -> feature/ci-workflows (trying to avoid multiple emails right now)
   pull_request:
     branches: [ ci-workflows ]
 
