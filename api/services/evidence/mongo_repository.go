@@ -1,9 +1,11 @@
+// file: mongo_repository.go
 package evidence
 
 import (
-	"context"
-	"github.com/google/uuid"
 	"aegis-api/db"
+	"context"
+
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -17,6 +19,18 @@ type MongoCollection interface {
 // MongoEvidenceRepository handles persistence in MongoDB.
 type MongoEvidenceRepository struct {
 	Collection MongoCollection
+}
+
+// MongoEvidenceLogger is a struct for logging evidence actions.
+type MongoEvidenceLogger struct{}
+
+func NewMongoEvidenceLogger() *MongoEvidenceLogger {
+	return &MongoEvidenceLogger{}
+}
+
+func (l *MongoEvidenceLogger) Log(userID, evidenceID, filename string) error {
+	// calls your existing function in logs.go:
+	return LogEvidenceUpload(userID, evidenceID, filename)
 }
 
 // NewMongoEvidenceRepository uses the live MongoDB collection.

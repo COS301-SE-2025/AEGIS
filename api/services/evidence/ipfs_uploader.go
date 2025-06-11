@@ -1,11 +1,11 @@
+// ipfs_uploader.go
 package evidence
 
 import (
 	"bytes"
-	"fmt"
-	shell "github.com/ipfs/go-ipfs-api"
 	"io"
-	"os"
+
+	shell "github.com/ipfs/go-ipfs-api"
 )
 
 var ipfs *shell.Shell
@@ -14,24 +14,34 @@ func InitIPFSClient() {
 	ipfs = shell.NewShell("localhost:5001")
 }
 
-func UploadToIPFS(filePath string) (string, error) {
-	file, err := os.Open(filePath)
+type IPFSShellClient struct {
+	shell *shell.Shell
+}
+
+func NewIPFSShellClient(addr string) *IPFSShellClient {
+	return &IPFSShellClient{
+		shell: shell.NewShell(addr),
+	}
+}
+func (c *IPFSShellClient) Upload(data []byte) (string, error) {
+	reader := bytes.NewReader(data)
+	cid, err := c.shell.Add(reader)
 	if err != nil {
-		return "", fmt.Errorf("failed to open file: %w", err)
+		return "", err
 	}
-	defer file.Close()
-
-	// Read the file into memory
-	buf := new(bytes.Buffer)
-	if _, err := io.Copy(buf, file); err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
-	}
-
-	// Upload to IPFS
-	cid, err := ipfs.Add(bytes.NewReader(buf.Bytes()))
-	if err != nil {
-		return "", fmt.Errorf("IPFS upload failed: %w", err)
-	}
-
 	return cid, nil
+}
+
+func (c *IPFSShellClient) Download(cid string) ([]byte, error) {
+	reader, err := c.shell.Cat(cid)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, reader)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

@@ -1,4 +1,6 @@
+// dto.go
 package evidence
+
 type UploadEvidenceRequest struct {
 	CaseID     string                 `json:"case_id"`
 	UploadedBy string                 `json:"uploaded_by"`

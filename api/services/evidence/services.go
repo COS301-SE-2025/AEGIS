@@ -1,12 +1,14 @@
+// file: services.go
 package evidence
 
 import (
 	//"aegis-api/db"
+	"errors"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"errors"
-	"time"
 )
 
 type Service struct {
@@ -16,35 +18,42 @@ type Service struct {
 }
 
 type IPFSClient interface {
-	Upload(path string) (string, error)
-	Download(cid string) ([]byte, error) 
+	Upload(data []byte) (string, error)
+	Download(cid string) ([]byte, error)
 }
+type ServiceInterface interface {
+	ListEvidenceByCase(caseID string) ([]Evidence, error)
+	ListEvidenceByUser(userID string) ([]Evidence, error)
+	GetEvidenceByID(evidenceID string) (*Evidence, error)
+	DeleteEvidenceByID(evidenceID string) error
+	GetEvidenceMetadata(evidenceID string) (*EvidenceMetadata, error)
+	DownloadEvidenceByUser(userID string) ([]EvidenceFile, error)
 
-
+	SaveEvidence(req UploadEvidenceRequest) (*Evidence, error)
+	UploadFromBytes(data []byte) (string, error)
+}
 type EvidenceRepository interface {
 	SaveEvidence(e *Evidence) error
 	AttachTags(e *Evidence, tags []string) error
 	FindByID(id uuid.UUID) (*Evidence, error)
 	DeleteByID(id uuid.UUID) error
-	FindByCase(caseID uuid.UUID) ([]Evidence, error) 
+	FindByCase(caseID uuid.UUID) ([]Evidence, error)
 	FindByUser(userID uuid.UUID) ([]Evidence, error)
 	PreloadMetadata(id uuid.UUID) (*Evidence, error)
 }
-
-
 
 type EvidenceLogger interface {
 	Log(userID, evidenceID, filename string) error
 }
 
-
 func NewEvidenceService(ipfs IPFSClient, repo EvidenceRepository, logger EvidenceLogger) *Service {
 	return &Service{ipfs: ipfs, repo: repo, logger: logger}
 }
+func (s *Service) UploadFromBytes(data []byte) (string, error) {
+	return s.ipfs.Upload(data)
+}
 
-
-
-func (s *Service) UploadEvidence(req UploadEvidenceRequest) (*Evidence, error) {
+func (s *Service) SaveEvidence(req UploadEvidenceRequest) (*Evidence, error) {
 	caseID, err := uuid.Parse(req.CaseID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid case ID: %w", err)
@@ -96,14 +105,13 @@ func (s *Service) ListEvidenceByUser(userID string) ([]Evidence, error) {
 	return s.repo.FindByUser(id)
 }
 
-
 func (s *Service) GetEvidenceByID(evidenceID string) (*Evidence, error) {
 	id, err := uuid.Parse(evidenceID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid evidence ID: %w", err)
 	}
 
-	ev, err := s.repo.FindByID(id) // 
+	ev, err := s.repo.FindByID(id) //
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("evidence not found")
@@ -128,7 +136,6 @@ func (s *Service) DeleteEvidenceByID(evidenceID string) error {
 	return nil
 }
 
-
 func (s *Service) GetEvidenceMetadata(evidenceID string) (*EvidenceMetadata, error) {
 	id, err := uuid.Parse(evidenceID)
 	if err != nil {
@@ -138,9 +145,8 @@ func (s *Service) GetEvidenceMetadata(evidenceID string) (*EvidenceMetadata, err
 	ev, err := s.repo.PreloadMetadata(id)
 
 	if err != nil {
-	return nil, fmt.Errorf("evidence not found")
-}
-
+		return nil, fmt.Errorf("evidence not found")
+	}
 
 	var tagNames []string
 	for _, tag := range ev.Tags {
@@ -164,34 +170,34 @@ func (s *Service) GetEvidenceMetadata(evidenceID string) (*EvidenceMetadata, err
 	return metadata, nil
 }
 func (s *Service) DownloadEvidenceByUser(userID string) ([]EvidenceFile, error) {
-    // 1) Parse the incoming string
-    id, err := uuid.Parse(userID)
-    if err != nil {
-        return nil, fmt.Errorf("invalid user ID: %w", err)
-    }
+	// 1) Parse the incoming string
+	id, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
 
-    // 2) Fetch metadata records from Postgres
-    records, err := s.repo.FindByUser(id)
-    if err != nil {
-        return nil, err
-    }
+	// 2) Fetch metadata records from Postgres
+	records, err := s.repo.FindByUser(id)
+	if err != nil {
+		return nil, err
+	}
 
-    // 3) For each record, download from IPFS
-    var out []EvidenceFile
-    for _, ev := range records {
-        blob, err := s.ipfs.Download(ev.IpfsCID)
-        if err != nil {
-            // optional: log and skip
-            _ = s.logger.Log(userID, ev.ID.String(), "ipfs download failed")
-            continue
-        }
-        out = append(out, EvidenceFile{
-            Filename: ev.Filename,
-            FileType: ev.FileType,
-            IpfsCID:  ev.IpfsCID,
-            Content:  blob,
-        })
-    }
+	// 3) For each record, download from IPFS
+	var out []EvidenceFile
+	for _, ev := range records {
+		blob, err := s.ipfs.Download(ev.IpfsCID)
+		if err != nil {
+			// optional: log and skip
+			_ = s.logger.Log(userID, ev.ID.String(), "ipfs download failed")
+			continue
+		}
+		out = append(out, EvidenceFile{
+			Filename: ev.Filename,
+			FileType: ev.FileType,
+			IpfsCID:  ev.IpfsCID,
+			Content:  blob,
+		})
+	}
 
-    return out, nil
+	return out, nil
 }
