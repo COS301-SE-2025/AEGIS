@@ -3,520 +3,100 @@ package handlers
 import (
 	//"strconv"
 
+	"aegis-api/services/ListCases"
+	"aegis-api/services/ListUsers"
+	"aegis-api/services/case_assign"
+	"aegis-api/services/case_creation"
+	"aegis-api/services/case_status_update"
+	"aegis-api/services/delete_user"
+	"aegis-api/services/evidence"
+	"aegis-api/services/get_collaborators"
+	"aegis-api/services/login/auth"
+	"aegis-api/services/registration"
+	"aegis-api/services/reset_password"
+	"aegis-api/services/update_user_role"
+	"context"
+	"github.com/google/uuid"
+	"strings"
+
 	//"aegis-core/services"
 	"aegis-api/structs"
 	"github.com/gin-gonic/gin"
-	"time"
-	"aegis-api/services/registration"
-	"aegis-api/services/ListUsers"
-	"aegis-api/services/update_user_role"
-	"aegis-api/services/delete_user"
-	"context"
 	"net/http"
-	"strings"
-	"log"
-	"aegis-api/services/login/auth"
-	"github.com/google/uuid"
-	"aegis-api/services/reset_password"
-	"aegis-api/services/case_creation"
-	"aegis-api/services/case_assign"
-	
+	"time"
+	//"net/http"
 )
 
 type Handler struct {
-	AdminService    AdminServiceInterface
-	AuthService     AuthServiceInterface
-	CaseService     CaseServiceInterface
-	EvidenceService EvidenceServiceInterface
-	UserService     UserServiceInterface
+	AdminService    AdminInterface
+	AuthService     AuthInterface
+	CaseService     CaseInterface
+	EvidenceService EvidenceInterface
+	UserService     UserInterface
 }
 
 //mock services
 
-type AdminServiceInterface interface {
+type AdminInterface interface {
 	RegisterUser(c *gin.Context)
 	ListUsers(c *gin.Context)
-	//GetUserActivity(c *gin.Context)// I cant Find the Implementation
+	GetUserActivity(c *gin.Context)
 	UpdateUserRole(c *gin.Context)
 	DeleteUser(c *gin.Context)
-	//GetRoles(c *gin.Context)//I cant find implementation
-
-
-}
-type AuthServiceInterface interface {
-    LoginHandler(c *gin.Context)
-   // LogoutHandler(c *gin.Context)
-    ResetPasswordHandler(c *gin.Context)
+	GetRoles(c *gin.Context)
 }
 
-type AdminService struct {
-	registrationService *registration.RegistrationService
-	listUserService     ListUsers.ListUserService
-	userService         *update_user_role.UserService
-	userDeleteService *delete_user.UserDeleteService
+type AuthInterface interface {
+	Login(c *gin.Context)
+	Logout(c *gin.Context)
+	ResetPassword(c *gin.Context)
 }
 
-
-//constructor for your AdminService. It’s used to create a new instance of AdminService with its dependencies properly injected
-// NewAdminService constructs an AdminService with required dependencies.
-func NewAdminService(
-    regService *registration.RegistrationService,
-    listUserSvc ListUsers.ListUserService,
-    userService *update_user_role.UserService,
-    userDeleteService *delete_user.UserDeleteService,
-) *AdminService {
-    return &AdminService{
-        registrationService: regService,
-        listUserService:     listUserSvc,
-        userService:         userService,
-        userDeleteService:   userDeleteService,
-    }
-}
-/*
-**
-**----------------- RegisterUser -----
-**
-*/
-
-
-
-
-//Registration
-func (s *AdminService) RegisterUser(c *gin.Context) {
-	var req registration.RegistrationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: err.Error(),
-		})
-		return
-	}
-
-	user, err := s.registrationService.Register(req)
-	if err != nil {
-		log.Printf("Registration error: %v", err)
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "registration_failed",
-			Message: err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusCreated, structs.SuccessResponse{
-		Success: true,
-		Message: "User registered successfully",
-		Data:    user,
-	})
-}
-
-
-
-
-/*
-**
-**----------------- ListUsers -----
-**
-*/
-
-
-func (s *AdminService) ListUsers(c *gin.Context) {
-	users, err := s.listUserService.ListUsers(context.Background())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-			Error:   "list_users_failed",
-			Message: err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, structs.SuccessResponse{
-		Success: true,
-		Message: "Users retrieved successfully",
-		Data:    users,
-	})
-}
-
-
-
-
-
-
-
-
-
-/*
-**
-**----------------- updateUserRole -----
-**
-*/
-
-
-func (s *AdminService) UpdateUserRole(c *gin.Context) {
-	userID := c.Param("user_id")
-	if userID == "" {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "User ID is required",
-		})
-		return
-	}
-
-	var req structs.UpdateUserRoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: err.Error(),
-		})
-		return
-	}
-
-	if err := s.userService.UpdateUserRole(userID, req.Role); err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "update_failed",
-			Message: err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, structs.SuccessResponse{
-		Success: true,
-		Message: "User role updated successfully",
-	})
-}
-
-
-
-
-
-/*
-**
-**----------------- DeleteUser -----
-**
-*/
-
-
-
-
-
-// DeleteUser handles HTTP DELETE /admin/users/:user_id
-func (s *AdminService) DeleteUser(c *gin.Context) {
-	// Bind URI parameter into your common structs type
-	var reqStruct structs.DeleteUserRequest
-	if err := c.ShouldBindUri(&reqStruct); err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: err.Error(),
-		})
-		return
-	}
-
-	// Extract requester role from context
-	reqRoleIface, exists := c.Get("userRole")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
-			Error:   "unauthorized",
-			Message: "User role missing",
-		})
-		return
-	}
-
-	reqRole, ok := reqRoleIface.(string)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Invalid user role in context",
-		})
-		return
-	}
-
-	// Convert to service package's request type
-	serviceReq := delete_user.DeleteUserRequest{UserID: reqStruct.UserID}
-
-	// Call delete service
-	err := s.userDeleteService.DeleteUser(serviceReq, reqRole)
-	if err != nil {
-		status := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "unauthorized") {
-			status = http.StatusForbidden
-		}
-		c.JSON(status, structs.ErrorResponse{
-			Error:   "deletion_failed",
-			Message: err.Error(),
-		})
-		return
-	}
-
-	// Successful deletion
-	c.JSON(http.StatusOK, structs.SuccessResponse{
-		Success: true,
-		Message: "User deleted successfully",
-	})
-}
-
-
-
-
-
-
-
-
-/*
-**
-**----------------- Login -----
-**
-*/
-
-type AuthHandler struct {
-	authService           *auth.AuthService
-	passwordResetService  *reset_password.PasswordResetService
-}
-type EmailSender interface {
-	SendPasswordResetEmail(email string, token string) error
-}
-
-// NewAuthHandler constructs an AuthHandler with required dependencies
-
-func NewAuthHandler(authService *auth.AuthService, resetService *reset_password.PasswordResetService) *AuthHandler {
-    return &AuthHandler{
-        authService: authService,
-        passwordResetService: resetService,
-    }
-}
-
-
-func (h *AuthHandler) LoginHandler(c *gin.Context) {
-	var req struct {
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: err.Error(),
-		})
-		return
-	}
-
-	resp, err := h.authService.Login(req.Email, req.Password)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
-			Error:   "authentication_failed",
-			Message: "Invalid email or password",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, structs.SuccessResponse{
-		Success: true,
-		Message: "Login successful",
-		Data:    resp,
-	})
-}
-
-
-
-// LogoutHandler handles POST /auth/logout
-// func (h *AuthHandler) LogoutHandler(c *gin.Context) {
-// 	// Assume userID is set in context by middleware
-// 	userID, exists := c.Get("userID")
-// 	if !exists {
-// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "User not authenticated"})
-// 		return
-// 	}
-
-// 	uid, ok := userID.(uuid.UUID)
-// 	if !ok {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Invalid user ID"})
-// 		return
-// 	}
-
-// 	if err := h.authService.Logout(uid); err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "logout_failed", "message": err.Error()})
-// 		return
-// 	}
-
-// 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Logged out successfully"})
-// }
-
-
-
-//ResetPasswordHandler handles POST /auth/password-reset
-func (h *AuthHandler) ResetPasswordHandler(c *gin.Context) {
-	var req struct {
-		Email       string `json:"email" binding:"required,email"`
-		NewPassword string `json:"newPassword" binding:"required"`
-		Token       string `json:"token" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
-		return
-	}
-
-	err := h.passwordResetService.ResetPassword(req.Token, req.NewPassword)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "reset_failed", "message": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Password reset successfully"})
-}
-
-type CaseServiceInterface interface {
-	//GetCases(c *gin.Context)
+type CaseInterface interface {
+	GetCases(c *gin.Context)
 	CreateCase(c *gin.Context)
-	//GetCase(c *gin.Context)
-	//UpdateCase(c *gin.Context)
-	//GetCollaborators(c *gin.Context)
+	GetCase(c *gin.Context)
+	UpdateCase(c *gin.Context)
+	GetCollaborators(c *gin.Context)
 	CreateCollaborator(c *gin.Context)
-	//RemoveCollaborator(c *gin.Context)
+	RemoveCollaborator(c *gin.Context)
 }
 
-type CaseHandler struct {
-    caseService *case_creation.Service
-	  caseAssignmentService *case_assign.CaseAssignmentService
-	      service *case_creation.Service
-}
-
-func NewCaseHandler(
-    service *case_creation.Service, 
-    caseAssignService *case_assign.CaseAssignmentService,
-) *CaseHandler {
-    return &CaseHandler{
-        caseService: service,
-        caseAssignmentService: caseAssignService,
-    }
-}
-// func NewCaseHandler(caseService case_creation.ServiceInterface, caseAssignService *case_assign.CaseAssignmentService) *CaseHandler {
-//     return &CaseHandler{
-//         caseService:           caseService,
-//         caseAssignmentService: caseAssignService,
-//     }
-// }
-// CreateCase handles POST /api/v1/cases
-func (h *CaseHandler) CreateCase(c *gin.Context) {
-    var req case_creation.CreateCaseRequest
-
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-            Error:   "invalid_request",
-            Message: "Invalid case data",
-            Details: err.Error(),
-        })
-        return
-    }
-
-    newCase, err := h.service.CreateCase(req)
-    if err != nil {
-        log.Printf("CreateCase error: %v", err)
-        c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-            Error:   "creation_failed",
-            Message: err.Error(),
-        })
-        return
-    }
-
-    c.JSON(http.StatusCreated, structs.SuccessResponse{
-        Success: true,
-        Message: "Case created successfully",
-        Data:    newCase,
-    })
-}
-
-
-func (h *CaseHandler) CreateCollaborator(c *gin.Context) {
-    caseIDStr := c.Param("case_id")
-    if caseIDStr == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Case ID is required"})
-        return
-    }
-
-    var req struct {
-        UserID string `json:"user_id" binding:"required,uuid"`
-        Role   string `json:"role" binding:"required"`
-    }
-
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
-        return
-    }
-
-    // Parse UUIDs
-    caseID, err := uuid.Parse(caseIDStr)
-    if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Invalid case ID"})
-        return
-    }
-
-    assigneeID, err := uuid.Parse(req.UserID)
-    if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Invalid user ID"})
-        return
-    }
-
-    // Get assigner ID from context (set by middleware)
-    assignerIDStr, exists := c.Get("userID")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "User ID missing from context"})
-        return
-    }
-
-    assignerID, err := uuid.Parse(assignerIDStr.(string))
-    if err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "Invalid assigner user ID"})
-        return
-    }
-
-    // Call service to assign collaborator (role)
-    err = h.caseAssignmentService.AssignUserToCase(assignerID, assigneeID, caseID, req.Role)
-    if err != nil {
-        if strings.Contains(err.Error(), "forbidden") {
-            c.JSON(http.StatusForbidden, gin.H{"error": "forbidden", "message": err.Error()})
-            return
-        }
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "assignment_failed", "message": err.Error()})
-        return
-    }
-
-    c.JSON(http.StatusOK, gin.H{
-        "success": true,
-        "message": "Collaborator assigned successfully",
-    })
-}
-
-
-
-type EvidenceServiceInterface interface {
+type EvidenceInterface interface {
 	GetEvidence(c *gin.Context)
 	UploadEvidence(c *gin.Context)
 	GetEvidenceItem(c *gin.Context)
 	PreviewEvidence(c *gin.Context)
 }
 
-type UserServiceInterface interface {
+type UserInterface interface {
 	GetUserInfo(c *gin.Context)
 	UpdateUserInfo(c *gin.Context)
 	GetUserCases(c *gin.Context)
 }
 
 func NewHandler(
-    adminSvc AdminServiceInterface,
-    authSvc AuthServiceInterface,
-    caseSvc CaseServiceInterface,
-    evidenceSvc EvidenceServiceInterface,
-    userSvc UserServiceInterface,
+	admin AdminInterface,
+	auth AuthInterface,
+	caseSvc CaseInterface,
+	evidence EvidenceInterface,
+	user UserInterface,
 ) *Handler {
-    return &Handler{
-        AdminService:    adminSvc,
-        AuthService:     authSvc,
-        CaseService:     caseSvc,
-        EvidenceService: evidenceSvc,
-        UserService:     userSvc,
-    }
+	return &Handler{
+		AdminService:    admin,
+		AuthService:     auth,
+		CaseService:     caseSvc,
+		EvidenceService: evidence,
+		UserService:     user,
+	}
 }
 
-
-type MockAdminService struct{}
+type AdminServices struct {
+	registrationService *registration.RegistrationService
+	listUserService     ListUsers.ListUserService
+	userService         *update_user_role.UserService
+	userDeleteService   *delete_user.UserDeleteService
+}
 
 // @Summary Register a new user
 // @Description Registers a new user with the provided details. Only users with 'Admin' role can perform this action.
@@ -528,10 +108,10 @@ type MockAdminService struct{}
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users [post]
-func (m MockAdminService) RegisterUser(c *gin.Context) {
+func (m AdminServices) RegisterUser(c *gin.Context) {
 	//struct to hold user data
 	//binding and validation
-	var req structs.RegisterUserRequest
+	var req registration.RegistrationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -542,29 +122,22 @@ func (m MockAdminService) RegisterUser(c *gin.Context) {
 	}
 
 	//call the service function
-	//user, err := m.adminService.Register(req)
-	//if err != nil {
-	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-	//		Error:   "registration_failed",
-	//		Message: "Could not register user",
-	//		Details: err.Error(),
-	//	})
-	//	return
-	//}
+	user, err := m.registrationService.Register(req)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "registration_failed",
+			Message: "Could not register user",
+			Details: err.Error(),
+		})
+		return
+	}
 
 	//http response
 	c.JSON(http.StatusCreated, structs.SuccessResponse{
 		Success: true,
 		Message: "User registered successfully",
-		//Data:    user,
-		Data: structs.User{ //hardcode results
-			ID:       "mock-user-123",
-			Email:    req.Email,
-			FullName: req.FullName,
-			Role: structs.UserRole{
-				Name: req.Role,
-			},
-		},
+		Data:    user,
 	})
 }
 
@@ -581,7 +154,7 @@ func (m MockAdminService) RegisterUser(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid query parameters"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users [get]
-func (m MockAdminService) ListUsers(c *gin.Context) {
+func (m AdminServices) ListUsers(c *gin.Context) {
 	//binding and validation
 	var req structs.UserFilter
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -594,37 +167,21 @@ func (m MockAdminService) ListUsers(c *gin.Context) {
 	}
 
 	//call the service function
-	//users, err := m.adminService.ListUsers(req)
-	//if err != nil {
-	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-	//		Error:   "list_users_failed",
-	//		Message: "Could not retrieve users",
-	//		Details: err.Error(),
-	//	})
-	//	return
-	//}
-
-	mockUsers := []structs.User{
-		{
-			ID:       "user-1",
-			Email:    "user1@example.com",
-			FullName: "User One",
-			Role:     structs.UserRole{Name: "Forensic Analyst"},
-		},
-		{
-			ID:       "user-2",
-			Email:    "user2@example.com",
-			FullName: "User Two",
-			Role:     structs.UserRole{Name: "DFIR Manager"},
-		},
+	users, err := m.listUserService.ListUsers(context.Background())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "list_users_failed",
+			Message: "Could not retrieve users",
+			Details: err.Error(),
+		})
+		return
 	}
 
 	//http response
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
 		Message: "Users retrieved successfully",
-		//Data:    users,
-		Data: mockUsers,
+		Data:    users,
 	})
 }
 
@@ -638,7 +195,7 @@ func (m MockAdminService) ListUsers(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing user ID)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users/{user_id} [get]
-func (m MockAdminService) GetUserActivity(c *gin.Context) {
+func (m AdminServices) GetUserActivity(c *gin.Context) {
 	// Get user ID from URL parameter
 	userID := c.Param("user_id")
 	if userID == "" {
@@ -653,7 +210,7 @@ func (m MockAdminService) GetUserActivity(c *gin.Context) {
 	//timeRange := c.Query("time_range")
 	//activityType := c.Query("activity_type")
 
-	//activities, err := m.adminService.GetUserActivity(userID)
+	//activities, err := m.AdminServices.GetUserActivity(userID) //call service function here
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 	//		Error:   "activity_fetch_failed",
@@ -695,7 +252,7 @@ func (m MockAdminService) GetUserActivity(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload or user ID"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users/{user_id} [put]
-func (m MockAdminService) UpdateUserRole(c *gin.Context) {
+func (m AdminServices) UpdateUserRole(c *gin.Context) {
 	userID := c.Param("user_id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -715,15 +272,15 @@ func (m MockAdminService) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	//err := m.adminService.UpdateUserRole(userID, req.Role)
-	//if err != nil {
-	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-	//		Error:   "role_update_failed",
-	//		Message: "Could not update user role",
-	//		Details: err.Error(),
-	//	})
-	//	return
-	//}
+	err := m.userService.UpdateUserRole(userID, req.Role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "role_update_failed",
+			Message: "Could not update user role",
+			Details: err.Error(),
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
@@ -741,7 +298,7 @@ func (m MockAdminService) UpdateUserRole(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing user ID)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users/{user_id} [delete]
-func (m MockAdminService) DeleteUser(c *gin.Context) {
+func (m AdminServices) DeleteUser(c *gin.Context) {
 	// Get user ID from URL parameter
 	userID := c.Param("user_id")
 	if userID == "" {
@@ -751,16 +308,39 @@ func (m MockAdminService) DeleteUser(c *gin.Context) {
 		})
 		return
 	}
+	/////
+	reqRoleIface, exists := c.Get("userRole")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "User role missing",
+		})
+		return
+	}
 
-	//err := m.adminService.DeleteUser(userID)
-	//if err != nil {
-	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-	//		Error:   "deletion_failed",
-	//		Message: "Could not delete user",
-	//		Details: err.Error(),
-	//	})
-	//	return
-	//}
+	reqRole, ok := reqRoleIface.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Invalid user role in context",
+		})
+		return
+	}
+	//////
+	//role := user role //c.GetHeader("Role") // Get the role from the request header
+
+	//serviceReq := delete_user.DeleteUserRequest{UserID: reqStruct.UserID}
+	req := delete_user.DeleteUserRequest{UserID: userID}
+
+	err := m.userDeleteService.DeleteUser(req, reqRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "deletion_failed",
+			Message: "Could not delete user",
+			Details: err.Error(),
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
@@ -776,8 +356,8 @@ func (m MockAdminService) DeleteUser(c *gin.Context) {
 // @Success 200 {object} structs.SuccessResponse{data=[]structs.UserRole} "Roles retrieved successfully"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/roles [get]
-func (m MockAdminService) GetRoles(c *gin.Context) {
-	//roles, err := m.adminService.GetRoles()
+func (m AdminServices) GetRoles(c *gin.Context) {
+	//roles, err := m.GetRoles()
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 	//		Error:   "roles_fetch_failed",
@@ -801,7 +381,14 @@ func (m MockAdminService) GetRoles(c *gin.Context) {
 	})
 }
 
-type MockAuthService struct{}
+type AuthServices struct {
+	authService          *auth.AuthService
+	passwordResetService *reset_password.PasswordResetService
+}
+
+type EmailSender interface {
+	SendPasswordResetEmail(email string, token string) error
+}
 
 // @Summary User login
 // @Description Authenticates a user and returns a token upon successful login.
@@ -813,7 +400,7 @@ type MockAuthService struct{}
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload or credentials"
 // @Failure 401 {object} structs.ErrorResponse "Authentication failed (invalid credentials)"
 // @Router /api/v1/auth/login [post]
-func (m MockAuthService) Login(c *gin.Context) {
+func (m AuthServices) Login(c *gin.Context) {
 	var req structs.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -824,24 +411,14 @@ func (m MockAuthService) Login(c *gin.Context) {
 		return
 	}
 
-	//response, err := m.authService.Login(req)
-	//if err != nil {
-	//	c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
-	//		Error:   "authentication_failed",
-	//		Message: "Invalid credentials",
-	//		Details: err.Error(),
-	//	})
-	//	return
-	//}
-
-	response := structs.LoginResponse{
-		Token: "mock-jwt-token-12345",
-		User: structs.User{
-			ID:       "user-123",
-			Email:    req.Email,
-			FullName: "Mock User",
-			Role:     structs.UserRole{Name: "Forensic Analyst"},
-		},
+	response, err := m.authService.Login(req.Email, req.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "authentication_failed",
+			Message: "Invalid credentials",
+			Details: err.Error(),
+		})
+		return
 	}
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
@@ -861,7 +438,7 @@ func (m MockAuthService) Login(c *gin.Context) {
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized (user not authenticated)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/logout [post]
-func (m MockAuthService) Logout(c *gin.Context) {
+func (m AuthServices) Logout(c *gin.Context) {
 	_, exists := c.Get("userID") //_ -> userID
 	if !exists {
 		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
@@ -897,7 +474,7 @@ func (m MockAuthService) Logout(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload (e.g., malformed email)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/password-reset [post]
-func (m MockAuthService) ResetPassword(c *gin.Context) {
+func (m AuthServices) ResetPassword(c *gin.Context) {
 	var req structs.ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -908,15 +485,15 @@ func (m MockAuthService) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	//err := m.authService.ResetPassword(req)
-	//if err != nil {
-	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-	//		Error:   "reset_failed",
-	//		Message: "Could not reset password",
-	//		Details: err.Error(),
-	//	})
-	//	return
-	//}
+	err := m.passwordResetService.ResetPassword(req.Token, req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "reset_failed",
+			Message: "Could not reset password",
+			Details: err.Error(),
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
@@ -924,7 +501,14 @@ func (m MockAuthService) ResetPassword(c *gin.Context) {
 	})
 }
 
-type MockCaseService struct{}
+type CaseServices struct {
+	createCase         *case_creation.Service
+	getCase            *ListCases.Service
+	updateCaseStatus   *case_status_update.CaseStatusService
+	getCollaborators   *get_collaborators.Service
+	assignCase         *case_assign.CaseAssignmentService
+	removeCollaborator *case_assign.CaseAssignmentService
+}
 
 // @Summary Get all cases
 // @Description Retrieves a paginated and filterable list of security cases.
@@ -942,7 +526,7 @@ type MockCaseService struct{}
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases [get]
-func (m MockCaseService) GetCases(c *gin.Context) {
+func (m CaseServices) GetCases(c *gin.Context) {
 	var filter structs.CaseFilter
 	if err := c.ShouldBindQuery(&filter); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -975,7 +559,7 @@ func (m MockCaseService) GetCases(c *gin.Context) {
 	//	return
 	//}
 
-	//cases, err := m.caseService.GetCases(filter)
+	//cases, err := m.getCase.
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 	//		Error:   "cases_fetch_failed",
@@ -1021,8 +605,8 @@ func (m MockCaseService) GetCases(c *gin.Context) {
 // @Failure 403 {object} structs.ErrorResponse "Forbidden (insufficient role)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases [post]
-func (m MockCaseService) CreateCase(c *gin.Context) {
-	var req structs.CreateCaseRequest
+func (m CaseServices) CreateCase(c *gin.Context) {
+	var req case_creation.CreateCaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -1042,29 +626,29 @@ func (m MockCaseService) CreateCase(c *gin.Context) {
 	//	return
 	//}
 
-	//case_, err := m.caseService.CreateCase(userID.(string), req)
-	//if err != nil {
-	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-	//		Error:   "case_creation_failed",
-	//		Message: "Could not create case",
-	//		Details: err.Error(),
-	//	})
-	//	return
-	//}
-
-	mockCase := structs.Case{
-		ID:          "new-case-123",
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      "active",
-		CreatedBy:   "mock-user-123",
+	case_, err := m.createCase.CreateCase(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "case_creation_failed",
+			Message: "Could not create case",
+			Details: err.Error(),
+		})
+		return
 	}
+
+	//mockCase := structs.Case{
+	//	ID:          "new-case-123",
+	//	Title:       req.Title,
+	//	Description: req.Description,
+	//	Status:      "active",
+	//	CreatedBy:   "mock-user-123",
+	//}
 
 	c.JSON(http.StatusCreated, structs.SuccessResponse{
 		Success: true,
 		Message: "Case created successfully",
-		//Data:    case_,
-		Data: mockCase,
+		Data:    case_,
+		//Data: mockCase,
 	})
 }
 
@@ -1081,7 +665,7 @@ func (m MockCaseService) CreateCase(c *gin.Context) {
 // @Failure 404 {object} structs.ErrorResponse "Case not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id} [get]
-func (m MockCaseService) GetCase(c *gin.Context) {
+func (m CaseServices) GetCase(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -1132,7 +716,7 @@ func (m MockCaseService) GetCase(c *gin.Context) {
 // @Failure 404 {object} structs.ErrorResponse "Case not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id} [put]
-func (m MockCaseService) UpdateCase(c *gin.Context) {
+func (m CaseServices) UpdateCase(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -1181,7 +765,7 @@ func (m MockCaseService) UpdateCase(c *gin.Context) {
 // @Failure 404 {object} structs.ErrorResponse "Case not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/collaborators [get]
-func (m MockCaseService) GetCollaborators(c *gin.Context) {
+func (m CaseServices) GetCollaborators(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -1233,7 +817,7 @@ func (m MockCaseService) GetCollaborators(c *gin.Context) {
 // @Failure 404 {object} structs.ErrorResponse "Case not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/collaborators [post]
-func (m MockCaseService) CreateCollaborator(c *gin.Context) {
+func (m CaseServices) CreateCollaborator(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -1243,7 +827,7 @@ func (m MockCaseService) CreateCollaborator(c *gin.Context) {
 		return
 	}
 
-	var req structs.User
+	var req structs.AssignCaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -1252,16 +836,40 @@ func (m MockCaseService) CreateCollaborator(c *gin.Context) {
 		})
 		return
 	}
+	caseID_, err := uuid.Parse(caseID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Invalid case ID"})
+		return
+	}
 
-	//err := m.caseService.AddCollaborator(caseID, req) //or assignCase
-	//if err != nil {
-	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-	//		Error:   "collaborator_creation_failed",
-	//		Message: "Could not add collaborator",
-	//		Details: err.Error(),
-	//	})
-	//	return
-	//}
+	assigneeID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Invalid user ID"})
+		return
+	}
+
+	// Get assigner ID from context (set by middleware)
+	assignerIDStr, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "User ID missing from context"})
+		return
+	}
+
+	assignerID, err := uuid.Parse(assignerIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "Invalid assigner user ID"})
+		return
+	}
+
+	err = m.assignCase.AssignUserToCase(assignerID, assigneeID, caseID_, req.Role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "collaborator_creation_failed",
+			Message: "Could not add collaborator",
+			Details: err.Error(),
+		})
+		return
+	}
 
 	c.JSON(http.StatusCreated, structs.SuccessResponse{
 		Success: true,
@@ -1284,7 +892,7 @@ func (m MockCaseService) CreateCollaborator(c *gin.Context) {
 // @Failure 404 {object} structs.ErrorResponse "Case or user not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/collaborators/{user} [delete]
-func (m MockCaseService) RemoveCollaborator(c *gin.Context) {
+func (m CaseServices) RemoveCollaborator(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -1303,7 +911,7 @@ func (m MockCaseService) RemoveCollaborator(c *gin.Context) {
 		return
 	}
 
-	//err := m.caseService.RemoveCollaborator(caseID, userID)
+	//err = m.removeCollaborator.UnassignUserFromCase()
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 	//		Error:   "collaborator_removal_failed",
@@ -1319,7 +927,9 @@ func (m MockCaseService) RemoveCollaborator(c *gin.Context) {
 	})
 }
 
-type MockEvidenceService struct{}
+type EvidenceServices struct {
+	service *evidence.Service
+}
 
 // @Summary Get evidence for a case
 // @Description Retrieves a list of evidence items associated with a specific security case. Supports filtering.
@@ -1338,7 +948,7 @@ type MockEvidenceService struct{}
 // @Failure 404 {object} structs.ErrorResponse "Case not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/evidence [get]
-func (m MockEvidenceService) GetEvidence(c *gin.Context) {
+func (m EvidenceServices) GetEvidence(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -1358,6 +968,16 @@ func (m MockEvidenceService) GetEvidence(c *gin.Context) {
 		return
 	}
 
+	evidenceList, err := m.service.ListEvidenceByCase(caseID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "evidence_fetch_failed",
+			Message: "Could not fetch evidence",
+			Details: err.Error(),
+		})
+		return
+	}
+
 	//evidence, err := m.evidenceService.GetEvidence(caseID, filter)
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
@@ -1368,21 +988,21 @@ func (m MockEvidenceService) GetEvidence(c *gin.Context) {
 	//	return
 	//}
 
-	mockEvidence := []structs.EvidenceItem{
-		{
-			ID:     "evidence-1",
-			CaseID: caseID,
-			Name:   "suspicious_file.exe",
-			Type:   "application/octet-stream",
-			Hash:   "abc123hash",
-		},
-	}
+	//mockEvidence := []structs.EvidenceItem{
+	//	{
+	//		ID:     "evidence-1",
+	//		CaseID: caseID,
+	//		Name:   "suspicious_file.exe",
+	//		Type:   "application/octet-stream",
+	//		Hash:   "abc123hash",
+	//	},
+	//}
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
 		Message: "Evidence retrieved successfully",
 		//Data:    evidence,
-		Data: mockEvidence,
+		Data: evidenceList,
 	})
 }
 
@@ -1401,7 +1021,7 @@ func (m MockEvidenceService) GetEvidence(c *gin.Context) {
 // @Failure 403 {object} structs.ErrorResponse "Forbidden (insufficient role)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/evidence [post]
-func (m MockEvidenceService) UploadEvidence(c *gin.Context) {
+func (m EvidenceServices) UploadEvidence(c *gin.Context) {
 	caseID := c.Param("id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -1438,6 +1058,16 @@ func (m MockEvidenceService) UploadEvidence(c *gin.Context) {
 	//	Description: c.PostForm("description"),
 	//}
 
+	// Parse tags from form data
+	var tags []string
+	if tagsStr := c.PostForm("tags"); tagsStr != "" {
+		tags = strings.Split(tagsStr, ",")
+		// Trim whitespace from tags
+		for i, tag := range tags {
+			tags[i] = strings.TrimSpace(tag)
+		}
+	}
+
 	mockEvidence := structs.EvidenceItem{
 		ID:     "new-evidence-123",
 		CaseID: caseID,
@@ -1446,7 +1076,7 @@ func (m MockEvidenceService) UploadEvidence(c *gin.Context) {
 		Hash:   "mock-hash-123",
 	}
 
-	//evidence, err := m.evidenceService.UploadEvidence(caseID, req)
+	//evidence, err := m.UploadEvidence(caseID, req)
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 	//		Error:   "upload_failed",
@@ -1478,7 +1108,7 @@ func (m MockEvidenceService) UploadEvidence(c *gin.Context) {
 // @Failure 404 {object} structs.ErrorResponse "Case or evidence item not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/evidence/{e_id} [get]
-func (m MockEvidenceService) GetEvidenceItem(c *gin.Context) {
+func (m EvidenceServices) GetEvidenceItem(c *gin.Context) {
 	caseID := c.Param("id")
 	evidenceID := c.Param("e_id")
 	if caseID == "" || evidenceID == "" {
@@ -1489,29 +1119,56 @@ func (m MockEvidenceService) GetEvidenceItem(c *gin.Context) {
 		return
 	}
 
-	//evidence, err := m.evidenceService.GetEvidenceItem(caseID, evidenceID)
-	//if err != nil {
-	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-	//		Error:   "evidence_fetch_failed",
-	//		Message: "Could not fetch evidence item",
-	//		Details: err.Error(),
-	//	})
-	//	return
+	evidenceEntity, err := m.service.GetEvidenceByID(evidenceID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, structs.ErrorResponse{
+				Error:   "evidence_not_found",
+				Message: "Evidence item not found",
+				Details: err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "evidence_fetch_failed",
+			Message: "Could not fetch evidence item",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	//mockEvidence := structs.EvidenceItem{
+	//	ID:     evidenceID,
+	//	CaseID: caseID,
+	//	Name:   "evidence_file.pdf",
+	//	Type:   "application/pdf",
+	//	Hash:   "evidence-hash-456",
 	//}
 
-	mockEvidence := structs.EvidenceItem{
-		ID:     evidenceID,
-		CaseID: caseID,
-		Name:   "evidence_file.pdf",
-		Type:   "application/pdf",
-		Hash:   "evidence-hash-456",
+	if evidenceEntity.CaseID.String() != caseID {
+		c.JSON(http.StatusNotFound, structs.ErrorResponse{
+			Error:   "evidence_not_found",
+			Message: "Evidence item not found in specified case",
+		})
+		return
+	}
+
+	evidenceItem := structs.EvidenceItem{
+		ID:     evidenceEntity.ID.String(),
+		CaseID: evidenceEntity.CaseID.String(),
+		Name:   evidenceEntity.Filename,
+		Type:   evidenceEntity.FileType,
+		Hash:   evidenceEntity.Checksum,
+		//Size:       evidenceEntity.FileSize,
+		UploadedBy: evidenceEntity.UploadedBy.String(),
+		//UploadedAt: evidenceEntity.UploadedAt.Format(time.RFC3339),
 	}
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
 		Message: "Evidence item retrieved successfully",
 		//Data:    evidence,
-		Data: mockEvidence,
+		Data: evidenceItem,
 	})
 }
 
@@ -1529,7 +1186,7 @@ func (m MockEvidenceService) GetEvidenceItem(c *gin.Context) {
 // @Failure 404 {object} structs.ErrorResponse "Case or evidence item not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/evidence/{e_id}/preview [get]
-func (m MockEvidenceService) PreviewEvidence(c *gin.Context) {
+func (m EvidenceServices) PreviewEvidence(c *gin.Context) {
 	caseID := c.Param("id")
 	evidenceID := c.Param("e_id")
 	if caseID == "" || evidenceID == "" {
@@ -1723,11 +1380,11 @@ func (m MockUserService) GetUserCases(c *gin.Context) {
 //}
 
 func NewHandlerWithMocks(
-	admin AdminServiceInterface,
-	auth AuthServiceInterface,
-	caseSvc CaseServiceInterface,
-	evidence EvidenceServiceInterface,
-	user UserServiceInterface,
+	admin AdminInterface,
+	auth AuthInterface,
+	caseSvc CaseInterface,
+	evidence EvidenceInterface,
+	user UserInterface,
 ) *Handler {
 	return &Handler{
 		AdminService:    admin,

@@ -1,8 +1,8 @@
 package structs
 
 import (
-	"time"
 	"github.com/google/uuid"
+	"time"
 )
 
 type LoginRequest struct {
@@ -46,16 +46,15 @@ type CollaboratorInfo struct {
 // 	Description string `json:"description"`
 // }
 
-
 // CreateCaseRequest is what your handler will bind from JSON.
 type CreateCaseRequest struct {
-    Title              string `json:"title" binding:"required"`
-    Description        string `json:"description"`
-    Status             string `json:"status"`
-    Priority           string `json:"priority"`
-    InvestigationStage string `json:"investigationStage"`
-    CreatedBy          string `json:"createdBy" binding:"required,uuid"`
-    TeamName           string `json:"teamName" binding:"required"`
+	Title              string `json:"title" binding:"required"`
+	Description        string `json:"description"`
+	Status             string `json:"status"`
+	Priority           string `json:"priority"`
+	InvestigationStage string `json:"investigationStage"`
+	CreatedBy          string `json:"createdBy" binding:"required,uuid"`
+	TeamName           string `json:"teamName" binding:"required"`
 }
 
 type UpdateCaseRequest struct {
@@ -130,7 +129,9 @@ type RegisterUserRequest struct {
 }
 
 type ResetPasswordRequest struct {
-	Email string `json:"email" binding:"required,email"`
+	Email       string `json:"email" binding:"required,email"`
+	NewPassword string `json:"newPassword" binding:"required"`
+	Token       string `json:"token" binding:"required"`
 }
 
 type UpdateUserRoleRequest struct {
@@ -169,9 +170,6 @@ type SuccessResponse struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-
-
 type DeleteUserRequest struct {
-    UserID string `json:"user_id"`
+	UserID string `json:"user_id"`
 }
-
