@@ -10,10 +10,12 @@ import {
   Search,
   User,
 } from "lucide-react";
+import { HelpMenu } from "../../components/ui/HelpMenu";
 
 export const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
+      
       {/* Navigation */}
       <nav className="flex items-center justify-between px-6 py-4 bg-gray-900/95 backdrop-blur-sm">
         <div className="flex items-center space-x-8">
@@ -31,7 +33,7 @@ export const LandingPage: React.FC = () => {
             {/*<a href="#" className="hover:text-blue-400">Solutions</a>*/}
             <a href="#" className="hover:text-blue-400">Demo</a>
             <a href="#" className="hover:text-blue-400">Company</a>
-            <a href="#" className="hover:text-blue-400">Help</a>
+            {/*<a href="#" className="hover:text-blue-400">Help</a>*/}
           </div>
         </div>
         <div className="flex items-center space-x-4">
@@ -336,7 +338,7 @@ export const LandingPage: React.FC = () => {
       </footer>
 
 
-      
+      <HelpMenu />
     </div>
   );
 };
