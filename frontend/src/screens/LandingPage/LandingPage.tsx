@@ -18,21 +18,26 @@ export const LandingPage: React.FC = () => {
       <nav className="flex items-center justify-between px-6 py-4 bg-gray-900/95 backdrop-blur-sm">
         <div className="flex items-center space-x-8">
           <div className="flex items-center space-x-2">
-            <Shield className="h-8 w-8 text-blue-500" />
+            <img
+              src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
+              alt="AEGIS Logo"
+              className="h-11 w-11 object-cover"
+            />
             <span className="text-xl font-bold">AEGIS</span>
           </div>
+
           <div className="hidden md:flex space-x-6 text-sm">
-            <a href="#" className="hover:text-blue-400">Products</a>
-            <a href="#" className="hover:text-blue-400">Solutions</a>
+            {/*<a href="#" className="hover:text-blue-400">Products</a>*/}
+            {/*<a href="#" className="hover:text-blue-400">Solutions</a>*/}
             <a href="#" className="hover:text-blue-400">Demo</a>
             <a href="#" className="hover:text-blue-400">Company</a>
-            <a href="#" className="hover:text-blue-400">Learn & Grow</a>
+            <a href="#" className="hover:text-blue-400">Help</a>
           </div>
         </div>
         <div className="flex items-center space-x-4">
           <Search className="h-5 w-5 text-gray-400" />
           <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
-            Get Started
+            <a href="/login">Get Started</a>
           </button>
           <User className="h-5 w-5 text-gray-400" />
         </div>
@@ -72,9 +77,9 @@ export const LandingPage: React.FC = () => {
         </div>
         <div className="relative z-10 max-w-4xl mx-auto">
           <h1 className="text-5xl md:text-6xl font-bold mb-6">
-            Unrivaled Security for a<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-              Connected World
+            Unrivaled Security for a<br />
+            Connected World
             </span>
           </h1>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
@@ -195,16 +200,29 @@ export const LandingPage: React.FC = () => {
             Intuitive Interface, Powerful Insights
           </h2>
           <div className="grid grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="bg-gray-900 rounded-lg overflow-hidden border border-gray-700 hover:border-blue-500 transition-all">
-                <div className="aspect-video bg-gradient-to-br from-blue-900/30 to-purple-900/30 flex items-center justify-center">
-                  <div className="w-16 h-16 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                    <Shield className="h-8 w-8 text-blue-400" />
-                  </div>
-                </div>
+          {[
+            "/login.png",
+            "/dashboard.png",
+            "/cases.png",
+            "/caseManagement.png",
+            "/evidence.png",
+            "/chat.png",
+          ].map((src, i) => (
+            <div
+              key={i}
+              className="bg-gray-900 rounded-lg overflow-hidden border border-gray-700 hover:border-blue-500 transition-all"
+            >
+              <div className="aspect-video bg-black flex items-center justify-center">
+                <img
+                  src={`${src}?w=400&h=225&c=7&r=0&o=5&dpr=1.3&pid=1.7`}
+                  alt={`Screenshot ${i + 1}`}
+                  className="object-cover w-full h-full"
+                />
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
+
         </div>
       </section>
 
