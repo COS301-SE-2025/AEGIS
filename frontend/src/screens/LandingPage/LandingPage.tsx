@@ -95,7 +95,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Core Capabilities */}
-      <section className="px-6 py-20 bg-gray-800/50">
+      <section className="px-6 py-20 ">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-16">
             Core Capabilities That Set AEGIS Apart
@@ -196,7 +196,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Interface Screenshots */}
-      <section className="px-6 py-20 bg-gray-800/50">
+      <section className="px-6 py-20 ">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-16">
             Intuitive Interface, Powerful Insights
@@ -283,7 +283,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* Capabilities Section */}
-      <section className="px-6 py-20 bg-gray-800/50">
+      <section className="px-6 py-20 ">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-16">
             Explore AEGIS Capabilities
