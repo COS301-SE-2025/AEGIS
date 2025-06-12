@@ -4,11 +4,6 @@ import (
 	"aegis-api/services_/case/case_creation"
 )
 
-// Service provides operations for listing and filtering cases.
-type Service struct {
-	repo CaseQueryRepository
-}
-
 // NewListCasesService constructs a new ListCases service.
 func NewListCasesService(repo CaseQueryRepository) *Service {
 	return &Service{repo: repo}

@@ -1,25 +1,22 @@
 package ListActiveCases
+
 import (
 	"context"
 	//"aegis-api/db"
 	"gorm.io/gorm"
-	
 )
-type ActiveCaseQueryRepository interface {
-	// QueryActiveCases retrieves active cases based on the provided filter.
-	GetActiveCasesByUserID(ctx context.Context, userID string) ([]ActiveCase, error)
-}
 
 type ActiveCaseRepository struct {
 	// ActiveCaseQueryRepository is the repository for querying active cases.
 	db *gorm.DB
 }
+
 func NewActiveCaseRepository(db *gorm.DB) *ActiveCaseRepository {
 	return &ActiveCaseRepository{
 		db: db,
 	}
 }
-func (r *ActiveCaseRepository) GetActiveCasesByUserID(ctx context.Context,userID string) ([]ActiveCase, error) {
+func (r *ActiveCaseRepository) GetActiveCasesByUserID(ctx context.Context, userID string) ([]ActiveCase, error) {
 	var cases []ActiveCase
 	err := r.db.Table("cases").
 		Select("cases.*").

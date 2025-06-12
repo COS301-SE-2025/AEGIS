@@ -2,14 +2,10 @@ package ListUsers
 
 import (
 	"context"
+
 	"gorm.io/gorm"
 	//"aegis-api/db"
-	
 )
-
-type ListUserRepository interface {
-	GetAllUsers(ctx context.Context) ([]User, error)
-}
 
 type UserRepository struct {
 	db *gorm.DB

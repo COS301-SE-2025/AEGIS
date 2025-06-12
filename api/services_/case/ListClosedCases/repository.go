@@ -1,25 +1,23 @@
 package ListClosedCases
+
 import (
 	"context"
 	//"aegis-api/db"
 	"gorm.io/gorm"
 )
 
-type ListClosedCasesRepository interface {
-	GetClosedCasesByUserID(ctx context.Context, userID string) ([]ClosedCase, error)
-}
-
 type ClosedCaseRepository struct {
 	// ActiveCaseQueryRepository is the repository for querying active cases.
 	db *gorm.DB
 }
+
 func NewClosedCaseRepository(db *gorm.DB) *ClosedCaseRepository {
 	return &ClosedCaseRepository{
 		db: db,
 	}
 }
 
-func (r *ClosedCaseRepository) GetClosedCasesByUserID(ctx context.Context,userID string) ([]ClosedCase, error) {
+func (r *ClosedCaseRepository) GetClosedCasesByUserID(ctx context.Context, userID string) ([]ClosedCase, error) {
 	var cases []ClosedCase
 	err := r.db.Table("cases").
 		Select("cases.*").

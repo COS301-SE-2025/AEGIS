@@ -1,8 +1,9 @@
 package ListClosedCases
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type ClosedCase struct {
@@ -14,4 +15,12 @@ type ClosedCase struct {
 	Priority           string    `gorm:"type:varchar(50);not null" json:"priority"`
 	CreatedBy          uuid.UUID `gorm:"type:uuid;not null" json:"created_by"`
 	CreatedAt          time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+type ListClosedCasesRequest struct {
+	UserID string `json:"user_id"`
+}
+
+type ListClosedCasesResponse struct {
+	ClosedCases []ClosedCase `json:"closed_cases"`
 }
