@@ -1,41 +1,16 @@
 package handlers
 
 import (
-	//"strconv"
-
-	"aegis-api/services/ListCases"
-	"aegis-api/services/ListUsers"
-	"aegis-api/services/case_assign"
-	"aegis-api/services/case_creation"
-	"aegis-api/services/case_status_update"
-	"aegis-api/services/delete_user"
-	"aegis-api/services/evidence"
-	"aegis-api/services/get_collaborators"
-	"aegis-api/services/login/auth"
-	"aegis-api/services/registration"
-	"aegis-api/services/reset_password"
-	"aegis-api/services/update_user_role"
-	"context"
-	"github.com/google/uuid"
-	"strings"
-
-	//"aegis-core/services"
-	"aegis-api/structs"
 	"github.com/gin-gonic/gin"
-	"net/http"
-	"time"
-	//"net/http"
 )
 
 type Handler struct {
-	AdminService    AdminInterface
-	AuthService     AuthInterface
-	CaseService     CaseInterface
-	EvidenceService EvidenceInterface
-	UserService     UserInterface
+	AdminHandler    AdminInterface
+	AuthHandler     AuthInterface
+	CaseHandler     CaseInterface
+	EvidenceHandler EvidenceInterface
+	UserHandler     UserInterface
 }
-
-//mock services
 
 type AdminInterface interface {
 	RegisterUser(c *gin.Context)
@@ -50,23 +25,30 @@ type AuthInterface interface {
 	Login(c *gin.Context)
 	Logout(c *gin.Context)
 	ResetPassword(c *gin.Context)
+	//RequestPasswordReset(c *gin.Context)
 }
 
 type CaseInterface interface {
-	GetCases(c *gin.Context)
+	GetAllCases(c *gin.Context)
+	GetCasesByUser(c *gin.Context)
+	GetFilteredCases(c *gin.Context)
 	CreateCase(c *gin.Context)
-	GetCase(c *gin.Context)
-	UpdateCase(c *gin.Context)
-	GetCollaborators(c *gin.Context)
+	//GetCase(c *gin.Context)
+	UpdateCaseStatus(c *gin.Context)
+	GetClosedCasesByUserID(c *gin.Context)
+	//GetCollaborators(c *gin.Context) //get all people assigned to a case
 	CreateCollaborator(c *gin.Context)
 	RemoveCollaborator(c *gin.Context)
 }
 
 type EvidenceInterface interface {
-	GetEvidence(c *gin.Context)
+	GetEvidenceByID(c *gin.Context)
+	ListEvidenceByCase(c *gin.Context)
+	ListEvidenceByUser(c *gin.Context)
 	UploadEvidence(c *gin.Context)
-	GetEvidenceItem(c *gin.Context)
-	PreviewEvidence(c *gin.Context)
+	DeleteEvidence(c *gin.Context)
+	//PreviewEvidence(c *gin.Context)
+	GetEvidenceMetadata(c *gin.Context)
 }
 
 type UserInterface interface {
@@ -78,24 +60,38 @@ type UserInterface interface {
 func NewHandler(
 	admin AdminInterface,
 	auth AuthInterface,
-	caseSvc CaseInterface,
+	case_ CaseInterface,
 	evidence EvidenceInterface,
 	user UserInterface,
 ) *Handler {
 	return &Handler{
-		AdminService:    admin,
-		AuthService:     auth,
-		CaseService:     caseSvc,
-		EvidenceService: evidence,
-		UserService:     user,
+		AdminHandler:    admin,
+		AuthHandler:     auth,
+		CaseHandler:     case_,
+		EvidenceHandler: evidence,
+		UserHandler:     user,
 	}
 }
 
-type AdminServices struct {
+/*type AdminServices struct {
 	registrationService *registration.RegistrationService
 	listUserService     ListUsers.ListUserService
 	userService         *update_user_role.UserService
 	userDeleteService   *delete_user.UserDeleteService
+}
+
+func NewAdminServices(
+	regService *registration.RegistrationService,
+	listService ListUsers.ListUserService,
+	userService *update_user_role.UserService,
+	deleteService *delete_user.UserDeleteService,
+) AdminInterface {
+	return &AdminServices{
+		registrationService: regService,
+		listUserService:     listService,
+		userService:         userService,
+		userDeleteService:   deleteService,
+	}
 }
 
 // @Summary Register a new user
@@ -380,8 +376,9 @@ func (m AdminServices) GetRoles(c *gin.Context) {
 		Data: mockRoles,
 	})
 }
+*/
 
-type AuthServices struct {
+/*type AuthServices struct {
 	authService          *auth.AuthService
 	passwordResetService *reset_password.PasswordResetService
 }
@@ -499,9 +496,9 @@ func (m AuthServices) ResetPassword(c *gin.Context) {
 		Success: true,
 		Message: "Password reset email sent successfully",
 	})
-}
+}*/
 
-type CaseServices struct {
+/*type CaseServices struct {
 	createCase         *case_creation.Service
 	getCase            *ListCases.Service
 	updateCaseStatus   *case_status_update.CaseStatusService
@@ -927,7 +924,9 @@ func (m CaseServices) RemoveCollaborator(c *gin.Context) {
 	})
 }
 
-type EvidenceServices struct {
+*/
+
+/*type EvidenceServices struct {
 	service *evidence.Service
 }
 
@@ -1220,9 +1219,9 @@ func (m EvidenceServices) PreviewEvidence(c *gin.Context) {
 		//Data:    preview,
 		Data: mockPreview,
 	})
-}
+}*/
 
-type MockUserService struct{}
+/*type MockUserService struct{}
 
 // @Summary Get current user's information
 // @Description Retrieves the detailed profile information for the authenticated user.
@@ -1366,7 +1365,7 @@ func (m MockUserService) GetUserCases(c *gin.Context) {
 		//Data:    cases,
 		Data: mockCases,
 	})
-}
+}*/
 
 //
 //func NewHandler() *Handler {
@@ -1379,18 +1378,18 @@ func (m MockUserService) GetUserCases(c *gin.Context) {
 //	}
 //}
 
-func NewHandlerWithMocks(
-	admin AdminInterface,
-	auth AuthInterface,
-	caseSvc CaseInterface,
-	evidence EvidenceInterface,
-	user UserInterface,
-) *Handler {
-	return &Handler{
-		AdminService:    admin,
-		AuthService:     auth,
-		CaseService:     caseSvc,
-		EvidenceService: evidence,
-		UserService:     user,
-	}
-}
+//func NewHandlerWithMocks(
+//	admin AdminInterface,
+//	auth AuthInterface,
+//	caseSvc CaseInterface,
+//	evidence EvidenceInterface,
+//	user UserInterface,
+//) *Handler {
+//	return &Handler{
+//		AdminHandler:    admin,
+//		AuthService:     auth,
+//		CaseService:     caseSvc,
+//		EvidenceService: evidence,
+//		UserService:     user,
+//	}
+//}

@@ -63,6 +63,11 @@ type UpdateCaseRequest struct {
 	Status      string `json:"status"`
 }
 
+type UpdateCaseStatusRequest struct {
+	CaseID string `json:"case_id" validate:"required,uuid"`
+	Status string `json:"status" validate:"required"`
+}
+
 type AssignCaseRequest struct {
 	UserID string `json:"user_id" binding:"required"`
 	Role   string `json:"role" binding:"required"`

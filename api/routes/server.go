@@ -11,21 +11,13 @@ import (
 )
 
 // mock service structs
-func SetUpRouter() *gin.Engine {
+func SetUpRouter(h *handlers.Handler) *gin.Engine {
 	router := gin.Default()
 	//h := handlers.NewHandler()
 
 	router.Use(gin.Logger()) //middleware for logging requests
 	fmt.Println()
 	//router.Use(gin.Recovery())              //middleware for recovering from panics
-
-	h := handlers.NewHandler(
-		handlers.MockAdminService{},
-		handlers.MockAuthService{},
-		handlers.MockCaseService{},
-		handlers.MockEvidenceService{},
-		handlers.MockUserService{},
-	)
 
 	// Debug: Print all routes
 	router.Use(func(c *gin.Context) {
@@ -49,13 +41,13 @@ func SetUpRouter() *gin.Engine {
 		//auth.POST("/activate-account", authService.activateAccount)
 
 		// login
-		auth.POST("/login", h.AuthService.Login)
+		auth.POST("/login", h.AuthHandler.Login)
 
 		// logout
-		auth.POST("/logout", h.AuthService.Logout)
+		auth.POST("/logout", h.AuthHandler.Logout)
 
 		// password-reset
-		auth.POST("/password-reset", h.AuthService.ResetPassword)
+		auth.POST("/password-reset", h.AuthHandler.ResetPassword)
 
 		// auth.POST("/refresh-token", authService.refreshToken)
 	}
@@ -67,59 +59,59 @@ func SetUpRouter() *gin.Engine {
 		admin := protected.Group("/admin")
 		admin.Use(middleware.RequireRole("Admin"))
 		{
-			admin.POST("/users", h.AdminService.RegisterUser)
-			admin.GET("/users", h.AdminService.ListUsers)
-			admin.GET("/users/:user_id", h.AdminService.GetUserActivity)
-			admin.PUT("/users/:user_id", h.AdminService.UpdateUserRole)
-			admin.DELETE("/users/:user_id", h.AdminService.DeleteUser)
+			admin.POST("/users", h.AdminHandler.RegisterUser)
+			admin.GET("/users", h.AdminHandler.ListUsers)
+			admin.GET("/users/:user_id", h.AdminHandler.GetUserActivity)
+			admin.PUT("/users/:user_id", h.AdminHandler.UpdateUserRole)
+			admin.DELETE("/users/:user_id", h.AdminHandler.DeleteUser)
 
 			// roles
-			admin.GET("/roles", h.AdminService.GetRoles)
-			//admin.GET("/audit-logs", h.AdminService.getAuditLogs)
+			admin.GET("/roles", h.AdminHandler.GetRoles)
+			//admin.GET("/audit-logs", h.AdminHandler.getAuditLogs)
 			//dashboard stuff
 		}
 
 		user := protected.Group("/user")
 		{
-			user.GET("/me", h.UserService.GetUserInfo)
-			user.PUT("/me", h.UserService.UpdateUserInfo)
+			user.GET("/me", h.UserHandler.GetUserInfo)
+			user.PUT("/me", h.UserHandler.UpdateUserInfo)
 		}
 
 		//cases
 		cases := protected.Group("/cases")
 		{
-			cases.GET("", h.CaseService.GetCases)                                     //support for pagination, filtering, etc.
-			cases.POST("", middleware.RequireRole("Admin"), h.CaseService.CreateCase) //admin only --adjust***
+			cases.GET("", h.CaseHandler.GetCases)                                     //support for pagination, filtering, etc.
+			cases.POST("", middleware.RequireRole("Admin"), h.CaseHandler.CreateCase) //admin only --adjust***
 
 			//case-specific routes
 			singleCase := cases.Group("/:id")
 			{
 				// ?case_id
-				singleCase.GET("", h.CaseService.GetCase)                                     //get a specific case by id
-				singleCase.PUT("", middleware.RequireRole("Admin"), h.CaseService.UpdateCase) //admin only
+				singleCase.GET("", h.CaseHandler.GetCase)                                     //get a specific case by id
+				singleCase.PUT("", middleware.RequireRole("Admin"), h.CaseHandler.UpdateCase) //admin only
 
-				//cases.DELETE("", h.CaseService.DeleteCase)
+				//cases.DELETE("", h.CaseHandler.DeleteCase)
 
-				singleCase.POST("/collaborators", middleware.RequireRole("Admin"), h.CaseService.CreateCollaborator)
-				singleCase.DELETE("/collaborators/:user", middleware.RequireRole("Admin"), h.CaseService.RemoveCollaborator)
+				singleCase.POST("/collaborators", middleware.RequireRole("Admin"), h.CaseHandler.CreateCollaborator)
+				singleCase.DELETE("/collaborators/:user", middleware.RequireRole("Admin"), h.CaseHandler.RemoveCollaborator)
 
 				//collaborators
-				singleCase.GET("/collaborators", h.CaseService.GetCollaborators)
+				singleCase.GET("/collaborators", h.CaseHandler.GetCollaborators)
 
-				//singleCase.GET("/timeline", h.CaseService.GetTimeline) later
+				//singleCase.GET("/timeline", h.CaseHandler.GetTimeline) later
 
 				evidence := singleCase.Group("/evidence")
 				{
-					evidence.GET("", h.EvidenceService.GetEvidence) //evidence under a specific case
-					evidence.POST("", h.EvidenceService.UploadEvidence)
+					evidence.GET("", h.EvidenceHandler.GetEvidence) //evidence under a specific case
+					evidence.POST("", h.EvidenceHandler.UploadEvidence)
 
 					//evidence specific to a single case
 					evidenceItem := evidence.Group("/:e_id")
 					{
-						evidenceItem.GET("", h.EvidenceService.GetEvidenceItem)
-						evidenceItem.GET("/preview", h.EvidenceService.PreviewEvidence)
-						//evidenceItem.POST("/annotations", h.EvidenceService.AddAnnotation)
-						//evidenceItem.GET("/annotations", h.EvidenceService.GetAnnotations)
+						evidenceItem.GET("", h.EvidenceHandler.GetEvidenceItem)
+						evidenceItem.GET("/preview", h.EvidenceHandler.PreviewEvidence)
+						//evidenceItem.POST("/annotations", h.EvidenceHandler.AddAnnotation)
+						//evidenceItem.GET("/annotations", h.EvidenceHandler.GetAnnotations)
 					}
 				}
 			}
