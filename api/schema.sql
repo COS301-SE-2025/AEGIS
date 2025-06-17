@@ -69,9 +69,21 @@ CREATE TABLE IF NOT EXISTS evidence (
     ipfs_cid TEXT NOT NULL,
     file_size INTEGER CHECK (file_size >= 0),
     checksum TEXT NOT NULL,
-    metadata JSONB,
     uploaded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Normalized metadata storage for evidence
+CREATE TABLE IF NOT EXISTS evidence_metadata (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    evidence_id UUID NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Optional indexes for performance
+CREATE INDEX idx_evidence_metadata_evidence_id ON evidence_metadata(evidence_id);
+CREATE INDEX idx_evidence_metadata_key ON evidence_metadata(key);
 
 -- Tags and linking table
 CREATE TABLE IF NOT EXISTS tags (
