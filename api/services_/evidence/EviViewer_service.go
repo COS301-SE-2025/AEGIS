@@ -1,4 +1,4 @@
-package Evidence_Viewer
+package evidence
 
 import (
 	"aegis-api/models"

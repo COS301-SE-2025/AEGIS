@@ -1,4 +1,3 @@
-// src/pages/EvidenceViewer.tsx
 import { useState } from "react";
 import {
   Bell,
@@ -10,260 +9,403 @@ import {
   Settings,
   SlidersHorizontal,
   ArrowUpDown,
-  Code,
-  Image as ImageIcon,
-  Video,
+  Download,
+  Share,
+  Maximize2,
+  Send,
+  Info,
   MessageCircle
 } from "lucide-react";
-import { Link } from "react-router-dom";
 
 // Define file structure
 interface FileItem {
   id: string;
   name: string;
   type: 'executable' | 'log' | 'image' | 'document';
-  content?: string;
-  imageUrl?: string;
+  size?: string;
+  hash?: string;
+  created?: string;
+  description?: string;
 }
 
-export const EvidenceViewer = () => {
+interface AnnotationThread {
+  id: string;
+  title: string;
+  user: string;
+  avatar: string;
+  time: string;
+  messageCount: number;
+  isActive?: boolean;
+}
+
+interface ThreadMessage {
+  id: string;
+  user: string;
+  avatar: string;
+  time: string;
+  message: string;
+}
+
+export default function EvidenceViewer() {
   // Sample files data
   const files: FileItem[] = [
     {
       id: '1',
       name: 'system_logs.exe',
       type: 'executable',
-      content: 'This is a system executable file. Binary content cannot be displayed in text format.'
+      size: '110MB',
+      hash: 'a1b2c3d4e5f6789abc',
+      created: '2024-03-15',
+      description: 'Memory dump of workstation WS-0234 captured using FTK Imager following detection of unauthorized PowerShell activity'
     },
     {
       id: '2',
       name: 'malware_sample.exe',
       type: 'executable',
-      content: 'This is a malware sample file. Handle with extreme caution. Binary content cannot be displayed in text format.'
-    },
-    {
-      id: '3',
-      name: 'screenshot_evidence.png',
-      type: 'image',
-      content: 'Screenshot taken from suspect\'s computer showing suspicious activity.',
-      imageUrl: 'https://images.unsplash.com/photo-1516110833967-0b5716ca1387?w=800&h=600&fit=crop'
+      size: '1.8 MB',
+      hash: 'x1y2z3a4b5c6def',
+      created: '2024-03-14'
     }
   ];
 
-  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+  const annotationThreads: AnnotationThread[] = [
+    {
+      id: '1',
+      title: 'I noticed something in the image',
+      user: 'Adm.1',
+      avatar: 'A1',
+      time: '18 June 2025',
+      messageCount: 2,
+      isActive: true
+    }
+  ];
+
+  const threadMessages: ThreadMessage[] = [
+    {
+      id: '1',
+      user: 'User.1',
+      avatar: 'U1',
+      time: '1 min ago',
+      message: 'I noticed something in the image'
+    },
+    {
+      id: '2',
+      user: 'User.1',
+      avatar: 'U1',
+      time: '1 min ago',
+      message: 'I agree it\'s something random'
+    }
+  ];
+
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(files[0]);
+  const [selectedThread, setSelectedThread] = useState<AnnotationThread | null>(annotationThreads[0]);
+  const [newMessage, setNewMessage] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleFileClick = (file: FileItem) => {
     setSelectedFile(file);
   };
 
+  const handleThreadClick = (thread: AnnotationThread) => {
+    setSelectedThread(thread);
+  };
+
+  const handleSendMessage = () => {
+    if (newMessage.trim()) {
+      // Handle sending message logic here
+      setNewMessage('');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white flex">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-80 bg-black border-r border-gray-800 p-6 flex flex-col justify-between z-10">
+      <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-gray-800 p-4 flex flex-col justify-between z-10">
         <div>
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-14 h-14 rounded-lg overflow-hidden">
+            <div className="w-10 h-10 rounded-lg overflow-hidden">
               <img
                 src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
                 alt="AEGIS Logo"
                 className="w-full h-full object-cover"
               />
             </div>
-            <span className="font-bold text-white text-2xl">AEGIS</span>
+            <span className="font-bold text-white text-xl">AEGIS</span>
           </div>
 
           {/* Navigation */}
-          <nav className="space-y-2">
-            <Link to="/dashboard">
-              <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors">
-                <Home className="w-6 h-6" />
-                <span className="text-lg">Dashboard</span>
-              </div>
-            </Link>
-            <Link to="/case-management">
-              <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors">
-                <Folder className="w-6 h-6" />
-                <span className="text-lg">Case Management</span>
-              </div>
-            </Link>
-            <div className="flex items-center gap-3 bg-[#636AE8] text-white p-3 rounded-lg">
-              <File className="w-6 h-6" />
-              <span className="text-lg font-semibold">Evidence Viewer</span>
+          <nav className="space-y-1">
+            <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-lg transition-colors cursor-pointer">
+              <Home className="w-5 h-5" />
+              <span className="text-sm">Dashboard</span>
             </div>
-            <Link to="/secure-chat">
-              <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors">
-                <MessageSquare className="w-6 h-6" />
-                <span className="text-lg">Secure Chat</span>
-              </div>
-            </Link>
+            <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-lg transition-colors cursor-pointer">
+              <Folder className="w-5 h-5" />
+              <span className="text-sm">Case management</span>
+            </div>
+            <div className="flex items-center gap-3 bg-blue-600 text-white p-2 rounded-lg">
+              <File className="w-5 h-5" />
+              <span className="text-sm font-medium">Evidence Viewer</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-lg transition-colors cursor-pointer">
+              <MessageSquare className="w-5 h-5" />
+              <span className="text-sm">Secure chat</span>
+            </div>
           </nav>
         </div>
 
         {/* User Profile */}
         <div className="border-t border-gray-700 pt-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
-              <Link to="/profile">
-                <span className="text-white font-medium">AU</span>
-              </Link>
+            <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+              <span className="text-white font-medium text-xs">AU</span>
             </div>
             <div>
-              <p className="font-semibold text-white">Agent User</p>
-              <p className="text-gray-400 text-sm">user@dfir.com</p>
+              <p className="font-medium text-white text-sm">Agent User</p>
+              <p className="text-gray-400 text-xs cursor-pointer hover:text-white">settings</p>
+              <p className="text-gray-400 text-xs cursor-pointer hover:text-white">Logout</p>
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="ml-80 flex-grow bg-black">
-        {/* Topbar */}
-        <div className="sticky top-0 z-10 bg-black border-b border-gray-800 p-4">
+      <main className="ml-64 flex-grow bg-black flex">
+        {/* Header */}
+        <div className="fixed top-0 left-64 right-0 z-20 bg-black border-b border-gray-800 p-4">
           <div className="flex items-center justify-between">
-            {/* Tabs */}
-            <div className="flex items-center gap-6">
-              <Link to="/dashboard">
-                <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+            {/* Case Number and Tabs */}
+            <div className="flex items-center gap-4">
+              {/* Tabs */}
+              <div className="flex items-center gap-6">
+                <button className="text-gray-400 hover:text-white text-sm transition-colors">
                   Dashboard
                 </button>
-              </Link>
-              <button className="text-[#636AE8] font-semibold px-4 py-2 rounded-lg">
-                Evidence Viewer
-              </button>
-              <Link to="/case-management">
-                <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
-                  Case Management
+                <button className="text-blue-400 font-medium text-sm border-b-2 border-blue-400 pb-2">
+                  Evidence Viewer
                 </button>
-              </Link>
-              <Link to="/secure-chat">
-                <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
-                  Secure Chat
+                <button className="text-gray-400 hover:text-white text-sm transition-colors">
+                  case management
                 </button>
-              </Link>
+                <button className="text-gray-400 hover:text-white text-sm transition-colors">
+                  Secure chat
+                </button>
+              </div>
             </div>
 
             {/* Right actions */}
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
-                  className="w-80 h-12 bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-[#636AE8]"
+                  className="w-64 h-10 bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-4 text-white placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500"
                   placeholder="Search cases, evidence, users"
                 />
               </div>
-              <Bell className="text-gray-400 hover:text-white w-6 h-6 cursor-pointer" />
-              <Settings className="text-gray-400 hover:text-white w-6 h-6 cursor-pointer" />
-              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                <Link to="/profile">
-                  <span className="text-white font-medium text-sm">AU</span>
-                </Link>
+              <Bell className="text-gray-400 hover:text-white w-5 h-5 cursor-pointer" />
+              <Settings className="text-gray-400 hover:text-white w-5 h-5 cursor-pointer" />
+              <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+                <span className="text-white font-medium text-xs">AU</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Evidence Viewer Content */}
-        <div className="p-8">
-          <h1 className="text-3xl font-semibold mb-6">Evidence Viewer</h1>
-
-          <div className="flex gap-8">
-            {/* File list panel */}
-            <div className="w-1/3 space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Case Files</h2>
-                <div className="flex gap-2">
-                  <button className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-600 rounded-lg text-white hover:bg-gray-800">
-                    <SlidersHorizontal size={16} />
-                    Filter
-                  </button>
-                  <button className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-600 rounded-lg text-white hover:bg-gray-800">
-                    <ArrowUpDown size={16} />
-                    Sort
-                  </button>
-                </div>
+        {/* Content Area */}
+        <div className="flex-1 flex pt-20">
+          {/* Annotation Threads Panel */}
+          <div className="w-96 border-r border-gray-800 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <h2 className="text-xl font-semibold">Annotation threads</h2>
+              <div className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium">
+                #CS-00579
               </div>
-              <div className="space-y-2">
-                {files.map((file) => (
-                  <button
-                    key={file.id}
-                    onClick={() => handleFileClick(file)}
-                    className={`w-full flex items-center gap-2 p-2 rounded-md transition-colors cursor-pointer ${
-                      selectedFile?.id === file.id
-                        ? 'bg-[#636AE8] text-white'
-                        : 'bg-gray-800 hover:bg-gray-700'
-                    }`}
-                  >
-                    {file.type === 'image' ? (
-                      <ImageIcon className="w-5 h-5 text-green-500" />
-                    ) : (
-                      <File className="w-5 h-5 text-blue-500" />
-                    )}
-                    <span className="text-left">{file.name}</span>
-                  </button>
+            </div>
+            
+            {/* Search */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                className="w-full h-10 bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-4 text-white placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500"
+                placeholder="Search Evidence"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* Filter and Sort */}
+            <div className="flex gap-2 mb-4">
+              <button className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-600 rounded-lg text-white hover:bg-gray-800">
+                <SlidersHorizontal size={14} />
+                filter
+              </button>
+              <button className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-600 rounded-lg text-white hover:bg-gray-800">
+                <ArrowUpDown size={14} />
+                sort
+              </button>
+            </div>
+
+            {/* File List */}
+            <div className="space-y-2 mb-6">
+              {files.map((file) => (
+                <button
+                  key={file.id}
+                  onClick={() => handleFileClick(file)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-md transition-colors cursor-pointer ${
+                    selectedFile?.id === file.id
+                      ? 'bg-gray-800 border-l-2 border-blue-500'
+                      : 'hover:bg-gray-800'
+                  }`}
+                >
+                  <File className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  <div className="text-left flex-1">
+                    <div className="font-medium text-sm truncate">{file.name}</div>
+                  </div>
+                  {file.name === 'malware_sample.exe' && (
+                    <Info className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Thread List */}
+            {/* Removed annotation threads section */}
+          </div>
+
+          {/* Main Viewer Area */}
+          <div className="flex-1 flex flex-col">
+            {/* File Header */}
+            {selectedFile && (
+              <div className="border-b border-gray-800 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h1 className="text-2xl font-semibold">#{selectedFile.name}</h1>
+                  <div className="flex items-center gap-2">
+                    <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg">
+                      <Download className="w-5 h-5" />
+                    </button>
+                    <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg">
+                      <MessageCircle className="w-5 h-5" />
+                    </button>
+                    <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg">
+                      <Share className="w-5 h-5" />
+                    </button>
+                    <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg">
+                      <Maximize2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Evidence Information */}
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                  <div className="bg-gray-900 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-3">Evidence Information</h3>
+                    <div className="space-y-2 text-sm">
+                      <div><span className="text-gray-400">Description:</span></div>
+                      <div className="text-gray-300">{selectedFile.description || 'No description available'}</div>
+                      <div className="mt-3"><span className="text-gray-400">HDD-Image generic</span></div>
+                      <div className="mt-2"><span className="text-gray-400">Size:</span></div>
+                      <div className="text-gray-300">{selectedFile.size}</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-900 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-3">Indicators of compromise (IOCs)</h3>
+                    <div className="space-y-3 text-sm">
+                      <div className="border border-gray-700 rounded p-3">
+                        <div className="text-gray-400 mb-1">IP Address: 192.168.1.100</div>
+                      </div>
+                      <div className="border border-gray-700 rounded p-3">
+                        <div className="text-gray-400 mb-1">Hash (MD5):</div>
+                        <div className="text-gray-300 font-mono text-xs break-all">a1b2c3d4e5f67890</div>
+                        <div className="text-red-400 text-xs mt-1">High</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Thread Discussion */}
+                {selectedThread && (
+                  <div className="bg-gray-900 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center text-xs">
+                        A1
+                      </div>
+                      <span className="font-medium text-sm">Adm.1 started a thread:</span>
+                      <span className="text-sm text-gray-400">{selectedThread.title}</span>
+                    </div>
+                    
+                    <div className="bg-gray-800 rounded-lg p-3 mb-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center text-xs">
+                            U1
+                          </div>
+                          <span className="text-sm font-medium">User.1</span>
+                          <span className="text-xs text-gray-400">I agree it's something random</span>
+                          <span className="text-xs text-gray-500">1 min ago</span>
+                        </div>
+                        <button className="text-blue-400 text-sm hover:underline">
+                          2 Messages →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right Sidebar - Thread Messages */}
+          {selectedThread && (
+            <div className="w-80 border-l border-gray-800 bg-black flex flex-col">
+              <div className="p-4 border-b border-gray-800">
+                <h3 className="font-semibold">I noticed something in the image</h3>
+                <p className="text-sm text-gray-400 mt-1">Created by Adm.1</p>
+                <p className="text-xs text-gray-500">18 June 2025</p>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {threadMessages.map((message) => (
+                  <div key={message.id} className="flex gap-3">
+                    <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
+                      {message.avatar}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm">{message.user}</span>
+                        <span className="text-xs text-gray-400">{message.time}</span>
+                      </div>
+                      <div className="text-sm text-gray-300">{message.message}</div>
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
 
-            {/* Viewer panel */}
-            <div className="w-2/3 h-[400px] border border-gray-700 rounded-lg bg-gray-900">
-              {selectedFile ? (
-                <div className="p-4 h-full flex flex-col">
-                  <div className="border-b border-gray-700 pb-2 mb-4">
-                    <h3 className="text-lg font-semibold text-white">{selectedFile.name}</h3>
-                    <p className="text-sm text-gray-400 capitalize">{selectedFile.type} file</p>
-                  </div>
-                  <div className="flex-1 overflow-auto">
-                    {selectedFile.type === 'image' && selectedFile.imageUrl ? (
-                      <div className="space-y-4">
-                        <div className="flex justify-center">
-                          <img
-                            src={selectedFile.imageUrl}
-                            alt={selectedFile.name}
-                            className="max-w-full max-h-64 object-contain rounded-lg border border-gray-600"
-                          />
-                        </div>
-                        {selectedFile.content && (
-                          <div className="text-gray-300 text-sm">
-                            <strong>Description:</strong> {selectedFile.content}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-gray-300 whitespace-pre-wrap">
-                        {selectedFile.content}
-                      </div>
-                    )}
-                  </div>
+              {/* Message Input */}
+              <div className="p-4 border-t border-gray-800">
+                <div className="flex items-center gap-2 bg-gray-900 rounded-lg p-3">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message..."
+                    className="flex-1 bg-transparent text-white placeholder-gray-400 text-sm focus:outline-none"
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    className="p-1 text-blue-400 hover:bg-gray-800 rounded"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
                 </div>
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-400">
-                  Select a file to view
-                </div>
-              )}
+              </div>
             </div>
-          </div>
-
-          {/* Annotation tools */}
-          <div className="mt-10">
-            <h2 className="text-xl font-semibold mb-2">Annotation Tools</h2>
-            <div className="flex gap-4">
-              <button className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full text-white hover:bg-[#636AE8]">
-                <Code />
-              </button>
-              <button className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full text-white hover:bg-[#636AE8]">
-                <ImageIcon />
-              </button>
-              <button className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full text-white hover:bg-[#636AE8]">
-                <MessageCircle />
-              </button>
-              <button className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full text-white hover:bg-[#636AE8]">
-                <Video />
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </main>
     </div>
   );
-};
+}

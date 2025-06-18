@@ -1,5 +1,5 @@
 // user_service_test.go
-package tests
+package unit_tests
 
 import (
 	mocks "aegis-api/mock"

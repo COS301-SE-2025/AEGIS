@@ -1,4 +1,4 @@
-package Evidence_Viewer
+package postgres
 
 import (
     "database/sql"

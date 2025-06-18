@@ -1,4 +1,4 @@
-package mocks
+package evidence
 
 import (
 	"github.com/stretchr/testify/mock"
