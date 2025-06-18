@@ -4,14 +4,6 @@ import (
 	"context"
 )
 
-type ListUserService interface {
-	ListUsers(ctx context.Context) ([]User, error)
-}
-
-type listUserService struct {
-	repo ListUserRepository
-}
-
 func NewListUserService(repo ListUserRepository) ListUserService {
 	return &listUserService{repo: repo}
 }
