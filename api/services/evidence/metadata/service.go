@@ -7,16 +7,18 @@ import (
 	"io"
 	"os"
 
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 )
 
 type Service struct {
 	repo Repository
-	ipfs upload.IPFSClient // IPFS client used for uploading evidence files
+	ipfs upload.IPFSClientImp
+	// IPFS client used for uploading evidence files
 }
 
 // NewService creates a new instance of the metadata service.
-func NewService(repo Repository, ipfs upload.IPFSClient) *Service {
+func NewService(repo Repository, ipfs upload.IPFSClientImp) *Service {
 	return &Service{repo: repo, ipfs: ipfs}
 }
 
@@ -72,4 +74,19 @@ func computeChecksum(path string) (string, error) {
 	}
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+// DownloadEvidence retrieves an evidence record and returns its filename, filetype, and IPFS file stream.
+func (s *Service) DownloadEvidence(evidenceID uuid.UUID) (string, string, io.ReadCloser, error) {
+	evidence, err := s.repo.FindEvidenceByID(evidenceID)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	reader, err := s.ipfs.Download(evidence.IpfsCID)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	return evidence.Filename, evidence.FileType, reader, nil
 }

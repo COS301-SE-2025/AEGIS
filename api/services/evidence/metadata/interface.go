@@ -1,6 +1,10 @@
 package metadata
 
-import "github.com/google/uuid"
+import (
+	"io"
+
+	"github.com/google/uuid"
+)
 
 // Repository defines methods for storing and retrieving evidence data.
 type Repository interface {
@@ -9,4 +13,9 @@ type Repository interface {
 
 	// FindEvidenceByID retrieves an evidence record by its ID.
 	FindEvidenceByID(id uuid.UUID) (*Evidence, error)
+}
+
+type MetadataService interface {
+	UploadEvidence(UploadEvidenceRequest) error
+	DownloadEvidence(evidenceID uuid.UUID) (string, string, io.ReadCloser, error)
 }

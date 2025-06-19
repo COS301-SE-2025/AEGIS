@@ -1,17 +1,18 @@
-package evidence
+package upload
 
-// IPFSClient is a mock interface for the IPFS client
+// Service handles high-level file operations via IPFS
 type Service struct {
-	ipfs *IPFSClient
+	ipfs IPFSClientImp
 }
 
-func NewEvidenceService(ipfs *IPFSClient) *Service {
+// NewEvidenceService returns a new upload service using the provided IPFS client.
+func NewEvidenceService(ipfs IPFSClientImp) *Service {
 	return &Service{
 		ipfs: ipfs,
 	}
 }
 
-// Service provides methods to interact with the IPFS client for uploading files.
+// UploadFile uploads a file to IPFS via the configured IPFS client.
 func (s *Service) UploadFile(path string) (string, error) {
 	return s.ipfs.UploadFile(path)
 }

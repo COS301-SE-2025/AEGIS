@@ -1,38 +1,37 @@
-package evidence
+package upload
 
 import (
+	"io"
 	"os"
 
 	shell "github.com/ipfs/go-ipfs-api"
 )
 
-// IPFSClient is a client for interacting with an IPFS node.
-// // It provides methods to upload files to IPFS and retrieve their CIDs (Content Identifiers).
-type IPFSClient struct {
+// ipfsClientImpl is a concrete implementation of IPFSClientImp.
+type ipfsClientImpl struct {
 	shell *shell.Shell
 }
 
-// NewIPFSClient creates a new IPFS client instance.
-// It takes the API endpoint as an argument and returns a pointer to IPFSClient.
-// If no API endpoint is provided, it defaults to "http://ipfs:5001".
-func NewIPFSClient(api string) *IPFSClient {
-	return &IPFSClient{
-		shell: shell.NewShell("http://ipfs:5001"),
+// NewIPFSClient creates and returns a new IPFS client.
+func NewIPFSClient(api string) IPFSClientImp {
+	if api == "" {
+		api = "http://ipfs:5001"
+	}
+	return &ipfsClientImpl{
+		shell: shell.NewShell(api),
 	}
 }
 
-// // UploadFile uploads a file to IPFS and returns the CID (Content Identifier).
-// It takes the file path as an argument and returns the CID or an error.
-func (c *IPFSClient) UploadFile(path string) (string, error) {
+func (c *ipfsClientImpl) UploadFile(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
 	defer file.Close()
 
-	cid, err := c.shell.Add(file)
-	if err != nil {
-		return "", err
-	}
-	return cid, nil
+	return c.shell.Add(file)
+}
+
+func (c *ipfsClientImpl) Download(cid string) (io.ReadCloser, error) {
+	return c.shell.Cat(cid)
 }
