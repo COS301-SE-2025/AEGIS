@@ -12,6 +12,7 @@ import { DashBoardPage } from "./screens/DashboardPage";
 import { LandingPage } from "./screens/LandingPage";
 import {VerifyEmailPage} from "./screens/VerifyEmailPage/VerifyEmailPage";
 import {TermsAndConditionsPage} from "./screens/TermsAndConditionsPage/TermsAndConditionsPage";
+import {ThemeProvider} from "./context/ThemeContext"
 
 //FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
@@ -23,6 +24,7 @@ import { ShareCaseForm } from "./screens/ShareCasePage/ShareCasePage";
 
 export default function App() {
   return (
+  <ThemeProvider>
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/login" element={<LoginPage />} />
@@ -43,5 +45,6 @@ export default function App() {
       <Route path="/terms" element={<TermsAndConditionsPage />} />
 
     </Routes>
+    </ThemeProvider>
   );
 }
