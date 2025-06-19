@@ -10,9 +10,15 @@ import {
   MoreVertical,
   Users,
   Check,
-  CheckCheck
+  CheckCheck,
+  Paperclip,
+  LogOut,
+  X,
+  Reply,
+  Download,
+  Eye
 } from "lucide-react";
-// Navigation will be handled by parent component
+import {Link} from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 
 // Type definitions
@@ -24,7 +30,24 @@ interface Message {
   time: string;
   status: string;
   self?: boolean;
+  attachment?: {
+    name: string;
+    type: string;
+    size: string;
+    url?: string;
+    isImage?: boolean;
+  };
+  replyTo?: {
+    id: number;
+    user: string;
+    content: string;
+    attachment?: {
+      name: string;
+      type: string;
+    };
+  };
 }
+
 
 interface Group {
   id: number;
@@ -45,7 +68,22 @@ export const SecureChatPage = (): JSX.Element => {
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showChatSearch, setShowChatSearch] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [showAttachmentPreview, setShowAttachmentPreview] = useState(false);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [attachmentMessage, setAttachmentMessage] = useState("");
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [modalImageUrl, setModalImageUrl] = useState("");
+  const [previewFileData, setPreviewFileData] = useState<string>("");
+
+
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   // Mock data for groups and messages
   const [groups, setGroups] = useState<Group[]>([
@@ -116,6 +154,15 @@ export const SecureChatPage = (): JSX.Element => {
     group.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Filter messages based on chat search
+  const filteredMessages = activeChat && chatMessages[activeChat.id] 
+    ? chatMessages[activeChat.id].filter(msg =>
+        msg.content.toLowerCase().includes(chatSearchQuery.toLowerCase())
+      )
+    : [];
+
+  const displayMessages = showChatSearch && chatSearchQuery ? filteredMessages : (activeChat ? chatMessages[activeChat.id] || [] : []);
+
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -123,6 +170,28 @@ export const SecureChatPage = (): JSX.Element => {
   useEffect(() => {
     scrollToBottom();
   }, [chatMessages, activeChat]);
+
+  // Close more menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  // Clean up preview URL when component unmounts or preview changes
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const handleSendMessage = (e?: React.MouseEvent | React.KeyboardEvent) => {
     e?.preventDefault();
@@ -135,14 +204,26 @@ export const SecureChatPage = (): JSX.Element => {
       self: true,
       content: message,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: "sent"
+      status: "sent",
+      ...(replyingTo && {
+        replyTo: {
+          id: replyingTo.id,
+          user: replyingTo.user,
+          content: replyingTo.content,
+          ...(replyingTo.attachment && {
+            attachment: {
+              name: replyingTo.attachment.name,
+              type: replyingTo.attachment.type
+            }
+          })
+        }
+      })
     };
 
     setChatMessages(prev => ({
       ...prev,
       [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
     }));
-
     // Update last message in group
     setGroups(prev => prev.map(group =>
       group.id === activeChat.id
@@ -151,6 +232,101 @@ export const SecureChatPage = (): JSX.Element => {
     ));
 
     setMessage("");
+    setReplyingTo(null);
+
+  };
+
+  const handleFileSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  const file = files[0];
+  
+  // Convert file to base64 for persistent storage
+  const fileData = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.readAsDataURL(file);
+  });
+  
+  const url = URL.createObjectURL(file);
+  
+  setPreviewFile(file);
+  setPreviewUrl(url);
+  setShowAttachmentPreview(true);
+  setAttachmentMessage("");
+
+  // Store the base64 data for later use
+  setPreviewFileData(fileData);
+
+  // Reset file input
+  if (fileInputRef.current) {
+    fileInputRef.current.value = '';
+  }
+};
+
+  const handleSendAttachment = () => {
+  if (!previewFile || !activeChat || !previewFileData) return;
+
+  const isImage = previewFile.type.startsWith('image/');
+  
+  const newMessage: Message = {
+    id: Date.now(),
+    user: "You",
+    color: "text-green-400",
+    self: true,
+    content: attachmentMessage || `Shared ${isImage ? 'an image' : 'a file'}: ${previewFile.name}`,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: "sent",
+    attachment: {
+      name: previewFile.name,
+      type: previewFile.type,
+      size: (previewFile.size / 1024).toFixed(1) + " KB",
+      url: previewFileData, // Use base64 data instead of blob URL
+      isImage
+    },
+      ...(replyingTo && {
+        replyTo: {
+          id: replyingTo.id,
+          user: replyingTo.user,
+          content: replyingTo.content,
+          ...(replyingTo.attachment && {
+            attachment: {
+              name: replyingTo.attachment.name,
+              type: replyingTo.attachment.type
+            }
+          })
+        }
+      })
+    };
+
+    setChatMessages(prev => ({
+      ...prev,
+      [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
+    }));
+      // Update last message in group
+    const lastMessageText = attachmentMessage ? attachmentMessage : `📎 ${previewFile.name}`;
+    setGroups(prev => prev.map(group =>
+      group.id === activeChat.id
+        ? { ...group, lastMessage: lastMessageText, lastMessageTime: "now" }
+        : group
+    ));
+    // Reset states
+    setShowAttachmentPreview(false);
+    setPreviewFile(null);
+    setPreviewUrl("");
+    setAttachmentMessage("");
+    setReplyingTo(null);
+  };
+
+  const handleCancelAttachment = () => {
+    setShowAttachmentPreview(false);
+    setPreviewFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl("");
+    setAttachmentMessage("");
   };
 
   const handleCreateGroup = (e?: React.MouseEvent | React.KeyboardEvent) => {
@@ -177,23 +353,132 @@ export const SecureChatPage = (): JSX.Element => {
     setShowNewGroupModal(false);
   };
 
+  const handleExitGroup = () => {
+    if (!activeChat) return;
+    
+    setGroups(prev => prev.filter(group => group.id !== activeChat.id));
+    setChatMessages(prev => {
+      const newMessages = { ...prev };
+      delete newMessages[activeChat.id];
+      return newMessages;
+    });
+    setActiveChat(null);
+    setShowMoreMenu(false);
+  };
+  const handleReplyToMessage = (message: Message) => {
+    setReplyingTo(message);
+  };
+
+  const handleImageClick = (url: string) => {
+    setModalImageUrl(url);
+    setShowImageModal(true);
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "sent":
-        return <Check className="w-4 h-4 text-gray-400" />;
+        return <Check className="w-4 h-4 text-muted-foreground" />;
       case "delivered":
-        return <CheckCheck className="w-4 h-4 text-gray-400" />;
+        return <CheckCheck className="w-4 h-4 text-muted-foreground" />;
       case "read":
         return <CheckCheck className="w-4 h-4 text-blue-400" />;
       default:
         return null;
     }
   };
+  const MessageComponent = ({ msg }: { msg: Message }) => (
+    <div className={`flex ${msg.self ? "justify-end" : "justify-start"} group`}>
+      <div
+        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative ${
+          msg.self
+            ? "bg-blue-600 text-white"
+            : "bg-muted text-foreground"
+        }`}
+      >
+        {/* Reply preview */}
+        {msg.replyTo && (
+          <div className={`mb-2 p-2 rounded border-l-4 ${
+            msg.self ? 'border-white/30 bg-white/10' : 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+          }`}>
+            <p className={`text-xs font-semibold ${msg.self ? 'text-white/80' : 'text-blue-600'}`}>
+              {msg.replyTo.user}
+            </p>
+            <p className={`text-xs truncate ${msg.self ? 'text-white/70' : 'text-muted-foreground'}`}>
+              {msg.replyTo.attachment 
+                ? `📎 ${msg.replyTo.attachment.name}`
+                : msg.replyTo.content
+              }
+            </p>
+          </div>
+        )}
+
+        {!msg.self && (
+          <p className={`text-xs font-bold ${msg.color} mb-1`}>
+            {msg.user}
+          </p>
+        )}
+
+        {/* Attachment preview */}
+        {msg.attachment && (
+          <div className="mb-2">
+            {msg.attachment.isImage ? (
+              <div className="relative">
+                <img
+                  src={msg.attachment.url}
+                  alt={msg.attachment.name}
+                  className="max-w-full h-auto rounded cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => handleImageClick(msg.attachment!.url!)}
+                />
+                <button
+                  onClick={() => handleImageClick(msg.attachment!.url!)}
+                  className="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-1 rounded-full hover:bg-opacity-70 transition-all"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className={`p-3 rounded border ${msg.self ? 'bg-black/20 border-white/20' : 'bg-accent border-border'}`}>
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate text-sm">{msg.attachment.name}</p>
+                    <p className="text-xs opacity-70">{msg.attachment.size}</p>
+                  </div>
+                  <button className="p-1 hover:bg-black/20 rounded">
+                    <Download className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <p className="text-sm">{msg.content}</p>
+        
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-xs opacity-70">{msg.time}</span>
+          <div className="flex items-center gap-1">
+            {msg.self && getStatusIcon(msg.status)}
+            {!msg.self && (
+              <button
+                onClick={() => handleReplyToMessage(msg)}
+                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/20 rounded transition-all"
+                title="Reply"
+              >
+                <Reply className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
 
   return (
-    <div className="bg-black flex w-full h-screen text-white relative overflow-hidden">
-      {/* Main Sidebar */}
-      <div className={`fixed z-30 top-0 left-0 h-full w-72 bg-gray-900 transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+    <div className="bg-background flex w-full h-screen text-foreground relative">
+      {/* Main Sidebar - Fixed positioning without overlay */}
+      <div className={`fixed z-30 top-0 left-0 h-full w-72 bg-card border-r border-border transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="p-6">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
@@ -204,56 +489,55 @@ export const SecureChatPage = (): JSX.Element => {
                 className="w-full h-full object-cover"
               />
             </div>
-            <span className="font-bold text-white text-xl">AEGIS</span>
+            <span className="font-bold text-foreground text-xl">AEGIS</span>
           </div>
 
           {/* Navigation */}
           <nav className="space-y-2">
-            <button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-gray-800 rounded-lg">
+            <Link to="/dashboard"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
               <Home className="w-5 h-5" />
               Dashboard
-            </button>
-            <button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-gray-800 rounded-lg">
+            </button></Link>
+            <Link to="/case-management"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
               <Folder className="w-5 h-5" />
               Case Management
-            </button>
-            <button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-gray-800 rounded-lg">
+            </button></Link>
+            <Link to="/evidence-viewer"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
               <FileText className="w-5 h-5" />
               Evidence Viewer
-            </button>
-            <button className="w-full flex items-center gap-3 text-left px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg">
+            </button></Link>
+            <button className="w-full flex items-center gap-3 text-left px-4 py-2 bg-muted hover:bg-accent rounded-lg">
               <MessageSquare className="w-5 h-5" />
               Secure Chat
             </button>
           </nav>
         </div>
       </div>
+        {/* Overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-background bg-opacity-50 z-20"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
-      {/* Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-20"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Chat Layout */}
-      <div className="flex flex-1 h-screen">
+      {/* Chat Layout - Adjusted margin for sidebar */}
+        <div className="flex flex-1 h-screen">
         {/* Chat List Sidebar */}
-        <div className="w-80 bg-gray-900 border-r border-gray-800 flex flex-col">
+        <div className="w-82 bg-card border-r border-border flex flex-col">
           {/* Chat Header */}
-          <div className="p-4 border-b border-gray-800">
+          <div className="p-4 border-b border">
             <div className="flex items-center justify-between mb-4">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="text-white hover:text-blue-400 mr-3"
+                className="text-foreground hover:text-blue-400 mr-3"
               >
                 <Menu className="w-6 h-6" />
               </button>
               <h2 className="text-xl font-bold flex-1">Chats</h2>
               <button
                 onClick={() => setShowNewGroupModal(true)}
-                className="text-white hover:text-blue-400"
+                className="text-foreground hover:text-blue-400"
                 title="Create new group"
               >
                 <Plus className="w-6 h-6" />
@@ -262,13 +546,13 @@ export const SecureChatPage = (): JSX.Element => {
             
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search chats..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400"
+                className="w-full pl-10 pr-4 py-2 bg-muted border border-border rounded-lg text-foreground placeholder-muted-foreground"
               />
             </div>
           </div>
@@ -283,23 +567,25 @@ export const SecureChatPage = (): JSX.Element => {
                   setGroups(prev =>
                     prev.map(g => g.id === group.id ? { ...g, unreadCount: 0 } : g)
                   );
+                  setShowChatSearch(false);
+                  setChatSearchQuery("");
+                  setReplyingTo(null);
                 }}
-
-                className={`p-4 border-b border-gray-800 cursor-pointer hover:bg-gray-800 transition-colors ${
-                  activeChat?.id === group.id ? "bg-gray-700" : ""
+                className={`p-4 border-b border-border cursor-pointer hover:bg-muted transition-colors ${
+                  activeChat?.id === group.id ? "bg-accent" : ""
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center text-xl">
+                  <div className="w-12 h-12 bg-accent rounded-full flex items-center justify-center text-xl">
                     {group.avatar}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-white truncate">{group.name}</h3>
-                      <span className="text-xs text-gray-400">{group.lastMessageTime}</span>
+                      <h3 className="font-semibold text-foreground truncate">{group.name}</h3>
+                      <span className="text-xs text-muted-foreground">{group.lastMessageTime}</span>
                     </div>
                     <div className="flex items-center justify-between mt-1">
-                      <p className="text-sm text-gray-400 truncate">{group.lastMessage}</p>
+                      <p className="text-sm text-muted-foreground truncate">{group.lastMessage}</p>
                       {group.unreadCount > 0 && (
                         <span className="bg-blue-500 text-white text-xs rounded-full px-2 py-1 min-w-5 text-center">
                           {group.unreadCount}
@@ -314,70 +600,141 @@ export const SecureChatPage = (): JSX.Element => {
         </div>
 
         {/* Active Chat Area */}
-        <div className="flex-1 flex flex-col bg-gray-950">
+        <div className="flex-1 flex flex-col bg-background">
           {activeChat ? (
             <>
               {/* Chat Header */}
-              <div className="p-4 border-b border-gray-800 bg-gray-900">
-                <div className="flex items-center justify-between">
+              <div className="p-4 border-b border-border bg-card">
+                {showChatSearch ? (
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center text-lg">
-                      {activeChat.avatar}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-white">{activeChat.name}</h3>
-                      <p className="text-sm text-gray-400 flex items-center gap-1">
-                        <Users className="w-4 h-4" />
-                        {activeChat.members.length} members
-                      </p>
+                    <button
+                      onClick={() => {
+                        setShowChatSearch(false);
+                        setChatSearchQuery("");
+                      }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search messages..."
+                        value={chatSearchQuery}
+                        onChange={(e) => setChatSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-muted border border-border rounded-lg text-foreground placeholder-muted-foreground"
+                        autoFocus
+                      />
                     </div>
                   </div>
-                  <button className="text-gray-400 hover:text-white">
-                    <MoreVertical className="w-5 h-5" />
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-accent rounded-full flex items-center justify-center text-lg">
+                        {activeChat.avatar}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">{activeChat.name}</h3>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Users className="w-4 h-4" />
+                          {activeChat.members.length} members
+                        </p>
+                      </div>
+                    </div>
+                    <div className="relative" ref={moreMenuRef}>
+                      <button 
+                        onClick={() => setShowMoreMenu(!showMoreMenu)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <MoreVertical className="w-5 h-5" />
+                      </button>
+                      
+                      {/* More Menu Dropdown */}
+                      {showMoreMenu && (
+                        <div className="absolute right-0 top-8 bg-card border border-border rounded-lg shadow-lg py-2 w-48 z-50">
+                          <button
+                            onClick={() => {
+                              setShowChatSearch(true);
+                              setShowMoreMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted"
+                          >
+                            <Search className="w-4 h-4" />
+                            Search
+                          </button>
+                          <button
+                            onClick={handleExitGroup}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted text-red-400"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            Exit Group
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Messages Area */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {(chatMessages[activeChat.id] || []).map((msg: Message) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.self ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                        msg.self
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-800 text-white"
-                      }`}
-                    >
-                      {!msg.self && (
-                        <p className={`text-xs font-bold ${msg.color} mb-1`}>
-                          {msg.user}
-                        </p>
-                      )}
-                      <p className="text-sm">{msg.content}</p>
-                      <div className="flex items-center justify-end gap-1 mt-1">
-                        <span className="text-xs text-gray-300">{msg.time}</span>
-                        {msg.self && getStatusIcon(msg.status)}
-                      </div>
-                    </div>
-                  </div>
+                {displayMessages.map((msg: Message) => (
+                  <MessageComponent key={msg.id} msg={msg} />
                 ))}
                 <div ref={chatEndRef} />
               </div>
 
+              {/* Reply Preview */}
+              {replyingTo && (
+                <div className="px-4 py-2 bg-muted border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-600">
+                        Replying to {replyingTo.user}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {replyingTo.attachment 
+                          ? `📎 ${replyingTo.attachment.name}`
+                          : replyingTo.content
+                        }
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setReplyingTo(null)}
+                      className="p-1 hover:bg-accent rounded"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+
               {/* Message Input */}
-              <div className="p-4 border-t border-gray-800 bg-gray-900">
+              <div className="p-4 border-t border-border bg-card">
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-3 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                    title="Attach file"
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileSelection}
+                    className="hidden"
+                    accept="*/*"
+                  />
                   <input
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(e)}
                     placeholder="Type a secure message..."
-                    className="flex-1 p-3 rounded-lg bg-gray-800 text-white border border-gray-700 placeholder-gray-400"
+                    className="flex-1 p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
                   />
                   <button
                     onClick={handleSendMessage}
@@ -390,7 +747,7 @@ export const SecureChatPage = (): JSX.Element => {
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
-              <div className="text-center text-gray-400">
+              <div className="text-center text-muted-foreground">
                 <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-50" />
                 <h3 className="text-xl font-semibold mb-2">Welcome to Secure Chat</h3>
                 <p>Select a group to start secure communication</p>
@@ -399,11 +756,128 @@ export const SecureChatPage = (): JSX.Element => {
           )}
         </div>
       </div>
+      {/* Attachment Preview Modal */}
+      {showAttachmentPreview && previewFile && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-lg p-6 w-full max-w-md border border-border max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">Send Attachment</h3>
+              <button
+                onClick={handleCancelAttachment}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* File Preview */}
+            <div className="mb-4">
+              {previewFile.type.startsWith('image/') ? (
+                 // Fixed size image preview container
+            <div className="w-full h-64 overflow-hidden rounded-lg border border-border bg-muted flex items-center justify-center">
+            <img
+              src={previewUrl}
+              alt={previewFile.name}
+              className="max-w-full max-h-full object-contain"
+            />
+            </div>
+              ) : (
+               // Fixed size file preview
+              <div className="w-full h-32 p-4 bg-muted rounded-lg border border-border flex items-center justify-center">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-12 h-12 text-blue-500 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{previewFile.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {(previewFile.size / 1024).toFixed(1)} KB
+                    </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Reply Preview in Attachment Modal */}
+            {replyingTo && (
+              <div className="mb-4 p-3 bg-muted rounded-lg border-l-4 border-blue-400">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-600">
+                      Replying to {replyingTo.user}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {replyingTo.attachment 
+                        ? `📎 ${replyingTo.attachment.name}`
+                        : replyingTo.content
+                      }
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setReplyingTo(null)}
+                    className="p-1 hover:bg-accent rounded"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Message Input */}
+            <div className="mb-4">
+              <input
+                type="text"
+                value={attachmentMessage}
+                onChange={(e) => setAttachmentMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendAttachment()}
+                placeholder="Add a message..."
+                className="w-full p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
+                autoFocus
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={handleCancelAttachment}
+                className="px-4 py-2 text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendAttachment}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Viewer Modal */}
+      {showImageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+          <div className="relative max-w-4xl max-h-full">
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute top-4 right-4 text-white hover:text-gray-300 bg-black bg-opacity-50 rounded-full p-2"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={modalImageUrl}
+              alt="Full size view"
+              className="max-w-full max-h-full object-contain rounded-lg"
+            />
+          </div>
+        </div>
+      )}
 
       {/* New Group Modal */}
       {showNewGroupModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+          <div className="bg-card rounded-lg p-6 w-full max-w-md border border-border">
             <h3 className="text-xl font-bold mb-4">Create New Group</h3>
             <div>
               <input
@@ -412,13 +886,13 @@ export const SecureChatPage = (): JSX.Element => {
                 onChange={(e) => setNewGroupName(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleCreateGroup(e)}
                 placeholder="Enter group name..."
-                className="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 placeholder-gray-400 mb-4"
+                className="w-full p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground mb-4"
                 autoFocus
               />
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setShowNewGroupModal(false)}
-                  className="px-4 py-2 text-gray-400 hover:text-white"
+                  className="px-4 py-2 text-muted-foreground hover:text-foreground"
                 >
                   Cancel
                 </button>
@@ -435,4 +909,4 @@ export const SecureChatPage = (): JSX.Element => {
       )}
     </div>
   );
-};
+}
