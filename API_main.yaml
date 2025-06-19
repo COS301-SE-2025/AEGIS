@@ -1,0 +1,437 @@
+openapi: 3.0.3
+info:
+  title: AEGIS API
+  description: Secure Digital Evidence and Case Management System
+  version: 1.0.0
+  contact:
+    email: support@aegis-secure.com
+
+servers:
+  - url: http://localhost:3000
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The unique identifier for the user.
+        full_name:
+          type: string
+          description: The user's full name.
+        email:
+          type: string
+          description: The user's email address.
+        password_hash:
+          type: string
+          description: The hashed password of the user.
+        role:
+          type: string
+          enum:
+            - "Incident Responder"
+            - "Forensic Analyst"
+            - "Malware Analyst"
+            - "Threat Intelligent Analyst"
+            - "DFIR Manager"
+            - "Legal/Compliance Liaison"
+            - "Detection Engineer"
+            - "Generic user"
+        is_verified:
+          type: boolean
+          description: Whether the user has verified their email.
+        verification_token:
+          type: string
+          description: Token used for email verification.
+        created_at:
+          type: string
+          format: date-time
+          description: The timestamp when the user was created.
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          description: The email of the user.
+        password:
+          type: string
+          description: The password of the user.
+
+    LoginResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The unique ID of the user.
+        token:
+          type: string
+          description: The JWT token of the user.
+        email:
+          type: string
+          description: The email address of the user.
+
+    Case:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [open, under_review, closed]
+        investigation_stage:
+          type: string
+          enum: [analysis, research, evaluation, finalization]
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    Evidence:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        uploaded_by:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        ipfs_cid:
+          type: string
+        file_size:
+          type: integer
+        uploaded_at:
+          type: string
+          format: date-time
+
+    EvidenceMetadata:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        ipfs_cid:
+          type: string
+        file_size:
+          type: integer
+        case_id:
+          type: string
+          format: uuid
+        uploaded_by:
+          type: string
+          format: uuid
+        uploaded_at:
+          type: string
+          format: date-time
+
+paths:
+  /register:
+    post:
+      summary: Registers a new user.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        "200":
+          description: User registered successfully.
+        "400":
+          description: Invalid input or missing required fields.
+        "409":
+          description: User already exists.
+
+  /login:
+    post:
+      summary: Logs in a user with their credentials.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials.
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logs the user out.
+      responses:
+        "200":
+          description: Logout successful.
+
+  /user/info:
+    get:
+      tags:
+        - User
+      summary: Get the current user's information.
+      responses:
+        "200":
+          description: Successfully retrieved user info.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /cases:
+    get:
+      tags:
+        - Cases
+      summary: Retrieve all cases.
+      responses:
+        "200":
+          description: A list of cases.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Case"
+
+  /cases/create:
+    post:
+      tags:
+        - Cases
+      summary: Create a new case.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Case"
+      responses:
+        "201":
+          description: Case created successfully.
+
+  /cases/{id}:
+    get:
+      tags:
+        - Cases
+      summary: Get case details by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Case details.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+        "404":
+          description: Case not found.
+
+  /cases/user/{userId}:
+    get:
+      tags:
+        - Cases
+      summary: Retrieve cases created by a specific user.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of cases created by the user.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Case"
+
+  /evidence/upload:
+    post:
+      tags:
+        - Evidence
+      summary: Upload a piece of evidence.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                case_id:
+                  type: string
+                  format: uuid
+                uploaded_by:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Evidence uploaded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evidence"
+
+  /evidence/by-case/{case_id}:
+    get:
+      tags:
+        - Evidence
+      summary: Get evidence by case ID.
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of evidence.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Evidence"
+
+  /evidence/by-user/{user_id}:
+    get:
+      tags:
+        - Evidence
+      summary: Get evidence uploaded by a specific user.
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of evidence.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Evidence"
+
+  /evidence/{evidence_id}:
+    get:
+      tags:
+        - Evidence
+      summary: Get metadata for a specific piece of evidence.
+      parameters:
+        - name: evidence_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Evidence metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceMetadata"
+        "404":
+          description: Evidence not found.
+
+    delete:
+      tags:
+        - Evidence
+      summary: Delete a piece of evidence.
+      parameters:
+        - name: evidence_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Evidence deleted.
+        "404":
+          description: Evidence not found.
+
+  /admin/user/list:
+    get:
+      tags:
+        - Admin
+      summary: List all users.
+      responses:
+        "200":
+          description: List of users.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /admin/user/roles:
+    get:
+      tags:
+        - Admin
+      summary: Get all available user roles.
+      responses:
+        "200":
+          description: List of roles.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roles:
+                    type: array
+                    items:
+                      type: string
+                      enum:
+                        - analyst
+                        - admin
+                        - user

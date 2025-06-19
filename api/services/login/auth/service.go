@@ -26,7 +26,8 @@ func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
-	token, err := GenerateJWT(user.ID)
+	token, err := GenerateJWT(user.ID, user.Email, user.Role)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token")
 	}

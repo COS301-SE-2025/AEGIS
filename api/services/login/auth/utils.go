@@ -15,10 +15,13 @@ func ComparePasswords(hashedPwd, plainPwd string) bool {
 	return err == nil
 }
 
-func GenerateJWT(userID string) (string, error) {
+func GenerateJWT(userID, email, role string) (string, error) {
 	claims := jwt.MapClaims{
-		"sub": userID,
-		"exp": time.Now().Add(time.Hour * 24).Unix(),
+		"sub":   userID,                                // Subject (user ID)
+		"email": email,                                 // Helpful for display/logging
+		"role":  role,                                  // Required for RBAC
+		"iat":   time.Now().Unix(),                     // Issued At (optional but good)
+		"exp":   time.Now().Add(time.Hour * 24).Unix(), // Expiration (24h here)
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtSecret)
