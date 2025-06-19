@@ -84,7 +84,19 @@ export const SecureChatPage = (): JSX.Element => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
-
+  //for adding member
+  const [showAddMembersModal, setShowAddMembersModal] = useState(false);
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [availableUsers] = useState([
+    "analyst@company.com",
+    "forensics@company.com", 
+    "security@company.com",
+    "incident@company.com",
+    "malware@company.com",
+    "compliance@company.com",
+    "threat@company.com",
+    "ciso@company.com"
+  ]);
   // Mock data for groups and messages
   const [groups, setGroups] = useState<Group[]>([
     {
@@ -386,6 +398,49 @@ export const SecureChatPage = (): JSX.Element => {
         return null;
     }
   };
+  const handleAddMember = (e?: React.MouseEvent | React.KeyboardEvent) => {
+  e?.preventDefault();
+  if (!newMemberEmail.trim() || !activeChat) return;
+
+  // Check if user is already in the group
+  if (activeChat.members.includes(newMemberEmail)) {
+    alert("User is already in this group");
+    return;
+  }
+
+  // Update the active chat members
+  const updatedChat = {
+    ...activeChat,
+    members: [...activeChat.members, newMemberEmail]
+  };
+
+  // Update groups state
+  setGroups(prev => prev.map(group =>
+    group.id === activeChat.id ? updatedChat : group
+  ));
+
+  // Update active chat
+  setActiveChat(updatedChat);
+
+  // Add a system message about the new member
+  const systemMessage: Message = {
+    id: Date.now(),
+    user: "System",
+    color: "text-gray-400",
+    content: `${newMemberEmail} was added to the group`,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: "read"
+  };
+
+  setChatMessages(prev => ({
+    ...prev,
+    [activeChat.id]: [...(prev[activeChat.id] || []), systemMessage]
+  }));
+
+  setNewMemberEmail("");
+  setShowAddMembersModal(false);
+  setShowMoreMenu(false);
+};
   const MessageComponent = ({ msg }: { msg: Message }) => (
     <div className={`flex ${msg.self ? "justify-end" : "justify-start"} group`}>
       <div
@@ -664,6 +719,16 @@ export const SecureChatPage = (): JSX.Element => {
                             Search
                           </button>
                           <button
+                            onClick={() => {
+                              setShowAddMembersModal(true);
+                              setShowMoreMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted"
+                          >
+                            <Users className="w-4 h-4" />
+                            Add Members
+                          </button>
+                          <button
                             onClick={handleExitGroup}
                             className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted text-red-400"
                           >
@@ -907,6 +972,91 @@ export const SecureChatPage = (): JSX.Element => {
           </div>
         </div>
       )}
+      {/* Add Members Modal */}
+      {showAddMembersModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-lg p-6 w-full max-w-md border border-border max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">Add Members</h3>
+              <button
+                onClick={() => setShowAddMembersModal(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Current Members */}
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-muted-foreground mb-2">Current Members</h4>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {activeChat?.members.map((member, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded text-sm">
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                    <span>{member}</span>
+                    {member === "You" && (
+                      <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">You</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Add New Member */}
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-muted-foreground mb-2">Add New Member</h4>
+              <div className="space-y-3">
+                <input
+                  type="email"
+                  value={newMemberEmail}
+                  onChange={(e) => setNewMemberEmail(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddMember(e)}
+                  placeholder="Enter email address..."
+                  className="w-full p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
+                  autoFocus
+                />
+                
+                {/* Quick Add Suggestions */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Quick Add:</p>
+                  <div className="grid grid-cols-1 gap-1 max-h-32 overflow-y-auto">
+                    {availableUsers
+                      .filter(user => !activeChat?.members.includes(user))
+                      .map((user) => (
+                      <button
+                        key={user}
+                        onClick={() => setNewMemberEmail(user)}
+                        className="text-left p-2 hover:bg-muted rounded text-sm border border-border"
+                      >
+                        {user}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowAddMembersModal(false)}
+                className="px-4 py-2 text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddMember}
+                disabled={!newMemberEmail.trim()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg text-white flex items-center gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Add Member
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
