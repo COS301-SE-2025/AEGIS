@@ -1,4 +1,6 @@
 import { Routes, Route } from "react-router-dom";
+
+//PAGES
 import { LoginPage } from "./screens/LoginPage";
 import { RegistrationPage } from "./screens/RegistrationPage";
 import {ResetPasswordPage} from "./screens/ResetPasswordPage";
@@ -7,12 +9,17 @@ import { SecureChatPage } from "./screens/SecureChatPage";
 import {SettingsPage} from "./screens/SettingsPage";
 import { ProfilePage } from "./screens/ProfilePage";
 import { DashBoardPage } from "./screens/DashboardPage";
+import { LandingPage } from "./screens/LandingPage";
+import {VerifyEmailPage} from "./screens/VerifyEmailPage/VerifyEmailPage";
+import {TermsAndConditionsPage} from "./screens/TermsAndConditionsPage/TermsAndConditionsPage";
 
+//FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
 import { UploadEvidenceForm } from "./screens/UploadEvidencePage/UploadEvidencePage";
 import {AssignCaseMembersForm} from "./screens/AssignCaseMembersPage/AssignCaseMembersPage";
 import { EvidenceViewer } from "./screens/EvidenceViewer";
-import { LandingPage } from "./screens/LandingPage";
+import { ShareCaseForm } from "./screens/ShareCasePage/ShareCasePage";
+
 
 export default function App() {
   return (
@@ -31,6 +38,9 @@ export default function App() {
       <Route path = "/assign-case-members" element={<AssignCaseMembersForm />} />
       <Route path="/evidence-viewer" element={<EvidenceViewer />} />
       <Route path="/landing-page" element={<LandingPage />} />
+      <Route path="/cases/:caseId/share" element={<ShareCaseForm />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/terms" element={<TermsAndConditionsPage />} />
 
     </Routes>
   );

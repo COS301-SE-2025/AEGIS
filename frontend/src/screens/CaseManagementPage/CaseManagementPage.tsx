@@ -13,7 +13,13 @@ import {
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
+import {ShareButton} from "../ShareCasePage/sharecasebutton";
 export const CaseManagementPage = () => {
+
+const userRole = "admin"; // for now
+const caseName = "Malware"; 
+const caseId = "case-abc-123"; 
+
   // Timeline event data
   const timelineEvents = [
     {
@@ -176,7 +182,9 @@ export const CaseManagementPage = () => {
               </button>
               <button className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
                 <Share2 className="w-4 h-4" />
-                Share Case
+                  {userRole === "admin" && (
+                  <ShareButton caseId={caseId} caseName={caseName} />
+                )}
               </button>
               <button className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors">
                 <Filter className="w-4 h-4" />
