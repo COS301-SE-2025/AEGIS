@@ -36,7 +36,7 @@ type CaseInterface interface {
 	//GetCase(c *gin.Context)
 	UpdateCaseStatus(c *gin.Context)
 	GetClosedCasesByUserID(c *gin.Context)
-	//GetCollaborators(c *gin.Context) //get all people assigned to a case
+	GetCollaborators(c *gin.Context) //get all people assigned to a case
 	CreateCollaborator(c *gin.Context)
 	RemoveCollaborator(c *gin.Context)
 }
@@ -46,13 +46,14 @@ type EvidenceInterface interface {
 	ListEvidenceByCase(c *gin.Context)
 	ListEvidenceByUser(c *gin.Context)
 	UploadEvidence(c *gin.Context)
-	DeleteEvidence(c *gin.Context)
+	DeleteEvidenceByID(c *gin.Context)
 	//PreviewEvidence(c *gin.Context)
 	GetEvidenceMetadata(c *gin.Context)
+	DownloadEvidenceByUser(c *gin.Context)
 }
 
 type UserInterface interface {
-	GetUserInfo(c *gin.Context)
+	GetProfile(c *gin.Context)
 	UpdateUserInfo(c *gin.Context)
 	GetUserCases(c *gin.Context)
 }

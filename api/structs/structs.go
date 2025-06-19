@@ -70,7 +70,7 @@ type UpdateCaseStatusRequest struct {
 
 type AssignCaseRequest struct {
 	UserID string `json:"user_id" binding:"required"`
-	Role   string `json:"role" binding:"required"`
+	Role   string `json:"role" binding:"required"` //might need to remove
 }
 
 type EvidenceItem struct {

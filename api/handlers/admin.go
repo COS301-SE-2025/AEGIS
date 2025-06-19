@@ -42,7 +42,7 @@ func NewAdminServices(
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users [post]
-func (m AdminServices) RegisterUser(c *gin.Context) {
+func (as AdminServices) RegisterUser(c *gin.Context) {
 	//struct to hold user data
 	//binding and validation
 	var req registration.RegistrationRequest
@@ -56,7 +56,7 @@ func (m AdminServices) RegisterUser(c *gin.Context) {
 	}
 
 	//call the service function
-	user, err := m.registerUser.Register(req)
+	user, err := as.registerUser.Register(req)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
@@ -88,7 +88,7 @@ func (m AdminServices) RegisterUser(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid query parameters"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users [get]
-func (m AdminServices) ListUsers(c *gin.Context) {
+func (as AdminServices) ListUsers(c *gin.Context) {
 	//binding and validation
 	//var req structs.UserFilter
 	//if err := c.ShouldBindQuery(&req); err != nil {
@@ -101,7 +101,7 @@ func (m AdminServices) ListUsers(c *gin.Context) {
 	//}
 
 	//call the service function
-	users, err := m.listUser.ListUsers(c.Request.Context())
+	users, err := as.listUser.ListUsers(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 			Error:   "list_users_failed",
@@ -128,8 +128,8 @@ func (m AdminServices) ListUsers(c *gin.Context) {
 // @Success 200 {object} structs.SuccessResponse{data=[]structs.UserActivity} "User activity retrieved successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing user ID)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/admin/users/{user_id} [get]
-func (m AdminServices) GetUserActivity(c *gin.Context) {
+// @Router /api/v1/admin/users/:user_id [get]
+func (as AdminServices) GetUserActivity(c *gin.Context) {
 	// Get user ID from URL parameter
 	userID := c.Param("user_id")
 	if userID == "" {
@@ -144,7 +144,7 @@ func (m AdminServices) GetUserActivity(c *gin.Context) {
 	//timeRange := c.Query("time_range")
 	//activityType := c.Query("activity_type")
 
-	//activities, err := m.AdminServices.GetUserActivity(userID) //call service function here
+	//activities, err := as.AdminServices.GetUserActivity(userID) //call service function here
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 	//		Error:   "activity_fetch_failed",
@@ -185,8 +185,8 @@ func (m AdminServices) GetUserActivity(c *gin.Context) {
 // @Success 200 {object} structs.SuccessResponse "User role updated successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload or user ID"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/admin/users/{user_id} [put]
-func (m AdminServices) UpdateUserRole(c *gin.Context) {
+// @Router /api/v1/admin/users/:user_id [put]
+func (as AdminServices) UpdateUserRole(c *gin.Context) {
 	userID := c.Param("user_id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -206,7 +206,7 @@ func (m AdminServices) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	err := m.updateUserRole.UpdateUserRole(userID, req.Role)
+	err := as.updateUserRole.UpdateUserRole(userID, req.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 			Error:   "role_update_failed",
@@ -230,8 +230,8 @@ func (m AdminServices) UpdateUserRole(c *gin.Context) {
 // @Success 200 {object} structs.SuccessResponse{data=[]structs.UserRole} "Roles retrieved successfully"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/roles [get]
-func (m AdminServices) GetRoles(c *gin.Context) {
-	//roles, err := m.GetRoles()
+func (as AdminServices) GetRoles(c *gin.Context) {
+	//roles, err := as.GetRoles()
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 	//		Error:   "roles_fetch_failed",
@@ -258,24 +258,15 @@ func (m AdminServices) GetRoles(c *gin.Context) {
 //DeleteUser
 
 // @Summary Delete a user
-// @Description Deletes a specific user from the system. Only 'Admin' can perform this action.
+// @Description Deletes a specific user from the systeas. Only 'Admin' can perform this action.
 // @Tags Admin
 // @Accept json
 // @Produce json
-// @Param user_id path string true "User ID"
 // @Success 200 {object} structs.SuccessResponse "User deleted successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload or user ID"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/admin/users/{user_id} [delete]
-func (m AdminServices) DeleteUser(c *gin.Context) {
-	userID := c.Param("user_id")
-	if userID == "" {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "User ID is required",
-		})
-		return
-	}
+// @Router /api/v1/admin/users [delete]
+func (as AdminServices) DeleteUser(c *gin.Context) {
 
 	// Get requester's role from context
 	role, exists := c.Get("userRole")
@@ -287,12 +278,9 @@ func (m AdminServices) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	// Create the delete user request
-	req := delete_user.DeleteUserRequest{
-		UserID: userID,
-	}
+	var req delete_user.DeleteUserRequest
 
-	err := m.deleteUser.DeleteUser(req, role.(string))
+	err := as.deleteUser.DeleteUser(req, role.(string))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 			Error:   "user_deletion_failed",

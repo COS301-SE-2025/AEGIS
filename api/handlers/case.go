@@ -8,10 +8,10 @@ import (
 	"aegis-api/services/case_status_update"
 	"aegis-api/services/get_collaborators"
 	"aegis-api/structs"
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"net/http"
+	"strings"
 )
 
 type CaseServices struct {
@@ -31,7 +31,7 @@ func NewCaseServices(
 	getCollaborators *get_collaborators.Service,
 	assignCase *case_assign.CaseAssignmentService,
 	removeCollaborator *case_assign.CaseAssignmentService,
-	closedCasesByUser ListClosedCases.ClosedCaseRepository,
+	// closedCasesByUser ListClosedCases.ClosedCaseRepository, //active and closed cases functions to be removed
 ) *CaseServices {
 	return &CaseServices{
 		createCase:         createCase,
@@ -40,8 +40,64 @@ func NewCaseServices(
 		getCollaborators:   getCollaborators,
 		assignCase:         assignCase,
 		removeCollaborator: removeCollaborator,
-		closedCasesByUser:  closedCasesByUser,
+		//closedCasesByUser:  closedCasesByUser,
 	}
+}
+
+// @Summary Create a new case
+// @Description Creates a new case with the provided details
+// @Tags Cases
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param request body case_creation.CreateCaseRequest true "Case Creation Request"
+// @Success 201 {object} structs.SuccessResponse{data=case_creation.Case} "Case created successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases [post]
+func (cs CaseServices) CreateCase(c *gin.Context) {
+	var req case_creation.CreateCaseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid case data",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	creatorID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "No authentication provided",
+		})
+		return
+	}
+
+	req.CreatedBy = creatorID.(string) //use userID from middleware
+
+	newCase, err := cs.createCase.CreateCase(req)
+	if err != nil {
+		status := http.StatusInternalServerError
+		errorType := "creation_failed"
+		if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "invalid") {
+			status = http.StatusBadRequest
+			errorType = "validation_failed"
+		}
+		c.JSON(status, structs.ErrorResponse{
+			Error:   errorType,
+			Message: "Could not create case",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, structs.SuccessResponse{
+		Success: true,
+		Message: "Case created successfully",
+		Data:    newCase,
+	})
 }
 
 // @Summary Get all cases
@@ -52,9 +108,9 @@ func NewCaseServices(
 // @Success 200 {object} structs.SuccessResponse{data=[]case_creation.Case} "Cases retrieved successfully"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases [get]
-func (m CaseServices) GetAllCases(c *gin.Context) {
+func (cs CaseServices) GetAllCases(c *gin.Context) {
 	//admin-only privilege
-	cases, err := m.getCase.GetAllCases()
+	cases, err := cs.getCase.GetAllCases() //no filtering
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 			Error:   "fetch_failed",
@@ -67,43 +123,6 @@ func (m CaseServices) GetAllCases(c *gin.Context) {
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
 		Message: "Cases retrieved successfully",
-		Data:    cases,
-	})
-}
-
-// @Summary Get cases by user
-// @Description Retrieves cases created by a specific user
-// @Tags Cases
-// @Accept json
-// @Produce json
-// @Param user_id path string true "User ID"
-// @Success 200 {object} structs.SuccessResponse{data=[]case_creation.Case} "Cases retrieved successfully"
-// @Failure 400 {object} structs.ErrorResponse "Invalid user ID"
-// @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/user/{user_id} [get]
-func (m CaseServices) GetCasesByUser(c *gin.Context) {
-	userID := c.Param("user_id")
-	if userID == "" {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "User ID is required",
-		})
-		return
-	}
-
-	cases, err := m.getCase.GetCasesByUser(userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-			Error:   "fetch_failed",
-			Message: "Could not fetch user cases",
-			Details: err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, structs.SuccessResponse{
-		Success: true,
-		Message: "User cases retrieved successfully",
 		Data:    cases,
 	})
 }
@@ -123,7 +142,7 @@ func (m CaseServices) GetCasesByUser(c *gin.Context) {
 // @Success 200 {object} structs.SuccessResponse{data=[]case_creation.Case} "Cases retrieved successfully"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/filter [get]
-func (m CaseServices) GetFilteredCases(c *gin.Context) {
+func (cs CaseServices) GetFilteredCases(c *gin.Context) {
 	// Extract query parameters
 	status := c.Query("status")
 	priority := c.Query("priority")
@@ -133,7 +152,7 @@ func (m CaseServices) GetFilteredCases(c *gin.Context) {
 	sortBy := c.Query("sort_by")
 	order := c.Query("order")
 
-	cases, err := m.getCase.GetFilteredCases(
+	cases, err := cs.getCase.GetFilteredCases(
 		status,
 		priority,
 		createdBy,
@@ -158,41 +177,78 @@ func (m CaseServices) GetFilteredCases(c *gin.Context) {
 	})
 }
 
-// @Summary Create a new case
-// @Description Creates a new case with the provided details
+// @Summary Get cases by user
+// @Description Retrieves cases created by a specific user
 // @Tags Cases
 // @Accept json
 // @Produce json
-// @Param request body case_creation.CreateCaseRequest true "Case Creation Request"
-// @Success 201 {object} structs.SuccessResponse{data=case_creation.Case} "Case created successfully"
+// @Param user_id path string true "User ID"
+// @Success 200 {object} structs.SuccessResponse{data=[]case_creation.Case} "Cases retrieved successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid user ID"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/user/{user_id} [get]
+func (cs CaseServices) GetCasesByUser(c *gin.Context) {
+	userID := c.Param("user_id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "User ID is required",
+		})
+		return
+	}
+
+	cases, err := cs.getCase.GetCasesByUser(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "fetch_failed",
+			Message: "Could not fetch user cases",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "User cases retrieved successfully",
+		Data:    cases,
+	})
+}
+
+// @Summary Update case status
+// @Description Updates the status of a case
+// @Tags Cases
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param request body structs.UpdateCaseStatusRequest true "Status Update Request"
+// @Success 200 {object} structs.SuccessResponse "Case status updated successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases [post]
-func (m CaseServices) CreateCase(c *gin.Context) {
-	var req case_creation.CreateCaseRequest
+// @Router /api/v1/cases/status [put]
+func (cs CaseServices) UpdateCaseStatus(c *gin.Context) {
+	var req case_status_update.UpdateCaseStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
-			Message: "Invalid case data",
+			Message: "Invalid status update data",
 			Details: err.Error(),
 		})
 		return
 	}
 
-	newCase, err := m.createCase.CreateCase(req)
+	err := cs.updateCaseStatus.UpdateCaseStatus(req, "Admin") //hardcoded since the middleware checks for admin role
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-			Error:   "creation_failed",
-			Message: "Could not create case",
+			Error:   "update_failed",
+			Message: "Could not update case status",
 			Details: err.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, structs.SuccessResponse{
+	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
-		Message: "Case created successfully",
-		Data:    newCase,
+		Message: "Case status updated successfully",
 	})
 }
 
@@ -201,15 +257,17 @@ func (m CaseServices) CreateCase(c *gin.Context) {
 // @Tags Cases
 // @Accept json
 // @Produce json
-// @Param case_id path string true "Case ID"
+// @Security ApiKeyAuth
+// @Param id path string true "Case ID"
 // @Param request body structs.AssignCaseRequest true "Assignment Request"
 // @Success 200 {object} structs.SuccessResponse "User assigned successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized - Authentication required"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden - Admin privileges required"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/{case_id}/assign [post]
-func (m CaseServices) CreateCollaborator(c *gin.Context) {
-	caseID := c.Param("case_id")
+// @Router /api/v1/cases/{id}/collaborators [post]
+func (cs CaseServices) CreateCollaborator(c *gin.Context) {
+	caseID := c.Param("id")
 	var req structs.AssignCaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -220,8 +278,7 @@ func (m CaseServices) CreateCollaborator(c *gin.Context) {
 		return
 	}
 
-	// Get assigner ID from context (assuming it's set by auth middleware)
-	assignerID, exists := c.Get("userID")
+	assignerID, exists := c.Get("userID") //should be set by middleware
 	if !exists {
 		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 			Error:   "unauthorized",
@@ -258,10 +315,10 @@ func (m CaseServices) CreateCollaborator(c *gin.Context) {
 		return
 	}
 
-	err = m.assignCase.AssignUserToCase(assignerUUID, assigneeUUID, caseUUID, req.Role)
+	err = cs.assignCase.AssignUserToCase(assignerUUID, assigneeUUID, caseUUID, req.Role)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "forbidden: admin privileges required" {
+		if err.Error() == "forbidden: admin privileges required" { //middleware already checks this - could remove
 			status = http.StatusForbidden
 		}
 		c.JSON(status, structs.ErrorResponse{
@@ -278,24 +335,70 @@ func (m CaseServices) CreateCollaborator(c *gin.Context) {
 	})
 }
 
+// @Summary Get case collaborators
+// @Description Retrieves all collaborators (users with roles) for a specific case
+// @Tags Cases
+// @Accept json
+// @Produce json
+// @Param id path string true "Case ID"
+// @Success 200 {object} structs.SuccessResponse{data=[]get_collaborators.Collaborator} "Collaborators retrieved successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid case ID"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/cases/{id}/collaborators [get]
+func (cs CaseServices) GetCollaborators(c *gin.Context) {
+	caseID := c.Param("id")
+	if caseID == "" {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Case ID is required",
+		})
+		return
+	}
+
+	caseUUID, err := uuid.Parse(caseID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_case_id",
+			Message: "Invalid case ID format",
+		})
+		return
+	}
+
+	collaborators, err := cs.getCollaborators.GetCollaborators(caseUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "fetch_failed",
+			Message: "Could not fetch collaborators",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "Collaborators retrieved successfully",
+		Data:    collaborators,
+	})
+}
+
 // @Summary Unassign user from case
 // @Description Removes a user from a case (requires admin privileges)
 // @Tags Cases
 // @Accept json
 // @Produce json
-// @Param case_id path string true "Case ID"
+// @Param id path string true "Case ID"
 // @Param user_id path string true "User ID"
 // @Success 200 {object} structs.SuccessResponse "User unassigned successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden - Admin privileges required"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/{case_id}/users/{user_id} [delete]
-func (m CaseServices) RemoveCollaborator(c *gin.Context) {
-	caseID := c.Param("case_id")
+// @Router /api/v1/cases/{id}/users/{user_id} [delete]
+func (cs CaseServices) RemoveCollaborator(c *gin.Context) {
+	caseID := c.Param("id")
 	userID := c.Param("user_id")
 
 	// Get assigner ID from context
-	assignerID, exists := c.Get("userID")
+	assignerID, exists := c.Get("userID") //middleware
 	if !exists {
 		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 			Error:   "unauthorized",
@@ -332,7 +435,7 @@ func (m CaseServices) RemoveCollaborator(c *gin.Context) {
 		return
 	}
 
-	err = m.removeCollaborator.UnassignUserFromCase(assignerUUID, userUUID, caseUUID)
+	err = cs.removeCollaborator.UnassignUserFromCase(assignerUUID, userUUID, caseUUID)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "forbidden: admin privileges required" {
@@ -352,44 +455,7 @@ func (m CaseServices) RemoveCollaborator(c *gin.Context) {
 	})
 }
 
-// @Summary Update case status
-// @Description Updates the status of a case
-// @Tags Cases
-// @Accept json
-// @Produce json
-// @Param case_id path string true "Case ID"
-// @Param request body structs.UpdateCaseStatusRequest true "Status Update Request"
-// @Success 200 {object} structs.SuccessResponse "Case status updated successfully"
-// @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
-// @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/{case_id}/status [put]
-func (m CaseServices) UpdateCaseStatus(c *gin.Context) {
-	var req case_status_update.UpdateCaseStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "Invalid status update data",
-			Details: err.Error(),
-		})
-		return
-	}
-
-	err := m.updateCaseStatus.UpdateCaseStatus(req, "Admin") //cant hardcode COME BACK
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-			Error:   "update_failed",
-			Message: "Could not update case status",
-			Details: err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, structs.SuccessResponse{
-		Success: true,
-		Message: "Case status updated successfully",
-	})
-}
-
+/*
 // @Summary Get closed cases by user
 // @Description Retrieves all closed cases associated with a specific user
 // @Tags Cases
@@ -400,7 +466,7 @@ func (m CaseServices) UpdateCaseStatus(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid user ID"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/closed/{user_id} [get]
-func (m CaseServices) GetClosedCasesByUserID(c *gin.Context) {
+func (cs CaseServices) GetClosedCasesByUserID(c *gin.Context) {
 	userID := c.Param("user_id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -410,7 +476,7 @@ func (m CaseServices) GetClosedCasesByUserID(c *gin.Context) {
 		return
 	}
 
-	cases, err := m.closedCasesByUser.GetClosedCasesByUserID(c.Request.Context(), userID) //why is the context needed in this function if it is not being used by it?
+	cases, err := cs.closedCasesByUser.GetClosedCasesByUserID(c.Request.Context(), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 			Error:   "fetch_failed",
@@ -425,4 +491,4 @@ func (m CaseServices) GetClosedCasesByUserID(c *gin.Context) {
 		Message: "Closed cases retrieved successfully",
 		Data:    cases,
 	})
-}
+}*/
