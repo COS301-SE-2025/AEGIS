@@ -1,25 +1,27 @@
 package auth
 
 import (
-    "time"
-    "golang.org/x/crypto/bcrypt"
-    "github.com/golang-jwt/jwt/v5"
+	"os"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtSecret = []byte("your_secret_key")
+var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
 func ComparePasswords(hashedPwd, plainPwd string) bool {
-    err := bcrypt.CompareHashAndPassword([]byte(hashedPwd), []byte(plainPwd))
-    return err == nil
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPwd), []byte(plainPwd))
+	return err == nil
 }
 
 func GenerateJWT(userID string) (string, error) {
-    claims := jwt.MapClaims{
-        "sub": userID,
-        "exp": time.Now().Add(time.Hour * 24).Unix(),
-    }
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-    return token.SignedString(jwtSecret)
+	claims := jwt.MapClaims{
+		"sub": userID,
+		"exp": time.Now().Add(time.Hour * 24).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
 }
 
 // HashPassword hashes a plain-text password using bcrypt.

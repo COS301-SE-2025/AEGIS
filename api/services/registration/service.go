@@ -47,8 +47,6 @@ func (s *RegistrationService) Register(req RegistrationRequest) (User, error) {
 	id := generateID()
 	entity := ModelToEntity(model, id)
 
-	token := generateToken()
-	entity.VerificationToken = token
 	entity.IsVerified = false
 
 	err = s.repo.CreateUser(&entity)
@@ -58,7 +56,12 @@ func (s *RegistrationService) Register(req RegistrationRequest) (User, error) {
 	}
 
 	log.Printf("✅ Registered new user: %s (%s %s)", entity.Email, entity.FullName, entity.Role)
-
+	// JWT-based verification link
+	token, err := GenerateJWT(entity.ID, entity.Email, "verify")
+	if err != nil {
+		log.Printf("Failed to create verification token: %v", err)
+		return User{}, err
+	}
 	sendVerificationEmail(entity.Email, token)
 
 	return entity, nil
@@ -100,25 +103,43 @@ func (r *GormUserRepository) UpdatePassword(userID uuid.UUID, hashedPassword str
 
 // VerifyUser looks up a User by the given token, marks them as verified, and clears the token.
 func (s *RegistrationService) VerifyUser(token string) error {
-	// 1. Find the user whose VerificationToken equals the provided token
-	user, err := s.repo.GetUserByToken(token)
+	claims, err := VerifyJWT(token)
 	if err != nil {
-		// Could be ErrRecordNotFound or any other DB error
 		return fmt.Errorf("invalid or expired verification token")
 	}
+	if claims.Role != "verify" {
+		return fmt.Errorf("token is not a verification token")
+	}
 
-	// 2. If already verified, do nothing
+	user, err := s.repo.GetUserByEmail(claims.Email)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
 	if user.IsVerified {
 		return nil
 	}
-
-	// 3. Mark as verified and clear the token
 	user.IsVerified = true
-	user.VerificationToken = ""
-
-	// 4. Persist the change
 	if err := s.repo.UpdateUser(user); err != nil {
 		return fmt.Errorf("could not update user verification status: %v", err)
 	}
+	return nil
+}
+
+func (s *RegistrationService) ResendVerificationEmail(req ResendVerificationRequest) error {
+	user, err := s.repo.GetUserByEmail(req.Email)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+
+	if user.IsVerified {
+		return fmt.Errorf("user already verified")
+	}
+
+	token, err := GenerateJWT(user.ID, user.Email, "verify")
+	if err != nil {
+		return fmt.Errorf("could not generate verification token: %v", err)
+	}
+
+	sendVerificationEmail(user.Email, token)
 	return nil
 }

@@ -10,6 +10,8 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type RegistrationRequest struct {
@@ -24,11 +26,21 @@ type RegistrationRequest struct {
 	*/
 
 }
+type ResendVerificationRequest struct {
+	Email string `json:"email"`
+}
 
 type UserResponse struct {
 	ID       string `json:"id"`
 	FullName string `json:"full_name"`
 	Email    string `json:"email"`
+}
+
+type Claims struct {
+	UserID string `json:"user_id"`
+	Email  string `json:"email"`
+	Role   string `json:"role"` // use "verify" for email token
+	jwt.RegisteredClaims
 }
 
 func (r RegistrationRequest) Validate() error {

@@ -16,7 +16,6 @@ type UserRepository interface {
 	CreateUser(user *User) error
 	GetUserByEmail(email string) (*User, error)
 	UpdateUser(user *User) error
-	GetUserByToken(token string) (*User, error)
 	GetUserByFullName(fullName string) (*User, error)
 }
 
@@ -51,17 +50,6 @@ func (r *GormUserRepository) GetUserByEmail(email string) (*User, error) {
 	return &user, nil
 }
 
-// 2. Implement in GormUserRepository
-func (r *GormUserRepository) GetUserByToken(token string) (*User, error) {
-	var user User
-	result := r.db.Where("verification_token = ?", token).First(&user)
-	return &user, result.Error
-}
-func (r *GormUserRepository) UpdateUser(user *User) error {
-	result := r.db.Save(user)
-	return result.Error
-}
-
 // GetUserByFullName fetches a user by full name.
 func (r *GormUserRepository) GetUserByFullName(fullName string) (*User, error) {
 	var user User
@@ -70,4 +58,7 @@ func (r *GormUserRepository) GetUserByFullName(fullName string) (*User, error) {
 		return nil, result.Error
 	}
 	return &user, nil
+}
+func (r *GormUserRepository) UpdateUser(user *User) error {
+	return r.db.Save(user).Error
 }

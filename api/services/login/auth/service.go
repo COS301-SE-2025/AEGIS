@@ -26,10 +26,15 @@ func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
+	token, err := GenerateJWT(user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token")
+	}
+
 	return &LoginResponse{
 		ID:         user.ID,
 		Email:      user.Email,
-		Token:      user.VerificationToken, // Later replace with JWT
+		Token:      token,
 		IsVerified: user.IsVerified,
 	}, nil
 }
