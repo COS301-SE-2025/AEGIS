@@ -1,4 +1,4 @@
-package mocks
+package db
 
 import (
 	"context"
