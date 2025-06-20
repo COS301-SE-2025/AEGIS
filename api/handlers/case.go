@@ -7,6 +7,7 @@ import (
 	"aegis-api/services/case_creation"
 	"aegis-api/services/case_status_update"
 	"aegis-api/services/get_collaborators"
+	"aegis-api/services/remove_user_from_case"
 	"aegis-api/structs"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -20,7 +21,7 @@ type CaseServices struct {
 	updateCaseStatus   *case_status_update.CaseStatusService
 	getCollaborators   *get_collaborators.Service
 	assignCase         *case_assign.CaseAssignmentService
-	removeCollaborator *case_assign.CaseAssignmentService
+	removeCollaborator *remove_user_from_case.Service
 	closedCasesByUser  ListClosedCases.ClosedCaseRepository
 }
 
@@ -30,7 +31,7 @@ func NewCaseServices(
 	updateCaseStatus *case_status_update.CaseStatusService,
 	getCollaborators *get_collaborators.Service,
 	assignCase *case_assign.CaseAssignmentService,
-	removeCollaborator *case_assign.CaseAssignmentService,
+	removeCollaborator *remove_user_from_case.Service,
 	// closedCasesByUser ListClosedCases.ClosedCaseRepository, //active and closed cases functions to be removed
 ) *CaseServices {
 	return &CaseServices{
@@ -45,7 +46,7 @@ func NewCaseServices(
 }
 
 // @Summary Create a new case
-// @Description Creates a new case with the provided details
+// @Description Creates a new case with the provided details. Only users with 'Admin' role can perform this action.
 // @Tags Cases
 // @Accept json
 // @Produce json
@@ -56,7 +57,7 @@ func NewCaseServices(
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases [post]
 func (cs CaseServices) CreateCase(c *gin.Context) {
-	var req case_creation.CreateCaseRequest
+	var req case_creation.CreateCaseRequest //
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -220,12 +221,21 @@ func (cs CaseServices) GetCasesByUser(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
-// @Param request body structs.UpdateCaseStatusRequest true "Status Update Request"
+// @Param request body case_status_update.UpdateCaseStatusRequest true "Status Update Request"
 // @Success 200 {object} structs.SuccessResponse "Case status updated successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/status [put]
+// @Router /api/v1/cases/{id}/status [put]
 func (cs CaseServices) UpdateCaseStatus(c *gin.Context) {
+	caseID := c.Param("id")
+	if caseID == "" {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Case ID is required",
+		})
+		return
+	}
+
 	var req case_status_update.UpdateCaseStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -235,6 +245,8 @@ func (cs CaseServices) UpdateCaseStatus(c *gin.Context) {
 		})
 		return
 	}
+
+	req.CaseID = caseID //set case ID from URL parameter
 
 	err := cs.updateCaseStatus.UpdateCaseStatus(req, "Admin") //hardcoded since the middleware checks for admin role
 	if err != nil {
@@ -288,7 +300,7 @@ func (cs CaseServices) CreateCollaborator(c *gin.Context) {
 	}
 
 	// Parse UUIDs
-	caseUUID, err := uuid.Parse(caseID)
+	caseUUID, err := uuid.Parse(caseID) //from url
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_case_id",
@@ -297,7 +309,7 @@ func (cs CaseServices) CreateCollaborator(c *gin.Context) {
 		return
 	}
 
-	assignerUUID, err := uuid.Parse(assignerID.(string))
+	assignerUUID, err := uuid.Parse(assignerID.(string)) //from middleware
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_assigner_id",
@@ -306,7 +318,7 @@ func (cs CaseServices) CreateCollaborator(c *gin.Context) {
 		return
 	}
 
-	assigneeUUID, err := uuid.Parse(req.UserID)
+	assigneeUUID, err := uuid.Parse(req.UserID) //from request body
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_user_id",
@@ -315,7 +327,7 @@ func (cs CaseServices) CreateCollaborator(c *gin.Context) {
 		return
 	}
 
-	err = cs.assignCase.AssignUserToCase(assignerUUID, assigneeUUID, caseUUID, req.Role)
+	err = cs.assignCase.AssignUserToCase(assignerUUID, assigneeUUID, caseUUID, req.Role) //create request struct COME BACK TO THIS
 	if err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "forbidden: admin privileges required" { //middleware already checks this - could remove
@@ -329,7 +341,7 @@ func (cs CaseServices) CreateCollaborator(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, structs.SuccessResponse{
+	c.JSON(http.StatusCreated, structs.SuccessResponse{
 		Success: true,
 		Message: "User assigned to case successfully",
 	})
@@ -388,26 +400,13 @@ func (cs CaseServices) GetCollaborators(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Case ID"
 // @Param user_id path string true "User ID"
-// @Success 200 {object} structs.SuccessResponse "User unassigned successfully"
+// @Success 204 {} "No Content"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden - Admin privileges required"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/{id}/users/{user_id} [delete]
+// @Router /api/v1/cases/{id}/collaborators/{user_id} [delete]
 func (cs CaseServices) RemoveCollaborator(c *gin.Context) {
 	caseID := c.Param("id")
-	userID := c.Param("user_id")
-
-	// Get assigner ID from context
-	assignerID, exists := c.Get("userID") //middleware
-	if !exists {
-		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
-			Error:   "unauthorized",
-			Message: "No authentication provided",
-		})
-		return
-	}
-
-	// Parse UUIDs
 	caseUUID, err := uuid.Parse(caseID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -417,15 +416,7 @@ func (cs CaseServices) RemoveCollaborator(c *gin.Context) {
 		return
 	}
 
-	assignerUUID, err := uuid.Parse(assignerID.(string))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_assigner_id",
-			Message: "Invalid assigner ID format",
-		})
-		return
-	}
-
+	userID := c.Param("user_id")
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -435,7 +426,32 @@ func (cs CaseServices) RemoveCollaborator(c *gin.Context) {
 		return
 	}
 
-	err = cs.removeCollaborator.UnassignUserFromCase(assignerUUID, userUUID, caseUUID)
+	adminID, exists := c.Get("userID") // from middleware
+	if !exists {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "No authentication provided",
+		})
+		return
+	}
+
+	adminUUID, err := uuid.Parse(adminID.(string)) // from middleware
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_admin_id",
+			Message: "Invalid admin ID format",
+		})
+		return
+	}
+
+	req := remove_user_from_case.RemoveUserRequest{
+		CaseID:  caseUUID,
+		UserID:  userUUID,
+		AdminID: adminUUID,
+	}
+
+	err = cs.removeCollaborator.RemoveUser(req)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "forbidden: admin privileges required" {
@@ -449,10 +465,7 @@ func (cs CaseServices) RemoveCollaborator(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, structs.SuccessResponse{
-		Success: true,
-		Message: "User unassigned from case successfully",
-	})
+	c.Status(http.StatusNoContent) //no content returned
 }
 
 /*
