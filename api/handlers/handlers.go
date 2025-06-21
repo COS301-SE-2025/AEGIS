@@ -15,47 +15,45 @@ type Handler struct {
 type AdminInterface interface {
 	RegisterUser(c *gin.Context)
 	ListUsers(c *gin.Context)
-	GetUserActivity(c *gin.Context)
-	UpdateUserRole(c *gin.Context)
+	UpdateUserRole(c *gin.Context) //is this all an admin can update?
 	DeleteUser(c *gin.Context)
-	GetRoles(c *gin.Context)
+	//GetRoles(c *gin.Context)
 }
 
 type AuthInterface interface {
 	Login(c *gin.Context)
 	Logout(c *gin.Context)
-	ResetPassword(c *gin.Context)
+	//ResetPassword(c *gin.Context)
 	//RequestPasswordReset(c *gin.Context)
 }
 
 type CaseInterface interface {
-	GetAllCases(c *gin.Context)
-	GetCasesByUser(c *gin.Context)
-	GetFilteredCases(c *gin.Context)
 	CreateCase(c *gin.Context)
-	//GetCase(c *gin.Context)
+	GetAllCases(c *gin.Context)
+	GetFilteredCases(c *gin.Context)
+	GetCasesByUserID(c *gin.Context)
 	UpdateCaseStatus(c *gin.Context)
-	GetClosedCasesByUserID(c *gin.Context)
-	GetCollaborators(c *gin.Context) //get all people assigned to a case
 	CreateCollaborator(c *gin.Context)
+	GetCollaborators(c *gin.Context)
 	RemoveCollaborator(c *gin.Context)
+	//
 }
 
 type EvidenceInterface interface {
-	GetEvidenceByID(c *gin.Context)
-	ListEvidenceByCase(c *gin.Context)
-	ListEvidenceByUser(c *gin.Context)
 	UploadEvidence(c *gin.Context)
-	DeleteEvidenceByID(c *gin.Context)
-	//PreviewEvidence(c *gin.Context)
+	ListEvidenceByCaseID(c *gin.Context)
+	ListEvidenceByUserID(c *gin.Context)
+	GetEvidenceByID(c *gin.Context)
+	DownloadEvidenceByUserID(c *gin.Context)
 	GetEvidenceMetadata(c *gin.Context)
-	DownloadEvidenceByUser(c *gin.Context)
+	DeleteEvidenceByID(c *gin.Context)
 }
 
 type UserInterface interface {
 	GetProfile(c *gin.Context)
-	UpdateUserInfo(c *gin.Context)
+	UpdateProfile(c *gin.Context)
 	GetUserCases(c *gin.Context)
+	//listevidencebyuserid
 }
 
 func NewHandler(

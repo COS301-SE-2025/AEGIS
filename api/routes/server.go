@@ -10,7 +10,6 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-// mock service structs
 func SetUpRouter(h *handlers.Handler) *gin.Engine {
 	router := gin.Default()
 	//h := handlers.NewHandler()
@@ -37,17 +36,15 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 	//auth
 	auth := api.Group("/auth")
 	{
-		// activate-account
-		//auth.POST("/activate-account", authService.activateAccount)
-
 		// login
 		auth.POST("/login", h.AuthHandler.Login)
 
 		// logout
-		auth.POST("/logout", h.AuthHandler.Logout)
+		auth.DELETE("/logout", h.AuthHandler.Logout)
 
 		// password-reset
-		auth.POST("/password-reset", h.AuthHandler.ResetPassword)
+		//auth.POST("/password-reset", h.AuthHandler.ResetPassword)
+		//auth.POST("/password-reset-request", h.AuthHandler.RequestPasswordReset)
 
 		// auth.POST("/refresh-token", authService.refreshToken)
 	}
@@ -59,57 +56,76 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		admin := protected.Group("/admin")
 		admin.Use(middleware.RequireRole("Admin"))
 		{
-			admin.POST("/users", h.AdminHandler.RegisterUser)
-			admin.GET("/users", h.AdminHandler.ListUsers)
-			admin.GET("/users/:user_id", h.AdminHandler.GetUserActivity)
-			admin.PUT("/users/:user_id", h.AdminHandler.UpdateUserRole)
-			admin.DELETE("/users/:user_id", h.AdminHandler.DeleteUser)
+			users := admin.Group("/users")
+			{
+				users.GET("", h.AdminHandler.ListUsers)
+				users.POST("", h.AdminHandler.RegisterUser)
 
+				singleUser := users.Group("/:user_id")
+				{
+					singleUser.GET("", h.UserHandler.GetProfile)            //get user profile
+					singleUser.PUT("/profile", h.UserHandler.UpdateProfile) //update user profile
+					singleUser.PUT("", h.AdminHandler.UpdateUserRole)       //update user role
+					singleUser.DELETE("", h.AdminHandler.DeleteUser)        //delete user
+
+					singleUser.GET("/cases", h.UserHandler.GetUserCases)                                 //get cases by user id
+					singleUser.GET("/evidence", h.EvidenceHandler.ListEvidenceByUserID)                  //get evidence uploaded by user id
+					singleUser.GET("/evidence/:evidence_id", h.EvidenceHandler.DownloadEvidenceByUserID) //download specific evidence by user id
+				}
+			}
 			// roles
-			admin.GET("/roles", h.AdminHandler.GetRoles)
+			//admin.GET("/roles", h.AdminHandler.GetRoles)
 			//admin.GET("/audit-logs", h.AdminHandler.getAuditLogs)
 			//dashboard stuff
 		}
 
-		user := protected.Group("/user")
+		user := protected.Group("/users")
 		{
-			user.GET("/me", h.UserHandler.GetUserInfo)
-			user.PUT("/me", h.UserHandler.UpdateUserInfo)
+			//profile
+			user.GET("", h.UserHandler.GetProfile)
+			user.PUT("", h.UserHandler.UpdateProfile)
+
+			//cases
+			user.GET("/cases", h.UserHandler.GetUserCases)
+			user.GET("/evidence", h.EvidenceHandler.ListEvidenceByUserID)
+			user.GET("/evidence/:evidence_id", h.EvidenceHandler.DownloadEvidenceByUserID)
 		}
 
 		//cases
 		cases := protected.Group("/cases")
 		{
-			cases.GET("", h.CaseHandler.GetCases)                                     //support for pagination, filtering, etc.
-			cases.POST("", middleware.RequireRole("Admin"), h.CaseHandler.CreateCase) //admin only --adjust***
+			cases.POST("", middleware.RequireRole("Admin"), h.CaseHandler.CreateCase)
+			cases.GET("", h.CaseHandler.GetAllCases)                                              //no filtering
+			cases.GET("/filter", middleware.RequireRole("Admin"), h.CaseHandler.GetFilteredCases) //filter cases by status, type, etc.
 
 			//case-specific routes
-			singleCase := cases.Group("/:id")
+			singleCase := cases.Group("/:case_id")
 			{
 				// ?case_id
-				singleCase.GET("", h.CaseHandler.GetCase)                                     //get a specific case by id
-				singleCase.PUT("", middleware.RequireRole("Admin"), h.CaseHandler.UpdateCase) //admin only
-
+				//singleCase.GET("", h.CaseHandler.GetCaseByID) //get a specific case by id
+				singleCase.PUT("/status", middleware.RequireRole("Admin"), h.CaseHandler.UpdateCaseStatus) //admin only
 				//cases.DELETE("", h.CaseHandler.DeleteCase)
 
-				singleCase.POST("/collaborators", middleware.RequireRole("Admin"), h.CaseHandler.CreateCollaborator)
-				singleCase.DELETE("/collaborators/:user", middleware.RequireRole("Admin"), h.CaseHandler.RemoveCollaborator)
-
 				//collaborators
+				singleCase.POST("/collaborators", middleware.RequireRole("Admin"), h.CaseHandler.CreateCollaborator)
 				singleCase.GET("/collaborators", h.CaseHandler.GetCollaborators)
+				singleCase.DELETE("/collaborators/:user_id", middleware.RequireRole("Admin"), h.CaseHandler.RemoveCollaborator)
 
 				//singleCase.GET("/timeline", h.CaseHandler.GetTimeline) later
 
 				evidence := singleCase.Group("/evidence")
 				{
-					evidence.GET("", h.EvidenceHandler.GetEvidence) //evidence under a specific case
+					//evidence.GET("", h.EvidenceHandler.GetEvidence) //evidence under a specific case
 					evidence.POST("", h.EvidenceHandler.UploadEvidence)
+					evidence.GET("", h.EvidenceHandler.ListEvidenceByCaseID)
 
 					//evidence specific to a single case
-					evidenceItem := evidence.Group("/:e_id")
+					evidenceItem := evidence.Group("/:evidence_id")
 					{
-						evidenceItem.GET("", h.EvidenceHandler.GetEvidenceItem)
-						evidenceItem.GET("/preview", h.EvidenceHandler.PreviewEvidence)
+						evidenceItem.GET("", h.EvidenceHandler.GetEvidenceByID)
+						evidenceItem.GET("/metadata", h.EvidenceHandler.GetEvidenceMetadata)
+						evidenceItem.DELETE("", h.EvidenceHandler.DeleteEvidenceByID)
+
 						//evidenceItem.POST("/annotations", h.EvidenceHandler.AddAnnotation)
 						//evidenceItem.GET("/annotations", h.EvidenceHandler.GetAnnotations)
 					}
