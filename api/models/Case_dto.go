@@ -25,4 +25,19 @@ type Case struct {
 	TeamName           string             `gorm:"not null"`
 	CreatedBy          uuid.UUID          `gorm:"type:uuid"`
 	CreatedAt          time.Time          `gorm:"autoCreateTime"`
+		Tags []*Tag `gorm:"many2many:case_tags;constraint:OnDelete:CASCADE;"`
+}
+
+func (s InvestigationStage) IsValid() bool {
+	switch s {
+	case StageAnalysis, StageResearch, StageEvaluation, StageFinalization:
+		return true
+	default:
+		return false
+	}
+}
+
+type CaseTag struct {
+	CaseID uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TagID  int       `gorm:"primaryKey"`
 }
