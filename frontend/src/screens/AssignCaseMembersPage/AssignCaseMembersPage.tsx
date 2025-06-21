@@ -2,8 +2,14 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../../components/ui/select";
-import { ShieldUser, UserPlus2 } from "lucide-react";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "../../components/ui/select";
+import { UserPlus2 } from "lucide-react";
 
 const exampleUsers = [
   "Alice Johnson",
@@ -33,56 +39,46 @@ const dfirRoles = [
   "Case Manager",
 ];
 
-export function AssignCaseMembersForm():JSX.Element {
+export function AssignCaseMembersForm(): JSX.Element {
   const navigate = useNavigate();
 
-  // State to store selected members, each with user & role
-  const [members, setMembers] = useState<
-    { user: string; role: string }[]
-  >([]);
-
-  // For user input search/filter for users dropdown
+  const [members, setMembers] = useState<{ user: string; role: string }[]>([]);
   const [userSearch, setUserSearch] = useState("");
 
-  // For role free-text input per member
   const handleMemberUserChange = (index: number, value: string) => {
-    const newMembers = [...members];
-    newMembers[index].user = value;
-    setMembers(newMembers);
+    const updated = [...members];
+    updated[index].user = value;
+    setMembers(updated);
   };
 
   const handleMemberRoleChange = (index: number, value: string) => {
-    const newMembers = [...members];
-    newMembers[index].role = value;
-    setMembers(newMembers);
+    const updated = [...members];
+    updated[index].role = value;
+    setMembers(updated);
   };
 
-  // Add new empty member slot (max 10)
   const addMember = () => {
     if (members.length < 10) {
       setMembers([...members, { user: "", role: "" }]);
     }
   };
 
-  // Remove member by index
   const removeMember = (index: number) => {
-    const newMembers = members.filter((_, i) => i !== index);
-    setMembers(newMembers);
+    setMembers(members.filter((_, i) => i !== index));
   };
 
-  // Filter users for dropdown based on search input
   const filteredUsers = exampleUsers.filter(
-    (u) => u.toLowerCase().includes(userSearch.toLowerCase()) && !members.some((m) => m.user === u)
+    (u) =>
+      u.toLowerCase().includes(userSearch.toLowerCase()) &&
+      !members.some((m) => m.user === u)
   );
 
-  // Submit handler
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (members.length === 0) {
       alert("Please add at least one member.");
       return;
     }
-    // Validate members have user and role
     for (const m of members) {
       if (!m.user.trim() || !m.role.trim()) {
         alert("Please fill in user and role for all members.");
@@ -94,28 +90,28 @@ export function AssignCaseMembersForm():JSX.Element {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center p-6">
-      <div className="max-w-4xl w-full bg-zinc-900 p-6 rounded-2xl shadow-xl border border-zinc-700 font-mono">
-        <h1 className="text-3xl font-bold text-cyan-400 mb-6 flex items-center gap-2">
-          <UserPlus2 size={28} /> Assign Case Members
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+      <div className="max-w-4xl w-full bg-card p-6 rounded-2xl shadow-xl border border-border font-mono">
+        <h1 className="text-3xl font-bold text-cyan-400 mb-6 flex items-center gap-2">          <UserPlus2 size={28} /> Assign Case Members
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Members List */}
+          {/* Members */}
           <div className="space-y-4">
             {members.map((member, idx) => (
               <div
                 key={idx}
-                className="flex flex-wrap gap-4 items-center border border-zinc-700 rounded p-3 bg-zinc-800"
+                className="flex flex-wrap gap-4 items-center border border-border rounded p-3 bg-muted"
               >
-                {/* User select with free text + dropdown */}
                 <div className="flex-1 min-w-[220px]">
-                  <label className="block mb-1 text-sm">Choose Member</label>
+                  <label className="block mb-1 text-sm text-muted-foreground">
+                    Choose Member
+                  </label>
                   <Input
                     type="text"
-                    list={`users-list-${idx}`}
+                    list={`users-${idx}`}
                     placeholder="Type or select user"
-                    className="bg-zinc-700 border-zinc-600 text-white"
+                    className="bg-background border-border text-foreground"
                     value={member.user}
                     onChange={(e) => {
                       handleMemberUserChange(idx, e.target.value);
@@ -123,36 +119,36 @@ export function AssignCaseMembersForm():JSX.Element {
                     }}
                     required
                   />
-                  <datalist id={`users-list-${idx}`}>
+                  <datalist id={`users-${idx}`}>
                     {filteredUsers.map((user) => (
                       <option key={user} value={user} />
                     ))}
                   </datalist>
                 </div>
 
-                {/* Role select + free text */}
                 <div className="flex-1 min-w-[220px]">
-                  <label className="block mb-1 text-sm">Assign Role</label>
+                  <label className="block mb-1 text-sm text-muted-foreground">
+                    Assign Role
+                  </label>
                   <Select
                     value={member.role}
-                    onValueChange={(value: string) => handleMemberRoleChange(idx, value)}
+                    onValueChange={(val: string) => handleMemberRoleChange(idx, val)}
                   >
-                    <SelectTrigger className="bg-zinc-700 border-zinc-600 text-white w-full">
+                    <SelectTrigger className="bg-background border-border text-foreground w-full">
                       <SelectValue placeholder="Select or type role" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-800 text-white max-h-40 overflow-y-auto">
-                      {dfirRoles.map((role: string) => (
+                    <SelectContent className="bg-muted text-foreground max-h-40 overflow-y-auto">
+                      {dfirRoles.map((role) => (
                         <SelectItem key={role} value={role}>
                           {role}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* Allow free text role override */}
                   <Input
                     type="text"
                     placeholder="Or type custom role"
-                    className="mt-1 bg-zinc-700 border-zinc-600 text-white"
+                    className="mt-1 bg-background border-border text-foreground"
                     value={member.role}
                     onChange={(e) => handleMemberRoleChange(idx, e.target.value)}
                   />
@@ -170,13 +166,12 @@ export function AssignCaseMembersForm():JSX.Element {
             ))}
           </div>
 
-          {/* Add member button */}
+          {/* Add Member */}
           {members.length < 10 && (
             <Button
               type="button"
               variant="outline"
-              className="bg-zinc-800 border-cyan-500 text-cyan-400 hover:bg-cyan-800"
-              onClick={addMember}
+              className="border-muted-foreground border-cyan-500 text-cyan-400 hover:bg-cyan-800"              onClick={addMember}
             >
               + Add Member
             </Button>
@@ -186,14 +181,13 @@ export function AssignCaseMembersForm():JSX.Element {
             <Button
               type="button"
               variant="outline"
-              className="bg-zinc-800 border-gray-500 text-gray-300 hover:bg-gray-700"
+              className="border-muted-foreground text-muted-foreground hover:bg-muted"
               onClick={() => navigate("/create-case")}
             >
               Back
             </Button>
 
-            <Button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white">
-              Done
+      <Button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white">              Done
             </Button>
           </div>
         </form>

@@ -14,16 +14,23 @@ const ThemeContext = createContext<ThemeContextType>({
 });
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => {
+    // Load from localStorage on initial render
+    const stored = localStorage.getItem("theme") as Theme | null;
+    return stored ?? "dark";
+  });
 
   useEffect(() => {
-    // Apply or remove the dark class on <html>
     const root = document.documentElement;
+
     if (theme === "dark") {
       root.classList.add("dark");
     } else {
       root.classList.remove("dark");
     }
+
+    // Save to localStorage
+    localStorage.setItem("theme", theme);
   }, [theme]);
 
   const toggleTheme = () => {

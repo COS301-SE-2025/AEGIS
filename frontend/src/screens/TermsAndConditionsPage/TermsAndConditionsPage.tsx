@@ -1,7 +1,7 @@
-import {useState} from "react";
-import {useNavigate} from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-export const  TermsAndConditionsPage =() => {
+export const TermsAndConditionsPage = () => {
   const [accepted, setAccepted] = useState(false);
   const navigate = useNavigate();
 
@@ -12,11 +12,12 @@ export const  TermsAndConditionsPage =() => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-gray-200 p-8 font-mono">
-      <div className="max-w-3xl mx-auto bg-zinc-800 p-6 rounded-xl shadow-lg border border-green-400">
+    <div className="min-h-screen bg-background text-foreground p-8 font-mono">
+      <div className="max-w-3xl mx-auto bg-muted p-6 rounded-xl shadow-lg border border-primary">
         <h1 className="text-2xl text-green-400 mb-4 font-bold">AEGIS Terms & Conditions</h1>
-        <div className="h-64 overflow-y-scroll p-4 bg-black border border-zinc-600 rounded">
-          <p>
+
+        <div className="h-64 overflow-y-scroll p-4 bg-background border border-border rounded">
+          <p className="text-muted-foreground text-sm leading-relaxed">
             By using AEGIS, you agree to abide by our cybersecurity standards, policies and practices.
             Your personal data is handled in accordance with POPIA/GDPR and will not be shared
             without your consent. Activity may be logged for integrity verification.
@@ -24,7 +25,6 @@ export const  TermsAndConditionsPage =() => {
             You have the right to access, update, or delete your information. Accepting these
             terms is required to use the platform. Your consent can be revoked at any time if you so wish.
           </p>
-          {/* Add more legal copy as required */}
         </div>
 
         <div className="flex items-center mt-6">
@@ -33,9 +33,11 @@ export const  TermsAndConditionsPage =() => {
             id="accept"
             checked={accepted}
             onChange={() => setAccepted(!accepted)}
-            className="mr-2 accent-green-500"
+            className="mr-2 accent-primary"
           />
-          <label htmlFor="accept">I have read and accept the Terms & Conditions</label>
+          <label htmlFor="accept" className="text-sm">
+            I have read and accept the Terms & Conditions
+          </label>
         </div>
 
         <div className="mt-4 flex gap-4">
@@ -60,4 +62,4 @@ export const  TermsAndConditionsPage =() => {
       </div>
     </div>
   );
-}
+};

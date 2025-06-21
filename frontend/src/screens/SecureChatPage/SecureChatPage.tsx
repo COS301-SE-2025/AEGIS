@@ -707,7 +707,7 @@ export const SecureChatPage = (): JSX.Element => {
                       
                       {/* More Menu Dropdown */}
                       {showMoreMenu && (
-                        <div className="absolute right-0 top-8 bg-card border border-border rounded-lg shadow-lg py-2 w-48 z-50">
+                      <div className="absolute right-0 top-8 bg-background border border-border rounded-lg shadow-lg py-2 w-48 z-50">
                           <button
                             onClick={() => {
                               setShowChatSearch(true);
@@ -824,9 +824,9 @@ export const SecureChatPage = (): JSX.Element => {
       {/* Attachment Preview Modal */}
       {showAttachmentPreview && previewFile && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-lg p-6 w-full max-w-md border border-border max-h-[90vh] overflow-y-auto">
+<div className="rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border-[3px] border-border bg-background shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">Send Attachment</h3>
+              <h3 className="font-bold text-foreground text-lg mb-4">Send Attachment</h3>
               <button
                 onClick={handleCancelAttachment}
                 className="text-muted-foreground hover:text-foreground"
@@ -942,7 +942,7 @@ export const SecureChatPage = (): JSX.Element => {
       {/* New Group Modal */}
       {showNewGroupModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-lg p-6 w-full max-w-md border border-border">
+          <div className="rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border-[3px] border-border bg-background shadow-xl">
             <h3 className="text-xl font-bold mb-4">Create New Group</h3>
             <div>
               <input
@@ -975,7 +975,7 @@ export const SecureChatPage = (): JSX.Element => {
       {/* Add Members Modal */}
       {showAddMembersModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-lg p-6 w-full max-w-md border border-border max-h-[90vh] overflow-y-auto">
+            <div className="rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border-[3px] border-border bg-background shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold">Add Members</h3>
               <button

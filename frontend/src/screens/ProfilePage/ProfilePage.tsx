@@ -1,10 +1,14 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "../../components/ui/button";
+
 import { Pencil, Save, Upload, User, Mail, Shield } from "lucide-react";
-//@ts-ignore
-import updateProfile from "./profile"
+// @ts-ignore
+import updateProfile from "./profile";
 
 export const ProfilePage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState({
@@ -14,30 +18,29 @@ export const ProfilePage = () => {
     image: null as string | null,
   });
 
+  const toggleEdit = async () => {
+    if (isEditing) {
+      try {
+        const imageFile = fileInputRef.current?.files?.[0];
+        const updated = await updateProfile({
+          name: profile.name,
+          email: profile.email,
+          imageFile,
+        });
 
-const toggleEdit = async () => {
-  if (isEditing) {
-    try {
-      const imageFile = fileInputRef.current?.files?.[0];
-      const updated = await updateProfile({
-        name: profile.name,
-        email: profile.email,
-        imageFile,
-      });
-
-      setProfile({
-        ...profile,
-        name: updated.name,
-        email: updated.email,
-        image: updated.image_url,
-      });
-    } catch (err) {
-      console.error("Error updating profile:", err);
+        setProfile({
+          ...profile,
+          name: updated.name,
+          email: updated.email,
+          image: updated.image_url,
+        });
+      } catch (err) {
+        console.error("Error updating profile:", err);
+      }
     }
-  }
 
-  setIsEditing(!isEditing);
-};
+    setIsEditing(!isEditing);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfile({ ...profile, [e.target.name]: e.target.value });
@@ -57,7 +60,7 @@ const toggleEdit = async () => {
     <div className="min-h-screen bg-background text-foreground p-10 transition-colors">
       <h1 className="text-3xl font-bold mb-8">Profile</h1>
 
-      <div className="bg-card text-card-foreground p-6 rounded-lg max-w-xl mx-auto shadow-lg space-y-6">
+      <div className="bg-card text-card-foreground p-6 rounded-lg max-w-xl mx-auto shadow-lg space-y-6 border border-border">
         {/* Profile Picture */}
         <div className="flex flex-col items-center space-y-3">
           <div className="relative w-24 h-24">
@@ -135,11 +138,20 @@ const toggleEdit = async () => {
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end mt-4">
+        {/* Action Buttons: Back + Edit/Save aligned */}
+        <div className="flex justify-between items-center pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate(-1)}
+            className="border-muted-foreground text-muted-foreground hover:bg-muted"
+          >
+            ← Back
+          </Button>
+
           <button
             onClick={toggleEdit}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg transition"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg transition text-white"
           >
             {isEditing ? <Save className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
             {isEditing ? "Save Changes" : "Edit Profile"}

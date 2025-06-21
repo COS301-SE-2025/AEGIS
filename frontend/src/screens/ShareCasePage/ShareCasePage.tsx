@@ -1,69 +1,65 @@
-//Form to share  a case with an external user/collaborator
 import React, { useState } from 'react';
-import { useParams, useLocation, useNavigation, useNavigate } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { MailIcon, Share2Icon } from 'lucide-react';
 
 export function ShareCaseForm(): JSX.Element {
-    const { caseId } = useParams<{ caseId: string }>();
-    const location = useLocation();
-    const navigate = useNavigate();
+  const { caseId } = useParams<{ caseId: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-    const caseName = location.state?.caseName || 'Untitled Case'; //retrieve case name from location state or default to 'Untitled Case'
+  const caseName = location.state?.caseName || 'Untitled Case';
 
-    const [form, setForm] = useState({
-        senderName: "",
-        recipientEmail: "",
-    });
+  const [form, setForm] = useState({
+    senderName: "",
+    recipientEmail: "",
+  });
 
-    const handleChange = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
-        setForm({ ...form, [field]: e.target.value });
-    };
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
+  const handleChange = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [field]: e.target.value });
+  };
 
-        const payload = {
-            ...form,
-            caseId: caseId
-        };
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
 
-        // Simulate API call to share the case
-        try {
-            console.log(`Sharing case ${caseId} with ${form.recipientEmail}...`);
-            console.log("Payload:", payload);
-
-            //TODO: Send payload to backend
-
-            alert(`Case "${caseName}" shared successfully with ${form.recipientEmail}!`);
-            //successfully shared the case, redirect to dashboard
-            navigate('/dashboard');
-
-        } catch (error) {
-
-            console.error("Error sharing case:", error);
-            alert("Failed to share the case. Please try again.");
-        }
+    const payload = {
+      ...form,
+      caseId: caseId,
     };
 
-     return (
-    <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center p-6">
-      <div className="max-w-xl w-full bg-zinc-900 border border-zinc-700 p-6 rounded-2xl shadow-xl font-mono">
-        <h1 className="text-3xl font-bold text-cyan-400 mb-6 flex items-center gap-2">
+    try {
+      console.log(`Sharing case ${caseId} with ${form.recipientEmail}...`);
+      console.log("Payload:", payload);
+
+      // TODO: Integrate API call here
+
+      alert(`Case "${caseName}" shared successfully with ${form.recipientEmail}!`);
+      navigate('/dashboard');
+    } catch (error) {
+      console.error("Error sharing case:", error);
+      alert("Failed to share the case. Please try again.");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+      <div className="max-w-xl w-full bg-card border border-border p-6 rounded-2xl shadow-xl font-mono">
+        <h1 className="text-3xl font-bold text-primary mb-6 flex items-center gap-2">
           <Share2Icon size={28} /> Share Case
         </h1>
 
         {caseName && (
-          <p className="mb-4 text-sm text-zinc-400">
-            Sharing: <span className="text-cyan-300 font-bold">{caseName}</span>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Sharing: <span className="text-primary font-bold">{caseName}</span>
           </p>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block mb-1 text-sm">Your Name</label>
+            <label className="block mb-1 text-sm text-foreground">Your Name</label>
             <Input
-              className="bg-zinc-800 border-zinc-600 text-white"
+              className="bg-muted border-border text-foreground placeholder-muted-foreground"
               placeholder="e.g. Adam Forensics"
               value={form.senderName}
               onChange={handleChange("senderName")}
@@ -72,10 +68,10 @@ export function ShareCaseForm(): JSX.Element {
           </div>
 
           <div>
-            <label className="block mb-1 text-sm">Recipient Email</label>
+            <label className="block mb-1 text-sm text-foreground">Recipient Email</label>
             <Input
               type="email"
-              className="bg-zinc-800 border-zinc-600 text-white"
+              className="bg-muted border-border text-foreground placeholder-muted-foreground"
               placeholder="e.g. analyst@partner.com"
               value={form.recipientEmail}
               onChange={handleChange("recipientEmail")}
@@ -87,7 +83,7 @@ export function ShareCaseForm(): JSX.Element {
             <Button
               type="button"
               variant="outline"
-              className="bg-zinc-800 border-red-500 text-red-400 hover:bg-red-800"
+              className="border-destructive text-destructive hover:bg-destructive/10"
               onClick={() => navigate(-1)}
             >
               Cancel
@@ -95,7 +91,7 @@ export function ShareCaseForm(): JSX.Element {
 
             <Button
               type="submit"
-              className="bg-cyan-600 hover:bg-cyan-700 text-white"
+              className="bg-cyan-400 text-cyan-600 hover:bg-primary/90"
             >
               <MailIcon size={18} className="mr-2" />
               Send Invite
@@ -105,6 +101,4 @@ export function ShareCaseForm(): JSX.Element {
       </div>
     </div>
   );
-
 }
-
