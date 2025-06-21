@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"aegis-api/structs"
 	"net/http"
 	"strings"
 
@@ -120,3 +121,24 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 //		)
 //	})
 //}
+
+// get user id based on which path was used
+func GetTargetUserID(c *gin.Context) (string, bool) {
+	targetUserID := c.Param("user_id")
+	role, _ := c.Get("userRole")
+
+	if targetUserID != "" && role == "Admin" { //admin to view any user profile
+		return targetUserID, true
+	}
+
+	currUserID, exists := c.Get("userID") //user to view own profile
+	if !exists {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "User not authenticated",
+		})
+		return "", false
+	}
+
+	return currUserID.(string), true
+}
