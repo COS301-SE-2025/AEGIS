@@ -127,7 +127,7 @@ const caseId = "case-abc-123";
       </div>
 
       {/* Main Content Area */}
-      <div className="ml-80 min-h-screen bg-black">
+      <div className="ml-80 min-h-screen bg-background">
         {/* Top Navigation Bar - Fixed */}
         <div className="sticky top-0 bg-black border-b border-gray-800 p-4 z-5">
           <div className="flex items-center justify-between">

@@ -57,9 +57,9 @@ export const EvidenceViewer = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex">
+    <div className="min-h-screen bg-background text-foreground flex">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-80 bg-black border-r border-gray-800 p-6 flex flex-col justify-between z-10">
+      <aside className="fixed left-0 top-0 h-full w-80 bg-background border-r border p-6 flex flex-col justify-between z-10">
         <div>
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
@@ -70,29 +70,29 @@ export const EvidenceViewer = () => {
                 className="w-full h-full object-cover"
               />
             </div>
-            <span className="font-bold text-white text-2xl">AEGIS</span>
+            <span className="font-bold text-foreground text-2xl">AEGIS</span>
           </div>
 
           {/* Navigation */}
           <nav className="space-y-2">
             <Link to="/dashboard">
-              <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors">
+              <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors">
                 <Home className="w-6 h-6" />
                 <span className="text-lg">Dashboard</span>
               </div>
             </Link>
             <Link to="/case-management">
-              <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors">
+              <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors">
                 <Folder className="w-6 h-6" />
                 <span className="text-lg">Case Management</span>
               </div>
             </Link>
-            <div className="flex items-center gap-3 bg-[#636AE8] text-white p-3 rounded-lg">
+            <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
               <File className="w-6 h-6" />
               <span className="text-lg font-semibold">Evidence Viewer</span>
             </div>
             <Link to="/secure-chat">
-              <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors">
+              <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors">
                 <MessageSquare className="w-6 h-6" />
                 <span className="text-lg">Secure Chat</span>
               </div>
@@ -101,43 +101,44 @@ export const EvidenceViewer = () => {
         </div>
 
         {/* User Profile */}
-        <div className="border-t border-gray-700 pt-4">
+        <div className="border-t border pt-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
+            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
               <Link to="/profile">
-                <span className="text-white font-medium">AU</span>
+                <span className="text-foreground font-medium">AU</span>
               </Link>
             </div>
             <div>
-              <p className="font-semibold text-white">Agent User</p>
-              <p className="text-gray-400 text-sm">user@dfir.com</p>
+              <p className="font-semibold text-foreground">Agent User</p>
+              <p className="text-muted-foreground text-sm">user@dfir.com</p>
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="ml-80 flex-grow bg-black">
+      <main className="ml-80 flex-grow bg-background">
         {/* Topbar */}
-        <div className="sticky top-0 z-10 bg-black border-b border-gray-800 p-4">
+        <div className="sticky top-0 z-10 bg-background border-b border p-4">
           <div className="flex items-center justify-between">
             {/* Tabs */}
+        {/* Tabs */}
             <div className="flex items-center gap-6">
               <Link to="/dashboard">
-                <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                   Dashboard
                 </button>
               </Link>
-              <button className="text-[#636AE8] font-semibold px-4 py-2 rounded-lg">
+              <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
                 Evidence Viewer
               </button>
               <Link to="/case-management">
-                <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                   Case Management
                 </button>
               </Link>
               <Link to="/secure-chat">
-                <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                   Secure Chat
                 </button>
               </Link>
@@ -146,17 +147,17 @@ export const EvidenceViewer = () => {
             {/* Right actions */}
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
-                  className="w-80 h-12 bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-[#636AE8]"
+                  className="w-80 h-12 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-[#636AE8]"
                   placeholder="Search cases, evidence, users"
                 />
               </div>
-              <Bell className="text-gray-400 hover:text-white w-6 h-6 cursor-pointer" />
-              <Settings className="text-gray-400 hover:text-white w-6 h-6 cursor-pointer" />
-              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
+              <Bell className="text-muted-foreground hover:text-foreground w-6 h-6 cursor-pointer" />
+              <Link to="/settings"><Settings className="text-muted-foreground hover:text-foreground w-6 h-6 cursor-pointer" /></Link>
+              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
                 <Link to="/profile">
-                  <span className="text-white font-medium text-sm">AU</span>
+                  <span className="text-foreground font-medium text-sm">AU</span>
                 </Link>
               </div>
             </div>
@@ -173,11 +174,11 @@ export const EvidenceViewer = () => {
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Case Files</h2>
                 <div className="flex gap-2">
-                  <button className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-600 rounded-lg text-white hover:bg-gray-800">
+                  <button className="flex items-center gap-1 px-3 py-1 text-sm border rounded-lg text-foreground hover:bg-muted">
                     <SlidersHorizontal size={16} />
                     Filter
                   </button>
-                  <button className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-600 rounded-lg text-white hover:bg-gray-800">
+                  <button className="flex items-center gap-1 px-3 py-1 text-sm border rounded-lg text-foreground hover:bg-muted">
                     <ArrowUpDown size={16} />
                     Sort
                   </button>
@@ -191,7 +192,7 @@ export const EvidenceViewer = () => {
                     className={`w-full flex items-center gap-2 p-2 rounded-md transition-colors cursor-pointer ${
                       selectedFile?.id === file.id
                         ? 'bg-[#636AE8] text-white'
-                        : 'bg-gray-800 hover:bg-gray-700'
+                        : 'bg-muted hover:bg-muted/80'
                     }`}
                   >
                     {file.type === 'image' ? (
@@ -206,12 +207,12 @@ export const EvidenceViewer = () => {
             </div>
 
             {/* Viewer panel */}
-            <div className="w-2/3 h-[400px] border border-gray-700 rounded-lg bg-gray-900">
+            <div className="w-2/3 h-[400px] border rounded-lg bg-card">
               {selectedFile ? (
                 <div className="p-4 h-full flex flex-col">
-                  <div className="border-b border-gray-700 pb-2 mb-4">
-                    <h3 className="text-lg font-semibold text-white">{selectedFile.name}</h3>
-                    <p className="text-sm text-gray-400 capitalize">{selectedFile.type} file</p>
+                  <div className="border-b border pb-2 mb-4">
+                    <h3 className="text-lg font-semibold text-foreground">{selectedFile.name}</h3>
+                    <p className="text-sm text-muted-foreground capitalize">{selectedFile.type} file</p>
                   </div>
                   <div className="flex-1 overflow-auto">
                     {selectedFile.type === 'image' && selectedFile.imageUrl ? (
@@ -220,24 +221,24 @@ export const EvidenceViewer = () => {
                           <img
                             src={selectedFile.imageUrl}
                             alt={selectedFile.name}
-                            className="max-w-full max-h-64 object-contain rounded-lg border border-gray-600"
+                            className="max-w-full max-h-64 object-contain rounded-lg border"
                           />
                         </div>
                         {selectedFile.content && (
-                          <div className="text-gray-300 text-sm">
+                          <div className="text-foreground text-sm">
                             <strong>Description:</strong> {selectedFile.content}
                           </div>
                         )}
                       </div>
                     ) : (
-                      <div className="text-gray-300 whitespace-pre-wrap">
+                      <div className="text-foreground whitespace-pre-wrap">
                         {selectedFile.content}
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-gray-400">
+                <div className="h-full flex items-center justify-center text-muted-foreground">
                   Select a file to view
                 </div>
               )}
@@ -248,16 +249,16 @@ export const EvidenceViewer = () => {
           <div className="mt-10">
             <h2 className="text-xl font-semibold mb-2">Annotation Tools</h2>
             <div className="flex gap-4">
-              <button className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full text-white hover:bg-[#636AE8]">
+              <button className="w-10 h-10 flex items-center justify-center bg-muted rounded-full text-foreground hover:bg-[#636AE8] hover:text-white">
                 <Code />
               </button>
-              <button className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full text-white hover:bg-[#636AE8]">
+              <button className="w-10 h-10 flex items-center justify-center bg-muted rounded-full text-foreground hover:bg-[#636AE8] hover:text-white">
                 <ImageIcon />
               </button>
-              <button className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full text-white hover:bg-[#636AE8]">
+              <button className="w-10 h-10 flex items-center justify-center bg-muted rounded-full text-foreground hover:bg-[#636AE8] hover:text-white">
                 <MessageCircle />
               </button>
-              <button className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full text-white hover:bg-[#636AE8]">
+              <button className="w-10 h-10 flex items-center justify-center bg-muted rounded-full text-foreground hover:bg-[#636AE8] hover:text-white">
                 <Video />
               </button>
             </div>
