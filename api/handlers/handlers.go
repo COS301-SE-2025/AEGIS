@@ -52,8 +52,6 @@ type EvidenceInterface interface {
 type UserInterface interface {
 	GetProfile(c *gin.Context)
 	UpdateProfile(c *gin.Context)
-	GetUserCases(c *gin.Context)
-	//listevidencebyuserid
 }
 
 func NewHandler(

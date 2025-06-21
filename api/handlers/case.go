@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"aegis-api/middleware"
 	"aegis-api/services/ListCases"
 	"aegis-api/services/ListClosedCases"
 	"aegis-api/services/case_assign"
@@ -54,6 +55,8 @@ func NewCaseServices(
 // @Param request body case_creation.CreateCaseRequest true "Case Creation Request"
 // @Success 201 {object} structs.SuccessResponse{data=case_creation.Case} "Case created successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases [post]
 func (cs CaseServices) CreateCase(c *gin.Context) {
@@ -102,14 +105,17 @@ func (cs CaseServices) CreateCase(c *gin.Context) {
 }
 
 // @Summary Get all cases
-// @Description Retrieves all cases without any filtering
+// @Description Retrieves all cases without any filtering. Accessible by all authenticated users.
 // @Tags Cases
 // @Accept json
 // @Produce json
+// @Security ApiKeyAuth
 // @Success 200 {object} structs.SuccessResponse{data=[]case_creation.Case} "Cases retrieved successfully"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases [get]
 func (cs CaseServices) GetAllCases(c *gin.Context) {
+	//might be more accurate to call it getlistofcases
 	//admin-only privilege
 	cases, err := cs.getCase.GetAllCases() //no filtering
 	if err != nil {
@@ -129,10 +135,11 @@ func (cs CaseServices) GetAllCases(c *gin.Context) {
 }
 
 // @Summary Get filtered cases
-// @Description Retrieves cases based on multiple filter criteria
+// @Description Retrieves cases based on multiple filter criteria. Only administrators can access this endpoint.
 // @Tags Cases
 // @Accept json
 // @Produce json
+// @Security ApiKeyAuth
 // @Param status query string false "Case status"
 // @Param priority query string false "Case priority"
 // @Param created_by query string false "Creator's user ID"
@@ -141,6 +148,8 @@ func (cs CaseServices) GetAllCases(c *gin.Context) {
 // @Param sort_by query string false "Field to sort by"
 // @Param order query string false "Sort order (asc/desc)"
 // @Success 200 {object} structs.SuccessResponse{data=[]case_creation.Case} "Cases retrieved successfully"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/filter [get]
 func (cs CaseServices) GetFilteredCases(c *gin.Context) {
@@ -178,23 +187,23 @@ func (cs CaseServices) GetFilteredCases(c *gin.Context) {
 	})
 }
 
-// @Summary Get cases by user id
-// @Description Retrieves cases created a user is assigned to
-// @Tags Cases
+// @Summary Get cases by user ID
+// @Description Retrieves cases associated with a user. Regular users can only access their own cases, while admins can access any user's cases.
+// @Tags Cases, Users, Admin
 // @Accept json
 // @Produce json
-// @Param user_id path string true "User ID"
+// @Security ApiKeyAuth
+// @Param user_id path string false "User ID (required for admin route, automatically determined for user route)"
 // @Success 200 {object} structs.SuccessResponse{data=[]case_creation.Case} "Cases retrieved successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid user ID"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized - Authentication required"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden - Insufficient permissions"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/user/{user_id} [get]
+// @Router /api/v1/users/cases [get]
+// @Router /api/v1/admin/users/{user_id}/cases [get]
 func (cs CaseServices) GetCasesByUserID(c *gin.Context) {
-	userID := c.Param("user_id")
-	if userID == "" {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "User ID is required",
-		})
+	userID, ok := middleware.GetTargetUserID(c)
+	if !ok {
 		return
 	}
 
@@ -216,18 +225,21 @@ func (cs CaseServices) GetCasesByUserID(c *gin.Context) {
 }
 
 // @Summary Update case status
-// @Description Updates the status of a case
+// @Description Updates the status of a case. Only users with 'Admin' role can perform this action.
 // @Tags Cases
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
+// @Param id path string true "Case ID"
 // @Param request body case_status_update.UpdateCaseStatusRequest true "Status Update Request"
 // @Success 200 {object} structs.SuccessResponse "Case status updated successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/status [put]
 func (cs CaseServices) UpdateCaseStatus(c *gin.Context) {
-	caseID := c.Param("id")
+	caseID := c.Param("case_id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -265,21 +277,21 @@ func (cs CaseServices) UpdateCaseStatus(c *gin.Context) {
 }
 
 // @Summary Assign user to case
-// @Description Assigns a user to a case with a specific role (requires admin privileges)
+// @Description Assigns a user to a case with a specific role. Only users with 'Admin' role can perform this action.
 // @Tags Cases
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
 // @Param id path string true "Case ID"
 // @Param request body structs.AssignCaseRequest true "Assignment Request"
-// @Success 200 {object} structs.SuccessResponse "User assigned successfully"
+// @Success 201 {object} structs.SuccessResponse "User assigned successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized - Authentication required"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden - Admin privileges required"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/collaborators [post]
 func (cs CaseServices) CreateCollaborator(c *gin.Context) {
-	caseID := c.Param("id")
+	caseID := c.Param("case_id")
 	var req structs.AssignCaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -348,17 +360,19 @@ func (cs CaseServices) CreateCollaborator(c *gin.Context) {
 }
 
 // @Summary Get case collaborators
-// @Description Retrieves all collaborators (users with roles) for a specific case
+// @Description Retrieves all collaborators (users with roles) for a specific case. Requires authentication.
 // @Tags Cases
 // @Accept json
 // @Produce json
+// @Security ApiKeyAuth
 // @Param id path string true "Case ID"
 // @Success 200 {object} structs.SuccessResponse{data=[]get_collaborators.Collaborator} "Collaborators retrieved successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid case ID"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/collaborators [get]
 func (cs CaseServices) GetCollaborators(c *gin.Context) {
-	caseID := c.Param("id")
+	caseID := c.Param("case_id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -394,19 +408,21 @@ func (cs CaseServices) GetCollaborators(c *gin.Context) {
 }
 
 // @Summary Unassign user from case
-// @Description Removes a user from a case (requires admin privileges)
+// @Description Removes a user from a case. Only users with 'Admin' role can perform this action.
 // @Tags Cases
 // @Accept json
 // @Produce json
+// @Security ApiKeyAuth
 // @Param id path string true "Case ID"
 // @Param user_id path string true "User ID"
 // @Success 200 {object} structs.SuccessResponse "User successfully removed from case"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden - Admin privileges required"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/collaborators/{user_id} [delete]
 func (cs CaseServices) RemoveCollaborator(c *gin.Context) {
-	caseID := c.Param("id")
+	caseID := c.Param("case_id")
 	caseUUID, err := uuid.Parse(caseID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{

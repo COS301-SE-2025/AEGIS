@@ -23,15 +23,18 @@ func NewEvidenceHandler(service *evidence.Service) *EvidenceServices {
 }
 
 // @Summary Upload evidence
-// @Description Upload new evidence to a case
+// @Description Upload new evidence to a case. Requires authentication.
 // @Tags Evidence
 // @Accept json
 // @Produce json
+// @Security ApiKeyAuth
+// @Param case_id path string true "Case ID"
 // @Param request body evidence.UploadEvidenceRequest true "Evidence Upload Request"
 // @Success 201 {object} structs.SuccessResponse{data=evidence.Evidence} "Evidence uploaded successfully"
-// @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload or case ID"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/{id}/evidence [post]
+// @Router /api/v1/cases/{case_id}/evidence [post]
 func (e *EvidenceServices) UploadEvidence(c *gin.Context) {
 	var req evidence.UploadEvidenceRequest //some fields don't make sense for upload
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -43,7 +46,7 @@ func (e *EvidenceServices) UploadEvidence(c *gin.Context) {
 		return
 	}
 
-	caseID := c.Param("id")
+	caseID := c.Param("case_id")
 	req.CaseID = caseID
 	// Get user ID from context
 	userID, exists := c.Get("userID") //middleware
@@ -88,17 +91,19 @@ func (e *EvidenceServices) UploadEvidence(c *gin.Context) {
 }
 
 // @Summary List evidence by case
-// @Description Retrieves all evidence items for a specific case
+// @Description Retrieves all evidence items for a specific case. Requires authentication.
 // @Tags Evidence
 // @Accept json
 // @Produce json
-// @Param id path string true "Case ID"
+// @Security ApiKeyAuth
+// @Param case_id path string true "Case ID"
 // @Success 200 {object} structs.SuccessResponse{data=[]evidence.Evidence} "Evidence retrieved successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid case ID"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/{id}/evidence [get]
+// @Router /api/v1/cases/{case_id}/evidence [get]
 func (e *EvidenceServices) ListEvidenceByCaseID(c *gin.Context) {
-	caseID := c.Param("id")
+	caseID := c.Param("case_id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -131,7 +136,7 @@ func (e *EvidenceServices) ListEvidenceByCaseID(c *gin.Context) {
 // @Produce json
 // @Security ApiKeyAuth
 // @Param user_id path string false "User ID (required for admin access to other users)"
-// @Success 200 {object} structs.SuccessResponse{data=[]structs.Evidence} "User evidence retrieved successfully"
+// @Success 200 {object} structs.SuccessResponse{data=[]evidence.Evidence} "User evidence retrieved successfully"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
@@ -161,19 +166,22 @@ func (e *EvidenceServices) ListEvidenceByUserID(c *gin.Context) {
 }
 
 // @Summary Get evidence by ID
-// @Description Retrieves a specific evidence item by its ID
+// @Description Retrieves a specific evidence item by its ID. Requires authentication.
 // @Tags Evidence
 // @Accept json
 // @Produce json
-// @Param id path string true "Evidence ID"
+// @Security ApiKeyAuth
+// @Param case_id path string true "Case ID"
+// @Param evidence_id path string true "Evidence ID"
 // @Success 200 {object} structs.SuccessResponse{data=evidence.Evidence} "Evidence retrieved successfully"
-// @Failure 400 {object} structs.ErrorResponse "Invalid evidence ID"
+// @Failure 400 {object} structs.ErrorResponse "Invalid evidence ID or case ID"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 404 {object} structs.ErrorResponse "Evidence not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/{id}/evidence/{e_id} [get]
+// @Router /api/v1/cases/{case_id}/evidence/{evidence_id} [get]
 func (e *EvidenceServices) GetEvidenceByID(c *gin.Context) {
-	caseID := c.Param("id")
-	evidenceID := c.Param("e_id")
+	caseID := c.Param("case_id")
+	evidenceID := c.Param("evidence_id")
 	if caseID == "" || evidenceID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -300,20 +308,22 @@ func (e *EvidenceServices) DownloadEvidenceByUserID(c *gin.Context) {
 }
 
 // @Summary Get evidence metadata
-// @Description Retrieves detailed metadata for a specific evidence item
+// @Description Retrieves detailed metadata for a specific evidence item. Requires authentication.
 // @Tags Evidence
 // @Accept json
 // @Produce json
-// @Param id path string true "Evidence ID"
-// @Param e_id path string true "Evidence ID"
+// @Security ApiKeyAuth
+// @Param case_id path string true "Case ID"
+// @Param evidence_id path string true "Evidence ID"
 // @Success 200 {object} structs.SuccessResponse{data=evidence.Metadata} "Metadata retrieved successfully"
-// @Failure 400 {object} structs.ErrorResponse "Invalid evidence ID"
+// @Failure 400 {object} structs.ErrorResponse "Invalid evidence ID or case ID"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 404 {object} structs.ErrorResponse "Evidence not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/{id}/evidence/{e_id}/metadata [get]
+// @Router /api/v1/cases/{case_id}/evidence/{evidence_id}/metadata [get]
 func (e *EvidenceServices) GetEvidenceMetadata(c *gin.Context) {
-	caseID := c.Param("id")
-	evidenceID := c.Param("e_id")
+	caseID := c.Param("case_id")
+	evidenceID := c.Param("evidence_id")
 
 	evidenceM, err := e.service.GetEvidenceMetadata(evidenceID)
 	if err != nil {
@@ -355,22 +365,22 @@ func (e *EvidenceServices) GetEvidenceMetadata(c *gin.Context) {
 }
 
 // @Summary Delete evidence
-// @Description Deletes a specific evidence item by its id (requires admin privileges)
+// @Description Deletes a specific evidence item by its ID. Only administrators can perform this action.
 // @Tags Evidence
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
-// @Param id path string true "Case ID"
-// @Param e_id path string true "Evidence ID"
+// @Param case_id path string true "Case ID"
+// @Param evidence_id path string true "Evidence ID"
 // @Success 200 {object} structs.SuccessResponse "Evidence deleted successfully"
-// @Failure 400 {object} structs.ErrorResponse "Invalid evidence ID"
+// @Failure 400 {object} structs.ErrorResponse "Invalid evidence ID or case ID"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
-// @Failure 403 {object} structs.ErrorResponse "Forbidden - Admin required"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden - Admin role required"
 // @Failure 404 {object} structs.ErrorResponse "Evidence not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/cases/{id}/evidence/{e_id} [delete]
+// @Router /api/v1/cases/{case_id}/evidence/{evidence_id} [delete]
 func (e *EvidenceServices) DeleteEvidenceByID(c *gin.Context) { //admin only?
-	evidenceID := c.Param("e_id")
+	evidenceID := c.Param("evidence_id")
 	if evidenceID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",

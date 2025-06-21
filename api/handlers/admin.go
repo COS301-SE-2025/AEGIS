@@ -36,9 +36,12 @@ func NewAdminServices( //constructor
 // @Tags Admin
 // @Accept  json
 // @Produce  json
+// @Security ApiKeyAuth
 // @Param   request body registration.RegisterUserRequest true "User Registration Request"
 // @Success 201 {object} structs.SuccessResponse{data=registration.User} "User registered successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users [post]
 func (as AdminServices) RegisterUser(c *gin.Context) {
@@ -75,12 +78,15 @@ func (as AdminServices) RegisterUser(c *gin.Context) {
 }
 
 // @Summary List all users
-// @Description Retrieves a list of all registered users.
+// @Description Retrieves a list of all registered users. Only administrators can access this endpoint.
 // @Tags Admin
 // @Accept json
 // @Produce json
+// @Security ApiKeyAuth
 // @Success 200 {object} structs.SuccessResponse{data=[]listusers.User} "Users retrieved successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid query parameters"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users [get]
 func (as AdminServices) ListUsers(c *gin.Context) {
@@ -172,14 +178,18 @@ func (as AdminServices) GetUserActivity(c *gin.Context) {
 }*/
 
 // @Summary Update a user's role
-// @Description Updates the role of a specific user. Only 'Admin' can perform this action.
+// @Description Updates the role of a specific user. Only administrators can perform this action.
 // @Tags Admin
 // @Accept json
 // @Produce json
+// @Security ApiKeyAuth
 // @Param user_id path string true "User ID"
 // @Param request body structs.UpdateUserRoleRequest true "User Role Update Request"
 // @Success 200 {object} structs.SuccessResponse "User role updated successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload or user ID"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
+// @Failure 404 {object} structs.ErrorResponse "User not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users/{user_id} [put]
 func (as AdminServices) UpdateUserRole(c *gin.Context) {
@@ -255,13 +265,17 @@ func (as AdminServices) GetRoles(c *gin.Context) {
 //DeleteUser
 
 // @Summary Delete a user
-// @Description Deletes a specific user from the systeas. Only 'Admin' can perform this action.
+// @Description Deletes a specific user from the system. Only administrators can perform this action.
 // @Tags Admin
 // @Accept json
 // @Produce json
+// @Security ApiKeyAuth
 // @Param user_id path string true "User ID to delete"
 // @Success 200 {object} structs.SuccessResponse "User deleted successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid user ID"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
+// @Failure 404 {object} structs.ErrorResponse "User not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users/{user_id} [delete]
 func (as AdminServices) DeleteUser(c *gin.Context) {

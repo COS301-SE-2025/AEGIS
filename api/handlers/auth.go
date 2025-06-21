@@ -32,14 +32,15 @@ type EmailSender interface {
 }
 
 // @Summary User login
-// @Description Authenticates a user and returns a token upon successful login.
+// @Description Authenticates a user and returns a JWT token and user details upon successful login
 // @Tags Authentication
 // @Accept json
 // @Produce json
-// @Param request body structs.LoginRequest true "User Login Credentials"
+// @Param request body structs.LoginRequest true "User login credentials (email and password)"
 // @Success 200 {object} structs.SuccessResponse{data=auth.LoginResponse} "Login successful"
-// @Failure 400 {object} structs.ErrorResponse "Invalid request payload or credentials"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} structs.ErrorResponse "Authentication failed (invalid credentials)"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/login [post]
 func (m AuthServices) Login(c *gin.Context) {
 	var req structs.LoginRequest
@@ -70,7 +71,7 @@ func (m AuthServices) Login(c *gin.Context) {
 }
 
 // @Summary User logout
-// @Description Logs out the currently authenticated user by invalidating their session or token. Requires authentication.
+// @Description Logs out the currently authenticated user by invalidating their session token
 // @Tags Authentication
 // @Accept json
 // @Produce json
