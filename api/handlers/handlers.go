@@ -13,45 +13,57 @@ type Handler struct {
 }
 
 type AdminInterface interface {
-	RegisterUser(c *gin.Context)
-	ListUsers(c *gin.Context)
-	UpdateUserRole(c *gin.Context) //is this all an admin can update?
-	DeleteUser(c *gin.Context)
+	RegisterUser(c *gin.Context)   //create
+	ListUsers(c *gin.Context)      //read // ListUsers
+	UpdateUserRole(c *gin.Context) //is this all an admin can update? | update
+	DeleteUser(c *gin.Context)     //delete // DeleteUser
 	//GetRoles(c *gin.Context)
+
+	//assignrole
+	//unassignrole
+	//listassignments*
+	//
+
 }
 
 type AuthInterface interface {
-	Login(c *gin.Context)
+	Login(c *gin.Context) // Login
 	Logout(c *gin.Context)
 	//ResetPassword(c *gin.Context)
 	//RequestPasswordReset(c *gin.Context)
 }
 
 type CaseInterface interface {
-	CreateCase(c *gin.Context)
-	GetAllCases(c *gin.Context)
-	GetFilteredCases(c *gin.Context)
-	GetCasesByUserID(c *gin.Context)
-	UpdateCaseStatus(c *gin.Context)
-	CreateCollaborator(c *gin.Context)
-	GetCollaborators(c *gin.Context)
-	RemoveCollaborator(c *gin.Context)
-	//
+	CreateCase(c *gin.Context) //CreateCase
+
+	//GetCaseByID(c *gin.Context) //missing service function
+	GetAllCases(c *gin.Context)      // GetAllCases
+	GetFilteredCases(c *gin.Context) // GetFilteredCases
+	GetCasesByUserID(c *gin.Context) // GetCasesByUser
+
+	UpdateCaseStatus(c *gin.Context) // UpdateCaseStatus
+
+	RemoveCollaborator(c *gin.Context) // RemoveCollaborator
+
+	CreateCollaborator(c *gin.Context) // AssignUserToCase
+	GetCollaborators(c *gin.Context)   // GetCollaborators
 }
 
 type EvidenceInterface interface {
-	UploadEvidence(c *gin.Context)
+	//UploadEvidence(c *gin.Context) //UNDER REVIEW
+
 	ListEvidenceByCaseID(c *gin.Context)
 	ListEvidenceByUserID(c *gin.Context)
 	GetEvidenceByID(c *gin.Context)
 	DownloadEvidenceByUserID(c *gin.Context)
 	GetEvidenceMetadata(c *gin.Context)
+
 	DeleteEvidenceByID(c *gin.Context)
 }
 
 type UserInterface interface {
-	GetProfile(c *gin.Context)
-	UpdateProfile(c *gin.Context)
+	GetProfile(c *gin.Context)    // GetProfile
+	UpdateProfile(c *gin.Context) // UpdateProfile
 }
 
 func NewHandler(

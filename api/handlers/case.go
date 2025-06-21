@@ -33,7 +33,6 @@ func NewCaseServices(
 	getCollaborators *get_collaborators.Service,
 	assignCase *case_assign.CaseAssignmentService,
 	removeCollaborator *remove_user_from_case.Service,
-	// closedCasesByUser ListClosedCases.ClosedCaseRepository, //active and closed cases functions to be removed
 ) *CaseServices {
 	return &CaseServices{
 		createCase:         createCase,
@@ -42,7 +41,6 @@ func NewCaseServices(
 		getCollaborators:   getCollaborators,
 		assignCase:         assignCase,
 		removeCollaborator: removeCollaborator,
-		//closedCasesByUser:  closedCasesByUser,
 	}
 }
 
@@ -52,7 +50,7 @@ func NewCaseServices(
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
-// @Param request body case_creation.CreateCaseRequest true "Case Creation Request"
+// @Param request body structs.CreateCaseRequest true "Case Creation Request"
 // @Success 201 {object} structs.SuccessResponse{data=case_creation.Case} "Case created successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
@@ -60,8 +58,8 @@ func NewCaseServices(
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases [post]
 func (cs CaseServices) CreateCase(c *gin.Context) {
-	var req case_creation.CreateCaseRequest //
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var apiReq structs.CreateCaseRequest //
+	if err := c.ShouldBindJSON(&apiReq); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Invalid case data",
@@ -79,9 +77,16 @@ func (cs CaseServices) CreateCase(c *gin.Context) {
 		return
 	}
 
-	req.CreatedBy = creatorID.(string) //use userID from middleware
-
-	newCase, err := cs.createCase.CreateCase(req)
+	serviceReq := case_creation.CreateCaseRequest{ //map
+		Title:              apiReq.Title,
+		Description:        apiReq.Description,
+		Status:             apiReq.Status,
+		Priority:           apiReq.Priority,
+		InvestigationStage: apiReq.InvestigationStage,
+		CreatedBy:          creatorID.(string),
+		TeamName:           apiReq.TeamName,
+	}
+	newCase, err := cs.createCase.CreateCase(serviceReq)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorType := "creation_failed"
@@ -231,7 +236,7 @@ func (cs CaseServices) GetCasesByUserID(c *gin.Context) {
 // @Produce json
 // @Security ApiKeyAuth
 // @Param id path string true "Case ID"
-// @Param request body case_status_update.UpdateCaseStatusRequest true "Status Update Request"
+// @Param request body structs.UpdateCaseStatusRequest true "Status Update Request"
 // @Success 200 {object} structs.SuccessResponse "Case status updated successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
@@ -248,8 +253,8 @@ func (cs CaseServices) UpdateCaseStatus(c *gin.Context) {
 		return
 	}
 
-	var req case_status_update.UpdateCaseStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var apiReq structs.UpdateCaseStatusRequest
+	if err := c.ShouldBindJSON(&apiReq); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Invalid status update data",
@@ -258,9 +263,12 @@ func (cs CaseServices) UpdateCaseStatus(c *gin.Context) {
 		return
 	}
 
-	req.CaseID = caseID //set case ID from URL parameter
+	serviceReq := case_status_update.UpdateCaseStatusRequest{
+		CaseID: caseID,
+		Status: apiReq.Status,
+	}
 
-	err := cs.updateCaseStatus.UpdateCaseStatus(req, "Admin") //hardcoded since the middleware checks for admin role
+	err := cs.updateCaseStatus.UpdateCaseStatus(serviceReq, "Admin") //hardcoded since the middleware checks for admin role
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 			Error:   "update_failed",

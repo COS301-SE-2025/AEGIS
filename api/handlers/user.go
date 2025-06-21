@@ -25,13 +25,13 @@ func NewUserService(
 }
 
 // @Summary Get user profile
-// @Description Retrieves a user profile. Admins can access any user's profile, regular users can only access their own.
+// @Description Retrieves the profile of the current user or a specific user for admins
 // @Tags Users, Admin
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
 // @Param user_id path string false "User ID (required for admin access to other users)"
-// @Success 200 {object} structs.SuccessResponse{data=structs.User} "User profile retrieved successfully"
+// @Success 200 {object} structs.SuccessResponse{data=GetUpdate_Users.UserProfile} "User profile retrieved successfully"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
@@ -79,13 +79,13 @@ func (m UserService) GetProfile(c *gin.Context) {
 }
 
 // @Summary Update user profile
-// @Description Updates a user's profile information. Admins can update any user's profile, regular users can only update their own.
+// @Description Updates the profile of the current user or a specific user for admins
 // @Tags Users, Admin
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
 // @Param user_id path string false "User ID (required for admin access to other users)"
-// @Param request body structs.UpdateProfileRequest true "Profile update information"
+// @Param request body structs.UpdateProfileRequest true "Profile Update Request"
 // @Success 200 {object} structs.SuccessResponse "Profile updated successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
@@ -160,6 +160,7 @@ func (m UserService) UpdateProfile(c *gin.Context) {
 	})
 }
 
+/*
 // @Summary Get user cases
 // @Description Retrieves cases associated with a user. Admins can access any user's cases, regular users can only access their own.
 // @Tags Users, Admin
@@ -195,3 +196,4 @@ func (m UserService) GetUserCases(c *gin.Context) {
 		Data:    cases,
 	})
 }
+*/

@@ -22,6 +22,7 @@ func NewEvidenceHandler(service *evidence.Service) *EvidenceServices {
 	}
 }
 
+/*
 // @Summary Upload evidence
 // @Description Upload new evidence to a case. Requires authentication.
 // @Tags Evidence
@@ -36,7 +37,7 @@ func NewEvidenceHandler(service *evidence.Service) *EvidenceServices {
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{case_id}/evidence [post]
 func (e *EvidenceServices) UploadEvidence(c *gin.Context) {
-	var req evidence.UploadEvidenceRequest //some fields don't make sense for upload
+	var req evidence.UploadEvidenceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -48,6 +49,7 @@ func (e *EvidenceServices) UploadEvidence(c *gin.Context) {
 
 	caseID := c.Param("case_id")
 	req.CaseID = caseID
+
 	// Get user ID from context
 	userID, exists := c.Get("userID") //middleware
 	if !exists {
@@ -89,6 +91,7 @@ func (e *EvidenceServices) UploadEvidence(c *gin.Context) {
 		Data:    newEvidence,
 	})
 }
+*/
 
 // @Summary List evidence by case
 // @Description Retrieves all evidence items for a specific case. Requires authentication.

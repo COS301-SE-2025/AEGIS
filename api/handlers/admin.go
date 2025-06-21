@@ -37,7 +37,7 @@ func NewAdminServices( //constructor
 // @Accept  json
 // @Produce  json
 // @Security ApiKeyAuth
-// @Param   request body registration.RegisterUserRequest true "User Registration Request"
+// @Param   request body structs.RegisterUserRequest true "User Registration Request"
 // @Success 201 {object} structs.SuccessResponse{data=registration.User} "User registered successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
@@ -47,8 +47,8 @@ func NewAdminServices( //constructor
 func (as AdminServices) RegisterUser(c *gin.Context) {
 	//struct to hold user data
 	//binding and validation
-	var req registration.RegistrationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var apiReq structs.RegistrationRequest
+	if err := c.ShouldBindJSON(&apiReq); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Invalid input",
@@ -57,8 +57,15 @@ func (as AdminServices) RegisterUser(c *gin.Context) {
 		return
 	}
 
+	serviceReq := registration.RegistrationRequest{ //map API request to service request
+		FullName: apiReq.FullName,
+		Email:    apiReq.Email,
+		Password: apiReq.Password,
+		Role:     apiReq.Role,
+	}
+
 	//call the service function
-	user, err := as.registerUser.Register(req)
+	user, err := as.registerUser.Register(serviceReq)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
