@@ -18,7 +18,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 	fmt.Println()
 	//router.Use(gin.Recovery())              //middleware for recovering from panics
 
-	// Debug: Print all routes
+	// Debug: Print all routes --remove later
 	router.Use(func(c *gin.Context) {
 		fmt.Printf("Requested URL: %s\n", c.Request.URL.Path)
 		c.Next()
@@ -40,7 +40,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		auth.POST("/login", h.AuthHandler.Login)
 
 		// logout
-		auth.DELETE("/logout", h.AuthHandler.Logout)
+		auth.DELETE("/logout", middleware.AuthMiddleware(), h.AuthHandler.Logout)
 
 		// password-reset
 		//auth.POST("/password-reset", h.AuthHandler.ResetPassword)
@@ -64,13 +64,13 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 				singleUser := users.Group("/:user_id")
 				{
 					singleUser.GET("", h.UserHandler.GetProfile)            //get user profile
-					singleUser.PUT("/profile", h.UserHandler.UpdateProfile) //update user profile
+					singleUser.PUT("/profile", h.UserHandler.UpdateProfile) //update user profile (name,email)
 					singleUser.PUT("", h.AdminHandler.UpdateUserRole)       //update user role
 					singleUser.DELETE("", h.AdminHandler.DeleteUser)        //delete user
 
-					singleUser.GET("/cases", h.UserHandler.GetUserCases)                                 //get cases by user id
+					singleUser.GET("/cases", h.CaseHandler.GetCasesByUserID)                             //get cases by user id
 					singleUser.GET("/evidence", h.EvidenceHandler.ListEvidenceByUserID)                  //get evidence uploaded by user id
-					singleUser.GET("/evidence/:evidence_id", h.EvidenceHandler.DownloadEvidenceByUserID) //download specific evidence by user id
+					singleUser.GET("/evidence/:evidence_id", h.EvidenceHandler.DownloadEvidenceByUserID) //download evidence by user id
 				}
 			}
 			// roles
@@ -79,14 +79,15 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			//dashboard stuff
 		}
 
+		// user self-service routes
 		user := protected.Group("/users")
 		{
 			//profile
 			user.GET("", h.UserHandler.GetProfile)
-			user.PUT("", h.UserHandler.UpdateProfile)
+			user.PUT("", h.UserHandler.UpdateProfile) //update name/email
 
 			//cases
-			user.GET("/cases", h.UserHandler.GetUserCases)
+			user.GET("/cases", h.CaseHandler.GetCasesByUserID)
 			user.GET("/evidence", h.EvidenceHandler.ListEvidenceByUserID)
 			user.GET("/evidence/:evidence_id", h.EvidenceHandler.DownloadEvidenceByUserID)
 		}
@@ -95,7 +96,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		cases := protected.Group("/cases")
 		{
 			cases.POST("", middleware.RequireRole("Admin"), h.CaseHandler.CreateCase)
-			cases.GET("", h.CaseHandler.GetAllCases)                                              //no filtering
+			cases.GET("", middleware.RequireRole("Admin"), h.CaseHandler.GetAllCases)             //no filtering
 			cases.GET("/filter", middleware.RequireRole("Admin"), h.CaseHandler.GetFilteredCases) //filter cases by status, type, etc.
 
 			//case-specific routes
@@ -115,8 +116,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 				evidence := singleCase.Group("/evidence")
 				{
-					//evidence.GET("", h.EvidenceHandler.GetEvidence) //evidence under a specific case
-					evidence.POST("", h.EvidenceHandler.UploadEvidence)
+					//evidence.POST("", h.EvidenceHandler.UploadEvidence) //UNDER REVIEW
 					evidence.GET("", h.EvidenceHandler.ListEvidenceByCaseID)
 
 					//evidence specific to a single case
@@ -124,7 +124,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 					{
 						evidenceItem.GET("", h.EvidenceHandler.GetEvidenceByID)
 						evidenceItem.GET("/metadata", h.EvidenceHandler.GetEvidenceMetadata)
-						evidenceItem.DELETE("", h.EvidenceHandler.DeleteEvidenceByID)
+						evidenceItem.DELETE("", middleware.RequireRole("Admin"), h.EvidenceHandler.DeleteEvidenceByID)
 
 						//evidenceItem.POST("/annotations", h.EvidenceHandler.AddAnnotation)
 						//evidenceItem.GET("/annotations", h.EvidenceHandler.GetAnnotations)
