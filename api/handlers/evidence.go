@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"aegis-api/middleware"
 	"aegis-api/services/evidence"
 	"aegis-api/structs"
 	"archive/zip"
 	"bytes"
-	"log"
 	"net/http"
 	"strings"
 
@@ -23,7 +23,7 @@ func NewEvidenceHandler(service *evidence.Service) *EvidenceServices {
 }
 
 // @Summary Upload evidence
-// @Description Upload new evidence for a case
+// @Description Upload new evidence to a case
 // @Tags Evidence
 // @Accept json
 // @Produce json
@@ -54,7 +54,17 @@ func (e *EvidenceServices) UploadEvidence(c *gin.Context) {
 		})
 		return
 	}
-	req.UploadedBy = userID.(string) //uid or email? request body just says string
+
+	userIDStr, ok := userID.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "server_error",
+			Message: "User ID type assertion failed",
+		})
+		return
+	}
+
+	req.UploadedBy = userIDStr //assuming uploadedby is uid
 
 	newEvidence, err := e.service.UploadEvidence(req)
 	if err != nil {
@@ -82,13 +92,13 @@ func (e *EvidenceServices) UploadEvidence(c *gin.Context) {
 // @Tags Evidence
 // @Accept json
 // @Produce json
-// @Param case_id path string true "Case ID"
+// @Param id path string true "Case ID"
 // @Success 200 {object} structs.SuccessResponse{data=[]evidence.Evidence} "Evidence retrieved successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid case ID"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/{id}/evidence [get]
-func (e *EvidenceServices) ListEvidenceByCase(c *gin.Context) {
-	caseID := c.Param("case_id")
+func (e *EvidenceServices) ListEvidenceByCaseID(c *gin.Context) {
+	caseID := c.Param("id")
 	if caseID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -115,22 +125,21 @@ func (e *EvidenceServices) ListEvidenceByCase(c *gin.Context) {
 }
 
 // @Summary List evidence by user
-// @Description Retrieves all evidence items uploaded by a specific user
-// @Tags Evidence
+// @Description Retrieves all evidence associated with a user. Admins can access any user's evidence, regular users can only access their own.
+// @Tags Users, Admin
 // @Accept json
 // @Produce json
-// @Param user_id path string true "User ID"
-// @Success 200 {object} structs.SuccessResponse{data=[]evidence.Evidence} "Evidence retrieved successfully"
-// @Failure 400 {object} structs.ErrorResponse "Invalid user ID"
+// @Security ApiKeyAuth
+// @Param user_id path string false "User ID (required for admin access to other users)"
+// @Success 200 {object} structs.SuccessResponse{data=[]structs.Evidence} "User evidence retrieved successfully"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/user/{user_id}/evidence [get]
-func (e *EvidenceServices) ListEvidenceByUser(c *gin.Context) {
-	userID := c.Param("user_id")
-	if userID == "" {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "User ID is required",
-		})
+// @Router /api/v1/users/evidence [get]
+// @Router /api/v1/admin/users/{user_id}/evidence [get]
+func (e *EvidenceServices) ListEvidenceByUserID(c *gin.Context) {
+	userID, ok := middleware.GetTargetUserID(c)
+	if !ok {
 		return
 	}
 
@@ -192,6 +201,7 @@ func (e *EvidenceServices) GetEvidenceByID(c *gin.Context) {
 		return
 	}
 
+	// Convert UUID to string for comparison with URL parameter
 	if evidenceItem.CaseID.String() != caseID {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_path",
@@ -207,16 +217,28 @@ func (e *EvidenceServices) GetEvidenceByID(c *gin.Context) {
 	})
 }
 
-// @Summary Download all user evidence files
-// @Description Downloads all evidence files uploaded by the current user
-// @Tags Evidence
-// @Produce application/zip
-// @Success 200 {file} binary "ZIP of user evidence files"
+// @Summary Download evidence by user
+// @Description Downloads a specific evidence file associated with a user. Admins can access any user's evidence, regular users can only access their own.
+// @Tags Users, Admin
+// @Accept json
+// @Produce octet-stream
+// @Security ApiKeyAuth
+// @Param user_id path string false "User ID (required for admin access to other users)"
+// @Param evidence_id path string true "Evidence ID"
+// @Success 200 {file} binary "Evidence file"
+// @Failure 400 {object} structs.ErrorResponse "Invalid request"
+// @Failure 401 {object} structs.ErrorResponse "Unauthorized"
+// @Failure 403 {object} structs.ErrorResponse "Forbidden"
+// @Failure 404 {object} structs.ErrorResponse "Evidence not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/user/me/evidence/download [get]
-func (e *EvidenceServices) DownloadEvidenceByUser(c *gin.Context) {
+// @Router /api/v1/users/evidence/{evidence_id} [get]
+// @Router /api/v1/admin/users/{user_id}/evidence/{evidence_id} [get]
+func (e *EvidenceServices) DownloadEvidenceByUserID(c *gin.Context) {
 
-	userID := c.GetString("userID")
+	userID, ok := middleware.GetTargetUserID(c)
+	if !ok {
+		return
+	}
 
 	files, err := e.service.DownloadEvidenceByUser(userID)
 	if err != nil {
@@ -231,16 +253,45 @@ func (e *EvidenceServices) DownloadEvidenceByUser(c *gin.Context) {
 	buf := new(bytes.Buffer)
 	zipWriter := zip.NewWriter(buf)
 
+	//for _, file := range files {
+	//	f, err := zipWriter.Create(file.Filename)
+	//	if err != nil {
+	//		continue
+	//	}
+	//	_, _ = f.Write(file.Content)
+	//}
+
 	for _, file := range files {
 		f, err := zipWriter.Create(file.Filename)
 		if err != nil {
-			continue
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "zip_creation_failed",
+				Message: "Failed to create zip file entry",
+				Details: err.Error(),
+			})
+			return
 		}
-		_, _ = f.Write(file.Content)
+		_, err = f.Write(file.Content)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "zip_write_failed",
+				Message: "Failed to write content to zip file",
+				Details: err.Error(),
+			})
+			return
+		}
 	}
 
 	err = zipWriter.Close()
-	if err != nil {
+	//if err != nil {
+	//	return
+	//}
+	if err = zipWriter.Close(); err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "zip_close_failed",
+			Message: "Failed to finalize zip file",
+			Details: err.Error(),
+		})
 		return
 	}
 
@@ -294,7 +345,7 @@ func (e *EvidenceServices) GetEvidenceMetadata(c *gin.Context) {
 		return
 	}
 
-	//COME BACK : check if a user has access to the case TO DO (middleware)
+	//COME BACK: check if a user has access to the case TO DO
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
@@ -329,7 +380,7 @@ func (e *EvidenceServices) DeleteEvidenceByID(c *gin.Context) { //admin only?
 	}
 
 	// Get user ID from context for permission checking
-	userID, exists := c.Get("userID")
+	_, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 			Error:   "unauthorized",
@@ -338,7 +389,7 @@ func (e *EvidenceServices) DeleteEvidenceByID(c *gin.Context) { //admin only?
 		return
 	}
 
-	log.Printf("Admin user %s deleting evidence %s", userID, evidenceID) //log the user deleting the evidence
+	//log.Printf("Admin user %s deleting evidence %s", userID, evidenceID) //log the user deleting the evidence
 
 	err := e.service.DeleteEvidenceByID(evidenceID) //why doesn't it take the userid to know who initiated the deletion?
 	if err != nil {

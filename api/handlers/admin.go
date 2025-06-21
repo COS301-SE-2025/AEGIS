@@ -14,11 +14,10 @@ type AdminServices struct {
 	registerUser   *registration.RegistrationService
 	listUser       listusers.ListUserService
 	updateUserRole *update_user_role.UserService
-
-	deleteUser *delete_user.UserDeleteService
+	deleteUser     *delete_user.UserDeleteService
 }
 
-func NewAdminServices(
+func NewAdminServices( //constructor
 	registerUser *registration.RegistrationService,
 	listUser listusers.ListUserService,
 	updateUserRole *update_user_role.UserService,
@@ -37,8 +36,8 @@ func NewAdminServices(
 // @Tags Admin
 // @Accept  json
 // @Produce  json
-// @Param   request body structs.RegisterUserRequest true "User Registration Request"
-// @Success 201 {object} structs.SuccessResponse{data=structs.User} "User registered successfully"
+// @Param   request body registration.RegisterUserRequest true "User Registration Request"
+// @Success 201 {object} structs.SuccessResponse{data=registration.User} "User registered successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users [post]
@@ -76,15 +75,11 @@ func (as AdminServices) RegisterUser(c *gin.Context) {
 }
 
 // @Summary List all users
-// @Description Retrieves a list of all registered users. Supports filtering by role, status, and creation date range.
+// @Description Retrieves a list of all registered users.
 // @Tags Admin
 // @Accept json
 // @Produce json
-// @Param role query string false "Filter users by role (e.g., 'Forensic Analyst')"
-// @Param status query string false "Filter users by status (e.g., 'active', 'inactive')"
-// @Param start_date query string false "Filter users created after this date (YYYY-MM-DD)"
-// @Param end_date query string false "Filter users created before this date (YYYY-MM-DD)"
-// @Success 200 {object} structs.SuccessResponse{data=[]structs.User} "Users retrieved successfully"
+// @Success 200 {object} structs.SuccessResponse{data=[]listusers.User} "Users retrieved successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid query parameters"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users [get]
@@ -119,6 +114,7 @@ func (as AdminServices) ListUsers(c *gin.Context) {
 	})
 }
 
+/*
 // @Summary Get user activity
 // @Description Retrieves the activity log for a specific user.
 // @Tags Admin
@@ -128,7 +124,7 @@ func (as AdminServices) ListUsers(c *gin.Context) {
 // @Success 200 {object} structs.SuccessResponse{data=[]structs.UserActivity} "User activity retrieved successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing user ID)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/admin/users/:user_id [get]
+// @Router /api/v1/admin/users/{user_id} [get]
 func (as AdminServices) GetUserActivity(c *gin.Context) {
 	// Get user ID from URL parameter
 	userID := c.Param("user_id")
@@ -173,7 +169,7 @@ func (as AdminServices) GetUserActivity(c *gin.Context) {
 		//Data:    activities,
 		Data: mockActivity,
 	})
-}
+}*/
 
 // @Summary Update a user's role
 // @Description Updates the role of a specific user. Only 'Admin' can perform this action.
@@ -185,7 +181,7 @@ func (as AdminServices) GetUserActivity(c *gin.Context) {
 // @Success 200 {object} structs.SuccessResponse "User role updated successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload or user ID"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/admin/users/:user_id [put]
+// @Router /api/v1/admin/users/{user_id} [put]
 func (as AdminServices) UpdateUserRole(c *gin.Context) {
 	userID := c.Param("user_id")
 	if userID == "" {
@@ -222,6 +218,7 @@ func (as AdminServices) UpdateUserRole(c *gin.Context) {
 	})
 }
 
+/*
 // @Summary Get all user roles
 // @Description Retrieves a list of all available user roles and their associated permissions.
 // @Tags Admin
@@ -254,7 +251,7 @@ func (as AdminServices) GetRoles(c *gin.Context) {
 		Data: mockRoles,
 	})
 }
-
+*/
 //DeleteUser
 
 // @Summary Delete a user
@@ -262,11 +259,21 @@ func (as AdminServices) GetRoles(c *gin.Context) {
 // @Tags Admin
 // @Accept json
 // @Produce json
+// @Param user_id path string true "User ID to delete"
 // @Success 200 {object} structs.SuccessResponse "User deleted successfully"
-// @Failure 400 {object} structs.ErrorResponse "Invalid request payload or user ID"
+// @Failure 400 {object} structs.ErrorResponse "Invalid user ID"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/admin/users [delete]
+// @Router /api/v1/admin/users/{user_id} [delete]
 func (as AdminServices) DeleteUser(c *gin.Context) {
+
+	userID := c.Param("user_id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "User ID is required",
+		})
+		return
+	}
 
 	// Get requester's role from context
 	role, exists := c.Get("userRole")
@@ -278,7 +285,9 @@ func (as AdminServices) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	var req delete_user.DeleteUserRequest
+	req := delete_user.DeleteUserRequest{
+		UserID: userID,
+	}
 
 	err := as.deleteUser.DeleteUser(req, role.(string))
 	if err != nil {

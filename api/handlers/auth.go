@@ -10,16 +10,20 @@ import (
 
 type AuthServices struct {
 	authService          *auth.AuthService
-	passwordResetService *reset_password.PasswordResetService
+	passwordReset        *reset_password.PasswordResetService
+	passwordResetRequest *reset_password.PasswordResetService
 }
 
 func NewAuthHandler(
 	authService *auth.AuthService,
-	passwordResetService *reset_password.PasswordResetService,
+	passwordReset *reset_password.PasswordResetService,
+	passwordResetRequest *reset_password.PasswordResetService,
+
 ) *AuthServices {
 	return &AuthServices{
 		authService:          authService,
-		passwordResetService: passwordResetService,
+		passwordReset:        passwordReset,
+		passwordResetRequest: passwordResetRequest,
 	}
 }
 
@@ -33,7 +37,7 @@ type EmailSender interface {
 // @Accept json
 // @Produce json
 // @Param request body structs.LoginRequest true "User Login Credentials"
-// @Success 200 {object} structs.SuccessResponse{data=structs.LoginResponse} "Login successful"
+// @Success 200 {object} structs.SuccessResponse{data=auth.LoginResponse} "Login successful"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload or credentials"
 // @Failure 401 {object} structs.ErrorResponse "Authentication failed (invalid credentials)"
 // @Router /api/v1/auth/login [post]
@@ -74,7 +78,7 @@ func (m AuthServices) Login(c *gin.Context) {
 // @Success 200 {object} structs.SuccessResponse "Logged out successfully"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized (user not authenticated)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/auth/logout [post]
+// @Router /api/v1/auth/logout [delete]
 func (m AuthServices) Logout(c *gin.Context) { //COME BACK TO THIS
 
 	//_, exists := c.Get("userID") //_ -> userID
@@ -101,6 +105,7 @@ func (m AuthServices) Logout(c *gin.Context) { //COME BACK TO THIS
 	})
 }
 
+/* TO DO
 // @Summary Request password reset
 // @Description Resets a user's password using the token sent to their email
 // @Tags Authentication
@@ -112,7 +117,7 @@ func (m AuthServices) Logout(c *gin.Context) { //COME BACK TO THIS
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/password-reset [post]
 func (m AuthServices) ResetPassword(c *gin.Context) {
-	var req structs.ResetPasswordRequest
+	var req structs.ResetPassword
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -122,7 +127,7 @@ func (m AuthServices) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	err := m.passwordResetService.ResetPassword(req.Token, req.NewPassword)
+	err := m.passwordReset.ResetPassword(req.Token, req.NewPassword)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if err.Error() == "invalid or expired token" || err.Error() == "token has expired" {
@@ -147,50 +152,14 @@ func (m AuthServices) ResetPassword(c *gin.Context) {
 
 //requestpasswordreset
 
-// @Summary Request password reset email
-// @Description Sends a password reset email to the user with a reset token.
-// @Tags Authentication
-// @Accept json
-// @Produce json
-// @Param request body structs.PasswordResetRequest true "Password Reset Request"
-// @Success 200 {object} structs.SuccessResponse "Password reset email sent successfully"
-// @Failure 400 {object} structs.ErrorResponse "Invalid request payload (e.g., malformed email)"
-// @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/auth/request-password-reset [post]
-/*func (m AuthServices) RequestPasswordReset(c *gin.Context) {
-	var req structs.PasswordResetRequest
+func (m AuthServices) RequestPasswordReset(c *gin.Context) {
+	var req structs.ResetPassword
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
-			Message: "Invalid request data",
+			Message: "Invalid reset password data",
 			Details: err.Error(),
 		})
 		return
 	}
-
-	// Get user ID from email first
-	userID, err := m.authService.GetUserIDByEmail(req.Email)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_email",
-			Message: "Email not found",
-			Details: err.Error(),
-		})
-		return
-	}
-
-	err = m.passwordResetService.RequestPasswordReset(userID, req.Email)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-			Error:   "request_failed",
-			Message: "Could not send password reset email",
-			Details: err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, structs.SuccessResponse{
-		Success: true,
-		Message: "Password reset email sent successfully",
-	})
 }*/

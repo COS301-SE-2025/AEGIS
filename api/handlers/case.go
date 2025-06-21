@@ -178,8 +178,8 @@ func (cs CaseServices) GetFilteredCases(c *gin.Context) {
 	})
 }
 
-// @Summary Get cases by user
-// @Description Retrieves cases created by a specific user
+// @Summary Get cases by user id
+// @Description Retrieves cases created a user is assigned to
 // @Tags Cases
 // @Accept json
 // @Produce json
@@ -188,7 +188,7 @@ func (cs CaseServices) GetFilteredCases(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid user ID"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/cases/user/{user_id} [get]
-func (cs CaseServices) GetCasesByUser(c *gin.Context) {
+func (cs CaseServices) GetCasesByUserID(c *gin.Context) {
 	userID := c.Param("user_id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -400,7 +400,7 @@ func (cs CaseServices) GetCollaborators(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Case ID"
 // @Param user_id path string true "User ID"
-// @Success 204 {} "No Content"
+// @Success 200 {object} structs.SuccessResponse "User successfully removed from case"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden - Admin privileges required"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
@@ -465,7 +465,10 @@ func (cs CaseServices) RemoveCollaborator(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusNoContent) //no content returned
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "User successfully removed from case",
+	})
 }
 
 /*
