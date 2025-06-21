@@ -15,20 +15,41 @@ func ComparePasswords(hashedPwd, plainPwd string) bool {
 	return err == nil
 }
 
-func GenerateJWT(userID, email, role string) (string, error) {
-	claims := jwt.MapClaims{
-		"sub":   userID,                                // Subject (user ID)
-		"email": email,                                 // Helpful for display/logging
-		"role":  role,                                  // Required for RBAC
-		"iat":   time.Now().Unix(),                     // Issued At (optional but good)
-		"exp":   time.Now().Add(time.Hour * 24).Unix(), // Expiration (24h here)
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+func GetJWTSecret() []byte {
+	return jwtSecret
 }
 
 // HashPassword hashes a plain-text password using bcrypt.
 func HashPassword(password string) (string, error) {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(hashed), err
+}
+
+// GenerateJWT issues a token with claims including version and expiration logic.
+func GenerateJWT(userID, email, role string, tokenVersion int, customExpiry *time.Time) (string, error) {
+	var exp time.Time
+
+	// External users default to 10 days unless a custom expiry is provided
+	if role == "External Collaborator" {
+		if customExpiry != nil {
+			exp = *customExpiry
+		} else {
+			exp = time.Now().Add(10 * 24 * time.Hour)
+		}
+	} else {
+		// Default expiry for internal users: 24 hours
+		exp = time.Now().Add(24 * time.Hour)
+	}
+
+	claims := jwt.MapClaims{
+		"sub":           userID,
+		"email":         email,
+		"role":          role,
+		"token_version": tokenVersion,
+		"iat":           time.Now().Unix(),
+		"exp":           exp.Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
 }

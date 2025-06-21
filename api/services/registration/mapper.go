@@ -15,16 +15,25 @@ func RegistrationRequestToModel(req RegistrationRequest, hash string) UserModel 
 	}
 }
 
-
 func ModelToEntity(model UserModel, id string) User {
-	return User{
+	user := User{
 		ID:           id,
 		FullName:     model.FullName,
 		Email:        model.Email,
 		PasswordHash: model.PasswordHash,
-		Role:         model.Role, 
+		Role:         model.Role,
 		CreatedAt:    time.Now(),
+		IsVerified:   false,
+		TokenVersion: 1, // default for all users
 	}
+
+	if model.Role == "External Collaborator" {
+		exp := time.Now().Add(10 * 24 * time.Hour)
+		user.ExternalTokenExpiry = &exp
+		user.ExternalTokenStatus = "active"
+	}
+
+	return user
 }
 
 func EntityToResponse(entity User) UserResponse {

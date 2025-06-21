@@ -1,21 +1,24 @@
 package auth
 
 import (
-	"errors"
-	"aegis-api/services/registration"
-	"aegis-api/db"
+	"gorm.io/gorm"
 )
-type UserRepository interface {
-	GetUserByEmail(email string) (*registration.User, error)
-}
-func GetUserByEmail(email string) (*registration.User, error) {
-	var user registration.User
 
-	result := db.DB.Where("email = ?", email).First(&user)
-	if result.Error != nil {
-		return nil, errors.New("user not found")
-	}
-
-	return &user, nil
+type GormUserRepo struct {
+	db *gorm.DB
 }
 
+// type UserRepository interface {
+// 	GetUserByEmail(email string) (*User, error)
+// }
+
+// func GetUserByEmail(email string) (*User, error) {
+// 	var user User
+
+// 	result := db.DB.Where("email = ?", email).First(&user)
+// 	if result.Error != nil {
+// 		return nil, errors.New("user not found")
+// 	}
+
+// 	return &user, nil
+// }

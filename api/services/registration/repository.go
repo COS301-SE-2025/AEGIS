@@ -17,6 +17,8 @@ type UserRepository interface {
 	GetUserByEmail(email string) (*User, error)
 	UpdateUser(user *User) error
 	GetUserByFullName(fullName string) (*User, error)
+	GetUserByID(userID string) (*User, error)
+	UpdateUserTokenInfo(user *User) error
 }
 
 type GormUserRepository struct {
@@ -61,4 +63,29 @@ func (r *GormUserRepository) GetUserByFullName(fullName string) (*User, error) {
 }
 func (r *GormUserRepository) UpdateUser(user *User) error {
 	return r.db.Save(user).Error
+}
+
+func (r *GormUserRepository) UpdateUserTokenInfo(user *User) error {
+	return r.db.Model(user).Updates(map[string]interface{}{
+		"token_version":         user.TokenVersion,
+		"external_token_status": user.ExternalTokenStatus,
+		"external_token_expiry": user.ExternalTokenExpiry,
+	}).Error
+}
+
+func (r *GormUserRepository) GetUserByID(userID string) (*User, error) {
+	var u User
+	if err := r.db.First(&u, "id = ?", userID).Error; err != nil {
+		return nil, err
+	}
+
+	return &User{
+		ID:                  u.ID,
+		Email:               u.Email,
+		Role:                u.Role,
+		TokenVersion:        u.TokenVersion,
+		ExternalTokenStatus: u.ExternalTokenStatus,
+		ExternalTokenExpiry: u.ExternalTokenExpiry,
+		IsVerified:          u.IsVerified,
+	}, nil
 }
