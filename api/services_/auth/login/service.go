@@ -21,7 +21,7 @@ func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 	}
 
 	return &LoginResponse{
-		ID:    user.ID,
+		ID:    user.ID.String(),
 		Email: user.Email,
 		Token: user.VerificationToken, // Later replace with JWT
 	}, nil

@@ -18,6 +18,10 @@ type GormUserRepository struct {
 	db *gorm.DB
 }
 
+func (r *GormUserRepository) GetDB() *gorm.DB {
+	return r.db
+}
+
 func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
 	if db == nil {
 		log.Fatal("DB is nil in NewGormUserRepository")

@@ -12,8 +12,8 @@ import (
 )
 
 // generateID generates a new UUID string
-func generateID() string {
-	return uuid.New().String()
+func generateID() uuid.UUID {
+	return uuid.New()
 }
 func generateToken() string {
 	b := make([]byte, 32)

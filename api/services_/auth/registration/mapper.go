@@ -2,6 +2,8 @@ package registration
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // This file contains the mapping functions to convert between different layers of the application.
@@ -15,7 +17,7 @@ func RegistrationRequestToModel(req RegistrationRequest, hash string) UserModel 
 	}
 }
 
-func ModelToEntity(model UserModel, id string) User {
+func ModelToEntity(model UserModel, id uuid.UUID) User {
 	return User{
 		ID:           id,
 		FullName:     model.FullName,
@@ -28,7 +30,7 @@ func ModelToEntity(model UserModel, id string) User {
 
 func EntityToResponse(entity User) UserResponse {
 	return UserResponse{
-		ID:       entity.ID,
+		ID:       entity.ID.String(),
 		FullName: entity.FullName,
 		Email:    entity.Email,
 	}
