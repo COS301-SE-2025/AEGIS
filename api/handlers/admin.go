@@ -34,10 +34,12 @@ func NewAdminServices( //constructor
 // @Summary Register a new user
 // @Description Registers a new user with the provided details. Only users with 'Admin' role can perform this action.
 // @Tags Admin
-// @Accept  json
-// @Produce  json
+// @Accept json
+// @Accept x-www-form-urlencoded
+// @Accept multipart/form-data
+// @Produce json
 // @Security ApiKeyAuth
-// @Param   request body structs.RegisterUserRequest true "User Registration Request"
+// @Param request body structs.RegistrationRequest true "User Registration Request"
 // @Success 201 {object} structs.SuccessResponse{data=registration.User} "User registered successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
@@ -48,7 +50,7 @@ func (as AdminServices) RegisterUser(c *gin.Context) {
 	//struct to hold user data
 	//binding and validation
 	var apiReq structs.RegistrationRequest
-	if err := c.ShouldBindJSON(&apiReq); err != nil {
+	if err := c.ShouldBind(&apiReq); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Invalid input",
@@ -188,6 +190,8 @@ func (as AdminServices) GetUserActivity(c *gin.Context) {
 // @Description Updates the role of a specific user. Only administrators can perform this action.
 // @Tags Admin
 // @Accept json
+// @Accept x-www-form-urlencoded
+// @Accept multipart/form-data
 // @Produce json
 // @Security ApiKeyAuth
 // @Param user_id path string true "User ID"
@@ -198,7 +202,7 @@ func (as AdminServices) GetUserActivity(c *gin.Context) {
 // @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
 // @Failure 404 {object} structs.ErrorResponse "User not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/admin/users/{user_id} [put]
+// @Router /api/v1/admin/users/{user_id}/role [put]
 func (as AdminServices) UpdateUserRole(c *gin.Context) {
 	userID := c.Param("user_id")
 	if userID == "" {
@@ -210,7 +214,7 @@ func (as AdminServices) UpdateUserRole(c *gin.Context) {
 	}
 
 	var req structs.UpdateUserRoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Invalid role data",

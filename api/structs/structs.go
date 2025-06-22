@@ -140,11 +140,7 @@ package structs
 // //	Email string `json:"email" binding:"required,email"`
 // //}
 // //
-// //type PasswordResetBody struct {
-// //	Token       string `json:"token" binding:"required"`
-// //	NewPassword string `json:"new_password" binding:"required,min=8"`
-// //}
-//
+
 //	type UpdateProfileRequest struct {
 //		FullName string `json:"full_name,omitempty" binding:"omitempty,min=1"`
 //		Email    string `json:"email,omitempty" binding:"omitempty,email"`

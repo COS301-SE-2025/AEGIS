@@ -35,6 +35,8 @@ type EmailSender interface {
 // @Description Authenticates a user and returns a JWT token and user details upon successful login
 // @Tags Authentication
 // @Accept json
+// @Accept x-www-form-urlencoded
+// @Accept multipart/form-data
 // @Produce json
 // @Param request body structs.LoginRequest true "User login credentials (email and password)"
 // @Success 200 {object} structs.SuccessResponse{data=auth.LoginResponse} "Login successful"
@@ -44,7 +46,7 @@ type EmailSender interface {
 // @Router /api/v1/auth/login [post]
 func (m AuthServices) Login(c *gin.Context) {
 	var req structs.LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Invalid input",
@@ -106,20 +108,63 @@ func (m AuthServices) Logout(c *gin.Context) { //COME BACK TO THIS
 	})
 }
 
-/* TO DO
+//requestpasswordreset -- UNDER REVIEW
+/*
 // @Summary Request password reset
-// @Description Resets a user's password using the token sent to their email
+// @Description Requests a password reset email to be sent to the provided email address
 // @Tags Authentication
 // @Accept json
+// @Accept x-www-form-urlencoded
+// @Accept multipart/form-data
 // @Produce json
-// @Param request body structs.ResetPasswordRequest true "Password Reset Request"
-// @Success 200 {object} structs.SuccessResponse "Password reset successfully"
+// @Param request body structs.PasswordResetRequestBody true "Password reset request with email"
+// @Success 200 {object} structs.SuccessResponse "Reset email sent (returns success regardless of whether email exists for security)"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/auth/password-reset [post]
+// @Router /api/v1/auth/reset-password/request [post]
+func (m AuthServices) RequestPasswordReset(c *gin.Context) {
+	var req structs.ResetPasswordRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid reset password data",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	err := m.passwordResetRequest.RequestPasswordReset(userID, req.Email) //should not take in a userID, just email
+	if err != nil {                                                       //log failure
+		c.JSON(http.StatusOK, structs.SuccessResponse{
+			Success: true,
+			Message: "If an account with that email exists, a password reset link has been sent.",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "If an account with that email exists, a password reset link has been sent.",
+	})
+	return
+}
+*/
+
+// @Summary Reset password
+// @Description Resets a user's password using a valid reset token
+// @Tags Authentication
+// @Accept json
+// @Accept x-www-form-urlencoded
+// @Accept multipart/form-data
+// @Produce json
+// @Param request body structs.PasswordResetBody true "Password reset with token and new password"
+// @Success 200 {object} structs.SuccessResponse "Password reset successfully"
+// @Failure 400 {object} structs.ErrorResponse "Invalid token or password requirements not met"
+// @Failure 500 {object} structs.ErrorResponse "Internal server error"
+// @Router /api/v1/auth/reset-password [post]
 func (m AuthServices) ResetPassword(c *gin.Context) {
-	var req structs.ResetPassword
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var req structs.PasswordResetBody
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Invalid reset password data",
@@ -148,19 +193,3 @@ func (m AuthServices) ResetPassword(c *gin.Context) {
 		Message: "Password reset successfully",
 	})
 }
-
-//authenticate
-
-//requestpasswordreset
-
-func (m AuthServices) RequestPasswordReset(c *gin.Context) {
-	var req structs.ResetPassword
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "Invalid reset password data",
-			Details: err.Error(),
-		})
-		return
-	}
-}*/

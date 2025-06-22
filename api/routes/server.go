@@ -43,8 +43,8 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		auth.DELETE("/logout", middleware.AuthMiddleware(), h.AuthHandler.Logout)
 
 		// password-reset
-		//auth.POST("/password-reset", h.AuthHandler.ResetPassword)
-		//auth.POST("/password-reset-request", h.AuthHandler.RequestPasswordReset)
+		//auth.POST("/reset-password", h.AuthHandler.ResetPassword)
+		//auth.POST("/reset-password/request", h.AuthHandler.RequestPasswordReset)
 
 		// auth.POST("/refresh-token", authService.refreshToken)
 	}
@@ -65,10 +65,12 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 				{
 					singleUser.GET("", h.UserHandler.GetProfile)            //get user profile
 					singleUser.PUT("/profile", h.UserHandler.UpdateProfile) //update user profile (name,email)
-					singleUser.PUT("", h.AdminHandler.UpdateUserRole)       //update user role
-					singleUser.DELETE("", h.AdminHandler.DeleteUser)        //delete user
 
-					singleUser.GET("/cases", h.CaseHandler.GetCasesByUserID)                             //get cases by user id
+					singleUser.GET("/roles", h.UserHandler.GetUserRoles)
+					singleUser.PUT("", h.AdminHandler.UpdateUserRole) //update user role
+					singleUser.DELETE("", h.AdminHandler.DeleteUser)  //delete user
+
+					singleUser.GET("/cases", h.CaseHandler.ListCasesByUserID)                            //get cases by user id
 					singleUser.GET("/evidence", h.EvidenceHandler.ListEvidenceByUserID)                  //get evidence uploaded by user id
 					singleUser.GET("/evidence/:evidence_id", h.EvidenceHandler.DownloadEvidenceByUserID) //download evidence by user id
 				}
@@ -87,17 +89,20 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			user.PUT("", h.UserHandler.UpdateProfile) //update name/email
 
 			//cases
-			user.GET("/cases", h.CaseHandler.GetCasesByUserID)
+			user.GET("/cases", h.CaseHandler.ListCasesByUserID)
 			user.GET("/evidence", h.EvidenceHandler.ListEvidenceByUserID)
 			user.GET("/evidence/:evidence_id", h.EvidenceHandler.DownloadEvidenceByUserID)
+
+			//
+			user.GET("/roles", h.UserHandler.GetUserRoles)
 		}
 
 		//cases
 		cases := protected.Group("/cases")
 		{
 			cases.POST("", middleware.RequireRole("Admin"), h.CaseHandler.CreateCase)
-			cases.GET("", middleware.RequireRole("Admin"), h.CaseHandler.GetAllCases)             //no filtering
-			cases.GET("/filter", middleware.RequireRole("Admin"), h.CaseHandler.GetFilteredCases) //filter cases by status, type, etc.
+			cases.GET("", middleware.RequireRole("Admin"), h.CaseHandler.ListAllCases)             //no filtering
+			cases.GET("/filter", middleware.RequireRole("Admin"), h.CaseHandler.ListFilteredCases) //filter cases by status, type, etc.
 
 			//case-specific routes
 			singleCase := cases.Group("/:case_id")
@@ -109,7 +114,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 				//collaborators
 				singleCase.POST("/collaborators", middleware.RequireRole("Admin"), h.CaseHandler.CreateCollaborator)
-				singleCase.GET("/collaborators", h.CaseHandler.GetCollaborators)
+				singleCase.GET("/collaborators", h.CaseHandler.ListCollaborators)
 				singleCase.DELETE("/collaborators/:user_id", middleware.RequireRole("Admin"), h.CaseHandler.RemoveCollaborator)
 
 				//singleCase.GET("/timeline", h.CaseHandler.GetTimeline) later

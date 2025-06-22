@@ -27,10 +27,16 @@ func NewEvidenceHandler(service *evidence.Service) *EvidenceServices {
 // @Description Upload new evidence to a case. Requires authentication.
 // @Tags Evidence
 // @Accept json
+// @Accept x-www-form-urlencoded
+// @Accept multipart/form-data
 // @Produce json
 // @Security ApiKeyAuth
 // @Param case_id path string true "Case ID"
-// @Param request body evidence.UploadEvidenceRequest true "Evidence Upload Request"
+// @Param file formData file true "Evidence file to upload"
+// @Param title formData string true "Evidence title"
+// @Param description formData string false "Evidence description"
+// @Param tags formData string false "Comma-separated list of tags"
+// @Param contentType formData string false "Content type of the file"
 // @Success 201 {object} structs.SuccessResponse{data=evidence.Evidence} "Evidence uploaded successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload or case ID"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
@@ -38,7 +44,7 @@ func NewEvidenceHandler(service *evidence.Service) *EvidenceServices {
 // @Router /api/v1/cases/{case_id}/evidence [post]
 func (e *EvidenceServices) UploadEvidence(c *gin.Context) {
 	var req evidence.UploadEvidenceRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Invalid evidence data",
@@ -236,7 +242,7 @@ func (e *EvidenceServices) GetEvidenceByID(c *gin.Context) {
 // @Security ApiKeyAuth
 // @Param user_id path string false "User ID (required for admin access to other users)"
 // @Param evidence_id path string true "Evidence ID"
-// @Success 200 {file} binary "Evidence file"
+// @Success 200 {file} binary "Evidence file as a zip archive"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden"
@@ -427,3 +433,5 @@ func (e *EvidenceServices) DeleteEvidenceByID(c *gin.Context) { //admin only?
 		Message: "Evidence deleted successfully",
 	})
 }
+
+//search evidence X

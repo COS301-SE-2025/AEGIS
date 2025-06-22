@@ -14,16 +14,10 @@ type Handler struct {
 
 type AdminInterface interface {
 	RegisterUser(c *gin.Context)   //create
-	ListUsers(c *gin.Context)      //read // ListUsers
-	UpdateUserRole(c *gin.Context) //is this all an admin can update? | update
-	DeleteUser(c *gin.Context)     //delete // DeleteUser
+	ListUsers(c *gin.Context)      //read
+	UpdateUserRole(c *gin.Context) //is this all an admin can update?
+	DeleteUser(c *gin.Context)     //delete
 	//GetRoles(c *gin.Context)
-
-	//assignrole
-	//unassignrole
-	//listassignments*
-	//
-
 }
 
 type AuthInterface interface {
@@ -37,16 +31,16 @@ type CaseInterface interface {
 	CreateCase(c *gin.Context) //CreateCase
 
 	//GetCaseByID(c *gin.Context) //missing service function
-	GetAllCases(c *gin.Context)      // GetAllCases
-	GetFilteredCases(c *gin.Context) // GetFilteredCases
-	GetCasesByUserID(c *gin.Context) // GetCasesByUser
+	ListAllCases(c *gin.Context)      // GetAllCases
+	ListFilteredCases(c *gin.Context) // GetFilteredCases
+	ListCasesByUserID(c *gin.Context) // GetCasesByUser
 
 	UpdateCaseStatus(c *gin.Context) // UpdateCaseStatus
 
 	RemoveCollaborator(c *gin.Context) // RemoveCollaborator
 
 	CreateCollaborator(c *gin.Context) // AssignUserToCase
-	GetCollaborators(c *gin.Context)   // GetCollaborators
+	ListCollaborators(c *gin.Context)  // GetCollaborators
 }
 
 type EvidenceInterface interface {
@@ -64,6 +58,7 @@ type EvidenceInterface interface {
 type UserInterface interface {
 	GetProfile(c *gin.Context)    // GetProfile
 	UpdateProfile(c *gin.Context) // UpdateProfile
+	GetUserRoles(c *gin.Context)  // GetUserRoles
 }
 
 func NewHandler(

@@ -35,27 +35,9 @@ func NewUserService(
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/users [get]
+// @Router /api/v1/users/profile [get]
 // @Router /api/v1/admin/users/{user_id} [get]
 func (m UserService) GetProfile(c *gin.Context) {
-
-	//check which path was used to access the user profile
-	/*targetUserID := c.Param("user_id") move to middleware
-	role, _ := c.Get("userRole")
-	var userID string
-	if targetUserID != "" && role == "Admin" {
-		userID = targetUserID //admin to view any user profile
-	} else {
-		currUserID, exists := c.Get("userID") //user to view own profile
-		if !exists {
-			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
-				Error:   "unauthorized",
-				Message: "User not authenticated",
-			})
-			return
-		}
-		userID = currUserID.(string)
-	}*/
 	userID, ok := middleware.GetTargetUserID(c)
 	if !ok {
 		return
@@ -82,6 +64,8 @@ func (m UserService) GetProfile(c *gin.Context) {
 // @Description Updates the profile of the current user or a specific user for admins
 // @Tags Users, Admin
 // @Accept json
+// @Accept x-www-form-urlencoded
+// @Accept multipart/form-data
 // @Produce json
 // @Security ApiKeyAuth
 // @Param user_id path string false "User ID (required for admin access to other users)"
@@ -90,24 +74,24 @@ func (m UserService) GetProfile(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden"
-// @Failure 404 {object} structs.ErrorResponse "User not found"
 // @Failure 409 {object} structs.ErrorResponse "Email already exists"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/users [put]
+// @Router /api/v1/users/profile [put]
 // @Router /api/v1/admin/users/{user_id}/profile [put]
 func (m UserService) UpdateProfile(c *gin.Context) {
-
 	userID, ok := middleware.GetTargetUserID(c)
 	if !ok {
 		return
 	}
 
 	var req structs.UpdateProfileRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid request body",
-			"details": err.Error(),
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+			Details: err.Error(),
 		})
+
 		return
 	}
 
@@ -121,8 +105,9 @@ func (m UserService) UpdateProfile(c *gin.Context) {
 	}
 
 	if len(updates) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "No valid fields to update",
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "No valid fields to update",
 		})
 		return
 	}
@@ -160,31 +145,30 @@ func (m UserService) UpdateProfile(c *gin.Context) {
 	})
 }
 
-/*
-// @Summary Get user cases
-// @Description Retrieves cases associated with a user. Admins can access any user's cases, regular users can only access their own.
+// @Summary Get user roles
+// @Description Retrieves all roles associated with a user. Admins can access any user's roles, regular users can only access their own.
 // @Tags Users, Admin
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
 // @Param user_id path string false "User ID (required for admin access to other users)"
-// @Success 200 {object} structs.SuccessResponse{data=[]structs.Case} "User cases retrieved successfully"
+// @Success 200 {object} structs.SuccessResponse{data=[]string} "User roles retrieved successfully"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
-// @Router /api/v1/users/cases [get]
-// @Router /api/v1/admin/users/{user_id}/cases [get]
-func (m UserService) GetUserCases(c *gin.Context) {
-	userID, ok := middleware.GetTargetUserID(c)
+// @Router /api/v1/users/roles [get]
+// @Router /api/v1/admin/users/{user_id}/roles [get]
+func (m UserService) GetUserRoles(c *gin.Context) {
+	userID, ok := middleware.GetTargetUserID(c) //either admin or user accessing their own roles
 	if !ok {
 		return
 	}
 
-	cases, err := m.userCases.GetCasesByUser(userID)
+	roles, err := m.updateUser.GetUserRoles(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-			Error:   "cases_fetch_failed",
-			Message: "Could not fetch user cases",
+			Error:   "roles_fetch_failed",
+			Message: "Could not fetch user roles",
 			Details: err.Error(),
 		})
 		return
@@ -192,8 +176,7 @@ func (m UserService) GetUserCases(c *gin.Context) {
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
-		Message: "User cases retrieved successfully",
-		Data:    cases,
+		Message: "User roles retrieved successfully",
+		Data:    roles,
 	})
 }
-*/

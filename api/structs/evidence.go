@@ -8,5 +8,4 @@ type UploadEvidenceRequest struct {
 	Type        string                `form:"type" binding:"required"`
 	Description string                `form:"description"`
 	File        *multipart.FileHeader `form:"file" binding:"required"`
-	// CaseID comes from URL parameter
 }
