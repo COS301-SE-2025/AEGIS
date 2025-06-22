@@ -21,9 +21,14 @@ import {AssignCaseMembersForm} from "./screens/AssignCaseMembersPage/AssignCaseM
 import { EvidenceViewer } from "./screens/EvidenceViewer";
 import { ShareCaseForm } from "./screens/ShareCasePage/ShareCasePage";
 
+//sidebar toggle
+import { SidebarProvider } from './context/SidebarToggleContext';
+
+
 
 export default function App() {
   return (
+  <SidebarProvider>
   <ThemeProvider>
     <Routes>
       <Route path="/" element={<LoginPage />} />
@@ -46,5 +51,6 @@ export default function App() {
 
     </Routes>
     </ThemeProvider>
+    </SidebarProvider>
   );
 }

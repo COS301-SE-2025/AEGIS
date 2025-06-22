@@ -16,6 +16,7 @@ import {
   MessageCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 
 // Define file structure
 interface FileItem {
@@ -124,6 +125,7 @@ export const EvidenceViewer = () => {
             {/* Tabs */}
         {/* Tabs */}
             <div className="flex items-center gap-6">
+              <SidebarToggleButton/>
               <Link to="/dashboard">
                 <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                   Dashboard
