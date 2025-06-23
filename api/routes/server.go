@@ -110,14 +110,11 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 				// ?case_id
 				//singleCase.GET("", h.CaseHandler.GetCaseByID) //get a specific case by id
 				singleCase.PUT("/status", middleware.RequireRole("Admin"), h.CaseHandler.UpdateCaseStatus) //admin only
-				//cases.DELETE("", h.CaseHandler.DeleteCase)
 
 				//collaborators
 				singleCase.POST("/collaborators", middleware.RequireRole("Admin"), h.CaseHandler.CreateCollaborator)
 				singleCase.GET("/collaborators", h.CaseHandler.ListCollaborators)
 				singleCase.DELETE("/collaborators/:user_id", middleware.RequireRole("Admin"), h.CaseHandler.RemoveCollaborator)
-
-				//singleCase.GET("/timeline", h.CaseHandler.GetTimeline) later
 
 				evidence := singleCase.Group("/evidence")
 				{
@@ -130,9 +127,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 						evidenceItem.GET("", h.EvidenceHandler.GetEvidenceByID)
 						evidenceItem.GET("/metadata", h.EvidenceHandler.GetEvidenceMetadata)
 						evidenceItem.DELETE("", middleware.RequireRole("Admin"), h.EvidenceHandler.DeleteEvidenceByID)
-
-						//evidenceItem.POST("/annotations", h.EvidenceHandler.AddAnnotation)
-						//evidenceItem.GET("/annotations", h.EvidenceHandler.GetAnnotations)
 					}
 				}
 			}
