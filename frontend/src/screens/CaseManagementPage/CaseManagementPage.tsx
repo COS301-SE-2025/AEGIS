@@ -13,13 +13,15 @@ import {
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
+//thati added
+import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 import {ShareButton} from "../ShareCasePage/sharecasebutton";
 export const CaseManagementPage = () => {
 
 const userRole = "admin"; // for now
 const caseName = "Malware"; 
 const caseId = "case-abc-123"; 
-
+<SidebarToggleButton />
   // Timeline event data
   const timelineEvents = [
     {
@@ -133,6 +135,7 @@ const caseId = "case-abc-123";
           <div className="flex items-center justify-between">
             {/* Navigation Tabs */}
             <div className="flex items-center gap-6">
+              <SidebarToggleButton/>
               <Link to="/dashboard"> <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                 Dashboard
               </button></Link>

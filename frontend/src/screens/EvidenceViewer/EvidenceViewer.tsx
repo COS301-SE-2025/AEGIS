@@ -301,6 +301,8 @@ import {
   Reply,
   ThumbsUp
 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 
 // Define file structure
 interface FileItem {

@@ -13,6 +13,7 @@ import {
   File,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 import { useState } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
@@ -111,7 +112,8 @@ interface CaseCard {
 
 export default function Dashboard() {
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
-
+//thati added
+<SidebarToggleButton />
   useEffect(() => {
     // Since localStorage is not supported in Claude.ai artifacts, 
     // we'll simulate loading from storage using React state
@@ -212,7 +214,7 @@ export const DashBoardPage = () => {
           </div>
           <span className="font-bold text-foreground text-2xl">AEGIS</span>
         </div>
-
+        
         {/* Navigation */}
         <nav className="flex-1 space-y-2">
           <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
@@ -258,6 +260,7 @@ export const DashBoardPage = () => {
         <div className="sticky top-0 bg-background border-b border p-4 z-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
+              <SidebarToggleButton/>
               <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
                 Dashboard
               </button>
