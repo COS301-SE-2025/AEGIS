@@ -18,15 +18,16 @@ func RegistrationRequestToModel(req RegistrationRequest, hash string) UserModel 
 }
 
 func ModelToEntity(model UserModel, id uuid.UUID) User {
-	return User{
-		ID:           id,
-		FullName:     model.FullName,
-		Email:        model.Email,
-		PasswordHash: model.PasswordHash,
-		Role:         model.Role,
-		CreatedAt:    time.Now(),
-		IsVerified:   false,
-		TokenVersion: 1, // default for all users
+	user := User{
+		ID:                  id,
+		FullName:            model.FullName,
+		Email:               model.Email,
+		PasswordHash:        model.PasswordHash,
+		Role:                model.Role,
+		CreatedAt:           time.Now(),
+		IsVerified:          false,
+		TokenVersion:        1, // default for all users
+		ExternalTokenStatus: "active",
 	}
 
 	if model.Role == "External Collaborator" {

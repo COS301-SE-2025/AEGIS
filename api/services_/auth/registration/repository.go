@@ -12,17 +12,12 @@ import (
 // Interface Definition
 // ----------------------
 
-type UserRepository interface {
-	CreateUser(user *User) error
-	GetUserByEmail(email string) (*User, error)
-	UpdateUser(user *User) error
-	GetUserByFullName(fullName string) (*User, error)
-	GetUserByID(userID string) (*User, error)
-	UpdateUserTokenInfo(user *User) error
-}
-
 type GormUserRepository struct {
 	db *gorm.DB
+}
+
+func NewRegistrationService(repo UserRepository) *RegistrationService {
+	return &RegistrationService{repo: repo}
 }
 
 func NewGormUserRepository(db *gorm.DB) *GormUserRepository {

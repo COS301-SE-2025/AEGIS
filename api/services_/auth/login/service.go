@@ -3,16 +3,12 @@ package login
 import (
 	//"aegis-api/services/registration"
 	//database "aegis-api/db"
-	"aegis-api/services/registration"
+	"aegis-api/services_/auth/registration"
 	"fmt"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
-
-type AuthService struct {
-	repo registration.UserRepository
-}
 
 func NewAuthService(repo registration.UserRepository) *AuthService {
 	return &AuthService{repo: repo}
@@ -37,17 +33,16 @@ func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 		}
 	}
 
-	token, err := GenerateJWT(user.ID, user.Email, user.Role, user.TokenVersion, user.ExternalTokenExpiry)
+	token, err := GenerateJWT(user.ID.String(), user.Email, user.Role, user.TokenVersion, user.ExternalTokenExpiry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token")
 	}
 
 	return &LoginResponse{
-		ID:         user.ID,
-		Email:      user.Email,
-		Token:      token,
-		IsVerified: user.IsVerified,
-		Role:       user.Role,
+		ID:    user.ID.String(),
+		Email: user.Email,
+		Token: token,
+		Role:  user.Role,
 	}, nil
 }
 
@@ -82,13 +77,13 @@ func (s *AuthService) RegenerateExternalToken(adminID, targetUserID string, req 
 	}
 
 	// Generate new JWT
-	token, err := GenerateJWT(user.ID, user.Email, user.Role, user.TokenVersion, user.ExternalTokenExpiry)
+	token, err := GenerateJWT(user.ID.String(), user.Email, user.Role, user.TokenVersion, user.ExternalTokenExpiry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token")
 	}
 
 	return &LoginResponse{
-		ID:         user.ID,
+		ID:         user.ID.String(),
 		Email:      user.Email,
 		Token:      token,
 		IsVerified: user.IsVerified,
