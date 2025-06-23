@@ -120,12 +120,40 @@ const { formData, errors, handleChange, handleSubmit } = useRegistrationForm();
                   Select your role
                 </option>
                 <option className="text-black">Admin</option>
-                <option className="text-black">Incident Responder</option>
-                <option className="text-black">Forensics Analyst</option>
-                <option className="text-black">Malware Analyst</option>
-                <option className="text-black">Threat Intelligence Analyst</option>
+                <option className="text-black">Audit Reviewer</option>
+                <option className="text-black">Crisis Communications Officer</option>
+                <option className="text-black">Cloud Forensics Specialist</option>
+                <option className="text-black">Compliance Officer</option>
+                <option className="text-black">Detection Engineer</option>
                 <option className="text-black">DFIR Manager</option>
+                <option className="text-black">Digital Evidence Technician</option>
+                <option className="text-black">Disk Forensics Analyst</option>
+                <option className="text-black">Endpoint Forensics Analyst</option>
+                <option className="text-black">Evidence Archivist</option>
+                <option className="text-black">Forensic Analyst</option>
+                <option className="text-black">Forensics Analyst</option>
+                <option className="text-black">Generic user</option>
+                <option className="text-black">Image Forensics Analyst</option>
+                <option className="text-black">Incident Commander</option>
+                <option className="text-black">Incident Responder</option>
+                <option className="text-black">IT Infrastructure Liaison</option>
+                <option className="text-black">Legal Counsel</option>
                 <option className="text-black">Legal/Compliance Liaison</option>
+                <option className="text-black">Log Analyst</option>
+                <option className="text-black">Malware Analyst</option>
+                <option className="text-black">Memory Forensics Analyst</option>
+                <option className="text-black">Mobile Device Analyst</option>
+                <option className="text-black">Network Evidence Analyst</option>
+                <option className="text-black">Packet Analyst</option>
+                <option className="text-black">Policy Analyst</option>
+                <option className="text-black">Reverse Engineer</option>
+                <option className="text-black">SIEM Analyst</option>
+                <option className="text-black">SOC Analyst</option>
+                <option className="text-black">Threat Hunter</option>
+                <option className="text-black">Threat Intelligence Analyst</option>
+                <option className="text-black">Triage Analyst</option>
+                <option className="text-black">Training Coordinator</option>
+                <option className="text-black">Vulnerability Analyst</option>
               </select>
               {errors.role && <p className="text-red-300 text-sm">{errors.role}</p>}
 

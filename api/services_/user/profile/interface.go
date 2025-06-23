@@ -8,7 +8,3 @@ type ProfileRepository interface {
 	// UpdateProfile updates the user's name, email, and optionally profile picture.
 	UpdateProfile(data *UpdateProfileRequest) error
 }
-type IPFSUploader interface {
-    UploadProfilePicture(filename string, fileData []byte, userID string) (string, error)
-    DeleteFile(hash string) error
-}
