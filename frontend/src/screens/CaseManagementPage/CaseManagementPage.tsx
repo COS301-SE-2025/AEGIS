@@ -139,13 +139,12 @@ const caseId = "case-abc-123";
               <Link to="/dashboard"> <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                 Dashboard
               </button></Link>
+               <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
+                Case Management
+              </button>
               <Link to="/evidence-viewer"><button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                 Evidence Viewer
               </button></Link>
-              <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
-                Case Management
-              </button>
-              
               <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                <Link to="/secure-chat"> Secure Chat</Link>
               </button>

@@ -238,7 +238,7 @@ export const EvidenceViewer  =() =>{
       case 'high': return 'text-red-400 bg-red-400/10';
       case 'medium': return 'text-yellow-400 bg-yellow-400/10';
       case 'low': return 'text-green-400 bg-green-400/10';
-      default: return 'text-gray-400 bg-gray-400/10';
+      default: return 'text-muted-foreground bg-gray-400/10';
     }
   };
 
@@ -247,9 +247,9 @@ export const EvidenceViewer  =() =>{
   );
 
   return (
-    <div className="min-h-screen bg-black text-white flex">
+    <div className="min-h-screen bg-background text-foreground flex">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-gray-800 p-4 flex flex-col justify-between z-10">
+      <aside className="fixed left-0 top-0 h-full w-64 bg-background border-r border-border p-4 flex flex-col justify-between z-10">
         <div>
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
@@ -260,84 +260,84 @@ export const EvidenceViewer  =() =>{
                 className="w-full h-full object-cover"
               />
             </div>
-            <span className="font-bold text-white text-xl">AEGIS</span>
+            <span className="font-bold text-foreground text-xl">AEGIS</span>
           </div>
 
           {/* Navigation */}
           <nav className="space-y-1">
-            <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-lg transition-colors cursor-pointer">
-              <Home className="w-5 h-5" />
-              <span className="text-sm">Dashboard</span>
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <Home className="w-6 h-6" />
+              <Link to="/dashboard"><span className="text-sm">Dashboard</span></Link>
             </div>
-            <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-lg transition-colors cursor-pointer">
-              <Folder className="w-5 h-5" />
-              <span className="text-sm">Case management</span>
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <Folder className="w-6 h-6" />
+              <Link to="/case-management"><span className="text-sm">Case management</span></Link>
             </div>
             <div className="flex items-center gap-3 bg-blue-600 text-white p-2 rounded-lg">
-              <File className="w-5 h-5" />
+              <File className="w-6 h-6" />
               <span className="text-sm font-medium">Evidence Viewer</span>
             </div>
-            <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-2 rounded-lg transition-colors cursor-pointer">
-              <MessageSquare className="w-5 h-5" />
-              <span className="text-sm">Secure chat</span>
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <MessageSquare className="w-6 h-6" />
+              <Link to="/secure-chat"><span className="text-sm">Secure chat</span></Link>
             </div>
           </nav>
         </div>
 
         {/* User Profile */}
-        <div className="border-t border-gray-700 pt-4">
+        <div className="border-t border-muted pt-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-medium text-xs">AU</span>
+            <div className="w-8 h-8 bd-muted rounded-full flex items-center justify-center">
+              <span className="text-foreground font-medium text-xs">AU</span>
             </div>
             <div>
-              <p className="font-medium text-white text-sm">Agent User</p>
-              <p className="text-gray-400 text-xs cursor-pointer hover:text-white">settings</p>
-              <p className="text-gray-400 text-xs cursor-pointer hover:text-white">Logout</p>
+              <p className="font-medium text-foreground text-sm">Agent User</p>
+              <p className="text-muted-foreground text-xs cursor-pointer hover:text-foreground">settings</p>
+              <p className="text-muted-foreground text-xs cursor-pointer hover:text-foreground">Logout</p>
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="ml-64 flex-grow bg-black flex">
+      <main className="ml-64 flex-grow bg-background flex">
         {/* Header */}
-        <div className="fixed top-0 left-64 right-0 z-20 bg-black border-b border-gray-800 p-4">
+        <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border p-4">
           <div className="flex items-center justify-between">
             {/* Case Number and Tabs */}
             <div className="flex items-center gap-4">
-              <div className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium">
+              <div className="text-blue-500 bg-blue-500/10 px-3 py-1 rounded text-sm font-medium">
                 #CS-00579
               </div>
               <div className="flex items-center gap-6">
-                <button className="text-gray-400 hover:text-white text-sm transition-colors">
+                <Link to="/dashboard"><button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                   Dashboard
-                </button>
-                <button className="text-blue-400 font-medium text-sm border-b-2 border-blue-400 pb-2">
+                </button></Link>
+                <Link to="/case-management"><button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                  Case Management
+                </button></Link>
+                <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
                   Evidence Viewer
                 </button>
-                <button className="text-gray-400 hover:text-white text-sm transition-colors">
-                  case management
-                </button>
-                <button className="text-gray-400 hover:text-white text-sm transition-colors">
+                <Link to="/secure-chat"><button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                   Secure chat
-                </button>
+                </button></Link>
               </div>
             </div>
 
             {/* Right actions */}
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
-                  className="w-64 h-10 bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-4 text-white placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500"
+                  className="w-64 h-10 bg-card border border-muted rounded-lg pl-10 pr-4 text-foreground placeholder-gray-400 text-sm focus:outline-none focus:border-primary"
                   placeholder="Search cases, evidence, users"
                 />
               </div>
-              <Bell className="text-gray-400 hover:text-white w-5 h-5 cursor-pointer" />
-              <Settings className="text-gray-400 hover:text-white w-5 h-5 cursor-pointer" />
-              <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-medium text-xs">AU</span>
+              <Bell className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
+              <Link to="/settings"><Settings className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" /></Link>
+              <div className="w-8 h-8 bd-muted rounded-full flex items-center justify-center">
+                <Link to="/profile" ><span className="text-foreground font-medium text-xs">AU</span></Link>
               </div>
             </div>
           </div>
@@ -346,17 +346,17 @@ export const EvidenceViewer  =() =>{
         {/* Content Area */}
         <div className="flex-1 flex pt-20">
           {/* Evidence Files Panel */}
-          <div className="w-80 border-r border-gray-800 p-4">
+          <div className="w-80 border-r border-border p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Evidence Files</h2>
-              <span className="text-sm text-gray-400">{files.length} items</span>
+              <span className="text-sm text-muted-foreground">{files.length} items</span>
             </div>
             
             {/* Search */}
             <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
-                className="w-full h-9 bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-4 text-white placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full h-9 bg-card border border-muted rounded-lg pl-10 pr-4 text-foreground placeholder-gray-400 text-sm focus:outline-none focus:border-primary"
                 placeholder="Search evidence files"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -365,11 +365,11 @@ export const EvidenceViewer  =() =>{
 
             {/* Filter and Sort */}
             <div className="flex gap-2 mb-4">
-              <button className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-600 rounded-lg text-white hover:bg-gray-800">
+              <button className="flex items-center gap-1 px-3 py-1.5 text-xs border border-muted/70 rounded-lg text-foreground hover:bg-muted">
                 <SlidersHorizontal size={12} />
                 Filter
               </button>
-              <button className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-600 rounded-lg text-white hover:bg-gray-800">
+              <button className="flex items-center gap-1 px-3 py-1.5 text-xs border border-muted/70 rounded-lg text-foreground hover:bg-muted">
                 <ArrowUpDown size={12} />
                 Sort
               </button>
@@ -383,12 +383,12 @@ export const EvidenceViewer  =() =>{
                   onClick={() => setSelectedFile(file)}
                   className={`w-full p-3 rounded-lg border transition-all ${
                     selectedFile?.id === file.id
-                      ? 'bg-blue-600/20 border-blue-500'
-                      : 'border-gray-700 hover:bg-gray-800/50 hover:border-gray-600'
+                      ? 'bg-blue-800/20 border-blue-500'
+                      : 'border-gra7-700 hover:bg-gray-800/50 hover:border-gray/600'
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <File className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <File className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="flex-1 text-left">
                       <div className="font-medium text-sm truncate mb-1">{file.name}</div>
                       <div className="flex items-center gap-2 mb-2">
@@ -400,7 +400,7 @@ export const EvidenceViewer  =() =>{
                           {file.priority}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-gray-400">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{file.size}</span>
                         <div className="flex items-center gap-1">
                           <MessageCircle className="w-3 h-3" />
@@ -419,7 +419,7 @@ export const EvidenceViewer  =() =>{
             {selectedFile && (
               <>
                 {/* File Header */}
-                <div className="border-b border-gray-800 p-6">
+                <div className="border-b border-border p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <h1 className="text-2xl font-semibold">{selectedFile.name}</h1>
@@ -429,29 +429,29 @@ export const EvidenceViewer  =() =>{
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg">
+                      <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
                         <Download className="w-5 h-5" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg">
+                      <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
                         <FileText className="w-5 h-5" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg">
+                      <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
                         <Share className="w-5 h-5" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg">
+                      <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
                         <MoreVertical className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
 
                   {/* Tabs */}
-                  <div className="flex items-center gap-6 border-b border-gray-700">
+                  <div className="flex items-center gap-6 border-b border-muted">
                     <button
                       onClick={() => setActiveTab('overview')}
                       className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'overview'
-                          ? 'text-blue-400 border-blue-400'
-                          : 'text-gray-400 border-transparent hover:text-white hover:border-gray-600'
+                          ? 'text-primary border-blue-400'
+                          : 'text-muted-foreground border-transparent hover:text-foreground hover:border-muted/70'
                       }`}
                     >
                       Overview
@@ -460,8 +460,8 @@ export const EvidenceViewer  =() =>{
                       onClick={() => setActiveTab('threads')}
                       className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'threads'
-                          ? 'text-blue-400 border-blue-400'
-                          : 'text-gray-400 border-transparent hover:text-white hover:border-gray-600'
+                          ? 'text-primary border-blue-400'
+                          : 'text-muted-foreground border-transparent hover:text-foreground hover:border-muted/70'
                       }`}
                     >
                       Discussions ({filteredThreads.length})
@@ -470,8 +470,8 @@ export const EvidenceViewer  =() =>{
                       onClick={() => setActiveTab('metadata')}
                       className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'metadata'
-                          ? 'text-blue-400 border-blue-400'
-                          : 'text-gray-400 border-transparent hover:text-white hover:border-gray-600'
+                          ? 'text-primary border-blue-400'
+                          : 'text-muted-foreground border-transparent hover:text-foreground hover:border-muted/70'
                       }`}
                     >
                       Metadata
@@ -484,28 +484,28 @@ export const EvidenceViewer  =() =>{
                   {activeTab === 'overview' && (
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                       {/* Evidence Information */}
-                      <div className="bg-gray-900 p-4 rounded-lg">
+                      <div className="bg-card p-4 rounded-lg">
                         <h3 className="font-semibold mb-4 flex items-center gap-2">
                           <Shield className="w-5 h-5 text-blue-400" />
                           Evidence Information
                         </h3>
                         <div className="space-y-3 text-sm">
                           <div>
-                            <span className="text-gray-400">Description:</span>
-                            <p className="text-gray-300 mt-1">{selectedFile.description}</p>
+                            <span className="text-muted-foreground">Description:</span>
+                            <p className="text-muted-foreground mt-1">{selectedFile.description}</p>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <span className="text-gray-400">Size:</span>
-                              <p className="text-gray-300">{selectedFile.size}</p>
+                              <span className="text-muted-foreground">Size:</span>
+                              <p className="text-muted-foreground">{selectedFile.size}</p>
                             </div>
                             <div>
-                              <span className="text-gray-400">Type:</span>
-                              <p className="text-gray-300 capitalize">{selectedFile.type.replace('_', ' ')}</p>
+                              <span className="text-muted-foreground">Type:</span>
+                              <p className="text-muted-foreground capitalize">{selectedFile.type.replace('_', ' ')}</p>
                             </div>
                           </div>
                           <div>
-                            <span className="text-gray-400">Integrity Check:</span>
+                            <span className="text-muted-foreground">Integrity Check:</span>
                             <div className={`inline-flex items-center gap-1 ml-2 ${getStatusColor(selectedFile.integrityCheck)}`}>
                               {getStatusIcon(selectedFile.integrityCheck)}
                               <span className="capitalize">{selectedFile.integrityCheck}</span>
@@ -515,7 +515,7 @@ export const EvidenceViewer  =() =>{
                       </div>
 
                       {/* Chain of Custody */}
-                      <div className="bg-gray-900 p-4 rounded-lg">
+                      <div className="bg-card p-4 rounded-lg">
                         <h3 className="font-semibold mb-4 flex items-center gap-2">
                           <Users className="w-5 h-5 text-green-400" />
                           Chain of Custody
@@ -526,7 +526,7 @@ export const EvidenceViewer  =() =>{
                               <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                               <div className="flex-1">
                                 <div className="text-sm font-medium">{person}</div>
-                                <div className="text-xs text-gray-400">
+                                <div className="text-xs text-muted-foreground">
                                   {index === 0 ? 'Original Collector' : 
                                    index === selectedFile.chainOfCustody.length - 1 ? 'Current Custodian' : 'Transferred'}
                                 </div>
@@ -538,29 +538,29 @@ export const EvidenceViewer  =() =>{
                       </div>
 
                       {/* Acquisition Details */}
-                      <div className="bg-gray-900 p-4 rounded-lg">
+                      <div className="bg-card p-4 rounded-lg">
                         <h3 className="font-semibold mb-4 flex items-center gap-2">
                           <Calendar className="w-5 h-5 text-purple-400" />
                           Acquisition Details
                         </h3>
                         <div className="space-y-3 text-sm">
                           <div>
-                            <span className="text-gray-400">Acquisition Date:</span>
-                            <p className="text-gray-300">{new Date(selectedFile.acquisitionDate).toLocaleString()}</p>
+                            <span className="text-muted-foreground">Acquisition Date:</span>
+                            <p className="text-muted-foreground">{new Date(selectedFile.acquisitionDate).toLocaleString()}</p>
                           </div>
                           <div>
-                            <span className="text-gray-400">Tool Used:</span>
-                            <p className="text-gray-300">{selectedFile.acquisitionTool}</p>
+                            <span className="text-muted-foreground">Tool Used:</span>
+                            <p className="text-muted-foreground">{selectedFile.acquisitionTool}</p>
                           </div>
                           <div>
-                            <span className="text-gray-400">Hash:</span>
-                            <p className="text-gray-300 font-mono text-xs break-all">{selectedFile.hash}</p>
+                            <span className="text-muted-foreground">Hash:</span>
+                            <p className="text-muted-foreground font-mono text-xs break-all">{selectedFile.hash}</p>
                           </div>
                         </div>
                       </div>
 
                       {/* Recent Activity */}
-                      <div className="bg-gray-900 p-4 rounded-lg">
+                      <div className="bg-card p-4 rounded-lg">
                         <h3 className="font-semibold mb-4 flex items-center gap-2">
                           <Clock className="w-5 h-5 text-yellow-400" />
                           Recent Activity
@@ -569,15 +569,15 @@ export const EvidenceViewer  =() =>{
                           <div className="flex items-center gap-3 text-sm">
                             <MessageCircle className="w-4 h-4 text-blue-400" />
                             <div className="flex-1">
-                              <span className="text-gray-300">New discussion thread created</span>
-                              <div className="text-xs text-gray-400">by Forensic.Analyst.1 • 2 hours ago</div>
+                              <span className="text-muted-foreground">New discussion thread created</span>
+                              <div className="text-xs text-muted-foreground">by Forensic.Analyst.1 • 2 hours ago</div>
                             </div>
                           </div>
                           <div className="flex items-center gap-3 text-sm">
                             <CheckCircle className="w-4 h-4 text-green-400" />
                             <div className="flex-1">
-                              <span className="text-gray-300">Integrity verification completed</span>
-                              <div className="text-xs text-gray-400">System • 4 hours ago</div>
+                              <span className="text-muted-foreground">Integrity verification completed</span>
+                              <div className="text-xs text-muted-foreground">System • 4 hours ago</div>
                             </div>
                           </div>
                         </div>
@@ -599,19 +599,19 @@ export const EvidenceViewer  =() =>{
                           key={thread.id}
                           className={`border rounded-lg p-4 cursor-pointer transition-all ${
                             selectedThread?.id === thread.id
-                              ? 'border-blue-500 bg-blue-600/10'
-                              : 'border-gray-700 hover:border-gray-600 hover:bg-gray-800/50'
+                              ? 'border-primary bg-primary/10'
+                              : 'border-muted hover:border-muted/70 hover:bg-muted/50'
                           }`}
                           onClick={() => setSelectedThread(thread)}
                         >
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
+                              <div className="w-8 h-8 bd-muted rounded-full flex items-center justify-center text-xs font-medium">
                                 {thread.avatar}
                               </div>
                               <div>
                                 <h4 className="font-medium text-sm">{thread.title}</h4>
-                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                   <span>{thread.user}</span>
                                   <span>•</span>
                                   <span>{thread.time}</span>
@@ -628,7 +628,7 @@ export const EvidenceViewer  =() =>{
                             </div>
                           </div>
                           
-                          <div className="flex items-center gap-4 text-xs text-gray-400">
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <MessageSquare className="w-3 h-3" />
                               <span>{thread.messageCount} messages</span>
@@ -642,7 +642,7 @@ export const EvidenceViewer  =() =>{
                           {thread.tags.length > 0 && (
                             <div className="flex items-center gap-2 mt-2">
                               {thread.tags.map((tag, index) => (
-                                <span key={index} className="px-2 py-1 bg-gray-700 text-gray-300 rounded text-xs">
+                                <span key={index} className="px-2 py-1 bg-muted text-muted-foreground rounded text-xs">
                                   {tag}
                                 </span>
                               ))}
@@ -656,7 +656,7 @@ export const EvidenceViewer  =() =>{
                   {activeTab === 'metadata' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* File Metadata */}
-                      <div className="bg-gray-900 p-4 rounded-lg">
+                      <div className="bg-card p-4 rounded-lg">
                         <h3 className="font-semibold mb-4 flex items-center gap-2">
                           <Hash className="w-5 h-5 text-cyan-400" />
                           File Metadata
@@ -664,27 +664,27 @@ export const EvidenceViewer  =() =>{
                         <div className="space-y-3 text-sm">
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <span className="text-gray-400">File Name:</span>
-                              <p className="text-gray-300 font-mono">{selectedFile.name}</p>
+                              <span className="text-muted-foreground">File Name:</span>
+                              <p className="text-muted-foreground font-mono">{selectedFile.name}</p>
                             </div>
                             <div>
-                              <span className="text-gray-400">File Size:</span>
-                              <p className="text-gray-300">{selectedFile.size}</p>
+                              <span className="text-muted-foreground">File Size:</span>
+                              <p className="text-muted-foreground">{selectedFile.size}</p>
                             </div>
                           </div>
                           
                           <div>
-                            <span className="text-gray-400">Hash Values:</span>
+                            <span className="text-muted-foreground">Hash Values:</span>
                             <div className="mt-2 space-y-2">
-                              <div className="bg-gray-800 p-2 rounded">
-                                <div className="text-xs text-gray-400 mb-1">SHA256:</div>
-                                <div className="text-gray-300 font-mono text-xs break-all">
+                              <div className="bg-muted p-2 rounded">
+                                <div className="text-xs text-muted-foreground mb-1">SHA256:</div>
+                                <div className="text-muted-foreground font-mono text-xs break-all">
                                   a1b2c3d4e5f6789abcdef1234567890abcdef1234567890abcdef1234567890ab
                                 </div>
                               </div>
-                              <div className="bg-gray-800 p-2 rounded">
-                                <div className="text-xs text-gray-400 mb-1">MD5:</div>
-                                <div className="text-gray-300 font-mono text-xs">
+                              <div className="bg-muted p-2 rounded">
+                                <div className="text-xs text-muted-foreground mb-1">MD5:</div>
+                                <div className="text-muted-foreground font-mono text-xs">
                                   x1y2z3a4b5c6def7890abcdef123456
                                 </div>
                               </div>
@@ -693,51 +693,51 @@ export const EvidenceViewer  =() =>{
 
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <span className="text-gray-400">Created:</span>
-                              <p className="text-gray-300">{new Date(selectedFile.created || '').toLocaleString()}</p>
+                              <span className="text-muted-foreground">Created:</span>
+                              <p className="text-muted-foreground">{new Date(selectedFile.created || '').toLocaleString()}</p>
                             </div>
                             <div>
-                              <span className="text-gray-400">Modified:</span>
-                              <p className="text-gray-300">{new Date(selectedFile.acquisitionDate).toLocaleString()}</p>
+                              <span className="text-muted-foreground">Modified:</span>
+                              <p className="text-muted-foreground">{new Date(selectedFile.acquisitionDate).toLocaleString()}</p>
                             </div>
                           </div>
                         </div>
                       </div>
 
                       {/* Forensic Metadata */}
-                      <div className="bg-gray-900 p-4 rounded-lg">
+                      <div className="bg-card p-4 rounded-lg">
                         <h3 className="font-semibold mb-4 flex items-center gap-2">
                           <Shield className="w-5 h-5 text-amber-400" />
                           Forensic Metadata
                         </h3>
                         <div className="space-y-3 text-sm">
                           <div>
-                            <span className="text-gray-400">Evidence ID:</span>
-                            <p className="text-gray-300 font-mono">EVD-{selectedFile.id.padStart(6, '0')}</p>
+                            <span className="text-muted-foreground">Evidence ID:</span>
+                            <p className="text-muted-foreground font-mono">EVD-{selectedFile.id.padStart(6, '0')}</p>
                           </div>
                           
                           <div>
-                            <span className="text-gray-400">Acquisition Method:</span>
-                            <p className="text-gray-300">Physical Image</p>
+                            <span className="text-muted-foreground">Acquisition Method:</span>
+                            <p className="text-muted-foreground">Physical Image</p>
                           </div>
                           
                           <div>
-                            <span className="text-gray-400">Source Device:</span>
-                            <p className="text-gray-300">Workstation WS-0234</p>
+                            <span className="text-muted-foreground">Source Device:</span>
+                            <p className="text-muted-foreground">Workstation WS-0234</p>
                           </div>
                           
                           <div>
-                            <span className="text-gray-400">Examiner:</span>
-                            <p className="text-gray-300">{selectedFile.chainOfCustody[0]}</p>
+                            <span className="text-muted-foreground">Examiner:</span>
+                            <p className="text-muted-foreground">{selectedFile.chainOfCustody[0]}</p>
                           </div>
                           
                           <div>
-                            <span className="text-gray-400">Case Reference:</span>
-                            <p className="text-gray-300">#CS-00579</p>
+                            <span className="text-muted-foreground">Case Reference:</span>
+                            <p className="text-muted-foreground">#CS-00579</p>
                           </div>
                           
                           <div>
-                            <span className="text-gray-400">Legal Status:</span>
+                            <span className="text-muted-foreground">Legal Status:</span>
                             <div className="flex items-center gap-2 mt-1">
                               <CheckCircle className="w-4 h-4 text-green-400" />
                               <span className="text-green-400">Admissible</span>
@@ -747,7 +747,7 @@ export const EvidenceViewer  =() =>{
                       </div>
 
                       {/* System Information */}
-                      <div className="bg-gray-900 p-4 rounded-lg">
+                      <div className="bg-card p-4 rounded-lg">
                         <h3 className="font-semibold mb-4 flex items-center gap-2">
                           <Info className="w-5 h-5 text-indigo-400" />
                           System Information
@@ -755,55 +755,55 @@ export const EvidenceViewer  =() =>{
                         <div className="space-y-3 text-sm">
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <span className="text-gray-400">OS Version:</span>
-                              <p className="text-gray-300">Windows 11 Pro</p>
+                              <span className="text-muted-foreground">OS Version:</span>
+                              <p className="text-muted-foreground">Windows 11 Pro</p>
                             </div>
                             <div>
-                              <span className="text-gray-400">Architecture:</span>
-                              <p className="text-gray-300">x64</p>
+                              <span className="text-muted-foreground">Architecture:</span>
+                              <p className="text-muted-foreground">x64</p>
                             </div>
                           </div>
                           
                           <div>
-                            <span className="text-gray-400">Computer Name:</span>
-                            <p className="text-gray-300">DESKTOP-WS0234</p>
+                            <span className="text-muted-foreground">Computer Name:</span>
+                            <p className="text-muted-foreground">DESKTOP-WS0234</p>
                           </div>
                           
                           <div>
-                            <span className="text-gray-400">Domain:</span>
-                            <p className="text-gray-300">CORPORATE.LOCAL</p>
+                            <span className="text-muted-foreground">Domain:</span>
+                            <p className="text-muted-foreground">CORPORATE.LOCAL</p>
                           </div>
                           
                           <div>
-                            <span className="text-gray-400">Last Boot:</span>
-                            <p className="text-gray-300">2024-03-15 08:30:15 UTC</p>
+                            <span className="text-muted-foreground">Last Boot:</span>
+                            <p className="text-muted-foreground">2024-03-15 08:30:15 UTC</p>
                           </div>
                         </div>
                       </div>
 
                       {/* Analysis Tools */}
-                      <div className="bg-gray-900 p-4 rounded-lg">
+                      <div className="bg-card p-4 rounded-lg">
                         <h3 className="font-semibold mb-4 flex items-center gap-2">
                           <Settings className="w-5 h-5 text-purple-400" />
                           Analysis History
                         </h3>
                         <div className="space-y-3 text-sm">
                           <div className="border-l-2 border-blue-400 pl-3">
-                            <div className="font-medium text-gray-300">Volatility Analysis</div>
-                            <div className="text-gray-400 text-xs">Completed • 3 hours ago</div>
-                            <div className="text-gray-400 text-xs">Tool: Volatility 3.2.0</div>
+                            <div className="font-medium text-muted-foreground">Volatility Analysis</div>
+                            <div className="text-muted-foreground text-xs">Completed • 3 hours ago</div>
+                            <div className="text-muted-foreground text-xs">Tool: Volatility 3.2.0</div>
                           </div>
                           
                           <div className="border-l-2 border-green-400 pl-3">
-                            <div className="font-medium text-gray-300">String Extraction</div>
-                            <div className="text-gray-400 text-xs">Completed • 4 hours ago</div>
-                            <div className="text-gray-400 text-xs">Tool: strings (GNU binutils)</div>
+                            <div className="font-medium text-muted-foreground">String Extraction</div>
+                            <div className="text-muted-foreground text-xs">Completed • 4 hours ago</div>
+                            <div className="text-muted-foreground text-xs">Tool: strings (GNU binutils)</div>
                           </div>
                           
                           <div className="border-l-2 border-yellow-400 pl-3">
-                            <div className="font-medium text-gray-300">Malware Scan</div>
-                            <div className="text-gray-400 text-xs">In Progress • Started 1 hour ago</div>
-                            <div className="text-gray-400 text-xs">Tool: YARA Rules v4.3.2</div>
+                            <div className="font-medium text-muted-foreground">Malware Scan</div>
+                            <div className="text-muted-foreground text-xs">In Progress • Started 1 hour ago</div>
+                            <div className="text-muted-foreground text-xs">Tool: YARA Rules v4.3.2</div>
                           </div>
                         </div>
                       </div>
@@ -816,27 +816,27 @@ export const EvidenceViewer  =() =>{
 
           {/* Right Sidebar - Thread Messages */}
           {selectedThread && (
-            <div className="w-96 border-l border-gray-800 bg-black flex flex-col">
+            <div className="w-96 border-l border-border bg-background flex flex-col">
               {/* Thread Header */}
-              <div className="p-4 border-b border-gray-800">
+              <div className="p-4 border-b border-border">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="font-semibold text-sm leading-tight">{selectedThread.title}</h3>
-                  <button className="p-1 text-gray-400 hover:text-white">
+                  <button className="p-1 text-muted-foreground hover:text-foreground">
                     <MoreVertical className="w-4 h-4" />
                   </button>
                 </div>
                 
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center text-xs">
+                  <div className="w-6 h-6 bd-muted rounded-full flex items-center justify-center text-xs">
                     {selectedThread.avatar}
                   </div>
                   <div className="text-sm">
-                    <span className="text-gray-300">Created by </span>
+                    <span className="text-muted-foreground">Created by </span>
                     <span className="font-medium">{selectedThread.user}</span>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3 text-xs text-gray-400">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span>{selectedThread.time}</span>
                   <span>•</span>
                   <span>{selectedThread.messageCount} messages</span>
@@ -847,7 +847,7 @@ export const EvidenceViewer  =() =>{
                 {selectedThread.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {selectedThread.tags.map((tag, index) => (
-                      <span key={index} className="px-2 py-1 bg-gray-700 text-gray-300 rounded text-xs">
+                      <span key={index} className="px-2 py-1 bg-muted text-muted-foreground rounded text-xs">
                         {tag}
                       </span>
                     ))}
@@ -860,15 +860,15 @@ export const EvidenceViewer  =() =>{
                 {threadMessages.map((message) => (
                   <div key={message.id} className="space-y-2">
                     <div className="flex gap-3">
-                      <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
+                      <div className="w-8 h-8 bd-muted rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
                         {message.avatar}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-sm">{message.user}</span>
-                          <span className="text-xs text-gray-400">{message.time}</span>
+                          <span className="text-xs text-muted-foreground">{message.time}</span>
                           {message.isApproved === false && (
-                            <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded">
+                            <span className="px-2 py-0.5 bg-warning/20 text-yellow-400 text-xs rounded">
                               Pending Approval
                             </span>
                           )}
@@ -876,7 +876,7 @@ export const EvidenceViewer  =() =>{
                             <CheckCircle className="w-3 h-3 text-green-400" />
                           )}
                         </div>
-                        <div className="text-sm text-gray-300 mb-2">{message.message}</div>
+                        <div className="text-sm text-muted-foreground mb-2">{message.message}</div>
                         
                         {/* Reactions */}
                         {message.reactions.length > 0 && (
@@ -884,10 +884,10 @@ export const EvidenceViewer  =() =>{
                             {message.reactions.map((reaction, index) => (
                               <button
                                 key={index}
-                                className="flex items-center gap-1 px-2 py-1 bg-gray-800 rounded-full text-xs hover:bg-gray-700"
+                                className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs hover:bg-muted"
                               >
                                 <span>{reaction.type}</span>
-                                <span className="text-gray-400">{reaction.count}</span>
+                                <span className="text-muted-foreground">{reaction.count}</span>
                               </button>
                             ))}
                           </div>
@@ -895,11 +895,11 @@ export const EvidenceViewer  =() =>{
                         
                         {/* Action Buttons */}
                         <div className="flex items-center gap-3 text-xs">
-                          <button className="flex items-center gap-1 text-gray-400 hover:text-white">
+                          <button className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
                             <Reply className="w-3 h-3" />
                             Reply
                           </button>
-                          <button className="flex items-center gap-1 text-gray-400 hover:text-white">
+                          <button className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
                             <ThumbsUp className="w-3 h-3" />
                             React
                           </button>
@@ -914,20 +914,20 @@ export const EvidenceViewer  =() =>{
                     
                     {/* Replies */}
                     {message.replies && message.replies.map((reply) => (
-                      <div key={reply.id} className="ml-8 pl-4 border-l-2 border-gray-700">
+                      <div key={reply.id} className="ml-8 pl-4 border-l-2 border-muted">
                         <div className="flex gap-3">
-                          <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
+                          <div className="w-6 h-6 bd-muted rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
                             {reply.avatar}
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium text-sm">{reply.user}</span>
-                              <span className="text-xs text-gray-400">{reply.time}</span>
+                              <span className="text-xs text-muted-foreground">{reply.time}</span>
                               {reply.isApproved && (
                                 <CheckCircle className="w-3 h-3 text-green-400" />
                               )}
                             </div>
-                            <div className="text-sm text-gray-300">{reply.message}</div>
+                            <div className="text-sm text-muted-foreground">{reply.message}</div>
                           </div>
                         </div>
                       </div>
@@ -937,25 +937,25 @@ export const EvidenceViewer  =() =>{
               </div>
 
               {/* Message Input */}
-              <div className="p-4 border-t border-gray-800">
-                <div className="bg-gray-900 rounded-lg p-3">
+              <div className="p-4 border-t border-border">
+                <div className="bg-card rounded-lg p-3">
                   <input
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Type your message... (@mention users)"
-                    className="w-full bg-transparent text-white placeholder-gray-400 text-sm focus:outline-none mb-2"
+                    className="w-full bg-transparent text-foreground placeholder-gray-400 text-sm focus:outline-none mb-2"
                     onKeyPress={(e) => e.key === 'Enter' && setNewMessage('')}
                   />
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>@ to mention</span>
                       <span>•</span>
                       <span>Shift+Enter for new line</span>
                     </div>
                     <button
                       onClick={() => setNewMessage('')}
-                      className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue/700"
                     >
                       <Send className="w-4 h-4" />
                     </button>
