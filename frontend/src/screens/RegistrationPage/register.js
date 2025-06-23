@@ -3,19 +3,20 @@ import { useNavigate } from "react-router-dom";
 
 const useRegistrationForm = () => {
   const [formData, setFormData] = useState({
-    name: "",
+    fullName: "",
     email: "",
     password: "",
     role: "",
   });
+
   const [errors, setErrors] = useState({});
   const navigate = useNavigate();
 
   const validate = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = "Name is required";
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = "Full name is required";
     }
 
     if (!formData.email.trim()) {
@@ -48,20 +49,17 @@ const useRegistrationForm = () => {
     if (!validate()) return;
 
     try {
-      const res = await fetch(
-       "http://localhost:8080/api/v1/admin/users",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        }
-      );
+      const res = await fetch("http://localhost:8080/api/v1/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
       const payload = await res.json();
 
       if (res.ok && payload.success) {
         navigate("/login");
       } else {
-        // now uses `general` key to match your UI
         setErrors({ general: payload.message || "Registration failed" });
       }
     } catch (err) {
