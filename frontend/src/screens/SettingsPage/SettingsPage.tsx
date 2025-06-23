@@ -21,6 +21,11 @@ export const SettingsPage = () => {
     { id: 2, name: "Responder Alpha", email: "responder@aegis.com" },
     { id: 3, name: "Manager Zeta", email: "manager@aegis.com" },
   ]);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+
 
   const handleRemoveUser = (userId: number) => {
     if (!isAdmin) return;
@@ -30,31 +35,36 @@ export const SettingsPage = () => {
   return (
     <div className="min-h-screen px-8 py-10 bg-background text-foreground transition-colors">
      
-      <div className="flex items-center gap-6">
-         <h1 className="text-3xl font-bold mb-8 flex items-center gap-2">
-        <Settings className="w-6 h-6" /> Settings
-      </h1>
-              <Link to="/dashboard">
-                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
-                  Dashboard
-                </button>
-              </Link>
-              <Link to="/evidence-viewer">
-                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
-                Evidence Viewer
-              </button>
-              </Link>
-              <Link to="/case-management">
-                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
-                  Case Management
-                </button>
-              </Link>
-              <Link to="/secure-chat">
-                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
-                  Secure Chat
-                </button>
-              </Link>
-            </div>
+      <div className="flex items-center justify-between border-b border-border pb-4 mb-6">
+        {/* Left: Page title */}
+        <h1 className="text-3xl font-bold flex items-center gap-2 text-foreground">
+          <Settings className="w-6 h-6" /> Settings
+        </h1>
+
+        {/* Right: Navigation buttons */}
+        <div className="flex items-center gap-4">
+          <Link to="/dashboard">
+            <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+              Dashboard
+            </button>
+          </Link>
+          <Link to="/case-management">
+            <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+              Case Management
+            </button>
+          </Link>
+          <Link to="/evidence-viewer">
+            <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+              Evidence Viewer
+            </button>
+          </Link>
+          <Link to="/secure-chat">
+            <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+              Secure Chat
+            </button>
+          </Link>
+        </div>
+      </div>
 
 
       {/* Profile Settings */}
@@ -132,6 +142,19 @@ export const SettingsPage = () => {
         </div>
       )}
 
+      <div className="bg-card text-card-foreground rounded-lg p-6 mt-6">
+        <h2 className="text-xl font-semibold mb-4">Reset Password</h2>
+        <button
+          onClick={() => setShowPasswordModal(true)}
+          className="inline-flex items-center gap-2 bg-yellow-600 px-4 py-2 rounded-lg hover:bg-yellow-500 transition-colors text-white"
+        >
+          <Shield className="w-5 h-5" />
+          Reset Password
+        </button>
+      </div>
+
+
+
       {/* Logout */}
       <div className="bg-card text-card-foreground rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-4">Logout</h2>
@@ -167,6 +190,60 @@ export const SettingsPage = () => {
           </button>
         </div>
       </div>
+      {showPasswordModal && (
+      <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
+        <div className="bg-card text-card-foreground rounded-lg p-6 w-full max-w-md shadow-lg">
+          <h2 className="text-xl font-semibold mb-4">Reset Password</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-muted-foreground mb-1">Old Password</label>
+              <input
+                type="password"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-muted-foreground mb-1">New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-muted-foreground mb-1">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground focus:outline-none"
+              />
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              onClick={() => setShowPasswordModal(false)}
+              className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/70 text-muted-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                // TODO: Implement reset logic
+                setShowPasswordModal(false);
+              }}
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     </div>
   );
 };

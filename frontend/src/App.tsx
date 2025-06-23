@@ -4,6 +4,7 @@ import { Routes, Route } from "react-router-dom";
 import { LoginPage } from "./screens/LoginPage";
 import { RegistrationPage } from "./screens/RegistrationPage";
 import {ResetPasswordPage} from "./screens/ResetPasswordPage";
+import {ForgotPasswordPage} from "./screens/ForgotPasswordPage";
 import { CaseManagementPage } from "./screens/CaseManagementPage";
 import { SecureChatPage } from "./screens/SecureChatPage";
 import {SettingsPage} from "./screens/SettingsPage";
@@ -35,6 +36,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegistrationPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/case-management" element={<CaseManagementPage />} />
       <Route path="/secure-chat" element={<SecureChatPage />} />
       <Route path="/settings" element={<SettingsPage />} />
