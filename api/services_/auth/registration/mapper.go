@@ -25,7 +25,17 @@ func ModelToEntity(model UserModel, id uuid.UUID) User {
 		PasswordHash: model.PasswordHash,
 		Role:         model.Role,
 		CreatedAt:    time.Now(),
+		IsVerified:   false,
+		TokenVersion: 1, // default for all users
 	}
+
+	if model.Role == "External Collaborator" {
+		exp := time.Now().Add(10 * 24 * time.Hour)
+		user.ExternalTokenExpiry = &exp
+		user.ExternalTokenStatus = "active"
+	}
+
+	return user
 }
 
 func EntityToResponse(entity User) UserResponse {
