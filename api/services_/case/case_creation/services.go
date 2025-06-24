@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"aegis-api/services/registration"
+	"aegis-api/services_/auth/registration"
 
 	"github.com/google/uuid"
 )
@@ -51,11 +51,8 @@ func (s *Service) CreateCase(req CreateCaseRequest) (*Case, error) {
 		return nil, errors.New("user object is nil")
 	}
 
-	// Parse user.ID (string) to uuid.UUID
-	createdByUUID, err := uuid.Parse(user.ID)
-	if err != nil {
-		return nil, errors.New("invalid user ID format")
-	}
+	// Use user.ID directly as it is already uuid.UUID
+	createdByUUID := user.ID
 
 	// Construct new Case
 	newCase := &Case{

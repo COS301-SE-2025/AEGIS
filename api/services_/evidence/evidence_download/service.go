@@ -3,16 +3,11 @@ package evidence_download
 import (
 	"io"
 
-	"aegis-api/services/evidence/metadata"
-	upload "aegis-api/services/evidence/upload"
+	"aegis-api/services_/evidence/metadata"
+	upload "aegis-api/services_/evidence/upload"
 
 	"github.com/google/uuid"
 )
-
-type Service struct {
-	Repo metadata.Repository
-	IPFS upload.IPFSClientImp
-}
 
 // NewService initializes the download service.
 func NewService(repo metadata.Repository, ipfs upload.IPFSClientImp) *Service {

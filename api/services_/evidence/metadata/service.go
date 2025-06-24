@@ -1,7 +1,7 @@
 package metadata
 
 import (
-	upload "aegis-api/services/evidence/upload"
+	upload "aegis-api/services_/evidence/upload"
 	"crypto/sha256"
 	"encoding/hex"
 	"io"

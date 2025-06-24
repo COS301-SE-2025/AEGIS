@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"aegis-api/db"
 	"aegis-api/handlers"
@@ -11,13 +12,23 @@ import (
 	"aegis-api/services_/auth/login"
 	"aegis-api/services_/auth/registration"
 	"aegis-api/services_/auth/reset_password"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+
 	// ─── Initialize Database ───────────────────────────
 	if err := db.InitDB(); err != nil {
 		log.Fatalf("Database connection failed: %v", err)
 	}
+	// Load env vars from .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("⚠️  No .env file found. Using system environment variables.")
+	}
+
+	// Debug: print loaded SMTP host
+	log.Println("📨 Using SMTP server:", os.Getenv("SMTP_HOST"))
 
 	// ─── Repositories ─────────────────────────────────
 	userRepo := registration.NewGormUserRepository(db.DB)

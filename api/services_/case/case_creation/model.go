@@ -25,6 +25,6 @@ type CreateCaseRequest struct {
 	Status             string `json:"status"` // optional: default is handled by DB
 	Priority           string `json:"priority"`
 	InvestigationStage string `json:"investigation_stage"`
-	CreatedBy          string `json:"created_by" validate:"required,uuid"`
+	CreatedByFullName  string `json:"created_by_full_name" binding:"required"`
 	TeamName           string `json:"team_name" validate:"required"`
 }

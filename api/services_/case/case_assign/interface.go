@@ -9,5 +9,5 @@ type AdminChecker interface {
 type CaseAssignmentRepoInterface interface {
 	AssignRole(userID, caseID uuid.UUID, role string) error
 	UnassignRole(userID, caseID uuid.UUID) error
-	IsAdmin(userID uuid.UUID) (bool, error) // integrated for simplicity
+	IsAdmin(userID uuid.UUID) (bool, error)
 }

@@ -1,14 +1,11 @@
 package upload
 
 // Service handles high-level file operations via IPFS
-type Service struct {
-	ipfs IPFSClientImp
-}
 
 // NewEvidenceService returns a new upload service using the provided IPFS client.
 func NewEvidenceService(ipfs IPFSClientImp) *Service {
 	return &Service{
-		ipfs: ipfs,
+		ipfs: ipfs.(*ipfsClientImpl),
 	}
 }
 
