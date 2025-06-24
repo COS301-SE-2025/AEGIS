@@ -2,39 +2,59 @@ package case_creation
 
 import (
 	"errors"
+	"log"
 	"time"
+
+	"aegis-api/services/registration"
 
 	"github.com/google/uuid"
 )
 
 // Service handles business logic for case creation.
 type Service struct {
-	repo CaseRepository
+	repo     CaseRepository
+	userRepo registration.UserRepository // Inject user repository to resolve full name to user ID
 }
 
 // NewCaseService constructs a new CaseService.
-func NewCaseService(repo CaseRepository) *Service {
-	return &Service{repo: repo}
+func NewCaseService(repo CaseRepository, userRepo registration.UserRepository) *Service {
+	if userRepo == nil {
+		log.Fatal("userRepo is not initialized")
+	}
+	return &Service{repo: repo, userRepo: userRepo}
 }
 
 // CaseRepository defines persistence operations for cases
 
 // CreateCase validates and creates a new case.
 func (s *Service) CreateCase(req CreateCaseRequest) (*Case, error) {
-	// Validate title
+	// Validate title and team name
 	if req.Title == "" {
 		return nil, errors.New("title is required")
 	}
-
-	// Validate team name
 	if req.TeamName == "" {
 		return nil, errors.New("team name is required")
 	}
 
-	// Parse CreatedBy UUID
-	creatorUUID, err := uuid.Parse(req.CreatedBy)
+	// Check if userRepo is nil
+	if s.userRepo == nil {
+		return nil, errors.New("userRepo is nil in CreateCase service")
+	}
+	// Fetch the user's UUID by their full name
+	user, err := s.userRepo.GetUserByFullName(req.CreatedByFullName)
 	if err != nil {
-		return nil, errors.New("invalid CreatedBy UUID")
+		log.Printf("Error fetching user by full name: %v", err)
+		return nil, errors.New("user not found with full name: " + req.CreatedByFullName)
+	}
+	if user == nil {
+		log.Printf("User object is nil for full name: %s", req.CreatedByFullName)
+		return nil, errors.New("user object is nil")
+	}
+
+	// Parse user.ID (string) to uuid.UUID
+	createdByUUID, err := uuid.Parse(user.ID)
+	if err != nil {
+		return nil, errors.New("invalid user ID format")
 	}
 
 	// Construct new Case
@@ -45,12 +65,12 @@ func (s *Service) CreateCase(req CreateCaseRequest) (*Case, error) {
 		Status:             req.Status,
 		Priority:           req.Priority,
 		InvestigationStage: req.InvestigationStage,
-		CreatedBy:          creatorUUID,
+		CreatedBy:          createdByUUID, // Use the resolved user ID as uuid.UUID
 		TeamName:           req.TeamName,
 		CreatedAt:          time.Now(),
 	}
 
-	// Persist via repository
+	// Persist the case in the repository
 	if err := s.repo.CreateCase(newCase); err != nil {
 		return nil, err
 	}
