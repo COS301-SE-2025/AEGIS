@@ -34,6 +34,9 @@ type ChatRepository interface {
 	// Utility operations
 	GetGroupMembers(ctx context.Context, groupID primitive.ObjectID) ([]*Member, error)
 	IsGroupAdmin(ctx context.Context, groupID primitive.ObjectID, userEmail string) (bool, error)
+
+	GetUndeliveredMessages(ctx context.Context, userEmail string, limit int, before *primitive.ObjectID) ([]*Message, error) 
+	MarkMessagesAsDelivered(ctx context.Context, groupID primitive.ObjectID, messageIDs []primitive.ObjectID, userEmail string) error
 }
 
 // IPFSUploader defines the interface for IPFS file operations
