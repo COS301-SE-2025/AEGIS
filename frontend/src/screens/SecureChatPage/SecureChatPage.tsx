@@ -21,6 +21,8 @@ import {
 import {Link} from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 
+
+
 // Type definitions
 interface Message {
   id: number;
@@ -57,6 +59,8 @@ interface Group {
   unreadCount: number;
   members: string[];
   avatar: string;
+  hasStarted?: boolean;
+
 }
 
 type ChatMessages = Record<number, Message[]>;
@@ -79,7 +83,8 @@ export const SecureChatPage = (): JSX.Element => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState("");
   const [previewFileData, setPreviewFileData] = useState<string>("");
-
+  const [typingUsers, setTypingUsers] = useState<Record<number, string[]>>({});
+  const [hasMounted, setHasMounted] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,79 +93,118 @@ export const SecureChatPage = (): JSX.Element => {
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [availableUsers] = useState([
-    "analyst@company.com",
-    "forensics@company.com", 
-    "security@company.com",
-    "incident@company.com",
-    "malware@company.com",
-    "compliance@company.com",
-    "threat@company.com",
-    "ciso@company.com"
-  ]);
+  "alex.morgan@company.com"
+]);
   // Mock data for groups and messages
-  const [groups, setGroups] = useState<Group[]>([
-    {
-      id: 1,
-      name: "Incident Response Team",
-      lastMessage: "Uploading memory dump to sandbox for detonation and behavioral analysis.",
-      lastMessageTime: "2 min ago",
-      unreadCount: 3,
-      members: ["IR Lead", "Threat Intel", "Forensics", "You"],
-      avatar: "🔴"
-    },
-    {
-      id: 2,
-      name: "Malware Analysis Unit",
-      lastMessage: "Binary shows signs of process hollowing. Investigating persistence.",
-      lastMessageTime: "5 min ago",
-      unreadCount: 0,
-      members: ["Malware Analyst", "Reverse Engineer", "You"],
-      avatar: "🦠"
-    },
-    {
-      id: 3,
-      name: "Legal & Compliance",
-      lastMessage: "Preserve chain of custody logs for Host-29.",
-      lastMessageTime: "1 hour ago",
-      unreadCount: 1,
-      members: ["Legal/Compliance", "CISO", "You"],
-      avatar: "⚖️"
-    },
-    {
-      id: 4,
-      name: "Threat Intelligence",
-      lastMessage: "IOC package updated. Includes hashes, domains, and mutex strings.",
-      lastMessageTime: "3 hours ago",
-      unreadCount: 0,
-      members: ["Threat Intel", "Analyst", "You"],
-      avatar: "🎯"
-    }
-  ]);
+  const [groups, setGroups] = useState<Group[]>([]);
 
-  const [chatMessages, setChatMessages] = useState<ChatMessages>({
-    1: [
-      { id: 1, user: "IR Lead", color: "text-red-400", content: "Initial triage complete. Malware sample isolated from Host-22.", time: "10:23 AM", status: "read" },
-      { id: 2, user: "Threat Intel", color: "text-yellow-400", content: "YARA rule matched with UNC2452 variant. Likely APT activity.", time: "10:25 AM", status: "read" },
-      { id: 3, user: "You", color: "text-green-400", self: true, content: "Confirmed lateral movement from Host-22 to Host-29 via SMB.", time: "10:27 AM", status: "read" },
-      { id: 4, user: "Forensics", color: "text-purple-400", content: "Disk image acquisition started for Host-29. ETA: 15 minutes.", time: "10:30 AM", status: "read" },
-      { id: 5, user: "You", color: "text-green-400", self: true, content: "Blocking C2 domain on perimeter firewall. DNS sinkhole active.", time: "10:32 AM", status: "delivered" },
-      { id: 6, user: "Legal/Compliance", color: "text-pink-400", content: "Reminder: Preserve chain of custody logs for Host-29.", time: "10:35 AM", status: "unread" },
-      { id: 7, user: "Malware Analyst", color: "text-blue-400", content: "Binary shows signs of process hollowing. Investigating persistence.", time: "10:38 AM", status: "unread" },
-      { id: 8, user: "IR Lead", color: "text-red-400", content: "Prepare post-incident report template. Add TTP mapping to MITRE ATT&CK.", time: "10:40 AM", status: "unread" },
-      { id: 9, user: "Threat Intel", color: "text-yellow-400", content: "IOC package updated. Includes hashes, domains, and mutex strings.", time: "10:42 AM", status: "unread" },
-      { id: 10, user: "You", color: "text-green-400", self: true, content: "Uploading memory dump to sandbox for detonation and behavioral analysis.", time: "10:45 AM", status: "sent" },
-    ],
-    2: [
-      { id: 1, user: "Malware Analyst", color: "text-blue-400", content: "Starting reverse engineering of the suspected payload.", time: "9:15 AM", status: "read" },
-      { id: 2, user: "You", color: "text-green-400", self: true, content: "Sample uploaded to isolated environment. Proceed with analysis.", time: "9:20 AM", status: "read" },
-    ],
-    3: [
-      { id: 1, user: "Legal/Compliance", color: "text-pink-400", content: "Need incident documentation for regulatory compliance.", time: "8:30 AM", status: "unread" },
-    ],
-    4: [
-      { id: 1, user: "Threat Intel", color: "text-yellow-400", content: "New IOCs detected in the wild. Updating threat feeds.", time: "7:45 AM", status: "read" },
-    ]
-  });
+  const [chatMessages, setChatMessages] = useState<ChatMessages>({});
+
+  // Add this function to simulate incoming messages
+// Add this enhanced function to simulate realistic flowing conversations
+const simulateIncomingMessage = (chatId: number, delay: number = 1500) => {
+const teamMembers = [
+  { name: "Alex Morgan", role: "Forensics Analyst", color: "text-blue-400" }
+];
+
+  // Get current conversation context
+  const currentMessages = chatMessages[chatId] || [];
+  const lastMessage = currentMessages[currentMessages.length - 1];
+  
+  // Conversation flow patterns based on last message content
+  const getContextualResponse = (lastMsg: string, sender: string) => {
+  const lowerMsg = lastMsg.toLowerCase();
+  
+  if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
+    return ["Hey! Ready to review that evidence file?", "Hi there! Got the forensic data ready."];
+  }
+  
+  if (lowerMsg.includes('evidence') || lowerMsg.includes('file') || lowerMsg.includes('case')) {
+    return [
+      "Hash verified. Clean sample.",
+      "Metadata extracted successfully.", 
+      "Found deleted files in slack space.",
+      "Timeline established. 3 access points.",
+      "Registry analysis complete.",
+      "Network logs show suspicious activity."
+    ];
+  }
+  
+  // Default short responses
+  return [
+    "Got it.",
+    "Confirmed.", 
+    "Checking now.",
+    "Analysis complete.",
+    "Roger that.",
+    "On it."
+  ];
+};
+
+  setTimeout(() => {
+    // Choose appropriate team member based on context
+    let availableMembers = teamMembers;
+    const lastSender = lastMessage?.user;
+    
+    // Don't let the same person respond twice in a row
+    if (lastSender && lastSender !== "You") {
+      availableMembers = teamMembers.filter(member => 
+        `${member.name} (${member.role})` !== lastSender
+      );
+    }
+    
+    const selectedMember = availableMembers[Math.floor(Math.random() * availableMembers.length)];
+    const responses = getContextualResponse(lastMessage?.content || "", lastMessage?.user || "");
+    const selectedResponse = responses[Math.floor(Math.random() * responses.length)];
+    
+    const newMessage: Message = {
+      id: Date.now() + Math.random(),
+      user: `${selectedMember.name} (${selectedMember.role})`,
+      color: selectedMember.color,
+      content: selectedResponse,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: "read"
+    };
+
+    setChatMessages(prev => ({
+      ...prev,
+      [chatId]: [...(prev[chatId] || []), newMessage]
+    }));
+
+    // Update group's last message
+    setGroups(prev => prev.map(group =>
+      group.id === chatId
+        ? { 
+            ...group, 
+            lastMessage: selectedResponse, 
+            lastMessageTime: "now", 
+            unreadCount: group.id === activeChat?.id ? 0 : group.unreadCount + 1,
+            hasStarted: true
+
+          }
+        : group
+    ));
+  }, delay);
+};
+const simulateTyping = (chatId: number, userName?: string) => {
+  const user = "Alex Morgan (Forensics Analyst)";
+
+  
+  
+   setTypingUsers(prev => ({
+    ...prev,
+    [chatId]: [user]
+  }));
+
+  setTimeout(() => {
+    setTypingUsers(prev => ({
+      ...prev,
+      [chatId]: (prev[chatId] || []).filter(u => u !== user)
+    }));
+  },  15000 + Math.random() * 25000);
+
+};
+
 
   const filteredGroups = groups.filter(group =>
     group.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -196,6 +240,22 @@ export const SecureChatPage = (): JSX.Element => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+  const savedSidebar = localStorage.getItem("sidebarOpen");
+  if (savedSidebar) {
+    setSidebarOpen(savedSidebar === "true");
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("sidebarOpen", sidebarOpen.toString());
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+  setHasMounted(true);
+}, []);
+
   // Clean up preview URL when component unmounts or preview changes
   useEffect(() => {
     return () => {
@@ -205,48 +265,110 @@ export const SecureChatPage = (): JSX.Element => {
     };
   }, [previewUrl]);
 
+// Simulate random chat activity with better conversation flow
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (groups.length === 0) return;
+      
+      // Randomly pick a chat to add activity to
+      const randomChat = groups[Math.floor(Math.random() * groups.length)];
+      const teamMembers = [
+    { name: "Alex Morgan", role: "Forensics Analyst", color: "text-blue-400" }
+  ];
+  const randomUser = `${teamMembers[0].name} (${teamMembers[0].role})`;    
+    // 30% chance of just typing, 70% chance of sending message
+    if (Math.random() > 0.7) {
+      simulateTyping(randomChat.id, randomUser);
+    } else {
+      simulateIncomingMessage(randomChat.id, 1000);
+    }
+  }, 15000 + Math.random() * 25000); // Every 15-40 seconds
+
+  return () => clearInterval(interval);
+}, [groups, chatMessages]);
+// Save to localStorage
+  useEffect(() => {
+    const hasRealMessages = Object.values(chatMessages).some(msgs => msgs.length > 0);
+    const activeGroups = groups.filter(g => g.hasStarted);
+
+    if (activeGroups.length > 0 && hasRealMessages) {
+      localStorage.setItem('chatGroups', JSON.stringify(activeGroups));
+      localStorage.setItem('chatMessages', JSON.stringify(chatMessages));
+    }
+  }, [groups, chatMessages]);
+
+  useEffect(() => {
+    const savedGroups = localStorage.getItem('chatGroups');
+    const savedMessages = localStorage.getItem('chatMessages');
+    
+    if (savedGroups) setGroups(JSON.parse(savedGroups));
+    if (savedMessages) setChatMessages(JSON.parse(savedMessages));
+  }, []);
+
+
   const handleSendMessage = (e?: React.MouseEvent | React.KeyboardEvent) => {
-    e?.preventDefault();
-    if (!message.trim() || !activeChat) return;
+  e?.preventDefault();
+  if (!message.trim() || !activeChat) return;
 
-    const newMessage: Message = {
-      id: Date.now(),
-      user: "You",
-      color: "text-green-400",
-      self: true,
-      content: message,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: "sent",
-      ...(replyingTo && {
-        replyTo: {
-          id: replyingTo.id,
-          user: replyingTo.user,
-          content: replyingTo.content,
-          ...(replyingTo.attachment && {
-            attachment: {
-              name: replyingTo.attachment.name,
-              type: replyingTo.attachment.type
-            }
-          })
-        }
-      })
-    };
+  const newMessage: Message = {
+    id: Date.now(),
+    user: "You",
+    color: "text-green-400",
+    self: true,
+    content: message,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: "sent",
+    ...(replyingTo && {
+      replyTo: {
+        id: replyingTo.id,
+        user: replyingTo.user,
+        content: replyingTo.content,
+        ...(replyingTo.attachment && {
+          attachment: {
+            name: replyingTo.attachment.name,
+            type: replyingTo.attachment.type
+          }
+        })
+      }
+    })
+  };
 
+  setChatMessages(prev => ({
+    ...prev,
+    [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
+  }));
+
+  setGroups(prev => prev.map(group =>
+    group.id === activeChat.id
+      ? { ...group, lastMessage: message, lastMessageTime: "now", hasStarted: true }
+      : group
+  ));
+
+  setMessage("");
+  setReplyingTo(null);
+
+  // Simulate status updates
+  setTimeout(() => {
     setChatMessages(prev => ({
       ...prev,
-      [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
+      [activeChat.id]: prev[activeChat.id].map(msg =>
+        msg.id === newMessage.id ? { ...msg, status: "delivered" } : msg
+      )
     }));
-    // Update last message in group
-    setGroups(prev => prev.map(group =>
-      group.id === activeChat.id
-        ? { ...group, lastMessage: message, lastMessageTime: "now" }
-        : group
-    ));
+  }, 1000);
 
-    setMessage("");
-    setReplyingTo(null);
+  setTimeout(() => {
+    setChatMessages(prev => ({
+      ...prev,
+      [activeChat.id]: prev[activeChat.id].map(msg =>
+        msg.id === newMessage.id ? { ...msg, status: "read" } : msg
+      )
+    }));
+  }, 2000);
 
-  };
+  // Trigger auto-reply simulation
+  simulateIncomingMessage(activeChat.id, 3000 + Math.random() * 5000);
+};
 
   const handleFileSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
   const files = event.target.files;
@@ -276,6 +398,11 @@ export const SecureChatPage = (): JSX.Element => {
     fileInputRef.current.value = '';
   }
 };
+  const meaningfulGroups = groups.filter(g => g.hasStarted);
+if (meaningfulGroups.length > 0) {
+  localStorage.setItem('chatGroups', JSON.stringify(meaningfulGroups));
+}
+
 
   const handleSendAttachment = () => {
   if (!previewFile || !activeChat || !previewFileData) return;
@@ -440,6 +567,8 @@ export const SecureChatPage = (): JSX.Element => {
   setNewMemberEmail("");
   setShowAddMembersModal(false);
   setShowMoreMenu(false);
+  
+
 };
   const MessageComponent = ({ msg }: { msg: Message }) => (
     <div className={`flex ${msg.self ? "justify-end" : "justify-start"} group`}>
@@ -533,6 +662,7 @@ export const SecureChatPage = (): JSX.Element => {
   return (
     <div className="bg-background flex w-full h-screen text-foreground relative">
       {/* Main Sidebar - Fixed positioning without overlay */}
+      {hasMounted && (
       <div className={`fixed z-30 top-0 left-0 h-full w-72 bg-card border-r border-border transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="p-6">
           {/* Logo */}
@@ -567,20 +697,19 @@ export const SecureChatPage = (): JSX.Element => {
             </button>
           </nav>
         </div>
-      </div>
+      </div>)}
         {/* Overlay */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 bg-background bg-opacity-50 z-20"
+            className="fixed inset-0 bg-black bg-opacity-50 z-20"
             onClick={() => setSidebarOpen(false)}
           />
         )}
 
       {/* Chat Layout - Adjusted margin for sidebar */}
-        <div className="flex flex-1 h-screen">
+      <div className={`flex flex-1 h-screen transition-all duration-300 ${sidebarOpen ? 'ml-72' : 'ml-0'}`}>
         {/* Chat List Sidebar */}
-        <div className="w-82 bg-card border-r border-border flex flex-col">
-          {/* Chat Header */}
+        <div className="w-80 min-w-80 max-w-80 bg-card border-r border-border flex flex-col">          {/* Chat Header */}
           <div className="p-4 border-b border">
             <div className="flex items-center justify-between mb-4">
               <button
@@ -775,7 +904,12 @@ export const SecureChatPage = (): JSX.Element => {
                 </div>
               )}
 
-
+            {/* Typing Indicator */}
+            {typingUsers[activeChat.id]?.length > 0 && (
+              <div className="px-4 py-2 text-sm text-muted-foreground">
+                {typingUsers[activeChat.id].join(", ")} {typingUsers[activeChat.id].length === 1 ? "is" : "are"} typing...
+              </div>
+            )}
               {/* Message Input */}
               <div className="p-4 border-t border-border bg-card">
                 <div className="flex items-center gap-2">
