@@ -130,10 +130,55 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 					}
 				}
 			}
+
+			//threads
+			threads := singleCase.Group("/threads")
+			{
+				threads.POST("", h.ThreadHandler.CreateThread)
+				threads.GET("", h.ThreadHandler.GetThreadsByCaseID)
+
+				threads.GET("/by-file/:file_id", h.ThreadHandler.GetThreadsByFileID)
+
+				singleThread := threads.Group("/:thread_id")
+				{
+
+					singleThread.GET("", h.ThreadHandler.GetThreadByID)
+					singleThread.PUT("/status", h.ThreadHandler.UpdateThreadStatus)     //requires role == Lead Investigator
+					singleThread.PUT("/priority", h.ThreadHandler.UpdateThreadPriority) //requires role == Lead Investigator
+					participants := singleThread.Group("/participants")
+					{
+						participants.POST("", h.ThreadHandler.AddParticipant)
+						participants.GET("", h.ThreadHandler.GetThreadParticipants)
+					}
+
+					messages := singleThread.Group("/messages")
+					{
+						messages.POST("", h.MessageHandler.SendMessage)
+						messages.GET("", h.MessageHandler.GetMessagesByThreadID)
+						singleMessage := messages.Group("/:message_id")
+						{
+							singleMessage.GET("", h.MessageHandler.GetMessageByID)
+							singleMessage.PUT("/approve", h.MessageHandler.ApproveMessage)
+							reactions := singleMessage.Group("/reactions")
+							{
+								reactions.POST("", h.MessageHandler.AddReaction)
+								reactions.DELETE("", h.MessageHandler.RemoveReaction) //url or token for userid
+							}
+
+							mentions := singleMessage.Group("/mentions")
+							{
+								mentions.POST("", h.MessageHandler.AddMentions)
+							}
+
+							singleMessage.GET("/replies", h.MessageHandler.GetReplies)
+						}
+					}
+				}
+			}
+
 		}
 
+		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+		return router
 	}
-
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	return router
 }

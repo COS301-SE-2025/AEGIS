@@ -1,8 +1,9 @@
 package handlers
 
 import (
+	"aegis-api/services/ListUsers"
+	_ "aegis-api/services/ListUsers"
 	"aegis-api/services/delete_user"
-	"aegis-api/services/listusers"
 	"aegis-api/services/registration"
 	"aegis-api/services/update_user_role"
 	"aegis-api/structs"
@@ -10,20 +11,20 @@ import (
 	"net/http"
 )
 
-type AdminServices struct {
+type AdminHandler struct {
 	registerUser   *registration.RegistrationService
-	listUser       listusers.ListUserService
+	listUser       ListUsers.ListUserService
 	updateUserRole *update_user_role.UserService
 	deleteUser     *delete_user.UserDeleteService
 }
 
 func NewAdminServices( //constructor
 	registerUser *registration.RegistrationService,
-	listUser listusers.ListUserService,
+	listUser ListUsers.ListUserService,
 	updateUserRole *update_user_role.UserService,
 	deleteUser *delete_user.UserDeleteService,
-) *AdminServices {
-	return &AdminServices{
+) *AdminHandler {
+	return &AdminHandler{
 		registerUser:   registerUser,
 		listUser:       listUser,
 		updateUserRole: updateUserRole,
@@ -46,7 +47,7 @@ func NewAdminServices( //constructor
 // @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users [post]
-func (as AdminServices) RegisterUser(c *gin.Context) {
+func (as AdminHandler) RegisterUser(c *gin.Context) {
 	//struct to hold user data
 	//binding and validation
 	var apiReq structs.RegistrationRequest
@@ -98,7 +99,7 @@ func (as AdminServices) RegisterUser(c *gin.Context) {
 // @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users [get]
-func (as AdminServices) ListUsers(c *gin.Context) {
+func (as AdminHandler) ListUsers(c *gin.Context) {
 	//binding and validation
 	//var req structs.UserFilter
 	//if err := c.ShouldBindQuery(&req); err != nil {
@@ -140,7 +141,7 @@ func (as AdminServices) ListUsers(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid request (e.g., missing user ID)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users/{user_id} [get]
-func (as AdminServices) GetUserActivity(c *gin.Context) {
+func (as AdminHandler) GetUserActivity(c *gin.Context) {
 	// Get user ID from URL parameter
 	userID := c.Param("user_id")
 	if userID == "" {
@@ -155,7 +156,7 @@ func (as AdminServices) GetUserActivity(c *gin.Context) {
 	//timeRange := c.Query("time_range")
 	//activityType := c.Query("activity_type")
 
-	//activities, err := as.AdminServices.GetUserActivity(userID) //call service function here
+	//activities, err := as.AdminHandler.GetUserActivity(userID) //call service function here
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 	//		Error:   "activity_fetch_failed",
@@ -203,7 +204,7 @@ func (as AdminServices) GetUserActivity(c *gin.Context) {
 // @Failure 404 {object} structs.ErrorResponse "User not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users/{user_id}/role [put]
-func (as AdminServices) UpdateUserRole(c *gin.Context) {
+func (as AdminHandler) UpdateUserRole(c *gin.Context) {
 	userID := c.Param("user_id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -248,7 +249,7 @@ func (as AdminServices) UpdateUserRole(c *gin.Context) {
 // @Success 200 {object} structs.SuccessResponse{data=[]structs.UserRole} "Roles retrieved successfully"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/roles [get]
-func (as AdminServices) GetRoles(c *gin.Context) {
+func (as AdminHandler) GetRoles(c *gin.Context) {
 	//roles, err := as.GetRoles()
 	//if err != nil {
 	//	c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
@@ -289,7 +290,7 @@ func (as AdminServices) GetRoles(c *gin.Context) {
 // @Failure 404 {object} structs.ErrorResponse "User not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users/{user_id} [delete]
-func (as AdminServices) DeleteUser(c *gin.Context) {
+func (as AdminHandler) DeleteUser(c *gin.Context) {
 
 	userID := c.Param("user_id")
 	if userID == "" {
