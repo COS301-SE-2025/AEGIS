@@ -278,9 +278,9 @@ export const EvidenceViewer  =() =>{
   );
 
   return (
-    <div className="min-h-screen bg-black text-white flex">
+    <div className="min-h-screen bg-background text-white flex">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-black border-r border-gray-800 p-4 flex flex-col justify-between z-10">
+      <aside className="fixed left-0 top-0 h-full w-64 bg-background border-r border-gray-800 p-4 flex flex-col justify-between z-10">
         <div>
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
@@ -331,9 +331,9 @@ export const EvidenceViewer  =() =>{
       </aside>
 
       {/* Main Content */}
-      <main className="ml-64 flex-grow bg-black flex">
+      <main className="ml-64 flex-grow bg-background flex">
         {/* Header */}
-        <div className="fixed top-0 left-64 right-0 z-20 bg-black border-b border-gray-800 p-4">
+        <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border-gray-800 p-4">
           <div className="flex items-center justify-between">
             {/* Case Number and Tabs */}
             <div className="flex items-center gap-4">
@@ -879,7 +879,7 @@ export const EvidenceViewer  =() =>{
 
           {/* Right Sidebar - Thread Messages */}
           {selectedThread && (
-            <div className="w-96 border-l border-gray-800 bg-black flex flex-col">
+            <div className="w-96 border-l border-gray-800 bg-background flex flex-col">
               {/* Thread Header */}
               <div className="p-4 border-b border-gray-800">
                 <div className="flex items-start justify-between mb-2">
