@@ -1,7 +1,7 @@
 package registration
 
 import (
-	verifyemail "aegis-api/services_/auth/verify_email" // Assuming verifyemail package exists for email verification
+	// Assuming verifyemail package exists for email verification
 	"fmt"
 	"log"
 
@@ -93,7 +93,7 @@ func (s *RegistrationService) Register(req RegistrationRequest) (User, error) {
 	model := NewUserModel(req, string(hash))
 	id := generateID()
 	entity := ModelToEntity(model, id)
-	entity.IsVerified = false
+	entity.IsVerified = true
 
 	err = s.repo.CreateUser(&entity)
 	if err != nil {
@@ -101,16 +101,16 @@ func (s *RegistrationService) Register(req RegistrationRequest) (User, error) {
 		return User{}, err
 	}
 
-	token, err := verifyemail.CreateEmailVerificationToken(s.repo.GetDB(), id)
-	if err != nil {
-		log.Printf("❌ Failed to create email verification token for %s: %v", req.Email, err)
-		return User{}, err
-	}
+	// token, err := verifyemail.CreateEmailVerificationToken(s.repo.GetDB(), id)
+	// if err != nil {
+	// 	log.Printf("❌ Failed to create email verification token for %s: %v", req.Email, err)
+	// 	return User{}, err
+	// }
 
-	if err := verifyemail.SendVerificationEmail(entity.Email, token); err != nil {
-		log.Printf("❌ Failed to send verification email to %s: %v", entity.Email, err)
-		// Consider whether to proceed or rollback
-	}
+	// if err := verifyemail.SendVerificationEmail(entity.Email, token); err != nil {
+	// 	log.Printf("❌ Failed to send verification email to %s: %v", entity.Email, err)
+	// 	// Consider whether to proceed or rollback
+	// }
 
 	log.Printf("✅ Registered new user: %s (%s %s)", entity.Email, entity.FullName, entity.Role)
 	return entity, nil

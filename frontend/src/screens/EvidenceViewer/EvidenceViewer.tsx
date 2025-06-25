@@ -12,22 +12,17 @@ import {
   ArrowUpDown,
   Download,
   Share,
-  Maximize2,
   Send,
   Info,
   MessageCircle,
   Shield,
   Clock,
   Users,
-  AlertTriangle,
   CheckCircle,
   XCircle,
-  Eye,
   FileText,
   Hash,
   Calendar,
-  User,
-  Tag,
   MoreVertical,
   Reply,
   ThumbsUp
@@ -80,6 +75,15 @@ interface ThreadMessage {
 }
 
 export const EvidenceViewer  =() =>{
+  const storedUser = sessionStorage.getItem("user");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
+  const initials = displayName
+    .split(" ")
+    .map((part: string) => part[0])
+    .join("")
+    .toUpperCase();
+
   // Enhanced sample data
   const files: FileItem[] = [
     {
@@ -316,15 +320,16 @@ export const EvidenceViewer  =() =>{
         </div>
 
         {/* User Profile */}
-        <div className="border-t border-gray-700 pt-4">
+        <div className="border-t border-bg-accent pt-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-medium text-xs">AU</span>
+            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+              <Link to="/profile">
+                <span className="text-foreground font-small">{initials}</span>
+              </Link>
             </div>
             <div>
-              <p className="font-medium text-white text-sm">Agent User</p>
-              <p className="text-gray-400 text-xs cursor-pointer hover:text-white">settings</p>
-              <p className="text-gray-400 text-xs cursor-pointer hover:text-white">Logout</p>
+              <p className="font-semibold text-foreground">{displayName}</p>
+              <p className="text-muted-foreground text-xs">{user?.email || "user@dfir.com"}</p>
             </div>
           </div>
         </div>
@@ -368,7 +373,7 @@ export const EvidenceViewer  =() =>{
               <Bell className="text-gray-400 hover:text-white w-5 h-5 cursor-pointer" />
               <Settings className="text-gray-400 hover:text-white w-5 h-5 cursor-pointer" />
               <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-medium text-xs">AU</span>
+                <span className="text-white font-medium text-xs">{initials}</span>
               </div>
             </div>
           </div>
