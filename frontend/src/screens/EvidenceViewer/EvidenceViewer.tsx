@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import {useEffect,  useState } from "react";
 import {
   Bell,
   File,
@@ -210,7 +210,15 @@ export const EvidenceViewer  =() =>{
     }
   ];
 
-  const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>(initialAnnotationThreads);
+const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>(() => {
+  const saved = localStorage.getItem('annotationThreads');
+  return saved ? JSON.parse(saved) : initialAnnotationThreads;
+});
+
+useEffect(() => {
+  localStorage.setItem('annotationThreads', JSON.stringify(annotationThreads));
+}, [annotationThreads]);
+
   const [newThreadTitle, setNewThreadTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(files[0]);
   const [selectedThread, setSelectedThread] = useState<AnnotationThread | null>(annotationThreads[0]);
@@ -219,9 +227,15 @@ export const EvidenceViewer  =() =>{
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'threads' | 'metadata'>('overview');
-  const [allThreadMessages, setAllThreadMessages] = useState<{ [threadId: string]: ThreadMessage[] }>({
-    '1': threadMessages, // existing data
+  const [allThreadMessages, setAllThreadMessages] = useState<{ [threadId: string]: ThreadMessage[] }>(() => {
+    const saved = localStorage.getItem('allThreadMessages');
+    return saved ? JSON.parse(saved) : { '1': threadMessages };
   });
+
+useEffect(() => {
+  localStorage.setItem('allThreadMessages', JSON.stringify(allThreadMessages));
+}, [allThreadMessages]);
+
 
   const handleSendMessage = () => {
   if (!newMessage.trim() || !selectedThread) return;
@@ -276,6 +290,66 @@ export const EvidenceViewer  =() =>{
   const filteredThreads = annotationThreads.filter(thread => 
     selectedFile ? thread.fileId === selectedFile.id : true
   );
+
+  function addNestedReply(messages: ThreadMessage[], parentId: string, reply: ThreadMessage): ThreadMessage[] {
+    return messages.map(msg => {
+      if (msg.id === parentId) {
+        return {
+          ...msg,
+          replies: [...(msg.replies || []), reply]
+        };
+      } else if (msg.replies) {
+        return {
+          ...msg,
+          replies: addNestedReply(msg.replies, parentId, reply)
+        };
+      }
+      return msg;
+    });
+  }
+
+  function updateReplyReaction(replies: ThreadMessage[], replyId: string, user: string): ThreadMessage[] {
+  return replies.map(reply => {
+    if (reply.id === replyId) {
+      const existing = reply.reactions.find(r => r.type === '👍');
+      if (existing) {
+        if (existing.users.includes(user)) return reply;
+        return {
+          ...reply,
+          reactions: reply.reactions.map(r =>
+            r.type === '👍' ? { ...r, count: r.count + 1, users: [...r.users, user] } : r
+          )
+        };
+      } else {
+        return {
+          ...reply,
+          reactions: [...reply.reactions, { type: '👍', count: 1, users: [user] }]
+        };
+      }
+    } else if (reply.replies) {
+      return {
+        ...reply,
+        replies: updateReplyReaction(reply.replies, replyId, user)
+      };
+    }
+    return reply;
+  });
+}
+
+function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadMessage[] {
+  return replies.map(reply => {
+    if (reply.id === replyId) {
+      return { ...reply, isApproved: true };
+    } else if (reply.replies) {
+      return {
+        ...reply,
+        replies: updateReplyApproval(reply.replies, replyId)
+      };
+    }
+    return reply;
+  });
+}
+
 
   return (
     <div className="min-h-screen bg-black text-white flex">
@@ -340,20 +414,21 @@ export const EvidenceViewer  =() =>{
               <div className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium">
                 #CS-00579
               </div>
-              <div className="flex items-center gap-6">
-                <button className="text-gray-400 hover:text-white text-sm transition-colors">
-                  Dashboard
-                </button>
-                <button className="text-blue-400 font-medium text-sm border-b-2 border-blue-400 pb-2">
-                  Evidence Viewer
-                </button>
-                <button className="text-gray-400 hover:text-white text-sm transition-colors">
-                  case management
-                </button>
-                <button className="text-gray-400 hover:text-white text-sm transition-colors">
-                  Secure chat
-                </button>
-              </div>
+            <div className="flex items-center gap-6">
+              <SidebarToggleButton/>
+              <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
+                Dashboard
+              </button>
+              <Link to="/case-management"><button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                Case Management
+              </button></Link>
+              <Link to="/evidence-viewer"><button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                Evidence Viewer
+              </button></Link>
+              <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                <Link to="/secure-chat">Secure Chat</Link>
+              </button>
+            </div>
             </div>
 
             {/* Right actions */}
@@ -621,40 +696,40 @@ export const EvidenceViewer  =() =>{
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold">Discussion Threads</h3>
                           <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              placeholder="Enter thread title..."
-                              value={newThreadTitle}
-                              onChange={(e) => setNewThreadTitle(e.target.value)}
-                              className="bg-gray-900 text-white text-sm px-3 py-2 rounded-lg border border-gray-700 focus:outline-none"
-                            />
-                            <button
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                              onClick={() => {
-                                if (!newThreadTitle.trim()) return;
-
-                                const newThread: AnnotationThread = {
-                                  id: Date.now().toString(),
-                                  title: newThreadTitle,
-                                  user: 'Agent.User',
-                                  avatar: 'AU',
-                                  time: 'Just now',
-                                  messageCount: 0,
-                                  participantCount: 1,
-                                  status: 'open',
-                                  priority: 'low',
-                                  tags: [],
-                                  fileId: selectedFile?.id || '1'
-                                };
-
-                                setAnnotationThreads(prev => [...prev, newThread]);
-                                setSelectedThread(newThread);
-                                setAllThreadMessages(prev => ({ ...prev, [newThread.id]: [] }));
-                                setNewThreadTitle('');
-                              }}
-                            >
-                             Add New Thread
-                            </button>
+                            <div className="bg-gray-900 p-4 rounded-lg space-y-2">
+                              <input
+                                type="text"
+                                placeholder="Thread title"
+                                className="w-full px-3 py-2 bg-black border border-gray-700 rounded text-white text-sm"
+                                value={newThreadTitle}
+                                onChange={(e) => setNewThreadTitle(e.target.value)}
+                              />
+                              <button
+                                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                                onClick={() => {
+                                  if (!newThreadTitle.trim()) return;
+                                  const newThread: AnnotationThread = {
+                                    id: Date.now().toString(),
+                                    title: newThreadTitle,
+                                    user: 'Agent.User',
+                                    avatar: 'AU',
+                                    time: 'Just now',
+                                    messageCount: 0,
+                                    participantCount: 1,
+                                    status: 'open',
+                                    priority: 'low',
+                                    tags: [],
+                                    fileId: selectedFile?.id || '1'
+                                  };
+                                  setAnnotationThreads(prev => [...prev, newThread]);
+                                  setSelectedThread(newThread);
+                                  setAllThreadMessages(prev => ({ ...prev, [newThread.id]: [] }));
+                                  setNewThreadTitle('');
+                                }}
+                              >
+                                Create Thread
+                              </button>
+                            </div>
                           </div>
                       </div> 
                       {filteredThreads.map((thread) => (
@@ -980,7 +1055,7 @@ export const EvidenceViewer  =() =>{
                                   if (!replyText.trim() || !selectedThread) return;
 
                                   const reply: ThreadMessage = {
-                                    id: `${message.id}-reply-${Date.now()}`,
+                                    id: `${replyingToMessageId}-reply-${Date.now()}`,
                                     user: 'Agent.User',
                                     avatar: 'AU',
                                     time: 'Just now',
@@ -991,11 +1066,7 @@ export const EvidenceViewer  =() =>{
 
                                   setAllThreadMessages(prev => ({
                                     ...prev,
-                                    [selectedThread.id]: prev[selectedThread.id].map(msg =>
-                                      msg.id === message.id
-                                        ? { ...msg, replies: [...(msg.replies || []), reply] }
-                                        : msg
-                                    )
+                                    [selectedThread.id]: addNestedReply(prev[selectedThread.id], replyingToMessageId!, reply)
                                   }));
 
                                   setReplyText('');
@@ -1010,19 +1081,29 @@ export const EvidenceViewer  =() =>{
                           <button
                             className="flex items-center gap-1 text-gray-400 hover:text-white"
                             onClick={() => {
+                              const currentUser = 'Agent.User';
                               setAllThreadMessages(prev => ({
                                 ...prev,
-                                [selectedThread.id]: prev[selectedThread.id].map(msg =>
-                                  msg.id === message.id
-                                    ? {
-                                        ...msg,
-                                        reactions: [
-                                          ...msg.reactions,
-                                          { type: '👍', count: 1, users: ['Agent.User'] }
-                                        ]
-                                      }
-                                    : msg
-                                ) 
+                                [selectedThread.id]: prev[selectedThread.id].map(msg => {
+                                  if (msg.id !== message.id) return msg;
+                                  const existing = msg.reactions.find(r => r.type === '👍');
+                                  if (existing) {
+                                    if (existing.users.includes(currentUser)) return msg; // Already reacted
+                                    return {
+                                      ...msg,
+                                      reactions: msg.reactions.map(r =>
+                                        r.type === '👍'
+                                          ? { ...r, count: r.count + 1, users: [...r.users, currentUser] }
+                                          : r
+                                      )
+                                    };
+                                  } else {
+                                    return {
+                                      ...msg,
+                                      reactions: [...msg.reactions, { type: '👍', count: 1, users: [currentUser] }]
+                                    };
+                                  }
+                                })
                               }));
                             }}
                           >
@@ -1048,26 +1129,144 @@ export const EvidenceViewer  =() =>{
                       </div>
                     </div>
                     
-                    {/* Replies */}
-                    {message.replies && message.replies.map((reply) => (
-                      <div key={reply.id} className="ml-8 pl-4 border-l-2 border-gray-700">
-                        <div className="flex gap-3">
-                          <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
-                            {reply.avatar}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-sm">{reply.user}</span>
-                              <span className="text-xs text-gray-400">{reply.time}</span>
-                              {reply.isApproved && (
-                                <CheckCircle className="w-3 h-3 text-green-400" />
-                              )}
+{/* Replies - Recursive Component */}
+                    {message.replies && message.replies.map((reply) => {
+                      const renderReply = (replyItem: ThreadMessage, depth: number = 0) => {
+                        return (
+                          <div key={replyItem.id} className={`${depth === 0 ? 'ml-8' : 'ml-6'} pl-4 border-l-2 border-gray-700 space-y-2`}>
+                            <div className="flex gap-3">
+                              <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
+                                {replyItem.avatar}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium text-sm">{replyItem.user}</span>
+                                  <span className="text-xs text-gray-400">{replyItem.time}</span>
+                                  {replyItem.isApproved === false && (
+                                    <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded">
+                                      Pending Approval
+                                    </span>
+                                  )}
+                                  {replyItem.isApproved === true && (
+                                    <CheckCircle className="w-3 h-3 text-green-400" />
+                                  )}
+                                </div>
+                                <div className="text-sm text-gray-300 mb-2">{replyItem.message}</div>
+
+                                {/* Reactions */}
+                                {replyItem.reactions.length > 0 && (
+                                  <div className="flex items-center gap-2 mb-2">
+                                    {replyItem.reactions.map((reaction, index) => (
+                                      <button
+                                        key={index}
+                                        className="flex items-center gap-1 px-2 py-1 bg-gray-800 rounded-full text-xs hover:bg-gray-700"
+                                      >
+                                        <span>{reaction.type}</span>
+                                        <span className="text-gray-400">{reaction.count}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Action Buttons */}
+                                <div className="flex items-center gap-3 text-xs">
+                                  <button
+                                    className="flex items-center gap-1 text-gray-400 hover:text-white"
+                                    onClick={() => setReplyingToMessageId(replyItem.id)}
+                                  >
+                                    <Reply className="w-3 h-3" />
+                                    Reply
+                                  </button>
+                                  <button
+                                    className="flex items-center gap-1 text-gray-400 hover:text-white"
+                                    onClick={() => {
+                                      const currentUser = 'Agent.User';
+                                      setAllThreadMessages(prev => ({
+                                        ...prev,
+                                        [selectedThread.id]: prev[selectedThread.id].map(msg => ({
+                                          ...msg,
+                                          replies: updateReplyReaction(msg.replies || [], replyItem.id, currentUser)
+                                        }))
+                                      }));
+                                    }}
+                                  >
+                                    <ThumbsUp className="w-3 h-3" />
+                                    React
+                                  </button>
+                                  {replyItem.isApproved === false && (
+                                    <button
+                                      className="text-green-400 hover:text-green-300"
+                                      onClick={() => {
+                                        setAllThreadMessages(prev => ({
+                                          ...prev,
+                                          [selectedThread.id]: prev[selectedThread.id].map(msg => ({
+                                            ...msg,
+                                            replies: updateReplyApproval(msg.replies || [], replyItem.id)
+                                          }))
+                                        }));
+                                      }}
+                                    >
+                                      Approve
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Reply box for replying to this reply */}
+                                {replyingToMessageId === replyItem.id && (
+                                  <div className="mt-2 ml-1">
+                                    <input
+                                      type="text"
+                                      value={replyText}
+                                      onChange={(e) => setReplyText(e.target.value)}
+                                      placeholder="Type your reply..."
+                                      className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:outline-none"
+                                    />
+                                    <button
+                                      className="mt-1 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                                      onClick={() => {
+                                        if (!replyText.trim() || !selectedThread) return;
+
+                                        const nestedReply: ThreadMessage = {
+                                          id: `${replyItem.id}-reply-${Date.now()}`,
+                                          user: 'Agent.User',
+                                          avatar: 'AU',
+                                          time: 'Just now',
+                                          message: replyText,
+                                          isApproved: true,
+                                          reactions: [],
+                                          replies: []
+                                        };
+
+                                        setAllThreadMessages(prev => ({
+                                          ...prev,
+                                          [selectedThread.id]: addNestedReply(prev[selectedThread.id], replyItem.id, nestedReply)
+                                        }));
+
+                                        setReplyText('');
+                                        setReplyingToMessageId(null);
+                                      }}
+                                    >
+                                      Send Reply
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Nested Replies - Recursive Call */}
+                                {replyItem.replies && replyItem.replies.length > 0 && (
+                                  <div className="mt-2">
+                                    {replyItem.replies.map((nestedReply) => 
+                                      renderReply(nestedReply, depth + 1)
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-300">{reply.message}</div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      };
+
+                      return renderReply(reply);
+                    })}
                   </div>
                 ))}
               </div>
