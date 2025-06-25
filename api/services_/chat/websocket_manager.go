@@ -3,7 +3,9 @@ package chat
 
 import (
 	"context"
+
 	"encoding/json"
+
 	"fmt"
 	"log"
 	"net/http"
@@ -11,7 +13,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
+
 )
 
 // MessageType represents different types of WebSocket messages
@@ -31,6 +35,7 @@ const (
 	MessageTypePong          MessageType = "pong"
 	MessageTypeDelivered     MessageType = "delivered"
 	NewMessageType           MessageType = "NEW_MESSAGE"
+
 )
 
 // WebSocketMessage represents a WebSocket message
@@ -59,18 +64,22 @@ type webSocketManager struct {
 	userService  UserService
 	pingInterval time.Duration
 	pongTimeout  time.Duration
+
 	repo         ChatRepository
 }
 
 // NewWebSocketManager creates a new WebSocket manager
 func NewWebSocketManager(userService UserService, repo ChatRepository) WebSocketManager {
+
 	manager := &webSocketManager{
 		connections:  make(map[string]*websocket.Conn),
 		groupUsers:   make(map[string][]string),
 		userGroups:   make(map[string][]string),
 		typingUsers:  make(map[string]map[string]time.Time),
 		userService:  userService,
+
 		repo:         repo,
+
 		pingInterval: 30 * time.Second,
 		pongTimeout:  60 * time.Second,
 		upgrader: websocket.Upgrader{
@@ -160,6 +169,7 @@ func (w *webSocketManager) handleConnectionMessages(userEmail string, conn *webs
 			w.handleTypingIndicator(userEmail, message.GroupID, true)
 		case MessageTypeStopTyping:
 			w.handleTypingIndicator(userEmail, message.GroupID, false)
+
 		case MessageTypeDelivered:
 	var ack struct {
 		MessageID string `json:"message_id"`
@@ -189,6 +199,7 @@ func (w *webSocketManager) handleConnectionMessages(userEmail string, conn *webs
 			log.Printf("Failed to mark message %s as delivered: %v", msg.ID.Hex(), err)
 		}
 	}
+
 
 
 		case MessageTypePong:
@@ -537,6 +548,7 @@ func (w *webSocketManager) notifyUserLeft(groupID, userEmail string) {
 	}
 }
 
+
 // to do thati
 func (w *webSocketManager) deliverQueuedMessages(userEmail string) {
 	ctx := context.TODO()
@@ -569,3 +581,4 @@ func (w *webSocketManager) deliverQueuedMessages(userEmail string) {
 		}
 	}
 }
+

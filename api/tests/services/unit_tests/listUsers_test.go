@@ -1,15 +1,16 @@
 package unit_tests
+
 import (
-	"testing"
-	"time"
+	"aegis-api/services/listusers"
 	"context"
-	"aegis-api/services/ListUsers"
-	"github.com/stretchr/testify/assert"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-
+	"testing"
+	"time"
 )
+
 func TestListUsers(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
@@ -18,7 +19,7 @@ func TestListUsers(t *testing.T) {
 	gdb, err := gorm.Open(postgres.New(postgres.Config{Conn: db}), &gorm.Config{})
 	assert.NoError(t, err)
 
-	repo := ListUsers.NewUserRepository(gdb)
+	repo := listusers.NewUserRepository(gdb)
 
 	mock.ExpectQuery(`SELECT .* FROM "users"`).
 		WillReturnRows(sqlmock.NewRows([]string{
@@ -32,4 +33,3 @@ func TestListUsers(t *testing.T) {
 	assert.Len(t, users, 1)
 	assert.Equal(t, "Alice Sonders", users[0].Full_name)
 }
-
