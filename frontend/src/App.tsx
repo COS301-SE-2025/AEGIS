@@ -16,6 +16,7 @@ import {TermsAndConditionsPage} from "./screens/TermsAndConditionsPage/TermsAndC
 import {ThemeProvider} from "./context/ThemeContext"
 import {FAQ} from "./screens/FAQ"
 import {About} from "./screens/About"
+import { TutorialsPage } from "./screens/TutorialsPage";  
 
 //FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
@@ -54,7 +55,7 @@ export default function App() {
       <Route path="/terms" element={<TermsAndConditionsPage />} />
       <Route path="/faq" element={<FAQ />} />
       <Route path="/about" element={<About />} />
-
+      <Route path="/tutorials" element={<TutorialsPage />} />
 
     </Routes>
     </ThemeProvider>
