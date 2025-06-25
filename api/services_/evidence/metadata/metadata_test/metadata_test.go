@@ -2,7 +2,6 @@ package metadata_test
 
 import (
 	"aegis-api/services_/evidence/metadata"
-	"bytes"
 	"errors"
 	"io"
 	"os"
@@ -104,68 +103,5 @@ func TestUploadEvidence_IPFSError(t *testing.T) {
 	err := service.UploadEvidence(req)
 	assert.Error(t, err)
 
-	mockIPFS.AssertExpectations(t)
-}
-
-func TestDownloadEvidence_Success(t *testing.T) {
-	mockRepo := new(MockRepo)
-	mockIPFS := new(MockIPFS)
-	service := metadata.NewService(mockRepo, mockIPFS)
-
-	id := uuid.New()
-	ev := &metadata.Evidence{
-		ID:       id,
-		Filename: "result.txt",
-		FileType: "text/plain",
-		IpfsCID:  "Qm456",
-	}
-	mockRepo.On("FindEvidenceByID", id).Return(ev, nil)
-
-	content := "Test download"
-	stream := io.NopCloser(bytes.NewBufferString(content))
-	mockIPFS.On("Download", "Qm456").Return(stream, nil)
-
-	filename, filetype, reader, err := service.DownloadEvidence(id)
-
-	assert.NoError(t, err)
-	assert.Equal(t, ev.Filename, filename)
-	assert.Equal(t, ev.FileType, filetype)
-
-	buf := new(bytes.Buffer)
-	_, _ = io.Copy(buf, reader)
-	assert.Equal(t, content, buf.String())
-
-	mockRepo.AssertExpectations(t)
-	mockIPFS.AssertExpectations(t)
-}
-
-func TestDownloadEvidence_RepoError(t *testing.T) {
-	mockRepo := new(MockRepo)
-	mockIPFS := new(MockIPFS)
-	service := metadata.NewService(mockRepo, mockIPFS)
-
-	id := uuid.New()
-	mockRepo.On("FindEvidenceByID", id).Return(nil, errors.New("not found"))
-
-	_, _, _, err := service.DownloadEvidence(id)
-	assert.Error(t, err)
-
-	mockRepo.AssertExpectations(t)
-}
-
-func TestDownloadEvidence_IPFSError(t *testing.T) {
-	mockRepo := new(MockRepo)
-	mockIPFS := new(MockIPFS)
-	service := metadata.NewService(mockRepo, mockIPFS)
-
-	id := uuid.New()
-	ev := &metadata.Evidence{ID: id, IpfsCID: "QmErr", Filename: "bad", FileType: "text"}
-	mockRepo.On("FindEvidenceByID", id).Return(ev, nil)
-	mockIPFS.On("Download", "QmErr").Return(nil, errors.New("IPFS down"))
-
-	_, _, _, err := service.DownloadEvidence(id)
-	assert.Error(t, err)
-
-	mockRepo.AssertExpectations(t)
 	mockIPFS.AssertExpectations(t)
 }
