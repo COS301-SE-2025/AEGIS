@@ -11,12 +11,17 @@ export const ProfilePage = () => {
   const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState({
-    name: "Agent Carter",
-    email: "carter@aegis.com",
-    role: "Incident Responder",
-    image: null as string | null,
-  });
+
+  const storedUser = sessionStorage.getItem("user");
+const user = storedUser ? JSON.parse(storedUser) : null;
+
+const [profile, setProfile] = useState({
+  name: user?.name || "User",
+  email: user?.email || "user@aegis.com",
+  role: user?.role || "Admin",
+  image: user?.image_url || null, // assuming you might store this too
+});
+
 
   const toggleEdit = async () => {
     if (isEditing) {
@@ -67,7 +72,7 @@ export const ProfilePage = () => {
             <img
               src={
                 profile.image ||
-                "https://ui-avatars.com/api/?name=Agent+Carter&background=0D8ABC&color=fff"
+                "https://ui-avatars.com/api/?name=U&background=0D8ABC&color=fff"
               }
               alt="Profile"
               className="w-24 h-24 rounded-full object-cover border-4 border-border"

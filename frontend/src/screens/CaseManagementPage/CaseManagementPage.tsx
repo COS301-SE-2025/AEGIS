@@ -9,52 +9,84 @@ import {
   Search,
   Settings,
   Share2,
-  Plus
+  Plus,
+  Calendar,  
+  Clock
 } from "lucide-react";
-
+import { useState, useEffect  } from 'react';
 import { Link } from "react-router-dom";
 //thati added
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 import {ShareButton} from "../ShareCasePage/sharecasebutton";
+
+
 export const CaseManagementPage = () => {
+const storedUser = sessionStorage.getItem("user");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
+  const initials = displayName
+    .split(" ")
+    .map((part: string) => part[0])
+    .join("")
+    .toUpperCase();
 
 const userRole = "admin"; // for now
 const caseName = "Malware"; 
 const caseId = "case-abc-123"; 
 <SidebarToggleButton />
+
   // Timeline event data
-  const timelineEvents = [
-    {
-      date: "2025-05-25",
-      time: "23:30",
-      description: "Initial Access via Phishing Email",
-    },
-    {
-      date: "2025-05-26",
-      time: "00:05",
-      description: "Lateral Movement Attempt detected",
-    },
-    {
-      date: "2025-05-26",
-      time: "01:10",
-      description: "System Compromise (Server B)",
-    },
-    {
-      date: "2025-05-26",
-      time: "02:45",
-      description: "Data Staging Identified",
-    },
-    {
-      date: "2025-05-26",
-      time: "09:00",
-      description: "Data Exfiltration Commenced",
-    },
-    {
-      date: "2025-05-26",
-      time: "09:00",
-      description: "Case Initiated- Operation ShadowBroker",
-    },
-  ];
+  const [timelineEvents, setTimelineEvents] = useState<{ date: string; time: string; description: string }[]>(() => {
+    const saved = localStorage.getItem(`timeline-${caseId}`);
+    return saved ? JSON.parse(saved) : [];
+  });  
+  const [newEventDescription, setNewEventDescription] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  //state declaration for filtering the timeline
+  const [filterKeyword, setFilterKeyword] = useState('');
+  const [showFilterInput, setShowFilterInput] = useState(false);
+
+  const [filterDate, setFilterDate] = useState('');
+
+
+  // ADD THESE NEW FUNCTIONS
+  const getCurrentTimestamp = () => {
+    const now = new Date();
+    const date = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const time = now.toTimeString().slice(0, 5); // HH:MM format
+    return { date, time };
+  };
+
+  const addEvent = () => {
+    if (newEventDescription.trim()) {
+      const { date, time } = getCurrentTimestamp();
+      const newEvent = {
+        date,
+        time,
+        description: newEventDescription.trim()
+      };
+      
+      setTimelineEvents([...timelineEvents, newEvent]);
+      setNewEventDescription('');
+      setShowAddForm(false);
+    }
+  };
+    const deleteEvent = (index: number) => {
+    const updatedEvents = [...timelineEvents];
+    updatedEvents.splice(index, 1);
+    setTimelineEvents(updatedEvents);
+  };
+
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      addEvent();
+    }
+  };
+  useEffect(() => {
+  localStorage.setItem(`timeline-${caseId}`, JSON.stringify(timelineEvents));
+}, [timelineEvents]);
 
   // User data for assigned team
   const teamMembers = [
@@ -78,16 +110,16 @@ const caseId = "case-abc-123";
       {/* Left Sidebar - Fixed */}
       <div className="fixed left-0 top-0 h-full w-80 bg-background border-r border p-6 flex flex-col z-10">
         {/* Logo */}
-<div className="flex items-center gap-3 mb-8">
-  <div className="w-14 h-14 rounded-lg overflow-hidden">
-    <img
-      src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
-      alt="AEGIS Logo"
-      className="w-full h-full object-cover"
-    />
-  </div>
-  <span className="font-bold text-foreground text-2xl">AEGIS</span>
-</div>
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-14 h-14 rounded-lg overflow-hidden">
+              <img
+                src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
+                alt="AEGIS Logo"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <span className="font-bold text-foreground text-2xl">AEGIS</span>
+          </div>
 
 
         {/* Navigation Menu */}
@@ -118,11 +150,13 @@ const caseId = "case-abc-123";
         <div className="border-t border-bg-accent pt-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
-             <Link to="/profile" > <span className="text-foreground font-medium">AT</span></Link>
+              <Link to="/profile">
+                <span className="text-foreground font-medium">{initials}</span>
+              </Link>
             </div>
             <div>
-              <p className="font-semibold text-foreground">Agent Tshire</p>
-              <p className="text-muted-foreground text-sm">Status: Ongoing</p>
+              <p className="font-semibold text-foreground">{displayName}</p>
+              <p className="text-muted-foreground text-sm">{user?.email || "user@dfir.com"}</p>
             </div>
           </div>
         </div>
@@ -166,7 +200,7 @@ const caseId = "case-abc-123";
                <Link to="/settings" > <Settings className="w-6 h-6" /></Link>
               </button>
               <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-                <Link to="/profile" ><span className="text-foreground font-medium text-sm">AT</span></Link>
+                <Link to="/profile" ><span className="text-foreground font-medium text-sm">{initials}</span></Link>
               </div>
             </div>
           </div>
@@ -188,10 +222,47 @@ const caseId = "case-abc-123";
                   <ShareButton caseId={caseId} caseName={caseName} />
                 )}
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500">
+              <button
+                onClick={() => setShowFilterInput(!showFilterInput)}
+                className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500"
+              >
                 <Filter className="w-4 h-4" />
                 Filter Timeline
               </button>
+
+          {showFilterInput && (
+            <div className="mt-4 mb-6 flex flex-col gap-2 md:flex-row">
+              {/* Keyword Input */}
+              <input
+                type="text"
+                placeholder="Filter by keyword..."
+                value={filterKeyword}
+                onChange={(e) => setFilterKeyword(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+
+              {/* Date Input */}
+              <input
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+
+              {/* Clear Button */}
+              <button
+                onClick={() => {
+                  setFilterKeyword('');
+                  setFilterDate('');
+                }}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
+
 
             </div>
           </div>
@@ -276,11 +347,64 @@ const caseId = "case-abc-123";
             {/* Investigation Timeline Section */}
             <div className="lg:col-span-2">
               <div className="bg-card border border-bg-accent rounded-lg p-6">
-                <h2 className="text-2xl font-semibold text-foreground mb-8">Investigation Timeline</h2>
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-semibold text-foreground">Investigation Timeline</h2>
+                  <button
+                    onClick={() => setShowAddForm(!showAddForm)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus size={18} />
+                    Add Event
+                  </button>
+                </div>
+
+                {/* Add Event Form */}
+                {showAddForm && (
+                  <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Calendar size={16} className="text-blue-600" />
+                      <span className="text-sm text-blue-800">
+                        Will be timestamped: {getCurrentTimestamp().date} at {getCurrentTimestamp().time}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newEventDescription}
+                        onChange={(e) => setNewEventDescription(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Enter event description..."
+                        className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        autoFocus
+                      />
+                      <button
+                        onClick={addEvent}
+                        disabled={!newEventDescription.trim()}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Add
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAddForm(false);
+                          setNewEventDescription('');
+                        }}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="relative">
                   {/* Timeline events */}
-                  {timelineEvents.map((event, index) => (
+                  {timelineEvents  .filter(event => {
+                    const matchesKeyword = event.description.toLowerCase().includes(filterKeyword.toLowerCase());
+                    const matchesDate = !filterDate || event.date === filterDate;
+                    return matchesKeyword && matchesDate;
+                  })
+                  .map((event, index) => (
                     <div key={index} className="flex items-start mb-8 relative">
                       {/* Timeline line */}
                       {index < timelineEvents.length - 1 && (
@@ -289,10 +413,12 @@ const caseId = "case-abc-123";
                       
                       {/* Date and time */}
                       <div className="w-32 text-right pr-4">
-                        <div className="text-muted-foreground text-sm">
+                        <div className="text-muted-foreground text-sm flex items-center justify-end gap-1">
+                          <Calendar size={12} />
                           {event.date}
                         </div>
-                        <div className="text-muted-foreground text-sm">
+                        <div className="text-muted-foreground text-sm flex items-center justify-end gap-1">
+                          <Clock size={12} />
                           {event.time}
                         </div>
                       </div>
@@ -304,8 +430,14 @@ const caseId = "case-abc-123";
 
                       {/* Event description */}
                       <div className="flex-1 ml-4">
-                        <div className="bg-muted border border rounded-lg p-4">
+                        <div className="bg-muted border border rounded-lg p-4 flex justify-between items-center">
                           <p className="text-foreground">{event.description}</p>
+                          <button
+                            onClick={() => deleteEvent(index)}
+                            className="ml-4 px-2 py-1 text-xs text-red-600 hover:underline"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
                     </div>

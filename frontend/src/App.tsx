@@ -14,6 +14,9 @@ import { LandingPage } from "./screens/LandingPage";
 import {VerifyEmailPage} from "./screens/VerifyEmailPage/VerifyEmailPage";
 import {TermsAndConditionsPage} from "./screens/TermsAndConditionsPage/TermsAndConditionsPage";
 import {ThemeProvider} from "./context/ThemeContext"
+import {FAQ} from "./screens/FAQ"
+import {About} from "./screens/About"
+import { TutorialsPage } from "./screens/TutorialsPage";  
 
 //FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
@@ -32,7 +35,7 @@ export default function App() {
   <SidebarProvider>
   <ThemeProvider>
     <Routes>
-      <Route path="/" element={<LoginPage />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegistrationPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -50,6 +53,9 @@ export default function App() {
       <Route path="/cases/:caseId/share" element={<ShareCaseForm />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/terms" element={<TermsAndConditionsPage />} />
+      <Route path="/faq" element={<FAQ />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/tutorials" element={<TutorialsPage />} />
 
     </Routes>
     </ThemeProvider>

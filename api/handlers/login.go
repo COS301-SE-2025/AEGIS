@@ -74,13 +74,13 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 		return
 	}
 
-	if !resp.IsVerified {
-		c.JSON(http.StatusForbidden, structs.ErrorResponse{
-			Error:   "email_not_verified",
-			Message: "Please verify your email before logging in.",
-		})
-		return
-	}
+	// if !resp.IsVerified {
+	// 	c.JSON(http.StatusForbidden, structs.ErrorResponse{
+	// 		Error:   "email_not_verified",
+	// 		Message: "Please verify your email before logging in.",
+	// 	})
+	// 	return
+	// }
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
