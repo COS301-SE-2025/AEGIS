@@ -88,11 +88,11 @@ INSERT INTO enum_role_permissions (role, permission)
 VALUES
   ('DFIR Manager', 'case:view'),
   ('DFIR Manager', 'case:update'),
-  ('DFIR Manager', 'case:assign_user'),
+  ('DFIR Manager', 'case:assign_user'), --remove
   ('DFIR Manager', 'case:change_status'),
   ('DFIR Manager', 'case:set_priority'),
   ('DFIR Manager', 'evidence:view'),
-  ('DFIR Manager', 'evidence:assign_analyst'),
+  ('DFIR Manager', 'evidence:assign_analyst'), --remove
   ('DFIR Manager', 'dashboard:view'),
   ('DFIR Manager', 'audit:view_case'),
   ('DFIR Manager', 'chat:create_room'),
