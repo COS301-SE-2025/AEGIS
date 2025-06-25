@@ -3,6 +3,9 @@ package main
 import (
 	database "aegis-api/db"
 	"aegis-api/handlers"
+
+	"aegis-api/pkg/websocket"
+
 	"aegis-api/routes"
 	"log"
 
@@ -16,11 +19,14 @@ import (
 	"aegis-api/services/listcases"
 	"aegis-api/services/listclosedcases"
 	"aegis-api/services/listusers"
+
 	"aegis-api/services/login/auth"
 	"aegis-api/services/registration"
 	"aegis-api/services/reset_password"
 	"aegis-api/services/update_user_role"
+
 	"aegis-core/services/getupdate_users"
+
 )
 
 // @title AEGIS Platform API
@@ -42,6 +48,7 @@ func main() {
 	// Create repos
 	regRepo := registration.NewGormUserRepository(database.DB)
 	listUserRepo := listusers.NewUserRepository(database.DB)
+
 	updateRoleRepo := update_user_role.NewGormUserRepo(database.DB)
 	deleteUserRepo := delete_user.NewGormUserRepository(database.DB)
 
@@ -52,6 +59,7 @@ func main() {
 	// Services
 	regService := registration.NewRegistrationService(regRepo)
 	listUserService := listusers.NewListUserService(listUserRepo)
+
 	updateRoleService := update_user_role.NewUserService(updateRoleRepo)
 	deleteUserService := delete_user.NewUserDeleteService(deleteUserRepo)
 
@@ -111,6 +119,7 @@ func main() {
 		userHandler,
 	)
 	// Set up the router with the main handler
+
 	router := routes.SetUpRouter(handler)
 
 	log.Println("Starting AEGIS server on :8080...")
@@ -119,4 +128,6 @@ func main() {
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
+
 }
+

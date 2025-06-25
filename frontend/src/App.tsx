@@ -1,25 +1,42 @@
 import { Routes, Route } from "react-router-dom";
+
+//PAGES
 import { LoginPage } from "./screens/LoginPage";
 import { RegistrationPage } from "./screens/RegistrationPage";
 import {ResetPasswordPage} from "./screens/ResetPasswordPage";
+import {ForgotPasswordPage} from "./screens/ForgotPasswordPage";
 import { CaseManagementPage } from "./screens/CaseManagementPage";
 import { SecureChatPage } from "./screens/SecureChatPage";
 import {SettingsPage} from "./screens/SettingsPage";
 import { ProfilePage } from "./screens/ProfilePage";
 import { DashBoardPage } from "./screens/DashboardPage";
+import { LandingPage } from "./screens/LandingPage";
+import {VerifyEmailPage} from "./screens/VerifyEmailPage/VerifyEmailPage";
+import {TermsAndConditionsPage} from "./screens/TermsAndConditionsPage/TermsAndConditionsPage";
+import {ThemeProvider} from "./context/ThemeContext"
 
+//FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
 import { UploadEvidenceForm } from "./screens/UploadEvidencePage/UploadEvidencePage";
 import {AssignCaseMembersForm} from "./screens/AssignCaseMembersPage/AssignCaseMembersPage";
 import { EvidenceViewer } from "./screens/EvidenceViewer";
+import { ShareCaseForm } from "./screens/ShareCasePage/ShareCasePage";
+
+//sidebar toggle
+import { SidebarProvider } from './context/SidebarToggleContext';
+
+
 
 export default function App() {
   return (
+  <SidebarProvider>
+  <ThemeProvider>
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegistrationPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/case-management" element={<CaseManagementPage />} />
       <Route path="/secure-chat" element={<SecureChatPage />} />
       <Route path="/settings" element={<SettingsPage />} />
@@ -29,6 +46,13 @@ export default function App() {
       <Route path ="/upload-evidence" element={<UploadEvidenceForm />} />
       <Route path = "/assign-case-members" element={<AssignCaseMembersForm />} />
       <Route path="/evidence-viewer" element={<EvidenceViewer />} />
+      <Route path="/landing-page" element={<LandingPage />} />
+      <Route path="/cases/:caseId/share" element={<ShareCaseForm />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/terms" element={<TermsAndConditionsPage />} />
+
     </Routes>
+    </ThemeProvider>
+    </SidebarProvider>
   );
 }

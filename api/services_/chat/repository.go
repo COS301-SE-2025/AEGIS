@@ -520,3 +520,81 @@ func (r *MongoRepository) IsGroupAdmin(ctx context.Context, groupID primitive.Ob
 
 	return count > 0, nil
 }
+
+//mark messages as delivered
+// This function marks messages as delivered for a specific group and user.
+func (r *MongoRepository) MarkMessagesAsDelivered(ctx context.Context, groupID primitive.ObjectID, messageIDs []primitive.ObjectID, userEmail string) error {
+	collection := r.db.Collection(MessagesCollection)
+
+	if len(messageIDs) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+
+	filter := bson.M{
+		"_id":              bson.M{"$in": messageIDs},
+		"group_id":         groupID,
+		"is_deleted":       false,
+		"sender_email":     bson.M{"$ne": userEmail},
+		"status.delivered": nil,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"status.delivered": now,
+			"updated_at":       now,
+		},
+	}
+
+	_, err := collection.UpdateMany(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to mark messages as delivered: %w", err)
+	}
+
+	return nil
+}
+
+func (r *MongoRepository) GetUndeliveredMessages(ctx context.Context, userEmail string, limit int, before *primitive.ObjectID) ([]*Message, error) {
+	collection := r.db.Collection(MessagesCollection)
+
+	filter := bson.M{
+		"is_deleted":       false,
+		"sender_email":     bson.M{"$ne": userEmail},
+		"status.delivered": nil,
+	}
+
+	if before != nil {
+		beforeMessage, err := r.GetMessageByID(ctx, *before)
+		if err == nil {
+			filter["created_at"] = bson.M{"$lt": beforeMessage.CreatedAt}
+		}
+	}
+
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetLimit(int64(limit))
+
+	cursor, err := collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get undelivered messages: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var messages []*Message
+	for cursor.Next(ctx) {
+		var message Message
+		if err := cursor.Decode(&message); err != nil {
+			continue
+		}
+		messages = append(messages, &message)
+	}
+
+	// Reverse to get chronological order
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
+	return messages, nil
+}
+
