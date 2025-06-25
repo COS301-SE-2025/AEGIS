@@ -43,6 +43,13 @@ const caseId = "case-abc-123";
   const [newEventDescription, setNewEventDescription] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
 
+  //state declaration for filtering the timeline
+  const [filterKeyword, setFilterKeyword] = useState('');
+  const [showFilterInput, setShowFilterInput] = useState(false);
+
+  const [filterDate, setFilterDate] = useState('');
+
+
   // ADD THESE NEW FUNCTIONS
   const getCurrentTimestamp = () => {
     const now = new Date();
@@ -65,6 +72,12 @@ const caseId = "case-abc-123";
       setShowAddForm(false);
     }
   };
+    const deleteEvent = (index: number) => {
+    const updatedEvents = [...timelineEvents];
+    updatedEvents.splice(index, 1);
+    setTimelineEvents(updatedEvents);
+  };
+
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -209,10 +222,47 @@ const caseId = "case-abc-123";
                   <ShareButton caseId={caseId} caseName={caseName} />
                 )}
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500">
+              <button
+                onClick={() => setShowFilterInput(!showFilterInput)}
+                className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500"
+              >
                 <Filter className="w-4 h-4" />
                 Filter Timeline
               </button>
+
+          {showFilterInput && (
+            <div className="mt-4 mb-6 flex flex-col gap-2 md:flex-row">
+              {/* Keyword Input */}
+              <input
+                type="text"
+                placeholder="Filter by keyword..."
+                value={filterKeyword}
+                onChange={(e) => setFilterKeyword(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+
+              {/* Date Input */}
+              <input
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+
+              {/* Clear Button */}
+              <button
+                onClick={() => {
+                  setFilterKeyword('');
+                  setFilterDate('');
+                }}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
+
 
             </div>
           </div>
@@ -349,7 +399,12 @@ const caseId = "case-abc-123";
                 
                 <div className="relative">
                   {/* Timeline events */}
-                  {timelineEvents.map((event, index) => (
+                  {timelineEvents  .filter(event => {
+                    const matchesKeyword = event.description.toLowerCase().includes(filterKeyword.toLowerCase());
+                    const matchesDate = !filterDate || event.date === filterDate;
+                    return matchesKeyword && matchesDate;
+                  })
+                  .map((event, index) => (
                     <div key={index} className="flex items-start mb-8 relative">
                       {/* Timeline line */}
                       {index < timelineEvents.length - 1 && (
@@ -375,8 +430,14 @@ const caseId = "case-abc-123";
 
                       {/* Event description */}
                       <div className="flex-1 ml-4">
-                        <div className="bg-muted border border rounded-lg p-4">
+                        <div className="bg-muted border border rounded-lg p-4 flex justify-between items-center">
                           <p className="text-foreground">{event.description}</p>
+                          <button
+                            onClick={() => deleteEvent(index)}
+                            className="ml-4 px-2 py-1 text-xs text-red-600 hover:underline"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
                     </div>
