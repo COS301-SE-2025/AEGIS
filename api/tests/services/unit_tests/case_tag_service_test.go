@@ -1,4 +1,4 @@
-package isolation
+package unit_tests
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	services "aegis-api/services/case_tag"
+	services "aegis-api/services_/case_tags"
 	
 )
 

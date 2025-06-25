@@ -41,3 +41,4 @@ type CaseTag struct {
 	CaseID uuid.UUID `gorm:"type:uuid;primaryKey"`
 	TagID  int       `gorm:"primaryKey"`
 }
+
