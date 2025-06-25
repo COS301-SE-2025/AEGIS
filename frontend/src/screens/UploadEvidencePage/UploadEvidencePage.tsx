@@ -33,22 +33,47 @@ export function UploadEvidenceForm(): JSX.Element {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData();
-    formData.append("file", files[0]); // Single file for demo
-    formData.append("case_id", "123e4567-e89b-12d3-a456-426614174000");
-    formData.append("uploaded_by", "789e4567-e89b-12d3-a456-426614174111");
+    // Get the current case from localStorage
+    const cases = JSON.parse(localStorage.getItem("cases") || "[]");
+    const currentCase = cases[cases.length - 1]; // last created
 
-    alert("Evidence Uploaded!");
+    const allEvidence = JSON.parse(localStorage.getItem("evidenceFiles") || "[]");
 
-    try {
-      const response = await axios.post("http://localhost:8080/api/v1", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+    const newEvidence = files.map((file) => ({
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
+      name: file.name,
+      type: "unknown", // optional: allow user to choose type
+      size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+      hash: "SHA256: fake-hash-placeholder", // optionally generate real hash later
+      created: new Date().toISOString(),
+      description: "Uploaded evidence", // allow custom description later
+      status: "pending",
+      chainOfCustody: [], // add logged-in user if needed
+      acquisitionDate: new Date().toISOString(),
+      acquisitionTool: "Manual Upload",
+      integrityCheck: "pending",
+      threadCount: 0,
+      priority: "medium", // or let user choose
+      caseId: String(currentCase.id)
+    }));
 
-      console.log("Uploading files:", files);
-      console.log("Upload success:", response.data);
-    } catch (error) {
-      console.error("Upload error:", error);
-    }
+    localStorage.setItem("evidenceFiles", JSON.stringify([...allEvidence, ...newEvidence]));
+    alert("Evidence uploaded successfully!");
+    // navigate("/dashboard");
+
+
+    // alert("Evidence Uploaded!");
+
+    // try {
+    //   const response = await axios.post("http://localhost:8080/api/v1", formData, {
+    //     headers: { "Content-Type": "multipart/form-data" },
+    //   });
+
+    //   console.log("Uploading files:", files);
+    //   console.log("Upload success:", response.data);
+    // } catch (error) {
+    //   console.error("Upload error:", error);
+    // }
   };
 
   return (

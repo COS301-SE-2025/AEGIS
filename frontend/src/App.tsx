@@ -48,7 +48,7 @@ export default function App() {
       <Route path="/create-case" element={<CreateCaseForm />} />
       <Route path ="/upload-evidence" element={<UploadEvidenceForm />} />
       <Route path = "/assign-case-members" element={<AssignCaseMembersForm />} />
-      <Route path="/evidence-viewer" element={<EvidenceViewer />} />
+      <Route path="/evidence-viewer/:caseId" element={<EvidenceViewer />} />
       <Route path="/landing-page" element={<LandingPage />} />
       <Route path="/cases/:caseId/share" element={<ShareCaseForm />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />

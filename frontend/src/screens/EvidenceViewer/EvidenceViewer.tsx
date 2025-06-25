@@ -1,5 +1,5 @@
 
-import {useEffect,  useState } from "react";
+import {useEffect, useState } from "react";
 import {
   Bell,
   File,
@@ -29,9 +29,12 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
+import { string } from "prop-types";
+import { useParams } from "react-router-dom";
 
 // Define file structure
 interface FileItem {
+  caseId: any;
   id: string;
   name: string;
   type: 'executable' | 'log' | 'image' | 'document' | 'memory_dump' | 'network_capture';
@@ -85,56 +88,56 @@ export const EvidenceViewer  =() =>{
     .toUpperCase();
 
   // Enhanced sample data
-  const files: FileItem[] = [
-    {
-      id: '1',
-      name: 'system_memory.dmp',
-      type: 'memory_dump',
-      size: '8.2 GB',
-      hash: 'SHA256: a1b2c3d4e5f6789abc...',
-      created: '2024-03-15T14:30:00Z',
-      description: 'Memory dump of workstation WS-0234 captured using FTK Imager following detection of unauthorized PowerShell activity',
-      status: 'verified',
-      chainOfCustody: ['Agent.Smith', 'Forensic.Analyst.1', 'Lead.Investigator'],
-      acquisitionDate: '2024-03-15T14:30:00Z',
-      acquisitionTool: 'FTK Imager v4.7.1',
-      integrityCheck: 'passed',
-      threadCount: 3,
-      priority: 'high'
-    },
-    {
-      id: '2',
-      name: 'malware_sample.exe',
-      type: 'executable',
-      size: '1.8 MB',
-      hash: 'MD5: x1y2z3a4b5c6def...',
-      created: '2024-03-14T09:15:00Z',
-      description: 'Suspected malware executable recovered from infected system',
-      status: 'pending',
-      chainOfCustody: ['Field.Agent.2'],
-      acquisitionDate: '2024-03-14T09:15:00Z',
-      acquisitionTool: 'Manual Collection',
-      integrityCheck: 'pending',
-      threadCount: 1,
-      priority: 'high'
-    },
-    {
-      id: '3',
-      name: 'network_capture.pcap',
-      type: 'network_capture',
-      size: '245 MB',
-      hash: 'SHA1: abc123def456...',
-      created: '2024-03-13T16:45:00Z',
-      description: 'Network traffic capture during incident timeframe',
-      status: 'verified',
-      chainOfCustody: ['Network.Analyst', 'Forensic.Analyst.1'],
-      acquisitionDate: '2024-03-13T16:45:00Z',
-      acquisitionTool: 'Wireshark v4.0.3',
-      integrityCheck: 'passed',
-      threadCount: 2,
-      priority: 'medium'
-    }
-  ];
+  // const files: FileItem[] = [
+  //   {
+  //     id: '1',
+  //     name: 'system_memory.dmp',
+  //     type: 'memory_dump',
+  //     size: '8.2 GB',
+  //     hash: 'SHA256: a1b2c3d4e5f6789abc...',
+  //     created: '2024-03-15T14:30:00Z',
+  //     description: 'Memory dump of workstation WS-0234 captured using FTK Imager following detection of unauthorized PowerShell activity',
+  //     status: 'verified',
+  //     chainOfCustody: ['Agent.Smith', 'Forensic.Analyst.1', 'Lead.Investigator'],
+  //     acquisitionDate: '2024-03-15T14:30:00Z',
+  //     acquisitionTool: 'FTK Imager v4.7.1',
+  //     integrityCheck: 'passed',
+  //     threadCount: 3,
+  //     priority: 'high'
+  //   },
+  //   {
+  //     id: '2',
+  //     name: 'malware_sample.exe',
+  //     type: 'executable',
+  //     size: '1.8 MB',
+  //     hash: 'MD5: x1y2z3a4b5c6def...',
+  //     created: '2024-03-14T09:15:00Z',
+  //     description: 'Suspected malware executable recovered from infected system',
+  //     status: 'pending',
+  //     chainOfCustody: ['Field.Agent.2'],
+  //     acquisitionDate: '2024-03-14T09:15:00Z',
+  //     acquisitionTool: 'Manual Collection',
+  //     integrityCheck: 'pending',
+  //     threadCount: 1,
+  //     priority: 'high'
+  //   },
+  //   {
+  //     id: '3',
+  //     name: 'network_capture.pcap',
+  //     type: 'network_capture',
+  //     size: '245 MB',
+  //     hash: 'SHA1: abc123def456...',
+  //     created: '2024-03-13T16:45:00Z',
+  //     description: 'Network traffic capture during incident timeframe',
+  //     status: 'verified',
+  //     chainOfCustody: ['Network.Analyst', 'Forensic.Analyst.1'],
+  //     acquisitionDate: '2024-03-13T16:45:00Z',
+  //     acquisitionTool: 'Wireshark v4.0.3',
+  //     integrityCheck: 'passed',
+  //     threadCount: 2,
+  //     priority: 'medium'
+  //   }
+  // ];
 
   const initialAnnotationThreads: AnnotationThread[] = [
     
@@ -180,6 +183,17 @@ export const EvidenceViewer  =() =>{
     }
   ];
 
+    
+const caseId = String(useParams().caseId);
+
+  const [allFiles, setAllFiles] = useState<FileItem[]>(() => {
+    const stored = localStorage.getItem("evidenceFiles");
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  const files = allFiles.filter(file => String(file.caseId) === String(caseId));
+
+
   const threadMessages: ThreadMessage[] = [
     {
       id: '1',
@@ -214,7 +228,7 @@ export const EvidenceViewer  =() =>{
     }
   ];
 
-const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>(() => {
+  const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>(() => {
   const saved = localStorage.getItem('annotationThreads');
   return saved ? JSON.parse(saved) : initialAnnotationThreads;
 });
@@ -244,10 +258,12 @@ useEffect(() => {
   const handleSendMessage = () => {
   if (!newMessage.trim() || !selectedThread) return;
 
-  const newMsg: ThreadMessage = {
+  interface NewMsg extends ThreadMessage {}
+
+  const newMsg: NewMsg = {
     id: Date.now().toString(),
-    user: 'Agent.User',
-    avatar: 'AU',
+    user: profile.name,
+    avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
     time: 'Just now',
     message: newMessage,
     isApproved: false,
@@ -262,8 +278,13 @@ useEffect(() => {
   setNewMessage('');
 };
 
+  const [profile, setProfile] = useState({
+    name: user?.name || "User",
+    email: user?.email || "user@aegis.com",
+    role: user?.role || "Admin",
+    image: user?.image_url || null, // assuming you might store this too
+  });
 
-  
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'verified': case 'passed': case 'resolved': return 'text-green-400';
@@ -716,14 +737,14 @@ function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadM
                                   const newThread: AnnotationThread = {
                                     id: Date.now().toString(),
                                     title: newThreadTitle,
-                                    user: 'Agent.User',
-                                    avatar: 'AU',
+                                    user: profile.name,
+                                    avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
                                     time: 'Just now',
                                     messageCount: 0,
                                     participantCount: 1,
                                     status: 'open',
                                     priority: 'low',
-                                    tags: [],
+                                    tags: [] as string[],
                                     fileId: selectedFile?.id || '1'
                                   };
                                   setAnnotationThreads(prev => [...prev, newThread]);
@@ -1061,12 +1082,13 @@ function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadM
 
                                   const reply: ThreadMessage = {
                                     id: `${replyingToMessageId}-reply-${Date.now()}`,
-                                    user: 'Agent.User',
-                                    avatar: 'AU',
+                                    user: profile.name,
+                                    avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
                                     time: 'Just now',
                                     message: replyText,
                                     isApproved: true,
-                                    reactions: []
+                                    reactions: [],
+                                    replies: []
                                   };
 
                                   setAllThreadMessages(prev => ({
@@ -1233,8 +1255,8 @@ function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadM
 
                                         const nestedReply: ThreadMessage = {
                                           id: `${replyItem.id}-reply-${Date.now()}`,
-                                          user: 'Agent.User',
-                                          avatar: 'AU',
+                                          user: profile.name,
+                                          avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
                                           time: 'Just now',
                                           message: replyText,
                                           isApproved: true,
