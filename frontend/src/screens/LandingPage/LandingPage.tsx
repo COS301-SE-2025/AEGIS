@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Shield,
@@ -44,39 +43,84 @@ export const LandingPage: React.FC = () => {
           <User className="h-5 w-5 text-gray-400" />
         </div>
       </nav>
-      {/* Hero Section */}
-      <section className="relative px-6 py-20 text-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-pink-900/20"></div>
+      
+      {/* Hero Section with Enhanced Animated Background */}
+      <section className="relative px-6 py-20 text-center overflow-hidden">
+        {/* Multi-layer animated background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-blue-900/30 to-pink-900/30"></div>
+        
+        {/* Floating particles with different sizes and speeds */}
         <div className="absolute inset-0">
-          {/* Animated network background */}
-          <div className="absolute top-20 left-20 w-2 h-2 bg-blue-400 rounded-full opacity-60 animate-pulse"></div>
-          <div className="absolute top-40 right-32 w-1 h-1 bg-purple-400 rounded-full opacity-40 animate-pulse"></div>
-          <div className="absolute bottom-40 left-40 w-3 h-3 bg-pink-400 rounded-full opacity-50 animate-pulse"></div>
-          <div className="absolute top-60 right-20 w-2 h-2 bg-blue-300 rounded-full opacity-70 animate-pulse"></div>
-          {/* Connection lines */}
-          <svg className="absolute inset-0 w-full h-full opacity-20">
-            <line x1="10%" y1="20%" x2="80%" y2="30%" stroke="url(#gradient1)" strokeWidth="1" />
-            <line x1="20%" y1="60%" x2="70%" y2="20%" stroke="url(#gradient2)" strokeWidth="1" />
-            <line x1="80%" y1="70%" x2="30%" y2="40%" stroke="url(#gradient3)" strokeWidth="1" />
-            <defs>
-              <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#3B82F6" stopOpacity="0" />
-                <stop offset="50%" stopColor="#3B82F6" stopOpacity="0.5" />
-                <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
-              </linearGradient>
-              <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0" />
-                <stop offset="50%" stopColor="#8B5CF6" stopOpacity="0.5" />
-                <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
-              </linearGradient>
-              <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#EC4899" stopOpacity="0" />
-                <stop offset="50%" stopColor="#EC4899" stopOpacity="0.5" />
-                <stop offset="100%" stopColor="#EC4899" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-          </svg>
+          {/* Large floating orbs */}
+          <div className="absolute top-20 left-20 w-4 h-4 bg-blue-400/60 rounded-full animate-bounce" style={{animationDelay: '0s', animationDuration: '3s'}}></div>
+          <div className="absolute top-40 right-32 w-3 h-3 bg-purple-400/50 rounded-full animate-bounce" style={{animationDelay: '1s', animationDuration: '4s'}}></div>
+          <div className="absolute bottom-40 left-40 w-5 h-5 bg-pink-400/70 rounded-full animate-bounce" style={{animationDelay: '2s', animationDuration: '2.5s'}}></div>
+          <div className="absolute top-60 right-20 w-2 h-2 bg-blue-300/80 rounded-full animate-bounce" style={{animationDelay: '0.5s', animationDuration: '3.5s'}}></div>
+          <div className="absolute bottom-20 right-40 w-3 h-3 bg-green-400/60 rounded-full animate-bounce" style={{animationDelay: '1.5s', animationDuration: '4.5s'}}></div>
+          <div className="absolute top-32 left-60 w-2 h-2 bg-yellow-400/50 rounded-full animate-bounce" style={{animationDelay: '2.5s', animationDuration: '3s'}}></div>
+          
+          {/* Pulsing network nodes */}
+          <div className="absolute top-1/4 left-1/4 w-6 h-6 bg-blue-500/30 rounded-full animate-pulse border-2 border-blue-400/50"></div>
+          <div className="absolute top-3/4 right-1/4 w-8 h-8 bg-purple-500/20 rounded-full animate-pulse border-2 border-purple-400/40" style={{animationDelay: '1s'}}></div>
+          <div className="absolute bottom-1/3 left-1/3 w-4 h-4 bg-pink-500/40 rounded-full animate-pulse border-2 border-pink-400/60" style={{animationDelay: '2s'}}></div>
         </div>
+
+        {/* Animated connection lines */}
+        <svg className="absolute inset-0 w-full h-full opacity-30">
+          <g>
+            {/* Animated lines with gradient strokes */}
+            <line x1="10%" y1="20%" x2="80%" y2="30%" stroke="url(#gradient1)" strokeWidth="2">
+              <animate attributeName="stroke-dasharray" values="0,100;50,50;100,0;0,100" dur="4s" repeatCount="indefinite"/>
+            </line>
+            <line x1="20%" y1="60%" x2="70%" y2="20%" stroke="url(#gradient2)" strokeWidth="2">
+              <animate attributeName="stroke-dasharray" values="100,0;50,50;0,100;100,0" dur="3s" repeatCount="indefinite"/>
+            </line>
+            <line x1="80%" y1="70%" x2="30%" y2="40%" stroke="url(#gradient3)" strokeWidth="2">
+              <animate attributeName="stroke-dasharray" values="0,100;25,75;75,25;100,0;0,100" dur="5s" repeatCount="indefinite"/>
+            </line>
+            <line x1="15%" y1="80%" x2="85%" y2="15%" stroke="url(#gradient4)" strokeWidth="1">
+              <animate attributeName="stroke-dasharray" values="50,50;100,0;0,100;50,50" dur="3.5s" repeatCount="indefinite"/>
+            </line>
+            <line x1="70%" y1="60%" x2="25%" y2="80%" stroke="url(#gradient5)" strokeWidth="1">
+              <animate attributeName="stroke-dasharray" values="0,100;100,0;0,100" dur="4.5s" repeatCount="indefinite"/>
+            </line>
+          </g>
+          <defs>
+            <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#3B82F6" stopOpacity="0" />
+              <stop offset="50%" stopColor="#3B82F6" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0" />
+              <stop offset="50%" stopColor="#8B5CF6" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#EC4899" stopOpacity="0" />
+              <stop offset="50%" stopColor="#EC4899" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#EC4899" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="gradient4" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#10B981" stopOpacity="0" />
+              <stop offset="50%" stopColor="#10B981" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="gradient5" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#F59E0B" stopOpacity="0" />
+              <stop offset="50%" stopColor="#F59E0B" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#F59E0B" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Floating geometric shapes */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/3 left-10 w-0 h-0 border-l-[10px] border-r-[10px] border-b-[15px] border-l-transparent border-r-transparent border-b-blue-400/40 animate-spin" style={{animationDuration: '8s'}}></div>
+          <div className="absolute bottom-1/3 right-10 w-4 h-4 border-2 border-purple-400/50 rotate-45 animate-spin" style={{animationDuration: '6s', animationDirection: 'reverse'}}></div>
+          <div className="absolute top-1/2 right-1/4 w-3 h-3 bg-pink-400/30 transform rotate-45 animate-pulse"></div>
+        </div>
+
         <div className="relative z-10 max-w-4xl mx-auto">
           <h1 className="text-5xl md:text-6xl font-bold mb-6">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
@@ -203,12 +247,12 @@ export const LandingPage: React.FC = () => {
           </h2>
           <div className="grid grid-cols-3 gap-6">
           {[
-            "/login.png",
-            "/dashboard.png",
-            "/cases.png",
-            "/caseManagement.png",
-            "/evidence.png",
-            "/chat.png",
+            "/Create_Case.png",
+            "/Dashboard.png",
+            "/Cases.png",
+            "/Case_Management.png",
+            "/Evidence_Viewer.png",
+            "/Secure_Chat.png",
           ].map((src, i) => (
             <div
               key={i}
