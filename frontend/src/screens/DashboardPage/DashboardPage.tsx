@@ -205,6 +205,24 @@ export default function Dashboard() {
 export const DashBoardPage = () => {
   const [activeTab, setActiveTab] = useState("active");
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
+  useEffect(() => {
+    // Load cases from localStorage for the main dashboard page too
+    const stored = localStorage.getItem("cases");
+    console.log("DashboardPage - Loaded from localStorage:", stored);
+
+    if (stored) {
+      try {
+        const parsedCases: CaseCard[] = JSON.parse(stored);
+        console.log("DashboardPage - Parsed Cases:", parsedCases);
+        setCaseCards(parsedCases.reverse()); // Show newest first
+      } catch (error) {
+        console.error("Error parsing stored cases:", error);
+        setCaseCards(defaultCaseCards);
+      }
+    } else {
+      setCaseCards(defaultCaseCards);
+    }
+  }, []);
 
   useEffect(() => {
     // Load cases from localStorage for the main dashboard page too
@@ -225,6 +243,7 @@ export const DashBoardPage = () => {
     }
   }, []);
 
+  
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Sidebar */}
@@ -250,7 +269,7 @@ export const DashBoardPage = () => {
 
           <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors cursor-pointer">
             <FileText className="w-6 h-6" />
-            <Link to="/case-management"><span className="text-lg font-semibold">Case Management</span></Link>
+            <Link to="/case-management"><span className="text-lg">Case Management</span></Link>
           </div>
 
           <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors cursor-pointer">

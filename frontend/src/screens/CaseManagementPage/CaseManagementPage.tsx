@@ -129,9 +129,9 @@ const caseId = "case-abc-123";
            <Link to="/dashboard"> <span className="text-lg">Dashboard</span></Link>
           </div>
 
-          <div className="flex items-center gap-3 bg-blue-600 text-foreground p-3 rounded-lg">
+          <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
             <FileText className="w-6 h-6" />
-            <span className="text-lg font-semibold">Case Management</span>
+            <span className="text-lg">Case Management</span>
           </div>
 
           <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
