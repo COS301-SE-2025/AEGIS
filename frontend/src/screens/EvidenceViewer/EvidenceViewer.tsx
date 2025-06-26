@@ -32,6 +32,15 @@ import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 import { string } from "prop-types";
 import { useParams } from "react-router-dom";
 
+// Import Select components from your UI library
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from "../../components/ui/select";
+
 // Define file structure
 interface FileItem {
   caseId: any;
@@ -193,6 +202,10 @@ const caseId = String(useParams().caseId);
 
   const files = allFiles.filter(file => String(file.caseId) === String(caseId));
 
+  const uniqueTypes = Array.from(
+  new Set(files.map(file => file.type).filter(Boolean))
+);
+
 
   const threadMessages: ThreadMessage[] = [
     {
@@ -239,7 +252,7 @@ useEffect(() => {
 
   const [newThreadTitle, setNewThreadTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(files[0]);
-  const [selectedThread, setSelectedThread] = useState<AnnotationThread | null>(annotationThreads[0]);
+  const [selectedThread, setSelectedThread] = useState<AnnotationThread | null>(null);
   const [replyingToMessageId, setReplyingToMessageId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [newMessage, setNewMessage] = useState('');
@@ -285,6 +298,9 @@ useEffect(() => {
     image: user?.image_url || null, // assuming you might store this too
   });
 
+  const recentThread = [...annotationThreads]
+  .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0]; // most recent
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'verified': case 'passed': case 'resolved': return 'text-green-400';
@@ -315,6 +331,21 @@ useEffect(() => {
   const filteredThreads = annotationThreads.filter(thread => 
     selectedFile ? thread.fileId === selectedFile.id : true
   );
+
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [timeFilter, setTimeFilter] = useState<'recent' | 'oldest' | null>(null);
+
+  let filteredFiles = [...files];
+
+  if (typeFilter) {
+    filteredFiles = filteredFiles.filter(file => file.type === typeFilter);
+  }
+
+  if (timeFilter === 'recent') {
+    filteredFiles.sort((a, b) => new Date(b.created || '').getTime() - new Date(a.created || '').getTime());
+  } else if (timeFilter === 'oldest') {
+    filteredFiles.sort((a, b) => new Date(a.created || '').getTime() - new Date(b.created || '').getTime());
+  }
 
   function addNestedReply(messages: ThreadMessage[], parentId: string, reply: ThreadMessage): ThreadMessage[] {
     return messages.map(msg => {
@@ -374,6 +405,27 @@ function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadM
     return reply;
   });
 }
+
+function timeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  const intervals: [number, string][] = [
+    [60, "seconds"],
+    [3600, "minutes"],
+    [86400, "hours"],
+    [604800, "days"]
+  ];
+
+  for (let [limit, label] of intervals.reverse()) {
+    const value = Math.floor(seconds / limit);
+    if (value >= 1) return `${value} ${label} ago`;
+  }
+
+  return "just now";
+}
+
 
 
   return (
@@ -498,15 +550,34 @@ function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadM
 
             {/* Filter and Sort */}
             <div className="flex gap-2 mb-4">
-              <button className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-600 rounded-lg text-foreground hover:bg-muted">
-                <SlidersHorizontal size={12} />
-                Filter
-              </button>
-              <button className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-600 rounded-lg text-foreground hover:bg-muted">
-                <ArrowUpDown size={12} />
-                Sort
-              </button>
+              {/* Filter by type */}
+              <Select onValueChange={(value) => setTypeFilter(value)}>
+                <SelectTrigger className="w-40 bg-muted border-border text-foreground text-xs">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 text-popover-foreground text-sm">
+                  <SelectItem value="memory_dump">Memory Dump</SelectItem>
+                  <SelectItem value="executable">Executable</SelectItem>
+                  <SelectItem value="network_capture">Network Capture</SelectItem>
+                  <SelectItem value="log">Log</SelectItem>
+                  <SelectItem value="image">Image</SelectItem>
+                  <SelectItem value="document">Document</SelectItem>
+
+                </SelectContent>
+              </Select>
+
+              {/* Sort by time */}
+              <Select onValueChange={(value) => setTimeFilter(value as 'recent' | 'oldest')}>
+                <SelectTrigger className="w-36 bg-muted border-border text-foreground text-xs">
+                  <SelectValue placeholder="Sort by time" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 text-popover-foreground text-sm">
+                  <SelectItem value="recent">Most Recent</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
 
             {/* File List */}
             <div className="space-y-2">
@@ -700,17 +771,23 @@ function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadM
                         </h3>
                         <div className="space-y-3">
                           <div className="flex items-center gap-3 text-sm">
-                            <MessageCircle className="w-4 h-4 text-blue-400" />
-                            <div className="flex-1">
-                              <span className="text-muted-foreground">New discussion thread created</span>
-                              <div className="text-xs text-muted-foreground">by Forensic.Analyst.1 • 2 hours ago</div>
-                            </div>
+                              {recentThread && (
+                                <div className="flex items-center gap-3 text-sm">
+                                  <MessageCircle className="w-4 h-4 text-blue-400" />
+                                  <div className="flex-1">
+                                    <span className="text-muted-foreground">New discussion thread created</span>
+                                    <div className="text-xs text-muted-foreground">
+                                      by {recentThread.user} • {timeAgo(recentThread.time)}
+                                    </div>
+                                  </div>
+                                </div>
+                                )}
                           </div>
                           <div className="flex items-center gap-3 text-sm">
                             <CheckCircle className="w-4 h-4 text-green-400" />
                             <div className="flex-1">
-                              <span className="text-muted-foreground">Integrity verification completed</span>
-                              <div className="text-xs text-muted-foreground">System • 4 hours ago</div>
+                              <span className="text-muted-foreground">Integrity verification in progress </span>
+                              <div className="text-xs text-muted-foreground">System • just now</div>
                             </div>
                           </div>
                         </div>
@@ -727,7 +804,7 @@ function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadM
                               <input
                                 type="text"
                                 placeholder="Thread title"
-                                className="w-full px-3 py-2 bd-background border border-muted rounded text-foreground text-sm"
+                                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-gray-200 text-sm"
                                 value={newThreadTitle}
                                 onChange={(e) => setNewThreadTitle(e.target.value)}
                               />

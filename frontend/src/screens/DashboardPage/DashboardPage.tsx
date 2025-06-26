@@ -18,6 +18,8 @@ import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
 import { useEffect } from "react";
 
+
+
 const metricCards = [
   {
     value: "45",
@@ -108,6 +110,7 @@ interface CaseCard {
   progress: number;
   image: string;
 }
+
 
 export default function Dashboard() {
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
@@ -363,15 +366,41 @@ export const DashBoardPage = () => {
             {/* Extra spacing before next row */}
                 <div className="mt-[100px] flex gap-6">
                 {/* Threat Landscape Card */}
-                <div className="w-[550px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6">
-                    <h2 className="font-bold text-white text-lg mb-2">Threat Landscape</h2>
-                    <p className="text-gray-400 text-sm mb-4">Global incident trends, and a picture:</p>
-                    <img
-                    src="https://c.animaapp.com/maycc5gah5c0ar/img/graph.png"
-                    alt="Threat Landscape Graph"
-                    className="w-[503px] h-[265px] flex-shrink-0"
-                    />
-                </div>
+<div className="overflow-hidden w-[550px] h-[366px] rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6">
+  <h2 className="font-bold text-white text-lg mb-2">Threat Landscape</h2>
+  <p className="text-gray-400 text-sm mb-4">Graph: Evidence relationship between cases</p>
+
+  <div className="w-full h-[265px] overflow-auto cursor-grab active:cursor-grabbing">
+    <svg className="min-w-[600px] min-h-[265px]">
+      {/* Case A */}
+      <circle cx="100" cy="130" r="28" fill="#3b82f6" className="hover:stroke-white hover:stroke-2" />
+      <text x="100" y="130" fill="white" textAnchor="middle" dy="4" fontSize="10">Case A</text>
+      <title>Case A: Malware investigation</title>
+
+      {/* Case B */}
+      <circle cx="450" cy="90" r="28" fill="#6366f1" className="hover:stroke-white hover:stroke-2" />
+      <text x="450" y="90" fill="white" textAnchor="middle" dy="4" fontSize="10">Case B</text>
+      <title>Case B: Phishing attack</title>
+
+      {/* Evidence 1 */}
+      <circle cx="270" cy="70" r="20" fill="#ec4899" className="hover:stroke-blue-400 hover:stroke-2" />
+      <text x="270" y="70" fill="black" textAnchor="middle" dy="4" fontSize="10" fontWeight="600">mem.dmp</text>
+      <title>Evidence: Memory Dump</title>
+
+      {/* Evidence 2 */}
+      <circle cx="270" cy="200" r="20" fill="#a855f7" className="hover:stroke-blue-400 hover:stroke-2" />
+      <text x="270" y="200" fill="black" textAnchor="middle" dy="4" fontSize="10" fontWeight="600">mal.exe</text>
+      <title>Evidence: Executable Sample</title>
+
+      {/* Links */}
+      <line x1="100" y1="130" x2="270" y2="70" stroke="#4b5563" strokeWidth="1.5" />
+      <line x1="450" y1="90" x2="270" y2="70" stroke="#4b5563" strokeWidth="1.5" />
+      <line x1="100" y1="130" x2="270" y2="200" stroke="#6b7280" strokeDasharray="4 2" />
+    </svg>
+  </div>
+</div>
+
+
 
                  {/* Recent Activities Card */}
             <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6 overflow-auto">
