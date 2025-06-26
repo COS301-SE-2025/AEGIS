@@ -40,7 +40,6 @@ export default function App() {
       <Route path="/register" element={<RegistrationPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/case-management" element={<CaseManagementPage />} />
       <Route path="/secure-chat" element={<SecureChatPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
@@ -49,6 +48,7 @@ export default function App() {
       <Route path ="/upload-evidence" element={<UploadEvidenceForm />} />
       <Route path = "/assign-case-members" element={<AssignCaseMembersForm />} />
       <Route path="/evidence-viewer/:caseId" element={<EvidenceViewer />} />
+      <Route path="/case-management/:caseId" element={<CaseManagementPage />} />
       <Route path="/landing-page" element={<LandingPage />} />
       <Route path="/cases/:caseId/share" element={<ShareCaseForm />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />

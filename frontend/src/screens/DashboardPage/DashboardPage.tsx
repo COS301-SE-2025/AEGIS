@@ -141,7 +141,7 @@ export default function Dashboard() {
       <h1 className="text-3xl font-bold text-white mb-6">Dashboard</h1>
 
       {caseCards.length === 0 ? (
-        <div className="text-center text-gray-400 py-8">
+        <div className="text-center text-muted-foreground py-8">
           <p>No cases found. Create your first case to get started!</p>
         </div>
       ) : (
@@ -149,7 +149,7 @@ export default function Dashboard() {
           {caseCards.map((card) => (
             <div
               key={card.id}
-              className="flex flex-col justify-between items-center w-[440px] h-[370px] p-4 bg-[#19191F] border border-[#393D47] rounded-[8px]"
+              className="flex flex-col justify-between items-center w-[440px] h-[370px] p-4 bg-card border border-[#393D47] rounded-[8px]"
             >
               <img
                 src={card.image}
@@ -163,7 +163,7 @@ export default function Dashboard() {
                 {card.attackType || "Untitled Case"}
               </h3>
 
-              <div className="text-sm text-gray-400 text-center mb-2">
+              <div className="text-sm text-muted-foreground text-center mb-2">
                 Team: {card.team} | Last Activity: {card.lastActivity}
               </div>
 
@@ -181,20 +181,20 @@ export default function Dashboard() {
                         : "bg-green-400"
                     )}
                   ></span>
-                  <span className="text-gray-300 capitalize">{card.priority}</span>
+                  <span className="text-muted-foreground capitalize">{card.priority}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                  <span className="text-gray-300">Ongoing</span>
+                  <span className="text-muted-foreground">Ongoing</span>
                 </div>
               </div>
 
               <Progress
                 value={card.progress}
-                className="w-full h-3 bg-gray-800 mb-3 [&>div]:bg-green-500"
+                className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
               />
 
-              <button className="bg-[#633ae8] text-white text-sm px-14 py-2 rounded hover:bg-gray-800">
+              <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
                 View Details
               </button>
             </div>
@@ -206,6 +206,14 @@ export default function Dashboard() {
 }
 
 export const DashBoardPage = () => {
+  const storedUser = sessionStorage.getItem("user");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
+  const initials = displayName
+    .split(" ")
+    .map((part: string) => part[0])
+    .join("")
+    .toUpperCase();
   const [activeTab, setActiveTab] = useState("active");
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
   useEffect(() => {
@@ -248,9 +256,9 @@ export const DashBoardPage = () => {
 
   
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-background text-white">
       {/* Sidebar */}
-      <div className="fixed left-0 top-0 h-full w-80 bg-black border-r border-gray-800 p-6 flex flex-col z-10">
+      <div className="fixed left-0 top-0 h-full w-80 bg-background border-r border-border p-6 flex flex-col z-10">
         {/* Logo */}
         <div className=" flex items-center gap-3 mb-8">
           <div className="w-14 h-14 rounded-lg overflow-hidden">
@@ -270,17 +278,17 @@ export const DashBoardPage = () => {
             <span className="text-lg">Dashboard</span>
           </div>
 
-          <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors cursor-pointer">
+          <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <FileText className="w-6 h-6" />
             <Link to="/case-management"><span className="text-lg">Case Management</span></Link>
           </div>
 
-          <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors cursor-pointer">
+          <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <Folder className="w-6 h-6" />
             <Link to="/evidence-viewer"><span className="text-lg">Evidence Viewer</span></Link>
           </div>
 
-          <div className="flex items-center gap-3 text-gray-400 hover:text-white hover:bg-gray-800 p-3 rounded-lg transition-colors cursor-pointer">
+          <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <MessageSquare className="w-6 h-6" />
             <span className="text-lg">
               <Link to="/secure-chat">Secure Chat</Link>
@@ -289,55 +297,57 @@ export const DashBoardPage = () => {
         </nav>
 
         {/* User Profile */}
-        <div className="border-t border-gray-700 pt-4">
+        <div className="border-t border-bg-accent pt-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
-              <Link to="/profile" ><span className="text-white font-medium">AU</span></Link>
+            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+              <Link to="/profile">
+                <span className="text-foreground font-medium">{initials}</span>
+              </Link>
             </div>
             <div>
-              <p className="font-semibold text-white">Agent User</p>
-              <p className="text-gray-400 text-sm">user@dfir.com</p>
+              <p className="font-semibold text-foreground">{displayName}</p>
+              <p className="text-muted-foreground text-sm">{user?.email || "user@dfir.com"}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="ml-80 min-h-screen bg-black">
+      <div className="ml-80 min-h-screen bg-background">
         {/* Topbar */}
-        <div className="sticky top-0 bg-black border-b border-gray-800 p-4 z-5">
+        <div className="sticky top-0 bg-background border-b border-border p-4 z-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
                 Dashboard
               </button>
-              <Link to="/evidence-viewer"><button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+              <Link to="/evidence-viewer"><button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
                 Evidence Viewer
               </button></Link>
-              <Link to="/case-management"><button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+              <Link to="/case-management"><button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
                 Case Management
               </button></Link>
-              <button className="text-gray-400 hover:text-white px-4 py-2 rounded-lg transition-colors">
+              <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
                 <Link to="/secure-chat">Secure Chat</Link>
               </button>
             </div>
 
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
-                  className="w-80 h-12 bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                  className="w-80 h-12 bg-card border border-muted rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
                   placeholder="Search cases, evidence, users"
                 />
               </div>
-              <button className="p-2 text-gray-400 hover:text-white transition-colors">
+              <button className="p-2 text-muted-foreground hover:text-white transition-colors">
                 <Bell className="w-6 h-6" />
               </button>
-              <Link to="/settings" ><button className="p-2 text-gray-400 hover:text-white transition-colors">
+              <Link to="/settings" ><button className="p-2 text-muted-foreground hover:text-white transition-colors">
                 <Settings className="w-6 h-6" />
               </button></Link>
               <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                <Link to="/profile" ><span className="text-white font-medium text-sm">AU</span></Link>
+                <Link to="/profile" ><span className="text-white font-medium text-sm">{initials}</span></Link>
               </div>
             </div>
           </div>
@@ -352,12 +362,12 @@ export const DashBoardPage = () => {
             {metricCards.map((card, index) => (
               <div
                 key={index}
-                className="w-[266px] h-[126px] flex-shrink-0 bg-[#19191F] border-[5px] border-[#30333C] rounded-[8px] p-4 flex items-center justify-between"
+                className="w-[266px] h-[123px] flex-shrink-0 bg-card border-[5px] border rounded-[8px] p-4 flex items-center justify-between"
               >
                 <div>
                   <p className={`text-3xl font-bold ${card.color}`}>{card.value}</p>
-                  <p className="text-white/70 text-sm">{card.label}</p>
-                  <p className="text-white/40 text-xs mt-1">↑ {card.increase} from last week</p>
+                  <p className="text-foreground text-sm">{card.label}</p>
+                  <p className="text-foreground text-xs mt-1">↑ {card.increase} from last week</p>
                 </div>
                 {card.icon}
               </div>
@@ -366,9 +376,9 @@ export const DashBoardPage = () => {
             {/* Extra spacing before next row */}
                 <div className="mt-[100px] flex gap-6">
                 {/* Threat Landscape Card */}
-                <div className="overflow-hidden w-[550px] h-[366px] rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6">
-                  <h2 className="font-bold text-white text-lg mb-2">Threat Landscape</h2>
-                  <p className="text-gray-400 text-sm mb-4">Graph: Evidence relationship between cases</p>
+<div className="overflow-hidden w-[550px] h-[366px] rounded-lg border bg-card p-6">
+  <h2 className="font-bold text-white text-lg mb-2">Threat Landscape</h2>
+  <p className="text-gray-400 text-sm mb-4">Graph: Evidence relationship between cases</p>
 
                   <div className="w-full h-[265px] overflow-auto cursor-grab active:cursor-grabbing">
                     <svg className="min-w-[600px] min-h-[265px]">
@@ -400,8 +410,8 @@ export const DashBoardPage = () => {
                   </div>
                 </div>
                  {/* Recent Activities Card */}
-            <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border-[#30333C] bg-[#19191F] p-6 overflow-auto">
-              <h2 className="font-bold text-white text-lg mb-4">Recent Activities</h2>
+            <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border bg-card p-6 overflow-auto">
+              <h2 className="font-bold text-foreground text-lg mb-4">Recent Activities</h2>
               <ul className="space-y-4">
                 {recentActivities.map((activity, index) => {
                   const Icon = activity.icon;
@@ -409,10 +419,10 @@ export const DashBoardPage = () => {
                   return (
                     <li key={index}>
                       <div className="flex items-start gap-3 mb-2">
-                        <Icon className={`w-5 h-5 mt-1 ${isAlert ? 'text-red-500' : 'text-white'}`} />
+                        <Icon className={`w-5 h-5 mt-1 ${isAlert ? 'text-red-500' : 'text-foreground'}`} />
                         <div>
-                          <p className="text-white text-sm">{activity.text}</p>
-                          <p className="text-gray-400 text-xs">{activity.time}</p>
+                          <p className="text-foreground text-sm">{activity.text}</p>
+                          <p className="text-muted-foreground text-xs">{activity.time}</p>
                         </div>
                       </div>
                       {index < recentActivities.length - 1 && (
@@ -425,7 +435,7 @@ export const DashBoardPage = () => {
             </div>
           </div>
          
-          <div className="w-[1105px] h-[1700px] bg-[#19191F] border-[3px] border-[#393D47] rounded-[8px] mt-[30px] p-6">
+          <div className="w-full bg-card border border-border rounded-lg mt-8 p-6">
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-2">
           <button
@@ -433,8 +443,8 @@ export const DashBoardPage = () => {
             className={cn(
               "text-sm rounded-lg h-8 px-4",
               activeTab === "active"
-                ? "bg-gray-700 text-white"
-                : "bg-gray-900 text-gray-400 border border-gray-700"
+                ? "bg-muted text-foreground"
+                : "bg-card text-muted-foreground border border-muted"
             )}
           >
             Active Cases ({caseCards.length})
@@ -444,8 +454,8 @@ export const DashBoardPage = () => {
             className={cn(
               "text-sm rounded-lg h-8 px-4",
               activeTab === "archived"
-                ? "bg-gray-700 text-white"
-                : "bg-gray-900 text-gray-400 border border-gray-700"
+                ? "bg-muted text-white"
+                : "bg-card text-muted-foreground border border-muted"
             )}
           >
             Archived Cases (0)
@@ -457,7 +467,7 @@ export const DashBoardPage = () => {
       </div>
 
       {caseCards.length === 0 ? (
-        <div className="text-center text-gray-400 py-8">
+        <div className="text-center text-muted-foreground py-8">
           <p>No cases found. Create your first case to get started!</p>
         </div>
       ) : (
@@ -465,7 +475,7 @@ export const DashBoardPage = () => {
           {caseCards.map((card) => (
             <div
               key={card.id}
-              className="flex flex-col justify-between items-center w-[440px] h-[370px] p-4 bg-[#19191F] border border-[#393D47] rounded-[8px]"
+              className="flex flex-col justify-between items-center w-[440px] h-[430px] p-4 bg-card border border rounded-[8px]"
             >
               <img
               src={card.image}
@@ -478,7 +488,7 @@ export const DashBoardPage = () => {
               <h3 className="text-white text-lg font-bold text-center mb-1">
                 {card.attackType || "Untitled Case"}
               </h3>
-              <div className="text-sm text-gray-400 text-center mb-2">
+              <div className="text-sm text-muted-foreground text-center mb-2">
                 Team: {card.team} | Last Activity: {card.lastActivity}
               </div>
               <div className="flex justify-between items-center w-full text-xs mb-1">
@@ -495,23 +505,29 @@ export const DashBoardPage = () => {
                         : "bg-green-400"
                     )}
                   ></span>
-                  <span className="text-gray-300 capitalize">{card.priority}</span>
+                  <span className="text-muted-foreground capitalize">{card.priority}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                  <span className="text-gray-300">Ongoing</span>
+                  <span className="text-muted-foreground">Ongoing</span>
                 </div>
               </div>
               <Progress
               value={card.progress}
-              className="w-full h-3 bg-gray-800 mb-3 [&>div]:bg-green-500"
+              className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
               />
 
               <Link to={`/evidence-viewer/${card.id}`}>
-                <button className="bg-[#633ae8] text-white text-sm px-14 py-2 rounded hover:bg-gray-800">
+                <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
                   View Evidence Details
                 </button>
               </Link>
+              
+              <Link to={`/case-management/${card.id}`}>
+                <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
+                  View Details
+                </button>
+              </Link>             
             </div>
           ))}
         </div>
