@@ -34,7 +34,7 @@ export function CreateCaseForm(): JSX.Element {
     const stored = localStorage.getItem("cases");
     const cases = stored ? JSON.parse(stored) : [];
 
-    const newId = `case-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newId = cases.length > 0 ? Math.max(...cases.map((c: any) => c.id || 0)) + 1 : 1;
 
     const newCase = {
       id: newId,
@@ -44,7 +44,6 @@ export function CreateCaseForm(): JSX.Element {
       image:
         "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
     };
-
 
     cases.push(newCase);
     localStorage.setItem("cases", JSON.stringify(cases));

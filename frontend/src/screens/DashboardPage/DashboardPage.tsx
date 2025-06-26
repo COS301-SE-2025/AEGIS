@@ -111,6 +111,60 @@ interface CaseCard {
   image: string;
 }
 
+// interface Activity {
+//   icon: React.ElementType;
+//   text: string;
+//   time: string;
+// }
+
+// const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
+
+// useEffect(() => {
+//   const cases = JSON.parse(localStorage.getItem("cases") || "[]");
+//   const evidence = JSON.parse(localStorage.getItem("evidenceFiles") || "[]");
+
+//   const activities: Activity[] = [];
+
+//   // Add case creation activities
+//   cases.forEach((c: any) => {
+//     if (c.createdAt) {
+//       activities.push({
+//         icon: Briefcase,
+//         text: `Case created: ${c.creator} opened "${c.description || c.attackType || 'Untitled'}"`,
+//         time: timeAgo(c.createdAt),
+//       });
+//     }
+//   });
+
+//   // Add evidence upload activities
+//   evidence.forEach((e: any) => {
+//     if (e.uploadedAt) {
+//       const relatedCase = cases.find((c: any) => String(c.id) === String(e.caseId));
+//       const caseName = relatedCase?.description || relatedCase?.attackType || "Unknown Case";
+//       activities.push({
+//         icon: FileText,
+//         text: `Evidence uploaded to case "${caseName}"`,
+//         time: timeAgo(e.uploadedAt),
+//       });
+//     }
+//   });
+
+//   // Sort by time (most recent first)
+//   activities.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+//   setRecentActivities(activities);
+// }, []);
+
+// function timeAgo(iso: string): string {
+//   const date = new Date(iso);
+//   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+
+//   if (seconds < 60) return `${seconds}s ago`;
+//   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+//   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+//   return `${Math.floor(seconds / 86400)}d ago`;
+// }
+
 
 export default function Dashboard() {
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
@@ -376,9 +430,9 @@ export const DashBoardPage = () => {
             {/* Extra spacing before next row */}
                 <div className="mt-[100px] flex gap-6">
                 {/* Threat Landscape Card */}
-<div className="overflow-hidden w-[550px] h-[366px] rounded-lg border bg-card p-6">
-  <h2 className="font-bold text-white text-lg mb-2">Threat Landscape</h2>
-  <p className="text-gray-400 text-sm mb-4">Graph: Evidence relationship between cases</p>
+                <div className="overflow-hidden w-[550px] h-[366px] rounded-lg border bg-card p-6">
+                  <h2 className="font-bold text-white text-lg mb-2">Threat Landscape</h2>
+                  <p className="text-gray-400 text-sm mb-4">Graph: Evidence relationship between cases</p>
 
                   <div className="w-full h-[265px] overflow-auto cursor-grab active:cursor-grabbing">
                     <svg className="min-w-[600px] min-h-[265px]">
