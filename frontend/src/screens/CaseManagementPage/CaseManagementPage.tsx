@@ -21,6 +21,7 @@ import {ShareButton} from "../ShareCasePage/sharecasebutton";
 //
 import { useParams } from 'react-router-dom';
 
+
 export const CaseManagementPage = () => {
 const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
@@ -32,11 +33,42 @@ const storedUser = sessionStorage.getItem("user");
     .toUpperCase();
 
 const userRole = "admin"; // for now
-const caseName = "Malware"; 
-const { caseId } = useParams();
-if (!caseId) {
-  return <div className="p-6 text-red-500">No case selected.</div>;
-}
+ 
+// Define the CaseData type
+type CaseData = {
+  id: string;
+  creator: string;
+  team: string[]; // assuming it's always an array
+  priority: string;
+  attackType: string;
+  description: string;
+  createdAt: string;    // ISO date string
+  updatedAt: string;    // ISO date string
+  lastActivity: string; // e.g., "2025-06-25"
+  evidence: any[];      // you could define a type if you know structure of evidence
+  image: string;
+  progress: number;
+};
+
+
+//case ID
+const { caseId } = useParams<{ caseId: string }>();
+
+
+
+const [caseData, setCaseData] = useState<CaseData | null>(null);
+
+useEffect(() => {
+  const storedCases = localStorage.getItem("cases");
+  if (storedCases && caseId) {
+    const cases = JSON.parse(storedCases);
+    const found = cases.find((c: any) => c.id === caseId);
+    setCaseData(found);
+  }
+}, [caseId]);
+
+const caseName = caseData?.attackType || "Unknown Case";
+
 
 <SidebarToggleButton />
 
@@ -259,7 +291,9 @@ console.log("Current caseId:", caseId);
               <button className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500">
                 <Share2 className="w-4 h-4" />
                   {userRole === "admin" && (
-                  <ShareButton caseId={caseId} caseName={caseName} />
+                  //<ShareButton caseId={caseId} caseName={caseName} />
+                  <ShareButton caseId={caseId || ""} caseName={caseName} />
+
                 )}
               </button>
               <button
@@ -309,80 +343,111 @@ console.log("Current caseId:", caseId);
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Case Details Section */}
-            <div className="lg:col-span-1">
-              <div className="bg-card border border-bg-accent rounded-lg p-6 mb-6">
-                {/* Case Title and Threat Level */}
-                <div className="flex justify-between items-start mb-6">
-                  <h2 className="text-xl font-bold text-foreground">
-                    <br />Malware
-                  </h2>
-                  <span className="bg-red-900/30 text-red-400 border border-red-400 rounded-full px-3 py-1 text-sm">
-                    Critical
-                  </span>
-                </div>
+          {/* Case Details Section */}
+          <div className="lg:col-span-1">
+            <div className="bg-card border border-bg-accent rounded-lg p-6 mb-6">
+              {/* Case Title and Threat Level */}
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-foreground">
+                  {caseData?.attackType || "No Attack Type"}
+                </h2>
+                <p className="text-muted-foreground mt-1">
+                  {caseData?.priority || "Unknown Priority"}
+                </p>
+                <p className="text-muted-foreground mt-1">
+                  {caseData?.description || "No description"}
+                </p>
+              </div>
 
-                {/* Status */}
-                <div className="mb-6">
-                  <h3 className="text-muted-foreground mb-2">Status:</h3>
-                  <p className="text-foreground">Ongoing</p>
-                </div>
+              {/* Status */}
+              <div className="mb-6">
+                <h3 className="text-muted-foreground mb-2">Status:</h3>
+                <p className="text-foreground">
+                  {caseData?.progress === 100 ? "Completed" : "Ongoing"}
+                </p>
+              </div>
 
-                {/* Assigned Team */}
-                <div className="mb-6">
-                  <h3 className="text-muted-foreground mb-4">Assigned Team</h3>
-                  <div className="space-y-3">
-                    {teamMembers.map((member) => (
-                      <div key={member.id} className="flex items-center gap-3">
+              {/* Assigned Team */}
+              <div className="mb-6">
+                <h3 className="text-muted-foreground mb-4">Assigned Team</h3>
+                <div className="space-y-3">
+                  {Array.isArray(caseData?.team) && caseData.team.length > 0 ? (
+                    caseData.team.map((member: string, index: number) => (
+                      <div key={member} className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                           <span className="text-foreground text-sm font-medium">
-                            {member.name.split(' ').map(n => n[0]).join('')}
+                            {member.split(" ").map((n) => n[0]).join("").toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <span className="text-foreground">{member.name}</span>
-                          <span className="text-muted-foreground ml-2">({member.role})</span>
+                          <span className="text-foreground">{member}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground">No team assigned.</p>
+                  )}
                 </div>
+              </div>
 
-                {/* Timestamps */}
-                <div className="mb-6">
-                  <h3 className="text-muted-foreground mb-2">Timestamps:</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-muted-foreground text-sm">Created:</p>
-                      <p className="text-foreground">2025-03-20</p>
-                      <p className="text-foreground">8:09:00</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-sm">Last Updated:</p>
-                      <p className="text-foreground">2025-05-20</p>
-                      <p className="text-foreground">7:14:30</p>
-                    </div>
+              {/* Timestamps */}
+              <div className="mb-6">
+                <h3 className="text-muted-foreground mb-2">Timestamps:</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-muted-foreground text-sm">Created:</p>
+                    <p className="text-foreground">
+                      {caseData?.createdAt
+                        ? new Date(caseData.createdAt).toLocaleDateString()
+                        : "N/A"}
+                    </p>
+                    <p className="text-foreground">
+                      {caseData?.createdAt
+                        ? new Date(caseData.createdAt).toLocaleTimeString()
+                        : "N/A"}
+                    </p>
                   </div>
-                </div>
-
-                {/* Associated Evidence */}
-                <div>
-              <Link to="/evidence-viewer" className="block">
-                <h3 className="text-muted-foreground mb-4 hover:text-gray-300 cursor-pointer transition-colors">
-                  Associated Evidence:
-                </h3>
-              </Link>
-                  <div className="space-y-3">
-                    {evidenceItems.map((item) => (
-                      <div key={item.id} className="flex items-center gap-3">
-                        <Paperclip className="w-5 h-5 text-blue-500" />
-                        <span className="text-blue-500 hover:text-blue-400 cursor-pointer">{item.name}</span>
-                      </div>
-                    ))}
+                  <div>
+                    <p className="text-muted-foreground text-sm">Last Updated:</p>
+                    <p className="text-foreground">
+                      {caseData?.updatedAt
+                        ? new Date(caseData.updatedAt).toLocaleDateString()
+                        : "N/A"}
+                    </p>
+                    <p className="text-foreground">
+                      {caseData?.updatedAt
+                        ? new Date(caseData.updatedAt).toLocaleTimeString()
+                        : "N/A"}
+                    </p>
                   </div>
                 </div>
               </div>
+
+    {/* Associated Evidence */}
+    <div>
+      <Link to="/evidence-viewer" className="block">
+        <h3 className="text-muted-foreground mb-4 hover:text-gray-300 cursor-pointer transition-colors">
+          Associated Evidence:
+        </h3>
+      </Link>
+      <div className="space-y-3">
+        {Array.isArray(caseData?.evidence) && caseData.evidence.length > 0 ? (
+          caseData.evidence.map((item: any, index: number) => (
+            <div key={index} className="flex items-center gap-3">
+              <Paperclip className="w-5 h-5 text-blue-500" />
+              <span className="text-blue-500 hover:text-blue-400 cursor-pointer">
+                {item.name || `Evidence #${index + 1}`}
+              </span>
             </div>
+          ))
+        ) : (
+          <p className="text-muted-foreground">No evidence attached.</p>
+        )}
+      </div>
+    </div>
+  </div>
+</div>
+
 
             {/* Investigation Timeline Section */}
             <div className="lg:col-span-2">
