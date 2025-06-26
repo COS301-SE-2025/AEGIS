@@ -206,6 +206,14 @@ export default function Dashboard() {
 }
 
 export const DashBoardPage = () => {
+  const storedUser = sessionStorage.getItem("user");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
+  const initials = displayName
+    .split(" ")
+    .map((part: string) => part[0])
+    .join("")
+    .toUpperCase();
   const [activeTab, setActiveTab] = useState("active");
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
   useEffect(() => {
@@ -289,14 +297,16 @@ export const DashBoardPage = () => {
         </nav>
 
         {/* User Profile */}
-        <div className="border-t border-muted pt-4">
+        <div className="border-t border-bg-accent pt-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
-              <Link to="/profile" ><span className="text-white font-medium">AU</span></Link>
+            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+              <Link to="/profile">
+                <span className="text-foreground font-medium">{initials}</span>
+              </Link>
             </div>
             <div>
-              <p className="font-semibold text-white">Agent User</p>
-              <p className="text-muted-foreground text-sm">user@dfir.com</p>
+              <p className="font-semibold text-foreground">{displayName}</p>
+              <p className="text-muted-foreground text-sm">{user?.email || "user@dfir.com"}</p>
             </div>
           </div>
         </div>
@@ -337,7 +347,7 @@ export const DashBoardPage = () => {
                 <Settings className="w-6 h-6" />
               </button></Link>
               <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                <Link to="/profile" ><span className="text-white font-medium text-sm">AU</span></Link>
+                <Link to="/profile" ><span className="text-white font-medium text-sm">{initials}</span></Link>
               </div>
             </div>
           </div>
