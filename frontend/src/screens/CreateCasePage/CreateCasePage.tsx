@@ -21,6 +21,26 @@ export function CreateCaseForm(): JSX.Element {
   });
 
   type CreateCaseFormField = keyof typeof form;
+  // Mock activity logging function
+  const logActivity = (caseId: string, action: string, details: any = {}) => {
+    const activities = JSON.parse(localStorage.getItem("caseActivities") || "[]");
+    
+    const newActivity = {
+      id: `activity-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      caseId,
+      action,
+      details,
+      timestamp: new Date().toISOString(),
+      user: form.creator || "Unknown User",
+      userRole: "Case Creator"
+    };
+
+    activities.push(newActivity);
+    localStorage.setItem("caseActivities", JSON.stringify(activities));
+    
+    // Optional: Console log for debugging
+    console.log("Activity logged:", newActivity);
+  };
 
   const handleChange =
     (field: CreateCaseFormField) =>
@@ -48,6 +68,16 @@ export function CreateCaseForm(): JSX.Element {
 
     cases.push(newCase);
     localStorage.setItem("cases", JSON.stringify(cases));
+
+     // Log the case creation activity
+    logActivity(newId, "Case Created", {
+      priority: form.priority,
+      attackType: form.attackType,
+      team: form.team,
+      description: form.description.substring(0, 100) + "..." // Truncate for logging
+    });
+
+    
     window.location.href = "/dashboard";
   };
 
@@ -129,7 +159,10 @@ export function CreateCaseForm(): JSX.Element {
               type="button"
               variant="outline"
               className="border-cyan-500 text-primary hover:bg-cyan-800/10"
-              onClick={() => (window.location.href = "/assign-case-members")}
+              onClick={() => {
+                logActivity("temp-id", "Assigned Members");
+                window.location.href = "/assign-case-members";
+              }}
             >
               Assign Case Members
             </Button>
@@ -138,7 +171,10 @@ export function CreateCaseForm(): JSX.Element {
               type="button"
               variant="outline"
               className="border-purple-500 text-purple-500 hover:bg-purple-500/10"
-              onClick={() => (window.location.href = "/upload-evidence")}
+              onClick={() => {
+                logActivity("temp-id", "Uploaded Evidence");
+                window.location.href = "/upload-evidence";
+              }}
             >
               Upload Evidence
             </Button>
