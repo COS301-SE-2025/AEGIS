@@ -18,7 +18,8 @@ import { Link } from "react-router-dom";
 //thati added
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 import {ShareButton} from "../ShareCasePage/sharecasebutton";
-
+//
+import { useParams } from 'react-router-dom';
 
 export const CaseManagementPage = () => {
 const storedUser = sessionStorage.getItem("user");
@@ -32,14 +33,53 @@ const storedUser = sessionStorage.getItem("user");
 
 const userRole = "admin"; // for now
 const caseName = "Malware"; 
-const caseId = "case-abc-123"; 
+const { caseId } = useParams();
+if (!caseId) {
+  return <div className="p-6 text-red-500">No case selected.</div>;
+}
+
 <SidebarToggleButton />
 
   // Timeline event data
-  const [timelineEvents, setTimelineEvents] = useState<{ date: string; time: string; description: string }[]>(() => {
+  const [timelineEvents, setTimelineEvents] = useState<{ date: string; time: string; description: string }[]>([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+// 1. Load timeline data when component mounts or caseId changes
+useEffect(() => {
+  if (caseId) {
     const saved = localStorage.getItem(`timeline-${caseId}`);
-    return saved ? JSON.parse(saved) : [];
-  });  
+    if (saved) {
+      try {
+        const parsedEvents = JSON.parse(saved);
+        setTimelineEvents(parsedEvents);
+        console.log(`Loaded ${parsedEvents.length} events for case ${caseId}`);
+      } catch (error) {
+        console.warn(`Failed to parse timeline for case ${caseId}:`, error);
+        setTimelineEvents([]);
+      }
+    } else {
+      setTimelineEvents([]);
+    }
+
+    setHasLoaded(true); //  Only set after loading finishes
+  }
+}, [caseId]);
+
+
+// 2. Save timeline data whenever it changes (but only if we have a valid caseId)
+useEffect(() => {
+  if (caseId && hasLoaded) {
+    try {
+      localStorage.setItem(`timeline-${caseId}`, JSON.stringify(timelineEvents));
+      console.log(`Saved ${timelineEvents.length} events for case ${caseId}`);
+    } catch (error) {
+      console.error(`Failed to save timeline for case ${caseId}:`, error);
+    }
+  }
+}, [timelineEvents, caseId, hasLoaded]);
+
+  
+  
   const [newEventDescription, setNewEventDescription] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -58,20 +98,22 @@ const caseId = "case-abc-123";
     return { date, time };
   };
 
-  const addEvent = () => {
-    if (newEventDescription.trim()) {
-      const { date, time } = getCurrentTimestamp();
-      const newEvent = {
-        date,
-        time,
-        description: newEventDescription.trim()
-      };
+    const addEvent = () => {
+      if (newEventDescription.trim()) {
+        const { date, time } = getCurrentTimestamp();
+        const newEvent = { date, time, description: newEventDescription.trim() };
+        
+        setTimelineEvents(prevEvents => [...prevEvents, newEvent]); //  use previous events
+        setNewEventDescription('');
+        setShowAddForm(false);
+        console.log("Adding event:", newEvent);
+console.log("Current caseId:", caseId);
+
+      }
       
-      setTimelineEvents([...timelineEvents, newEvent]);
-      setNewEventDescription('');
-      setShowAddForm(false);
-    }
-  };
+    };
+
+
     const deleteEvent = (index: number) => {
     const updatedEvents = [...timelineEvents];
     updatedEvents.splice(index, 1);
@@ -84,9 +126,7 @@ const caseId = "case-abc-123";
       addEvent();
     }
   };
-  useEffect(() => {
-  localStorage.setItem(`timeline-${caseId}`, JSON.stringify(timelineEvents));
-}, [timelineEvents]);
+
 
   // User data for assigned team
   const teamMembers = [
@@ -131,7 +171,7 @@ const caseId = "case-abc-123";
 
           <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
             <FileText className="w-6 h-6" />
-            <span className="text-lg">Case Management</span>
+            <span className="text-lg font">Case Management</span>
           </div>
 
           <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
@@ -255,7 +295,7 @@ const caseId = "case-abc-123";
                   setFilterKeyword('');
                   setFilterDate('');
                 }}
-                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                className="px-4 py-2 bg-gray-500 text-foreground rounded-md hover:bg-gray-600 transition-colors"
               >
                 Clear
               </button>
@@ -351,7 +391,7 @@ const caseId = "case-abc-123";
                   <h2 className="text-2xl font-semibold text-foreground">Investigation Timeline</h2>
                   <button
                     onClick={() => setShowAddForm(!showAddForm)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-foreground rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     <Plus size={18} />
                     Add Event
@@ -380,7 +420,7 @@ const caseId = "case-abc-123";
                       <button
                         onClick={addEvent}
                         disabled={!newEventDescription.trim()}
-                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                        className="px-4 py-2 bg-green-600 text-foreground rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                       >
                         Add
                       </button>
@@ -389,7 +429,7 @@ const caseId = "case-abc-123";
                           setShowAddForm(false);
                           setNewEventDescription('');
                         }}
-                        className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                        className="px-4 py-2 bg-gray-500 text-foreground rounded-md hover:bg-gray-600 transition-colors"
                       >
                         Cancel
                       </button>
