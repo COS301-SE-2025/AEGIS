@@ -291,7 +291,7 @@ const simulateTyping = (chatId: number, userName?: string) => {
     const hasRealMessages = Object.values(chatMessages).some(msgs => msgs.length > 0);
     const activeGroups = groups.filter(g => g.hasStarted);
 
-    if (activeGroups.length > 0 && hasRealMessages) {
+    if (activeGroups.length > 0 || hasRealMessages) {
       localStorage.setItem('chatGroups', JSON.stringify(activeGroups));
       localStorage.setItem('chatMessages', JSON.stringify(chatMessages));
     }

@@ -44,23 +44,6 @@ const metricCards = [
   },
 ];
 
-const recentActivities = [
-  {
-    icon: File,
-    text: "Team Alpha assigned to Case #AEG-1234",
-    time: "yesterday",
-  },
-  {
-    icon: AlertTriangle,
-    text: "High severity alert triggered in Case #AEG-9012",
-    time: "5 hours ago",
-  },
-  {
-    icon: Briefcase,
-    text: "Case #AEG-5678 status updated to 'Analysis' by Team Delta",
-    time: "3 hours ago",
-  },
-];
 
 // Default fallback cases (only used if localStorage is empty)
 const defaultCaseCards = [
@@ -260,6 +243,25 @@ export default function Dashboard() {
 }
 
 export const DashBoardPage = () => {
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+
+useEffect(() => {
+  try {
+    const stored = localStorage.getItem("caseActivities");
+    const parsed = stored ? JSON.parse(stored) : [];
+
+    const sorted = parsed.sort((a: any, b: any) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+    setRecentActivities(sorted.slice(0, 10));
+  } catch (err) {
+    console.error("Error loading activities:", err);
+    setRecentActivities([]); // Fallback to empty
+  }
+}, []);
+
+
   const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
@@ -400,8 +402,8 @@ export const DashBoardPage = () => {
               <Link to="/settings" ><button className="p-2 text-muted-foreground hover:text-white transition-colors">
                 <Settings className="w-6 h-6" />
               </button></Link>
-              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                <Link to="/profile" ><span className="text-white font-medium text-sm">{initials}</span></Link>
+              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                <Link to="/profile" ><span className="text-foreground font-medium text-sm">{initials}</span></Link>
               </div>
             </div>
           </div>
@@ -466,26 +468,37 @@ export const DashBoardPage = () => {
                  {/* Recent Activities Card */}
             <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border bg-card p-6 overflow-auto">
               <h2 className="font-bold text-foreground text-lg mb-4">Recent Activities</h2>
-              <ul className="space-y-4">
-                {recentActivities.map((activity, index) => {
-                  const Icon = activity.icon;
-                  const isAlert = Icon === AlertTriangle;
-                  return (
-                    <li key={index}>
-                      <div className="flex items-start gap-3 mb-2">
-                        <Icon className={`w-5 h-5 mt-1 ${isAlert ? 'text-red-500' : 'text-foreground'}`} />
-                        <div>
-                          <p className="text-foreground text-sm">{activity.text}</p>
-                          <p className="text-muted-foreground text-xs">{activity.time}</p>
+                <ul className="space-y-4">
+                  {recentActivities.map((activity, index) => {
+                    const getIcon = (action: string) => {
+                      if (action.toLowerCase().includes("alert")) return AlertTriangle;
+                      if (action.toLowerCase().includes("case")) return Briefcase;
+                      return FileText;
+                    };
+
+                    const Icon = getIcon(activity.action);
+                    const timeAgo = activity.timestamp
+                      ? new Date(activity.timestamp).toLocaleString()
+                      : "unknown time";
+
+                    return (
+                      <li key={index}>
+                        <div className="flex items-start gap-3 mb-2">
+                          <Icon className="w-5 h-5 mt-1 text-foreground" />
+                          <div>
+                            <p className="text-foreground text-sm">
+                              <strong>{activity.user}</strong> {activity.action}
+                            </p>
+                            <p className="text-muted-foreground text-xs">{timeAgo}</p>
+                          </div>
                         </div>
-                      </div>
-                      {index < recentActivities.length - 1 && (
-                        <hr className="w-[500px] border-t-[2px] border-[#8C8D8B] transform rotate-[0.053deg]" />
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+                        {index < recentActivities.length - 1 && (
+                          <hr className="w-[500px] border-t-[2px] border-[#8C8D8B]" />
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
             </div>
           </div>
          
