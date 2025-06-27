@@ -38,17 +38,34 @@ const userRole = "admin"; // for now
 type CaseData = {
   id: string;
   creator: string;
-  team: string[]; // assuming it's always an array
+  team: string[]; // optional, e.g., ["Team Alpha"]
   priority: string;
   attackType: string;
   description: string;
-  createdAt: string;    // ISO date string
-  updatedAt: string;    // ISO date string
-  lastActivity: string; // e.g., "2025-06-25"
-  evidence: any[];      // you could define a type if you know structure of evidence
-  image: string;
+  createdAt: string;
+  updatedAt: string;
+  lastActivity: string;
   progress: number;
+  image: string;
 };
+
+const getPriorityStyle = (priority: string) => {
+  switch (priority.toLowerCase()) {
+    case "low":
+      return "text-green-600 border border-green-600";
+    case "mid":
+      return "text-yellow-600 border border-yellow-600";
+    case "high":
+      return "text-red-600 border border-red-600";
+    case "critical":
+      return "text-red-800 border border-red-800";
+    case "time-sensitive":
+      return "text-purple-600 border border-purple-600";
+    default:
+      return "text-gray-600 border border-gray-600";
+  }
+};
+
 
 
 //case ID
@@ -62,13 +79,57 @@ useEffect(() => {
   const storedCases = localStorage.getItem("cases");
   if (storedCases && caseId) {
     const cases = JSON.parse(storedCases);
-    const found = cases.find((c: any) => c.id === caseId);
+    const found = cases.find((c: any) => String(c.id) === caseId);
     setCaseData(found);
   }
 }, [caseId]);
 
-const caseName = caseData?.attackType || "Unknown Case";
+const [assignedMembers, setAssignedMembers] = useState<{ name: string; role: string }[]>([]);
 
+useEffect(() => {
+  const stored = localStorage.getItem("caseMembers");
+  if (stored && caseId) {
+    const parsed = JSON.parse(stored);
+    const entry = parsed.find((e: any) => String(e.caseId) === caseId);
+    if (entry) {
+      setAssignedMembers(entry.members);
+    }
+  }
+}, [caseId]);
+
+const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
+
+useEffect(() => {
+  const stored = localStorage.getItem("evidenceFiles");
+  if (stored && caseId) {
+    const parsed = JSON.parse(stored);
+    const matching = parsed.filter((e: any) => String(e.caseId) === caseId);
+    setEvidenceItems(matching);
+  }
+}, [caseId]);
+
+console.log("Current caseId from URL:", caseId);
+
+
+const caseName = caseData?.attackType || "Unknown Case";
+console.log("Loaded case data:", caseData);
+console.log("Assigned members:", assignedMembers);
+console.log("Evidence items:", evidenceItems);
+
+
+const updateCaseTimestamp = (caseId: string) => {
+  const stored = localStorage.getItem("cases");
+  if (!stored) return;
+
+  const cases = JSON.parse(stored);
+  const updated = cases.map((c: any) =>
+    String(c.id) === caseId
+      ? { ...c, updatedAt: new Date().toISOString() }
+      : c
+  );
+
+  localStorage.setItem("cases", JSON.stringify(updated));
+};
 
 <SidebarToggleButton />
 
@@ -170,12 +231,12 @@ console.log("Current caseId:", caseId);
   ];
 
   // Evidence data
-  const evidenceItems = [
-    { name: "System logs (Shadow.exe...)", id: 1 },
-    { name: "Malware Sample", id: 2 },
-    { name: "screenshot_evidence", id: 3 },
+  // const evidenceItems = [
+  //   { name: "System logs (Shadow.exe...)", id: 1 },
+  //   { name: "Malware Sample", id: 2 },
+  //   { name: "screenshot_evidence", id: 3 },
 
-  ];
+  // ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -348,16 +409,26 @@ console.log("Current caseId:", caseId);
             <div className="bg-card border border-bg-accent rounded-lg p-6 mb-6">
               {/* Case Title and Threat Level */}
               <div className="mb-6">
+              <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-foreground">
                   {caseData?.attackType || "No Attack Type"}
                 </h2>
-                <p className="text-muted-foreground mt-1">
-                  {caseData?.priority || "Unknown Priority"}
-                </p>
-                <p className="text-muted-foreground mt-1">
-                  {caseData?.description || "No description"}
-                </p>
+
+                {caseData?.priority && (
+                  <span
+                    className={`px-3 py-0.5 text-xs font-medium rounded-full ${getPriorityStyle(caseData.priority)}`}
+                  >
+                    {caseData.priority.toUpperCase()}
+                  </span>
+                )}
               </div>
+
+              <p className="text-muted-foreground mt-1">
+                {caseData?.description || "No description"}
+              </p>
+            </div>
+
+
 
               {/* Status */}
               <div className="mb-6">
@@ -367,20 +438,27 @@ console.log("Current caseId:", caseId);
                 </p>
               </div>
 
-              {/* Assigned Team */}
+             {/* Assigned Team */}
               <div className="mb-6">
                 <h3 className="text-muted-foreground mb-4">Assigned Team</h3>
                 <div className="space-y-3">
-                  {Array.isArray(caseData?.team) && caseData.team.length > 0 ? (
-                    caseData.team.map((member: string, index: number) => (
-                      <div key={member} className="flex items-center gap-3">
+                  {Array.isArray(assignedMembers) && assignedMembers.length > 0 ? (
+                    assignedMembers.map((member, index) => (
+                      <div key={index} className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                           <span className="text-foreground text-sm font-medium">
-                            {member.split(" ").map((n) => n[0]).join("").toUpperCase()}
+                            {member.name
+                              .split(" ")
+                              .map((n: string) => n[0])
+                              .join("")
+                              .toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <span className="text-foreground">{member}</span>
+                          <span className="text-foreground">{member.name}</span>
+                          <span className="text-muted-foreground ml-2">
+                            ({member.role})
+                          </span>
                         </div>
                       </div>
                     ))
@@ -389,6 +467,7 @@ console.log("Current caseId:", caseId);
                   )}
                 </div>
               </div>
+
 
               {/* Timestamps */}
               <div className="mb-6">
@@ -425,14 +504,14 @@ console.log("Current caseId:", caseId);
 
     {/* Associated Evidence */}
     <div>
-      <Link to="/evidence-viewer" className="block">
+      <Link to={`/evidence-viewer/${caseId}`} className="block" onClick={() => updateCaseTimestamp(caseId!)}>
         <h3 className="text-muted-foreground mb-4 hover:text-gray-300 cursor-pointer transition-colors">
           Associated Evidence:
         </h3>
       </Link>
       <div className="space-y-3">
-        {Array.isArray(caseData?.evidence) && caseData.evidence.length > 0 ? (
-          caseData.evidence.map((item: any, index: number) => (
+        {Array.isArray(evidenceItems) && evidenceItems.length > 0 ? (
+        evidenceItems.map((item: any, index: number) => (
             <div key={index} className="flex items-center gap-3">
               <Paperclip className="w-5 h-5 text-blue-500" />
               <span className="text-blue-500 hover:text-blue-400 cursor-pointer">
@@ -483,12 +562,16 @@ console.log("Current caseId:", caseId);
                         autoFocus
                       />
                       <button
-                        onClick={addEvent}
+                        onClick={() => {
+                          addEvent(); // your existing function
+                          if (caseId) updateCaseTimestamp(caseId); // update the timestamp after adding the event
+                        }}
                         disabled={!newEventDescription.trim()}
                         className="px-4 py-2 bg-green-600 text-foreground rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                       >
                         Add
                       </button>
+
                       <button
                         onClick={() => {
                           setShowAddForm(false);

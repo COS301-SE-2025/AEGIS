@@ -85,9 +85,35 @@ export function AssignCaseMembersForm(): JSX.Element {
         return;
       }
     }
-    alert("Members assigned!");
-    console.log("Assigned members:", members);
+    // alert("Members assigned!");
+    // console.log("Assigned members:", members);
+
+    
+  const cases = JSON.parse(localStorage.getItem("cases") || "[]");
+const currentCase = cases[cases.length - 1]; // last created
+
+const currentCaseId = String(currentCase.id);
+
+const allCaseMembers = JSON.parse(localStorage.getItem("caseMembers") || "[]");
+
+// remove old entry for the same case, if any
+const updatedCaseMembers = allCaseMembers.filter(
+  (entry: any) => entry.caseId !== currentCaseId
+);
+
+// add new entry
+updatedCaseMembers.push({
+  caseId: currentCaseId,
+  members: members.map(m => ({ name: m.user, role: m.role }))
+});
+
+// store updated list
+localStorage.setItem("caseMembers", JSON.stringify(updatedCaseMembers));
+
+alert("Members assigned!");
+navigate("/create-case"); 
   };
+
 
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">

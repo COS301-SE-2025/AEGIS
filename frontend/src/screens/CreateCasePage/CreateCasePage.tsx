@@ -48,37 +48,118 @@ export function CreateCaseForm(): JSX.Element {
       setForm({ ...form, [field]: e.target.value });
     };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  // const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  //   e.preventDefault();
 
-    const stored = localStorage.getItem("cases");
-    const cases = stored ? JSON.parse(stored) : [];
 
-    const newId = cases.length > 0 ? Math.max(...cases.map((c: any) => c.id || 0)) + 1 : 1;
 
-    const newCase = {
-      id: newId,
-      ...form,
-      lastActivity: new Date().toISOString().split("T")[0],
-      progress: 0,
-      image:
-        "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
-    };
+  //   const stored = localStorage.getItem("cases");
+  //   const cases = stored ? JSON.parse(stored) : [];
 
-    cases.push(newCase);
-    localStorage.setItem("cases", JSON.stringify(cases));
+  //   const newId = cases.length > 0 ? Math.max(...cases.map((c: any) => c.id || 0)) + 1 : 1;
 
-     // Log the case creation activity
-    logActivity(newId, "Case Created", {
-      priority: form.priority,
-      attackType: form.attackType,
-      team: form.team,
-      description: form.description.substring(0, 100) + "..." // Truncate for logging
-    });
+  //   const newCase = {
+  //     id: newId,
+  //     ...form,
+  //     lastActivity: new Date().toISOString().split("T")[0],
+  //     progress: 0,
+  //     image:
+  //       "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
+  //   };
+
+  //   cases.push(newCase);
+  //   localStorage.setItem("cases", JSON.stringify(cases));
+
+  //    // Log the case creation activity
+  //   logActivity(newId.toString(), "Case Created", {
+  //     priority: form.priority,
+  //     attackType: form.attackType,
+  //     team: form.team,
+  //     description: form.description.substring(0, 100) + "..." // Truncate for logging
+  //   });
 
     
-    window.location.href = "/dashboard";
+  //   window.location.href = "/dashboard";
+  // };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+
+  const stored = localStorage.getItem("cases");
+  const cases = stored ? JSON.parse(stored) : [];
+
+  const pendingCaseId = Number(localStorage.getItem("pendingCaseId"));
+  let updatedCases;
+
+  const now = new Date().toISOString();
+
+  const updatedCase = {
+  id: pendingCaseId || (cases.length > 0 ? Math.max(...cases.map((c: any) => c.id || 0)) + 1 : 1),
+  ...form,
+  lastActivity: now.split("T")[0],
+  createdAt: cases.find((c: any) => c.id === pendingCaseId)?.createdAt || now, // preserve original createdAt if exists
+  updatedAt: now, // update on final submit
+  progress: 0,
+  image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
   };
+
+  const existingIndex = cases.findIndex((c: any) => c.id === updatedCase.id);
+  if (existingIndex >= 0) {
+    cases[existingIndex] = updatedCase;
+    updatedCases = cases;
+  } else {
+    updatedCases = [...cases, updatedCase];
+  }
+
+  localStorage.setItem("cases", JSON.stringify(updatedCases));
+  localStorage.removeItem("pendingCaseId");
+
+  logActivity(updatedCase.id.toString(), "Case Created", {
+    priority: form.priority,
+    attackType: form.attackType,
+    team: form.team,
+    description: form.description.substring(0, 100) + "..."
+  });
+
+  window.location.href = "/dashboard";
+};
+
+
+ const ensureCaseExists = () => {
+  let pendingCaseId = localStorage.getItem("pendingCaseId");
+  const stored = localStorage.getItem("cases");
+  const cases = stored ? JSON.parse(stored) : [];
+
+  if (pendingCaseId) {
+    const existing = cases.find((c: any) => String(c.id) === pendingCaseId);
+    if (existing) return Number(pendingCaseId);
+  }
+
+  const newId = cases.length > 0 ? Math.max(...cases.map((c: any) => c.id || 0)) + 1 : 1;
+
+  const now = new Date().toISOString();
+
+  const placeholderCase = {
+  id: newId,
+  creator: form.creator || "Unknown",
+  team: form.team || "Unassigned",
+  priority: form.priority || "low",
+  attackType: form.attackType || "",
+  description: form.description || "",
+  lastActivity: now.split("T")[0],
+  createdAt: now,
+  updatedAt: now,
+  progress: 0,
+  image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7"
+  };
+
+
+  localStorage.setItem("pendingCaseId", String(newId));
+  localStorage.setItem("cases", JSON.stringify([...cases, placeholderCase]));
+
+  return newId;
+};
+
 
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
@@ -159,7 +240,9 @@ export function CreateCaseForm(): JSX.Element {
               variant="outline"
               className="border-cyan-500 text-primary hover:bg-cyan-800/10"
               onClick={() => {
-                logActivity("temp-id", "Assigned Members");
+                //logActivity("temp-id", "Assigned Members");
+                const id = ensureCaseExists();
+                logActivity(id.toString(), "Assigned Members");
                 window.location.href = "/assign-case-members";
               }}
             >
@@ -171,7 +254,9 @@ export function CreateCaseForm(): JSX.Element {
               variant="outline"
               className="border-purple-500 text-purple-500 hover:bg-purple-500/10"
               onClick={() => {
-                logActivity("temp-id", "Uploaded Evidence");
+                //logActivity("temp-id", "Uploaded Evidence");
+                const id = ensureCaseExists();
+                logActivity(id.toString(), "Uploaded Evidence");
                 window.location.href = "/upload-evidence";
               }}
             >
