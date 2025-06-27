@@ -147,6 +147,57 @@ CREATE TABLE IF NOT EXISTS cases (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
+-- Enable UUID generation
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Now create your table
+CREATE TABLE thread_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    thread_id UUID NOT NULL,
+    parent_message_id UUID,
+    user_id UUID NOT NULL,
+    message TEXT NOT NULL,
+    is_approved BOOLEAN,
+    approved_by UUID,
+    approved_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE message_mentions (
+    message_id UUID NOT NULL,
+    mentioned_user_id UUID NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (message_id, mentioned_user_id)
+);
+CREATE TABLE message_reactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    message_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    reaction TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE threads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE thread_messages
+  ADD FOREIGN KEY (parent_message_id) REFERENCES thread_messages(id),
+  ADD FOREIGN KEY (thread_id) REFERENCES threads(id),
+  ADD FOREIGN KEY (user_id) REFERENCES users(id);
+
+ALTER TABLE message_mentions
+  ADD FOREIGN KEY (message_id) REFERENCES thread_messages(id),
+  ADD FOREIGN KEY (mentioned_user_id) REFERENCES users(id);
+
+ALTER TABLE message_reactions
+  ADD FOREIGN KEY (message_id) REFERENCES thread_messages(id),
+  ADD FOREIGN KEY (user_id) REFERENCES users(id);
+
 -- Evidence table
 CREATE TABLE IF NOT EXISTS evidence (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

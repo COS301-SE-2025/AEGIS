@@ -1,14 +1,15 @@
 package unit_tests
 
 import (
-	"aegis-api/services/listusers"
+	listusers "aegis-api/services_/case/ListUsers"
 	"context"
+	"testing"
+	"time"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"testing"
-	"time"
 )
 
 func TestListUsers(t *testing.T) {

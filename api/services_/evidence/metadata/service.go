@@ -4,10 +4,11 @@ import (
 	upload "aegis-api/services_/evidence/upload"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"os"
 
-	"gorm.io/datatypes"
+	"github.com/google/uuid"
 )
 
 type Service struct {
@@ -33,9 +34,13 @@ func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
 	if err != nil {
 		return err
 	}
-
+	metadataJSON, err := json.Marshal(data.Metadata)
+	if err != nil {
+		return err
+	}
 	// Construct the evidence record
 	e := &Evidence{
+		ID:         uuid.New(),
 		CaseID:     data.CaseID,
 		UploadedBy: data.UploadedBy,
 		Filename:   data.Filename,
@@ -43,7 +48,7 @@ func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
 		IpfsCID:    cid,
 		FileSize:   data.FileSize,
 		Checksum:   checksum,
-		Metadata:   datatypes.JSONMap(convertToJSONMap(data.Metadata)), // Convert map[string]string to datatypes.JSONMap
+		Metadata:   string(metadataJSON), // Convert map[string]string to datatypes.JSONMap
 	}
 
 	// Save the record

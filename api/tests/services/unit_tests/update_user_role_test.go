@@ -6,9 +6,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+
 	//"github.com/stretchr/testify/mock"
 
-	"aegis-api/services/update_user_role"
+	"aegis-api/services_/user/update_user_role"
 )
 
 // MockUserRepo mocks the UserRepository interface

@@ -1,19 +1,18 @@
 package handlers
 
-
 import (
 	"github.com/gin-gonic/gin"
 )
 
-type Handler struct {
-	AdminHandler    AdminInterface
-	AuthHandler     AuthInterface
-	CaseHandler     CaseInterface
-	EvidenceHandler EvidenceInterface
-	UserHandler     UserInterface
-	ThreadHandler   ThreadInterface
-	MessageHandler  MessageInterface
-}
+// type Handler struct {
+// 	AdminHandler    AdminInterface
+// 	AuthHandler     AuthInterface
+// 	CaseHandler     CaseInterface
+// 	EvidenceHandler EvidenceInterface
+// 	UserHandler     UserInterface
+// 	ThreadHandler   ThreadInterface
+// 	MessageHandler  MessageInterface
+// }
 
 type AdminInterface interface {
 	RegisterUser(c *gin.Context)   //create
@@ -30,21 +29,21 @@ type AuthInterface interface {
 	//RequestPasswordReset(c *gin.Context)
 }
 
-type CaseInterface interface {
-	CreateCase(c *gin.Context) //CreateCase
+// type CaseInterface interface {
+// 	CreateCase(c *gin.Context) //CreateCase
 
-	//GetCaseByID(c *gin.Context) //missing service function
-	ListAllCases(c *gin.Context)      // GetAllCases
-	ListFilteredCases(c *gin.Context) // GetFilteredCases
-	ListCasesByUserID(c *gin.Context) // GetCasesByUser
+// 	//GetCaseByID(c *gin.Context) //missing service function
+// 	ListAllCases(c *gin.Context)      // GetAllCases
+// 	ListFilteredCases(c *gin.Context) // GetFilteredCases
+// 	ListCasesByUserID(c *gin.Context) // GetCasesByUser
 
-	UpdateCaseStatus(c *gin.Context) // UpdateCaseStatus
+// 	UpdateCaseStatus(c *gin.Context) // UpdateCaseStatus
 
-	RemoveCollaborator(c *gin.Context) // RemoveCollaborator
+// 	RemoveCollaborator(c *gin.Context) // RemoveCollaborator
 
-	CreateCollaborator(c *gin.Context) // AssignUserToCase
-	ListCollaborators(c *gin.Context)  // GetCollaborators
-}
+// 	CreateCollaborator(c *gin.Context) // AssignUserToCase
+// 	ListCollaborators(c *gin.Context)  // GetCollaborators
+// }
 
 type EvidenceInterface interface {
 	//UploadEvidence(c *gin.Context) //UNDER REVIEW
@@ -91,23 +90,23 @@ type MessageInterface interface {
 	RemoveReaction(c *gin.Context)
 }
 
-func NewHandler(
-	admin AdminInterface,
-	auth AuthInterface,
-	case_ CaseInterface,
-	evidence EvidenceInterface,
-	user UserInterface,
-	thread_ ThreadInterface,
-	message MessageInterface,
+// func NewHandler(
+// 	admin AdminInterface,
+// 	auth AuthInterface,
+// 	case_ CaseInterface,
+// 	evidence EvidenceInterface,
+// 	user UserInterface,
+// 	thread_ ThreadInterface,
+// 	message MessageInterface,
 
-) *Handler {
-	return &Handler{
-		AdminHandler:    admin,
-		AuthHandler:     auth,
-		CaseHandler:     case_,
-		EvidenceHandler: evidence,
-		UserHandler:     user,
-		ThreadHandler:   thread_,
-		MessageHandler:  message,
-	}
-}
+// ) *Handler {
+// 	return &Handler{
+// 		AdminHandler:    admin,
+// 		AuthHandler:     auth,
+// 		CaseHandler:     case_,
+// 		EvidenceHandler: evidence,
+// 		UserHandler:     user,
+// 		ThreadHandler:   thread_,
+// 		MessageHandler:  message,
+// 	}
+// }

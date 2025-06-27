@@ -1,4 +1,4 @@
-package isolation
+package unit_tests
 
 import (
 	"context"
@@ -8,8 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	services "aegis-api/services/case_tag"
-	
+	services "aegis-api/services_/case/case_tags"
 )
 
 type MockCaseTagRepository struct {
@@ -30,7 +29,6 @@ func (m *MockCaseTagRepository) GetTagsForCase(ctx context.Context, caseID uuid.
 	args := m.Called(ctx, caseID)
 	return args.Get(0).([]string), args.Error(1)
 }
-
 
 func TestTagCase(t *testing.T) {
 	mockRepo := new(MockCaseTagRepository)

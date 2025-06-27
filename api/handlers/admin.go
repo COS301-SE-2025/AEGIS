@@ -1,34 +1,36 @@
 package handlers
 
 import (
-	"aegis-api/services/ListUsers"
-	_ "aegis-api/services/ListUsers"
 	"aegis-api/services/delete_user"
-	"aegis-api/services/registration"
-	"aegis-api/services/update_user_role"
+	"aegis-api/services_/auth/registration"
+	"aegis-api/services_/case/ListUsers"
+	_ "aegis-api/services_/case/ListUsers"
+
+	//"aegis-api/services_/auth/update_user_role"
 	"aegis-api/structs"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 type AdminHandler struct {
-	registerUser   *registration.RegistrationService
-	listUser       ListUsers.ListUserService
-	updateUserRole *update_user_role.UserService
-	deleteUser     *delete_user.UserDeleteService
+	registerUser *registration.RegistrationService
+	listUser     ListUsers.ListUserService
+	//updateUserRole *update_user_role.UserService
+	deleteUser *delete_user.UserDeleteService
 }
 
 func NewAdminServices( //constructor
 	registerUser *registration.RegistrationService,
 	listUser ListUsers.ListUserService,
-	updateUserRole *update_user_role.UserService,
+	//updateUserRole *update_user_role.UserService,
 	deleteUser *delete_user.UserDeleteService,
 ) *AdminHandler {
 	return &AdminHandler{
-		registerUser:   registerUser,
-		listUser:       listUser,
-		updateUserRole: updateUserRole,
-		deleteUser:     deleteUser,
+		registerUser: registerUser,
+		listUser:     listUser,
+		//updateUserRole: updateUserRole,
+		deleteUser: deleteUser,
 	}
 }
 
@@ -204,41 +206,42 @@ func (as AdminHandler) GetUserActivity(c *gin.Context) {
 // @Failure 404 {object} structs.ErrorResponse "User not found"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/admin/users/{user_id}/role [put]
-func (as AdminHandler) UpdateUserRole(c *gin.Context) {
-	userID := c.Param("user_id")
-	if userID == "" {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "User ID is required",
-		})
-		return
-	}
 
-	var req structs.UpdateUserRoleRequest
-	if err := c.ShouldBind(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "invalid_request",
-			Message: "Invalid role data",
-			Details: err.Error(),
-		})
-		return
-	}
+// func (as AdminHandler) UpdateUserRole(c *gin.Context) {
+// 	userID := c.Param("user_id")
+// 	if userID == "" {
+// 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+// 			Error:   "invalid_request",
+// 			Message: "User ID is required",
+// 		})
+// 		return
+// 	}
 
-	err := as.updateUserRole.UpdateUserRole(userID, req.Role)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-			Error:   "role_update_failed",
-			Message: "Could not update user role",
-			Details: err.Error(),
-		})
-		return
-	}
+// 	var req structs.UpdateUserRoleRequest
+// 	if err := c.ShouldBind(&req); err != nil {
+// 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+// 			Error:   "invalid_request",
+// 			Message: "Invalid role data",
+// 			Details: err.Error(),
+// 		})
+// 		return
+// 	}
 
-	c.JSON(http.StatusOK, structs.SuccessResponse{
-		Success: true,
-		Message: "User role updated successfully",
-	})
-}
+// 	err := as.updateUserRole.UpdateUserRole(userID, req.Role)
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+// 			Error:   "role_update_failed",
+// 			Message: "Could not update user role",
+// 			Details: err.Error(),
+// 		})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusOK, structs.SuccessResponse{
+// 		Success: true,
+// 		Message: "User role updated successfully",
+// 	})
+// }
 
 /*
 // @Summary Get all user roles

@@ -1,9 +1,9 @@
-package metadata_test
+package unit_tests
 
 import (
 	"aegis-api/services_/evidence/metadata"
+	"encoding/json"
 	"errors"
-	"io"
 	"os"
 	"testing"
 
@@ -11,40 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-type MockRepo struct {
-	mock.Mock
-}
-
-func (m *MockRepo) SaveEvidence(e *metadata.Evidence) error {
-	args := m.Called(e)
-	return args.Error(0)
-}
-
-func (m *MockRepo) FindEvidenceByID(id uuid.UUID) (*metadata.Evidence, error) {
-	args := m.Called(id)
-	if ev := args.Get(0); ev != nil {
-		return ev.(*metadata.Evidence), args.Error(1)
-	}
-	return nil, args.Error(1)
-}
-
-type MockIPFS struct {
-	mock.Mock
-}
-
-func (m *MockIPFS) UploadFile(path string) (string, error) {
-	args := m.Called(path)
-	return args.String(0), args.Error(1)
-}
-
-func (m *MockIPFS) Download(cid string) (io.ReadCloser, error) {
-	args := m.Called(cid)
-	if r := args.Get(0); r != nil {
-		return r.(io.ReadCloser), args.Error(1)
-	}
-	return nil, args.Error(1)
-}
 
 func TestUploadEvidence_Success(t *testing.T) {
 	mockRepo := new(MockRepo)
@@ -79,7 +45,12 @@ func TestUploadEvidence_Success(t *testing.T) {
 		assert.Equal(t, req.Filename, e.Filename)
 		assert.Equal(t, req.FileType, e.FileType)
 		assert.Equal(t, fakeCID, e.IpfsCID)
-		assert.Equal(t, req.Metadata["source"], e.Metadata["source"])
+
+		// Unmarshal JSON metadata
+		var meta map[string]string
+		err := json.Unmarshal([]byte(e.Metadata), &meta)
+		assert.NoError(t, err)
+		assert.Equal(t, req.Metadata["source"], meta["source"])
 	})
 
 	err = service.UploadEvidence(req)
@@ -88,7 +59,6 @@ func TestUploadEvidence_Success(t *testing.T) {
 	mockIPFS.AssertExpectations(t)
 	mockRepo.AssertExpectations(t)
 }
-
 func TestUploadEvidence_IPFSError(t *testing.T) {
 	mockRepo := new(MockRepo)
 	mockIPFS := new(MockIPFS)

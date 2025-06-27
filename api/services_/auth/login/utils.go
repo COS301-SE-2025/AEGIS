@@ -1,23 +1,31 @@
 package login
 
 import (
-	"os"
 	"time"
+
+	"aegis-api/middleware"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+// var jwtSecret = []byte(os.Getenv("JWT_SECRET_KEY"))
 
-func ComparePasswords(hashedPwd, plainPwd string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPwd), []byte(plainPwd))
-	return err == nil
-}
+// func ComparePasswords(hashedPwd, plainPwd string) bool {
+// 	err := bcrypt.CompareHashAndPassword([]byte(hashedPwd), []byte(plainPwd))
+// 	return err == nil
+// }
 
-func GetJWTSecret() []byte {
-	return jwtSecret
-}
+// func SetJWTSecret(secret string) {
+// 	jwtSecret = []byte(secret)
+// }
+
+// func GetJWTSecret() []byte {
+// 	if len(jwtSecret) == 0 {
+// 		panic("JWT secret not initialized. Call SetJWTSecret first.")
+// 	}
+// 	return jwtSecret
+// }
 
 // HashPassword hashes a plain-text password using bcrypt.
 func HashPassword(password string) (string, error) {
@@ -42,7 +50,7 @@ func GenerateJWT(userID, email, role string, tokenVersion int, customExpiry *tim
 	}
 
 	claims := jwt.MapClaims{
-		"sub":           userID,
+		"user_id":       userID,
 		"email":         email,
 		"role":          role,
 		"token_version": tokenVersion,
@@ -51,5 +59,6 @@ func GenerateJWT(userID, email, role string, tokenVersion int, customExpiry *tim
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	return token.SignedString(middleware.GetJWTSecret())
+
 }
