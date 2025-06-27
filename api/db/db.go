@@ -2,9 +2,9 @@ package db
 
 import (
 	"fmt"
+	"github.com/joho/godotenv"
 	"log"
 	"os"
-	"github.com/joho/godotenv"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -13,29 +13,44 @@ import (
 var DB *gorm.DB
 
 func InitDB() error {
-		if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: .env file not loaded")
 	}
-	
-	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"),
-		os.Getenv("DB_PORT"),
-	)
 
+	// Set defaults for local development
+	host := getEnvOrDefault("DB_HOST", "postgres")
+	port := getEnvOrDefault("DB_PORT", "5432")
+	user := getEnvOrDefault("DB_USER", "app_user")
+	password := getEnvOrDefault("DB_PASSWORD", "dev_secure_password123")
+	dbname := getEnvOrDefault("DB_NAME", "app_database")
+
+	log.Printf("Attempting database connection to %s:%s as user %s for database %s", host, port, user, dbname)
+
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		host, user, password, dbname, port)
 
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize database, got error %w", err)
 	}
+
+	//err = DB.AutoMigrate(&registration.User{})
+	//if err != nil {
+	//	return fmt.Errorf("failed to auto-migrate database, got error %w", err)
+	//}
 
 	log.Println("✅ Connected to the database!")
 	return nil
 }
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 // package db
 
 // import (
@@ -56,4 +71,3 @@ func InitDB() error {
 // 	})
 // 	return err
 // }
-
