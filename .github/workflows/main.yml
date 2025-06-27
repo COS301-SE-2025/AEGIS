@@ -86,7 +86,7 @@ jobs:
       - name: Run go test
         run: |
           cd api
-          go test ./tests/services -coverprofile=coverage.out
+          go test ./tests/services/... -v -race -covermode=atomic -coverprofile=coverage.out
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
