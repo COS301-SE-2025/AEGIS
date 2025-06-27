@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.10",
