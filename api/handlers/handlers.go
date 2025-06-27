@@ -1,18 +1,18 @@
 package handlers
 
-
 import (
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
-	AdminHandler    AdminInterface
-	AuthHandler     AuthInterface
-	CaseHandler     CaseInterface
-	EvidenceHandler EvidenceInterface
-	UserHandler     UserInterface
-	ThreadHandler   ThreadInterface
-	MessageHandler  MessageInterface
+	AdminHandler AdminInterface
+	//AuthHandler     AuthInterface
+	//CaseHandler     CaseInterface
+	//EvidenceHandler EvidenceInterface
+	//UserHandler     UserInterface
+	//ThreadHandler   ThreadInterface
+	//MessageHandler  MessageInterface
+	//ChatHandler     ChatInterface
 }
 
 type AdminInterface interface {
@@ -26,7 +26,7 @@ type AdminInterface interface {
 type AuthInterface interface {
 	Login(c *gin.Context) // Login
 	Logout(c *gin.Context)
-	//ResetPassword(c *gin.Context)
+	ResetPassword(c *gin.Context)
 	//RequestPasswordReset(c *gin.Context)
 }
 
@@ -91,23 +91,49 @@ type MessageInterface interface {
 	RemoveReaction(c *gin.Context)
 }
 
+type ChatInterface interface {
+	CreateGroup(c *gin.Context)
+	GetGroup(c *gin.Context)
+	GetUserGroups(c *gin.Context)
+	UpdateGroup(c *gin.Context)
+	DeleteGroup(c *gin.Context)
+	AddMemberToGroup(c *gin.Context)
+	RemoveMemberFromGroup(c *gin.Context)
+	IsUserInGroup(c *gin.Context)
+	UpdateLastMessage(c *gin.Context)
+
+	CreateMessage(ctx gin.Context)
+	GetMessageByID(ctx gin.Context)
+	GetMessages(ctx gin.Context)
+	SearchMessages(ctx gin.Context)
+	UpdateMessage(ctx gin.Context)
+	DeleteMessage(ctx gin.Context)
+	MarkMessagesAsRead(ctx gin.Context)
+	GetUnreadCount(ctx gin.Context)
+
+	GetGroupMembers(ctx gin.Context)
+	IsGroupAdmin(ctx gin.Context)
+}
+
 func NewHandler(
 	admin AdminInterface,
-	auth AuthInterface,
-	case_ CaseInterface,
-	evidence EvidenceInterface,
-	user UserInterface,
-	thread_ ThreadInterface,
-	message MessageInterface,
+	//auth AuthInterface,
+	//case_ CaseInterface,
+	//evidence EvidenceInterface,
+	//user UserInterface,
+	//thread_ ThreadInterface,
+	//message MessageInterface,
+	//chat ChatInterface,
 
 ) *Handler {
 	return &Handler{
-		AdminHandler:    admin,
-		AuthHandler:     auth,
-		CaseHandler:     case_,
-		EvidenceHandler: evidence,
-		UserHandler:     user,
-		ThreadHandler:   thread_,
-		MessageHandler:  message,
+		AdminHandler: admin,
+		//AuthHandler:     auth,
+		//CaseHandler:     case_,
+		//EvidenceHandler: evidence,
+		//UserHandler:     user,
+		//ThreadHandler:   thread_,
+		//MessageHandler:  message,
+		//ChatHandler:     chat,
 	}
 }

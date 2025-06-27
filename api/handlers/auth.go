@@ -1,29 +1,28 @@
 package handlers
 
 import (
-	"aegis-api/services/login/auth"
-	"aegis-api/services/reset_password"
+	"aegis-api/services_/auth/login"
+	"aegis-api/services_/auth/reset_password"
 	"aegis-api/structs"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
 
-type AuthServices struct {
-	authService          *auth.AuthService
-	passwordReset        *reset_password.PasswordResetService
-	passwordResetRequest *reset_password.PasswordResetService
+type AuthHandler struct {
+	authService   *login.AuthService
+	passwordReset *reset_password.PasswordResetService
 }
 
 func NewAuthHandler(
-	authService *auth.AuthService,
+	authService *login.AuthService,
 	passwordReset *reset_password.PasswordResetService,
-	passwordResetRequest *reset_password.PasswordResetService,
+	//passwordResetRequest *reset_password.PasswordResetService,
 
-) *AuthServices {
-	return &AuthServices{
-		authService:          authService,
-		passwordReset:        passwordReset,
-		passwordResetRequest: passwordResetRequest,
+) *AuthHandler {
+	return &AuthHandler{
+		authService:   authService,
+		passwordReset: passwordReset,
+		//passwordResetRequest: passwordResetRequest,
 	}
 }
 
@@ -39,12 +38,12 @@ type EmailSender interface {
 // @Accept multipart/form-data
 // @Produce json
 // @Param request body structs.LoginRequest true "User login credentials (email and password)"
-// @Success 200 {object} structs.SuccessResponse{data=auth.LoginResponse} "Login successful"
+// @Success 200 {object} structs.SuccessResponse{data=login.LoginResponse} "Login successful"
 // @Failure 400 {object} structs.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} structs.ErrorResponse "Authentication failed (invalid credentials)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/login [post]
-func (m AuthServices) Login(c *gin.Context) {
+func (m AuthHandler) Login(c *gin.Context) {
 	var req structs.LoginRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -82,7 +81,7 @@ func (m AuthServices) Login(c *gin.Context) {
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized (user not authenticated)"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/logout [delete]
-func (m AuthServices) Logout(c *gin.Context) { //COME BACK TO THIS
+func (m AuthHandler) Logout(c *gin.Context) { //COME BACK TO THIS
 
 	//_, exists := c.Get("userID") //_ -> userID
 	//if !exists {
@@ -162,7 +161,7 @@ func (m AuthServices) RequestPasswordReset(c *gin.Context) {
 // @Failure 400 {object} structs.ErrorResponse "Invalid token or password requirements not met"
 // @Failure 500 {object} structs.ErrorResponse "Internal server error"
 // @Router /api/v1/auth/reset-password [post]
-func (m AuthServices) ResetPassword(c *gin.Context) {
+func (m AuthHandler) ResetPassword(c *gin.Context) {
 	var req structs.PasswordResetBody
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{

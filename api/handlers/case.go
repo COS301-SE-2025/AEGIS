@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"aegis-api/middleware"
-	"aegis-api/services/ListCases"
-	"aegis-api/services/case_assign"
-	"aegis-api/services/case_creation"
 	"aegis-api/services/case_status_update"
 	"aegis-api/services/get_collaborators"
 	"aegis-api/services/remove_user_from_case"
+	"aegis-api/services_/case/ListCases"
+	"aegis-api/services_/case/case_assign"
+	"aegis-api/services_/case/case_creation"
 	"aegis-api/structs"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -83,7 +83,7 @@ func (cs CaseServices) CreateCase(c *gin.Context) {
 		Status:             apiReq.Status,
 		Priority:           apiReq.Priority,
 		InvestigationStage: apiReq.InvestigationStage,
-		CreatedBy:          creatorID.(string),
+		CreatedByFullName:  creatorID.(string),
 		TeamName:           apiReq.TeamName,
 	}
 	newCase, err := cs.createCase.CreateCase(serviceReq)

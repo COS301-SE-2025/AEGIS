@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"aegis-api/services/ListUsers"
-	_ "aegis-api/services/ListUsers"
 	"aegis-api/services/delete_user"
-	"aegis-api/services/registration"
-	"aegis-api/services/update_user_role"
+	"aegis-api/services_/auth/registration"
+	"aegis-api/services_/case/ListUsers"
+	"aegis-api/services_/user/update_user_role"
 	"aegis-api/structs"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -18,7 +17,7 @@ type AdminHandler struct {
 	deleteUser     *delete_user.UserDeleteService
 }
 
-func NewAdminServices( //constructor
+func NewAdminHandler( //constructor
 	registerUser *registration.RegistrationService,
 	listUser ListUsers.ListUserService,
 	updateUserRole *update_user_role.UserService,
@@ -93,7 +92,7 @@ func (as AdminHandler) RegisterUser(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
-// @Success 200 {object} structs.SuccessResponse{data=[]listusers.User} "Users retrieved successfully"
+// @Success 200 {object} structs.SuccessResponse{data=[]ListUsers.User} "Users retrieved successfully"
 // @Failure 400 {object} structs.ErrorResponse "Invalid query parameters"
 // @Failure 401 {object} structs.ErrorResponse "Unauthorized"
 // @Failure 403 {object} structs.ErrorResponse "Forbidden - insufficient permissions"
