@@ -31,7 +31,6 @@ export function UploadEvidenceForm(): JSX.Element {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData();
     // Get the current case from localStorage
     const cases = JSON.parse(localStorage.getItem("cases") || "[]");
     const currentCase = cases[cases.length - 1]; // last created
@@ -127,7 +126,7 @@ export function UploadEvidenceForm(): JSX.Element {
               type="button"
               variant="outline"
               className="border-muted-foreground text-muted-foreground hover:bg-muted"
-              onClick={() => navigate("/create-case")}
+              onClick={() => navigate(-1)}
             >
               Back
             </Button>
@@ -135,6 +134,7 @@ export function UploadEvidenceForm(): JSX.Element {
             <Button
               type="submit"
               className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => navigate(-1)}
             >
               Done
             </Button>

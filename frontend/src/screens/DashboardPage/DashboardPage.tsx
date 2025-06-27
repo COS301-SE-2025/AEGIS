@@ -10,10 +10,9 @@ import {
   CheckCircle,
   Database,
   AlertTriangle,
-  File,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { SetStateAction, useState } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
 import { useEffect } from "react";
@@ -46,44 +45,10 @@ const metricCards = [
 
 
 // Default fallback cases (only used if localStorage is empty)
-const defaultCaseCards = [
-  {
-    id: 1,
-    creator: "System",
-    team: "Team Gamma",
-    priority: "critical",
-    attackType: "Malware infection analysis",
-    description: "System malware detected",
-    lastActivity: "Yesterday",
-    progress: 45,
-    image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
-  },
-  {
-    id: 2,
-    creator: "System",
-    team: "Team Alpha",
-    priority: "high",
-    attackType: "Data breach investigation",
-    description: "Unauthorized data access detected",
-    lastActivity: "2 hours ago",
-    progress: 72,
-    image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
-  },
-  {
-    id: 3,
-    creator: "System",
-    team: "Team Beta",
-    priority: "mid",
-    attackType: "Phishing campaign analysis",
-    description: "Suspicious email campaign identified",
-    lastActivity: "Today",
-    progress: 88,
-    image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
-  },
-];
+const defaultCaseCards: SetStateAction<CaseCard[]> = [];
 
 interface CaseCard {
-  id: number;
+  id: string;
   creator: string;
   team: string;
   priority: string;

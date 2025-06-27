@@ -17,8 +17,7 @@ import {ThemeProvider} from "./context/ThemeContext"
 import {FAQ} from "./screens/FAQ"
 import {About} from "./screens/About"
 import { TutorialsPage } from "./screens/TutorialsPage";  
-
-
+import NextStepsPage from "./screens/NextStepsPage/NextStepsPage";
 //FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
 import { UploadEvidenceForm } from "./screens/UploadEvidencePage/UploadEvidencePage";
@@ -50,6 +49,8 @@ export default function App() {
       <Route path = "/assign-case-members" element={<AssignCaseMembersForm />} />
       <Route path="/evidence-viewer/:caseId" element={<EvidenceViewer />} />
       <Route path="/case-management/:caseId" element={<CaseManagementPage />} />
+      <Route path="/case/:caseId/next-steps" element={<NextStepsPage />} />
+
       <Route path="/landing-page" element={<LandingPage />} />
       <Route path="/cases/:caseId/share" element={<ShareCaseForm />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
