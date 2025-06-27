@@ -1,18 +1,14 @@
 package unit_tests
 
 import (
-	"testing"
 	"errors"
+	"testing"
+
+	"aegis-api/services/get_collaborators"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"aegis-api/services/get_collaborators"
 )
-
-type MockRepo struct {
-	mock.Mock
-}
 
 func (m *MockRepo) GetCollaboratorsByCaseID(caseID uuid.UUID) ([]get_collaborators.Collaborator, error) {
 	args := m.Called(caseID)
@@ -67,7 +63,6 @@ func TestGetCollaborators_RepoError(t *testing.T) {
 	assert.EqualError(t, err, "database error")
 	mockRepo.AssertExpectations(t)
 }
-
 
 func TestGetCollaborators_MultipleResults(t *testing.T) {
 	mockRepo := new(MockRepo)

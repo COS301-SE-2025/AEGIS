@@ -1,15 +1,13 @@
 package unit_tests
 
 import (
+	"aegis-api/services_/case/ListCases"
+	"aegis-api/services_/case/case_creation"
 	"testing"
-	"aegis-api/services/ListCases"
-	"aegis-api/services/case_creation"
+
 	"github.com/stretchr/testify/assert"
 	//"github.com/stretchr/testify/mock"
 )
-
-
-
 
 func TestGetAllCases(t *testing.T) {
 	mockRepo := new(MockCaseQueryRepository)

@@ -3,8 +3,8 @@ package unit_tests
 import (
 	"testing"
 
-	"aegis-api/services/ListCases"
-	"aegis-api/services/case_creation"
+	"aegis-api/services_/case/ListCases"
+	"aegis-api/services_/case/case_creation"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

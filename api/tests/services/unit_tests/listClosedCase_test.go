@@ -1,12 +1,13 @@
 package unit_tests
 
 import (
+	"aegis-api/services_/case/ListClosedCases"
+	"context"
 	"testing"
 	"time"
-	"context"
-	"aegis-api/services/ListClosedCases"
-	"github.com/stretchr/testify/assert"
+
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

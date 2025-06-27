@@ -10,153 +10,153 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Link } from "react-router-dom";
 // @ts-ignore
-
 import useRegistrationForm from "./register";
 
 export const RegistrationPage = (): JSX.Element => {
-const { formData, errors, handleChange, handleSubmit } = useRegistrationForm();
+  const { formData, errors, handleChange, handleSubmit } = useRegistrationForm();
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden">
-      {/* Background Grid of 6 Image Tiles */}
-      <div className="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-0 z-0">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <div
-            key={index}
-            className="bg-cover bg-center"
-            style={{
-              backgroundImage:
-                "url('https://img.freepik.com/premium-photo/data-schemas-computer-data-technologies-data-protection-generative-ai_655310-724.jpg')",
-              filter: "brightness(1.0) saturate(2.5)",
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Dark overlay for better contrast */}
-      <div className="absolute inset-0 bg-black/40 z-10" />
-
-      {/* Registration Form Container */}
-      <div className="relative z-20 flex items-center justify-center min-h-screen px-4">
-        <Card className="w-full max-w-[615px] rounded-2xl bg-white/30 backdrop-blur-lg border border-white/20 shadow-2xl p-6 text-white">
-          <CardHeader className="p-0">
-            <div className="flex flex-col items-center">
-              <img
-                className="w-[100px] h-[90px] mb-6"
-                alt="Logo"
-                src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
-              />
-              <CardTitle className="text-3xl font-bold text-center mb-2 drop-shadow-md">
-                Create your AEGIS account
-              </CardTitle>
-              <p className="font-light text-lg mb-8 text-center drop-shadow-sm">
-                Enter your information to register
-              </p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] flex items-center justify-center px-4">
+      <div className="w-full max-w-xl">
+        <Card className="rounded-2xl shadow-xl border border-white/10 bg-white/5 backdrop-blur-md text-white">
+          <CardHeader className="text-center pt-8 pb-4">
+            <img
+              src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
+              alt="AEGIS Logo"
+              className="w-16 h-16 mx-auto mb-4"
+            />
+            <CardTitle className="text-2xl font-semibold drop-shadow-sm">
+              Create your AEGIS account
+            </CardTitle>
+            <p className="text-muted-foreground text-sm">
+              Enter your details to get started
+            </p>
           </CardHeader>
 
-          <CardContent className="p-0 space-y-6">
-            <form className="w-full space-y-6" onSubmit={handleSubmit}>
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-lg font-medium">
-                  Name
+          <CardContent className="px-6 py-8">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Name */}
+              <div>
+                <Label htmlFor="full_name" className="text-sm font-medium">
+                  Full Name
                 </Label>
                 <Input
-                  id="name"
-                  placeholder="Enter your Full Name"
-                  value={formData.name}
+                  id="full_name"
+                  placeholder="Jane Doe"
+                  value={formData.full_name}
                   onChange={handleChange}
-                  className="h-[50px] rounded-[10px] border-white/30 bg-white/50 text-white placeholder-white/80"
+                  className="h-11 bg-white/10 border border-white/20 placeholder-white/70 text-white"
                 />
-                  {errors.name && <p className="text-red-300 text-sm">{errors.name}</p>}
-
+                {errors.full_name && <p className="text-red-300 text-xs mt-1">{errors.fullName}</p>}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-lg font-medium">
-                  Email
+              {/* Email */}
+              <div>
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email Address
                 </Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="you@aegis.com"
                   value={formData.email}
                   onChange={handleChange}
-                  className="h-[50px] rounded-[10px] border-white/30 bg-white/50 text-white placeholder-white/80"
+                  className="h-11 bg-white/10 border border-white/20 placeholder-white/70 text-white"
                 />
-                {errors.email && <p className="text-red-300 text-sm">{errors.email}</p>}
-
+                {errors.email && <p className="text-red-300 text-xs mt-1">{errors.email}</p>}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-lg font-medium">
+              {/* Password */}
+              <div>
+                <Label htmlFor="password" className="text-sm font-medium">
                   Password
                 </Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Create a password"
+                  placeholder="Create a strong password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="h-[50px] rounded-[10px] border-white/30 bg-white/50 text-white placeholder-white/80"
+                  className="h-11 bg-white/10 border border-white/20 placeholder-white/70 text-white"
                 />
-                 {errors.password && (
-                <p className="text-red-300 text-sm">{errors.password}</p>
-                )}
+                {errors.password && <p className="text-red-300 text-xs mt-1">{errors.password}</p>}
               </div>
 
-              <div className="space-y-2">
-              <Label htmlFor="role" className="text-lg font-medium mb-2 block">
-                Role
-              </Label>
-              <select
-                id="role"
-                value={formData.role}
-                onChange={handleChange}
-                className="h-[50px] rounded-[10px] border-white/30 bg-white/50 text-white placeholder-white/80 px-4 focus:outline-none"
-                defaultValue=""
-              >
-                <option value="" disabled hidden className="text-gray-400">
-                  Select your role
-                </option>
-                <option className="text-black">Admin</option>
-                <option className="text-black">Incident Responder</option>
-                <option className="text-black">Forensics Analyst</option>
-                <option className="text-black">Malware Analyst</option>
-                <option className="text-black">Threat Intelligence Analyst</option>
-                <option className="text-black">DFIR Manager</option>
-                <option className="text-black">Legal/Compliance Liaison</option>
-              </select>
-              {errors.role && <p className="text-red-300 text-sm">{errors.role}</p>}
+              {/* Role */}
+              <div>
+                <Label htmlFor="role" className="text-sm font-medium">
+                  Role
+                </Label>
+                <select
+                  id="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className="h-11 bg-white/10 border border-white/20 text-white placeholder-white/70 w-full rounded-lg px-4 focus:outline-none"
+                >
+                  <option value="" disabled hidden>Select your role</option>
+                  {[
+                    "Admin",
+                    "Audit Reviewer",
+                    "Cloud Forensics Specialist",
+                    "Compliance Officer",
+                    "Detection Engineer",
+                    "DFIR Manager",
+                    "Digital Evidence Technician",
+                    "Disk Forensics Analyst",
+                    "Endpoint Forensics Analyst",
+                    "Evidence Archivist",
+                    "Forensic Analyst",
+                    "Forensics Analyst",
+                    "Generic user",
+                    "Image Forensics Analyst",
+                    "Incident Commander",
+                    "Incident Responder",
+                    "IT Infrastructure Liaison",
+                    "Legal Counsel",
+                    "Legal/Compliance Liaison",
+                    "Log Analyst",
+                    "Malware Analyst",
+                    "Memory Forensics Analyst",
+                    "Mobile Device Analyst",
+                    "Network Evidence Analyst",
+                    "Packet Analyst",
+                    "Policy Analyst",
+                    "Reverse Engineer",
+                    "SIEM Analyst",
+                    "SOC Analyst",
+                    "Threat Hunter",
+                    "Threat Intelligence Analyst",
+                    "Triage Analyst",
+                    "Training Coordinator",
+                    "Vulnerability Analyst"
+                  ].map((role) => (
+                    <option key={role} value={role} className="text-black">
+                      {role}
+                    </option>
+                  ))}
+                </select>
+                {errors.role && <p className="text-red-300 text-xs mt-1">{errors.role}</p>}
+              </div>
 
-            </div>
-            {errors.general && (
-      <p className="text-center text-red-400 text-sm">{errors.general}</p>
-    )}
+              {errors.general && (
+                <p className="text-center text-red-400 text-sm">{errors.general}</p>
+              )}
 
-
-
-              {/* Sign Up Button */}
+              {/* Submit */}
               <Button
                 type="submit"
-                className="w-full h-[60px] text-[22px] font-medium bg-[#1018ff] text-white hover:bg-[#0b13cc] transition"
+                className="w-full h-12 text-white font-semibold text-base bg-blue-600 hover:bg-blue-500 transition"
               >
                 Sign Up
               </Button>
 
-              {/* Already have an account? */}
-              <div className="text-center pt-2">
-                <p className="text-base">
-                  Already have an account?{" "}
-                  <Button
-                    variant="link"
-                    className="text-[#a0c9ff] text-lg font-light p-0 h-auto align-baseline hover:underline"
-                    asChild
-                  >
-                    <Link to="/">Sign in</Link>
-                  </Button>
-                </p>
-              </div>
+              {/* Redirect to login */}
+              <p className="text-center text-white/80 text-sm pt-2">
+                Already have an account?{" "}
+                <Link to="/" className="text-blue-300 hover:underline font-medium">
+                  Sign in
+                </Link>
+              </p>
             </form>
           </CardContent>
         </Card>
