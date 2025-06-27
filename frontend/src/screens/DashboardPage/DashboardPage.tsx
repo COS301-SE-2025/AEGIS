@@ -16,6 +16,7 @@ import { SetStateAction, useState } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
 import { useEffect } from "react";
+import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 
 
 
@@ -113,6 +114,7 @@ interface CaseCard {
 //   return `${Math.floor(seconds / 86400)}d ago`;
 // }
 
+<SidebarToggleButton />
 
 export default function Dashboard() {
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
@@ -294,11 +296,11 @@ useEffect(() => {
 
         {/* Navigation */}
         <nav className="flex-1 space-y-2">
+           
           <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
             <Home className="w-6 h-6" />
             <span className="text-lg">Dashboard</span>
           </div>
-
           <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <FileText className="w-6 h-6" />
             <Link to="/case-management"><span className="text-lg">Case Management</span></Link>
@@ -339,6 +341,7 @@ useEffect(() => {
         <div className="sticky top-0 bg-background border-b border-border p-4 z-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
+              <SidebarToggleButton/>
               <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
                 Dashboard
               </button>
