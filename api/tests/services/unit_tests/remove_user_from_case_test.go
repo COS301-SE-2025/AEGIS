@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"aegis-api/services/remove_user_from_case"
+	"aegis-api/services_/case/remove_user_from_case"
 )
 
 // MockRepository implements the Repository interface

@@ -6,7 +6,7 @@ import (
     "github.com/stretchr/testify/assert"
     "github.com/stretchr/testify/mock"
 
-    services  "aegis-api/services/Case_Evidence_Totals"
+    services  "aegis-api/services_/case/Case_Evidence_Totals"
 )
 
 // --- Mock definition ---

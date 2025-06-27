@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"aegis-api/models"
-	service "aegis-api/services/update_case_stage"
+	service "aegis-api/services_/case/update_case_Investigation_stage"
 	 "github.com/google/uuid" 
 )
 

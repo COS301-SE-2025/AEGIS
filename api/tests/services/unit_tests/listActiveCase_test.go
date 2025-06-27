@@ -2,7 +2,7 @@ package unit_tests
 import (
 	"testing"
 	"time"
-	"aegis-api/services/ListActiveCases"
+	"aegis-api/services_/case/ListActiveCases"
 	"github.com/stretchr/testify/assert"
 	"github.com/DATA-DOG/go-sqlmock"
 	"gorm.io/driver/postgres"
