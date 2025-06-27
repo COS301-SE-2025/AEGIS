@@ -93,7 +93,7 @@ const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
 
   cases.push(newCase);
   localStorage.setItem("cases", JSON.stringify(cases));
-  localStorage.setItem("currentCaseId", String(newCase.id)); // ✅ Save this for future use
+  localStorage.setItem("currentCaseId", String(newCase.id)); //  Save this for future use
 
   logActivity(String(newId), "Case Created", {
     priority: form.priority,

@@ -52,6 +52,19 @@ const useLoginForm = () => {
           "user",
           JSON.stringify({ email: payload.data.email, id: payload.data.id })
         );
+        // 1. Create audit entry
+        const loginAuditEntry = {
+          timestamp: new Date().toISOString(),
+          user: payload.data.email,
+          action: "User logged in",
+          userId: payload.data.id,
+        };
+
+        // 2. Store in localStorage under "audit-log"
+        const previousLogs = JSON.parse(localStorage.getItem("caseActivities") || "[]");
+        const updatedLogs = [loginAuditEntry, ...previousLogs];
+        localStorage.setItem("caseActivities", JSON.stringify(updatedLogs));
+
         navigate("/dashboard");
       } else {
         // Use general so your UI reads errors.general

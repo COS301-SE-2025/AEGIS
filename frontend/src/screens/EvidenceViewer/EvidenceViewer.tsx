@@ -246,6 +246,8 @@ const caseId = String(useParams().caseId);
   return saved ? JSON.parse(saved) : initialAnnotationThreads;
 });
 
+
+
 useEffect(() => {
   localStorage.setItem('annotationThreads', JSON.stringify(annotationThreads));
 }, [annotationThreads]);
@@ -494,9 +496,10 @@ function timeAgo(dateString: string): string {
               </div>
             <div className="flex items-center gap-6">
               <SidebarToggleButton/>
+              <Link to="/dashboard">
               <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                 Dashboard
-              </button>
+              </button></Link>
               <Link to="/case-management"><button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                 Case Management
               </button></Link>
@@ -504,9 +507,9 @@ function timeAgo(dateString: string): string {
 
                 Evidence Viewer
               </button></Link>
-              <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
-                <Link to="/secure-chat">Secure Chat</Link>
-              </button>
+              <Link to="/secure-chat"><button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                Secure Chat
+              </button></Link>
             </div>
             </div>
 

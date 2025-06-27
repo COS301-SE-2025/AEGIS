@@ -56,6 +56,22 @@ export function UploadEvidenceForm(): JSX.Element {
     }));
 
     localStorage.setItem("evidenceFiles", JSON.stringify([...allEvidence, ...newEvidence]));
+    // 1. Get current user info
+      const user = JSON.parse(sessionStorage.getItem("user") || "{}");
+
+      // 2. Create an audit log entry
+      const evidenceUploadLog = {
+        timestamp: new Date().toISOString(),
+        user: user.email || "Unknown user",
+        userId: user.id || "unknown",
+        action: `Uploaded ${files.length} evidence file(s) to case ${currentCase.id}`
+      };
+
+      // 3. Append to caseActivities log
+      const previousLogs = JSON.parse(localStorage.getItem("caseActivities") || "[]");
+      const updatedLogs = [evidenceUploadLog, ...previousLogs];
+      localStorage.setItem("caseActivities", JSON.stringify(updatedLogs));
+
     alert("Evidence uploaded successfully!");
     // navigate("/dashboard");
 

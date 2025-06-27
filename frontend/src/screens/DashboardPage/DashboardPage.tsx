@@ -211,7 +211,14 @@ export default function Dashboard() {
 
 export const DashBoardPage = () => {
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
-
+  const storedUser = sessionStorage.getItem("user");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
+  const initials = displayName
+    .split(" ")
+    .map((part: string) => part[0])
+    .join("")
+    .toUpperCase();
 useEffect(() => {
   try {
     const stored = localStorage.getItem("caseActivities");
@@ -229,14 +236,7 @@ useEffect(() => {
 }, []);
 
 
-  const storedUser = sessionStorage.getItem("user");
-  const user = storedUser ? JSON.parse(storedUser) : null;
-  const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
-  const initials = displayName
-    .split(" ")
-    .map((part: string) => part[0])
-    .join("")
-    .toUpperCase();
+
   const [activeTab, setActiveTab] = useState("active");
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
   useEffect(() => {
