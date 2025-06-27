@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 const useRegistrationForm = () => {
   const [formData, setFormData] = useState({
-    fullName: "",
+    full_name: "",
     email: "",
     password: "",
     role: "",
@@ -15,7 +15,7 @@ const useRegistrationForm = () => {
   const validate = () => {
     const newErrors = {};
 
-    if (!formData.fullName.trim()) {
+    if (!formData.full_name.trim()) {
       newErrors.fullName = "Full name is required";
     }
 

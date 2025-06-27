@@ -6,7 +6,8 @@ import (
 
 	"aegis-api/models"
 	service "aegis-api/services_/case/update_case_Investigation_stage"
-	 "github.com/google/uuid" 
+
+	"github.com/google/uuid"
 )
 
 // Fake repository that implements the interface

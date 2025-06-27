@@ -37,17 +37,17 @@ export const RegistrationPage = (): JSX.Element => {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Name */}
               <div>
-                <Label htmlFor="fullName" className="text-sm font-medium">
+                <Label htmlFor="full_name" className="text-sm font-medium">
                   Full Name
                 </Label>
                 <Input
-                  id="fullName"
+                  id="full_name"
                   placeholder="Jane Doe"
-                  value={formData.fullName}
+                  value={formData.full_name}
                   onChange={handleChange}
                   className="h-11 bg-white/10 border border-white/20 placeholder-white/70 text-white"
                 />
-                {errors.fullName && <p className="text-red-300 text-xs mt-1">{errors.fullName}</p>}
+                {errors.full_name && <p className="text-red-300 text-xs mt-1">{errors.fullName}</p>}
               </div>
 
               {/* Email */}

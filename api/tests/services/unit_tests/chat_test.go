@@ -113,6 +113,18 @@ func (m *MockChatRepository) UpdateMessage(ctx context.Context, message *chat.Me
 	panic("unimplemented")
 }
 
+// MarkMessagesAsDelivered implements chat.ChatRepository.
+func (m *MockChatRepository) MarkMessagesAsDelivered(ctx context.Context, groupID primitive.ObjectID, messageIDs []primitive.ObjectID, userEmail string) error {
+	args := m.Called(ctx, groupID, messageIDs, userEmail)
+	return args.Error(0)
+}
+
+// GetUndeliveredMessages implements chat.ChatRepository.
+func (m *MockChatRepository) GetUndeliveredMessages(ctx context.Context, userEmail string, limit int, before *primitive.ObjectID) ([]*chat.Message, error) {
+	args := m.Called(ctx, userEmail, limit, before)
+	return args.Get(0).([]*chat.Message), args.Error(1)
+}
+
 func (m *MockChatRepository) CreateGroup(ctx context.Context, group *chat.ChatGroup) error {
 	args := m.Called(ctx, group)
 	return args.Error(0)

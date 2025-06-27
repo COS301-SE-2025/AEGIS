@@ -1,8 +1,6 @@
 package metadata
 
 import (
-	"io"
-
 	"github.com/google/uuid"
 )
 
@@ -17,5 +15,4 @@ type Repository interface {
 
 type MetadataService interface {
 	UploadEvidence(UploadEvidenceRequest) error
-	DownloadEvidence(evidenceID uuid.UUID) (string, string, io.ReadCloser, error)
 }

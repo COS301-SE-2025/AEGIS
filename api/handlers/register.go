@@ -31,11 +31,12 @@ type AuthServiceInterface interface {
 	RequestPasswordReset(c *gin.Context)
 	ResetPasswordHandler(c *gin.Context)
 }
-type CaseServiceInterface interface {
-	CreateCase(c *gin.Context)
-	AssignCase(c *gin.Context)
-	GetCaseByID(c *gin.Context)
-}
+
+// type CaseServiceInterface interface {
+// 	CreateCase(c *gin.Context)
+// 	AssignCase(c *gin.Context)
+// 	GetCaseByID(c *gin.Context)
+// }
 
 type EvidenceServiceInterface interface {
 	UploadEvidence(c *gin.Context)

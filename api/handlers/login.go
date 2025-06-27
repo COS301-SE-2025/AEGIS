@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"aegis-api/services_/annotation_threads/messages"
 	"aegis-api/services_/auth/login"
 	"aegis-api/services_/auth/registration"
 	"aegis-api/services_/auth/reset_password"
@@ -34,6 +35,11 @@ type Handler struct {
 	CaseService     CaseServiceInterface
 	EvidenceService EvidenceServiceInterface
 	UserService     UserServiceInterface
+	CaseHandler     *CaseHandler
+	UploadHandler   *UploadHandler
+	DownloadHandler *DownloadHandler
+	MetadataHandler *MetadataHandler
+	MessageService  messages.MessageService
 }
 
 func NewHandler(
@@ -42,6 +48,11 @@ func NewHandler(
 	caseSvc CaseServiceInterface,
 	evidenceSvc EvidenceServiceInterface,
 	userSvc UserServiceInterface,
+	caseHandler *CaseHandler,
+	uploadHandler *UploadHandler,
+	downloadHandler *DownloadHandler, // Optional, if you have a download handler
+	metadataHandler *MetadataHandler, // Optional, if you have a metadata handler
+	messageService messages.MessageService,
 ) *Handler {
 	return &Handler{
 		AdminService:    adminSvc,
@@ -49,6 +60,11 @@ func NewHandler(
 		CaseService:     caseSvc,
 		EvidenceService: evidenceSvc,
 		UserService:     userSvc,
+		CaseHandler:     caseHandler,
+		UploadHandler:   uploadHandler,
+		DownloadHandler: downloadHandler,
+		MetadataHandler: metadataHandler,
+		MessageService:  messageService,
 	}
 }
 

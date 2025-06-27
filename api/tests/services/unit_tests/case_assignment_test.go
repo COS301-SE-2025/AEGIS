@@ -1,8 +1,8 @@
 package unit_tests
 
 import (
-	"testing"
 	"errors"
+	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -15,6 +15,12 @@ type MockCaseAssignmentRepo struct {
 	mock.Mock
 }
 
+// Implement IsAdmin to satisfy CaseAssignmentRepoInterface
+func (m *MockCaseAssignmentRepo) IsAdmin(userID uuid.UUID) (bool, error) {
+	args := m.Called(userID)
+	return args.Bool(0), args.Error(1)
+}
+
 type MockAdminChecker struct {
 	mock.Mock
 }
@@ -23,8 +29,6 @@ func (m *MockAdminChecker) IsAdmin(userID uuid.UUID) (bool, error) {
 	args := m.Called(userID)
 	return args.Bool(0), args.Error(1)
 }
-
-
 
 func (m *MockCaseAssignmentRepo) AssignRole(userID, caseID uuid.UUID, role string) error {
 	args := m.Called(userID, caseID, role)
@@ -76,8 +80,7 @@ func TestUnassignUserFromCase_Forbidden(t *testing.T) {
 	assigneeID := uuid.New()
 	caseID := uuid.New()
 
-perm.On("IsAdmin", assignerID).Return(false, errors.New("db error"))
-
+	perm.On("IsAdmin", assignerID).Return(false, errors.New("db error"))
 
 	err := svc.UnassignUserFromCase(assignerID, assigneeID, caseID)
 	assert.Error(t, err)

@@ -4,5 +4,5 @@ package upload
 // It provides methods to upload files to IPFS and retrieve their CIDs (Content Identifiers).
 
 type Service struct {
-	ipfs *ipfsClientImpl
+	ipfs IPFSClientImp
 }

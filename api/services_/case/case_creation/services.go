@@ -27,7 +27,7 @@ func NewCaseService(repo CaseRepository, userRepo registration.UserRepository) *
 // CaseRepository defines persistence operations for cases
 
 // CreateCase validates and creates a new case.
-func (s *Service) CreateCase(req CreateCaseRequest) (*Case, error) {
+func (s *Service) CreateCase(req *CreateCaseRequest) (*Case, error) {
 	// Validate title and team name
 	if req.Title == "" {
 		return nil, errors.New("title is required")
