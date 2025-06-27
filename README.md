@@ -7,6 +7,7 @@
   ![Build](https://github.com/COS301-SE-2025/AEGIS/actions/workflows/lint.yml/badge.svg)
   ![Git Structure: Monorepo](https://img.shields.io/badge/Git%20Structure-Monorepo-blue)
   ![Branching: Git Flow](https://img.shields.io/badge/Branching-Git%20Flow-green)
+  [![Build Status](https://img.shields.io/badge/Build_Status-GitHub_Actions-brightgreen)](https://github.com/COS301-SE-2025/AEGIS/actions)
  
 
 
