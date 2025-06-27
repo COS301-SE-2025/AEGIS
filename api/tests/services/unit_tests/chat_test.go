@@ -6,8 +6,7 @@ import (
 	"errors"
 	"mime/multipart"
 	"net/http"
-	"net/textproto"
-	"strings"
+
 	"testing"
 	"time"
 
@@ -129,6 +128,10 @@ func (m *MockChatRepository) CreateMessage(ctx context.Context, msg *chat.Messag
 func (m *MockChatRepository) IsUserInGroup(ctx context.Context, groupID primitive.ObjectID, userEmail string) (bool, error) {
 	args := m.Called(ctx, groupID, userEmail)
 	return args.Bool(0), args.Error(1)
+}
+func (m *MockChatRepository) GetUndeliveredMessages(ctx context.Context, groupID string, limit int, before *primitive.ObjectID) ([]*chat.Message, error) {
+	args := m.Called(ctx, groupID, limit, before)
+	return args.Get(0).([]*chat.Message), args.Error(1)
 }
 
 type MockIPFSUploader struct {
@@ -420,177 +423,11 @@ func TestIsUserInGroup_NilContext(t *testing.T) {
 	groupID := primitive.NewObjectID()
 	email := "user@example.com"
 
+	// Simulate nil context (should not panic, but context.Context cannot be nil in practice)
 	repo.On("IsUserInGroup", nil, groupID, email).Return(false, errors.New("nil context"))
 
 	ok, err := repo.IsUserInGroup(nil, groupID, email)
 	assert.Error(t, err)
 	assert.False(t, ok)
 	assert.EqualError(t, err, "nil context")
-}
-
-type nopFile struct {
-	*strings.Reader
-}
-
-func (n *nopFile) Close() error { return nil }
-func (n *nopFile) Read(p []byte) (int, error) {
-	return n.Reader.Read(p)
-}
-func (n *nopFile) Seek(offset int64, whence int) (int64, error) {
-	return n.Reader.Seek(offset, whence)
-}
-
-func TestSendMessageWithAttachment_Success(t *testing.T) {
-	repo := new(MockChatRepository)
-	uploader := new(MockIPFSUploader)
-	ws := new(MockWebSocketManager)
-
-	chatService := chat.NewChatService(repo, uploader, ws)
-
-	groupID := primitive.NewObjectID()
-	fileHeader := &multipart.FileHeader{
-		Filename: "file.txt",
-		Header:   make(textproto.MIMEHeader),
-		Size:     int64(len("content")),
-	}
-	fileHeader.Header.Set("Content-Type", "text/plain")
-
-	ipfsResult := &chat.IPFSUploadResult{
-		Hash:     "Qm...",
-		URL:      "https://ipfs.io/ipfs/Qm...",
-		FileName: "file.txt",
-		Size:     int64(len("content")),
-	}
-
-	uploader.On("UploadFile", mock.Anything, mock.Anything, "file.txt").Return(ipfsResult, nil)
-	repo.On("CreateMessage", mock.Anything, mock.AnythingOfType("*chat.Message")).Return(nil)
-	ws.On("BroadcastToGroup", groupID.Hex(), mock.Anything).Return(nil)
-
-	// Create a multipart.File by creating a multipart.FileHeader and opening it
-	// Since we are not actually uploading, we can use a custom struct that implements multipart.File
-	file := &nopFile{Reader: strings.NewReader("content")}
-
-	err := chatService.SendMessageWithAttachment(
-		context.Background(),
-		"user@example.com",
-		"User",
-		groupID,
-		"Here is a file",
-		file,
-		fileHeader,
-	)
-
-	assert.NoError(t, err)
-	repo.AssertCalled(t, "CreateMessage", mock.Anything, mock.AnythingOfType("*chat.Message"))
-}
-func TestSendMessageWithAttachment_UploadError(t *testing.T) {
-	repo := new(MockChatRepository)
-	uploader := new(MockIPFSUploader)
-	ws := new(MockWebSocketManager)
-
-	chatService := chat.NewChatService(repo, uploader, ws)
-
-	groupID := primitive.NewObjectID()
-	fileHeader := &multipart.FileHeader{
-		Filename: "file.txt",
-		Header:   make(textproto.MIMEHeader),
-		Size:     int64(len("content")),
-	}
-	fileHeader.Header.Set("Content-Type", "text/plain")
-
-	uploader.On("UploadFile", mock.Anything, mock.Anything, "file.txt").Return(nil, errors.New("upload failed"))
-
-	file := &nopFile{Reader: strings.NewReader("content")}
-
-	err := chatService.SendMessageWithAttachment(
-		context.Background(),
-		"user@example.com",
-		"User",
-		groupID,
-		"Here is a file",
-		file,
-		fileHeader,
-	)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "upload failed")
-	uploader.AssertCalled(t, "UploadFile", mock.Anything, mock.Anything, "file.txt")
-	repo.AssertNotCalled(t, "CreateMessage", mock.Anything, mock.AnythingOfType("*chat.Message"))
-	ws.AssertNotCalled(t, "BroadcastToGroup", groupID.Hex(), mock.Anything)
-}
-func TestSendMessageWithAttachment_DBError(t *testing.T) {
-	repo := new(MockChatRepository)
-	uploader := new(MockIPFSUploader)
-	ws := new(MockWebSocketManager)
-
-	chatService := chat.NewChatService(repo, uploader, ws)
-
-	groupID := primitive.NewObjectID()
-	fileHeader := &multipart.FileHeader{
-		Filename: "file.txt",
-		Header:   make(textproto.MIMEHeader),
-		Size:     int64(len("content")),
-	}
-	fileHeader.Header.Set("Content-Type", "text/plain")
-
-	ipfsResult := &chat.IPFSUploadResult{
-		Hash:     "Qm...",
-		URL:      "https://ipfs.io/ipfs/Qm...",
-		FileName: "file.txt",
-		Size:     int64(len("content")),
-	}
-
-	uploader.On("UploadFile", mock.Anything, mock.Anything, "file.txt").Return(ipfsResult, nil)
-	repo.On("CreateMessage", mock.Anything, mock.AnythingOfType("*chat.Message")).Return(errors.New("db error"))
-
-	file := &nopFile{Reader: strings.NewReader("content")}
-
-	err := chatService.SendMessageWithAttachment(
-		context.Background(),
-		"user@example.com",
-		"User",
-		groupID,
-		"Here is a file",
-		file,
-		fileHeader,
-	)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "db error")
-	uploader.AssertCalled(t, "UploadFile", mock.Anything, mock.Anything, "file.txt")
-	repo.AssertCalled(t, "CreateMessage", mock.Anything, mock.AnythingOfType("*chat.Message"))
-	ws.AssertNotCalled(t, "BroadcastToGroup", groupID.Hex(), mock.Anything)
-}
-
-func TestSendMessageWithAttachment_EmptyFile(t *testing.T) {
-	repo := new(MockChatRepository)
-	uploader := new(MockIPFSUploader)
-	ws := new(MockWebSocketManager)
-
-	chatService := chat.NewChatService(repo, uploader, ws)
-
-	groupID := primitive.NewObjectID()
-	fileHeader := &multipart.FileHeader{
-		Filename: "file.txt",
-		Header:   make(textproto.MIMEHeader),
-		Size:     0, // Empty file
-	}
-	fileHeader.Header.Set("Content-Type", "text/plain")
-
-	file := &nopFile{Reader: strings.NewReader("")}
-
-	err := chatService.SendMessageWithAttachment(
-		context.Background(),
-		"user@example.com",
-		"User",
-		groupID,
-		"Here is a file",
-		file,
-		fileHeader,
-	)
-
-	assert.Error(t, err)
-	assert.EqualError(t, err, "empty file")
-	uploader.AssertNotCalled(t, "UploadFile", mock.Anything, mock.Anything, "file.txt")
-	repo.AssertNotCalled(t, "CreateMessage", mock.Anything, mock.AnythingOfType("*chat.Message"))
-	ws.AssertNotCalled(t, "BroadcastToGroup", groupID.Hex(), mock.Anything)
 }

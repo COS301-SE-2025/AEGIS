@@ -208,13 +208,16 @@ navigate("/create-case");
               type="button"
               variant="outline"
               className="border-muted-foreground text-muted-foreground hover:bg-muted"
-              onClick={() => navigate("/create-case")}
+              onClick={() => navigate(-1)}
             >
               Back
             </Button>
 
-      <Button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white">              Done
-            </Button>
+            <Button type="submit" 
+            className="bg-cyan-600 hover:bg-cyan-700 text-white"
+            onClick={() => navigate(-1)}>
+                   Done
+           </Button>
           </div>
         </form>
       </div>
