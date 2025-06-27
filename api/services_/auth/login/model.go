@@ -1,10 +1,8 @@
 package login
 
-type User struct {
-	ID       string
-	Email    string
-	Password string // hashed
-}
+import (
+	"aegis-api/services_/auth/registration"
+)
 
 type LoginRequest struct {
 	Email    string `json:"email"`
@@ -12,11 +10,16 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	ID    string `json:"id"`
-	Token string `json:"token"`
-	Email string `json:"email"`
+	ID         string `json:"id"`
+	Email      string `json:"email"`
+	Token      string `json:"token"`
+	Role       string `json:"role"`
+	IsVerified bool   `json:"isVerified"`
+}
+type RegenerateTokenRequest struct {
+	ExpiresInDays int `json:"expires_in_days"` // how many days until it expires
 }
 
 type AuthService struct {
-	repo UserRepository
+	repo registration.UserRepository
 }

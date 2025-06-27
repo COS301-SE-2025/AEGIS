@@ -1,20 +1,8 @@
 package reset_password
 
-import (
-	"time"
-
-	"github.com/google/uuid"
-)
-
+// PasswordResetService orchestrates password reset logic using repositories and email services.
 type PasswordResetService struct {
 	repo    ResetTokenRepository
 	users   UserRepository
 	emailer EmailSender
-}
-
-type PasswordResetToken struct {
-	Token     string    `gorm:"primaryKey"`
-	UserID    uuid.UUID `gorm:"index"`
-	ExpiresAt time.Time
-	Used      bool
 }

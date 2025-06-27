@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 	"context"
-	"aegis-api/services/ListClosedCases"
+	"aegis-api/services_/case/ListClosedCases"
 	"github.com/stretchr/testify/assert"
 	"github.com/DATA-DOG/go-sqlmock"
 	"gorm.io/driver/postgres"
