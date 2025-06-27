@@ -8,14 +8,16 @@ import (
 	"gorm.io/gorm"
 )
 
-//
-// ─────────────────────────────────────────────────────────────────────
-//   GORM Repository (Production)
-// ─────────────────────────────────────────────────────────────────────
-//
+// ----------------------
+// Interface Definition
+// ----------------------
 
 type GormUserRepository struct {
 	db *gorm.DB
+}
+
+func NewRegistrationService(repo UserRepository) *RegistrationService {
+	return &RegistrationService{repo: repo}
 }
 
 func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
@@ -45,13 +47,40 @@ func (r *GormUserRepository) GetUserByEmail(email string) (*User, error) {
 	return &user, nil
 }
 
-// 2. Implement in GormUserRepository
-func (r *GormUserRepository) GetUserByToken(token string) (*User, error) {
+// GetUserByFullName fetches a user by full name.
+func (r *GormUserRepository) GetUserByFullName(fullName string) (*User, error) {
 	var user User
-	result := r.db.Where("verification_token = ?", token).First(&user)
-	return &user, result.Error
+	result := r.db.Where("full_name = ?", fullName).First(&user)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &user, nil
 }
 func (r *GormUserRepository) UpdateUser(user *User) error {
-	result := r.db.Save(user)
-	return result.Error
+	return r.db.Save(user).Error
+}
+
+func (r *GormUserRepository) UpdateUserTokenInfo(user *User) error {
+	return r.db.Model(user).Updates(map[string]interface{}{
+		"token_version":         user.TokenVersion,
+		"external_token_status": user.ExternalTokenStatus,
+		"external_token_expiry": user.ExternalTokenExpiry,
+	}).Error
+}
+
+func (r *GormUserRepository) GetUserByID(userID string) (*User, error) {
+	var u User
+	if err := r.db.First(&u, "id = ?", userID).Error; err != nil {
+		return nil, err
+	}
+
+	return &User{
+		ID:                  u.ID,
+		Email:               u.Email,
+		Role:                u.Role,
+		TokenVersion:        u.TokenVersion,
+		ExternalTokenStatus: u.ExternalTokenStatus,
+		ExternalTokenExpiry: u.ExternalTokenExpiry,
+		IsVerified:          u.IsVerified,
+	}, nil
 }
