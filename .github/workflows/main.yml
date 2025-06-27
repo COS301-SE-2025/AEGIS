@@ -79,7 +79,7 @@ jobs:
   go-test:
     runs-on: ubuntu-latest
     container:
-      image: golang:1.22.3
+      image: golang:1.24.3
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
