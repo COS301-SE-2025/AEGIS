@@ -1,4 +1,4 @@
-package GetUpdate_Users
+package postgres
 
 import (
 	"database/sql"

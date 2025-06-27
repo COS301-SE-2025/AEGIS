@@ -1,4 +1,4 @@
-package Evidence_Viewer
+package mongodb
 
 import (
 	"context"
@@ -17,7 +17,6 @@ import (
 // Ensure MongoEvidenceRepository implements the interface
 var _ EvidenceViewer = (*MongoEvidenceRepository)(nil)
 
-
 type MongoEvidenceRepository struct {
 	Collection EvidenceCollection
 }
@@ -25,8 +24,8 @@ type MongoEvidenceRepository struct {
 
 
 func NewMongoEvidenceRepository(client *mongo.Client, dbName, collectionName string) *MongoEvidenceRepository {
-	collection := client.Database(dbName).Collection(collectionName)
-	return &MongoEvidenceRepository{Collection: &RealCollection{Collection: collection}}
+    collection := client.Database(dbName).Collection(collectionName)
+    return &MongoEvidenceRepository{Collection: &RealCollection{Collection: collection}}
 }
 
 // GetEvidenceByCase returns all evidence items for a specific case ID.
@@ -154,3 +153,5 @@ func (repo *MongoEvidenceRepository) GetFilteredEvidence(caseID string, filters 
 
 	return results, nil
 }
+
+

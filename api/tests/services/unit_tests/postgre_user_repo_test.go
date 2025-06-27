@@ -1,5 +1,4 @@
-// postgres_user_repository_test.go
-package tests
+package unit_tests
 
 import (
 	"database/sql"

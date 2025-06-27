@@ -1,5 +1,5 @@
 // user_dto_test.go
-package tests
+package unit_tests
 
 import (
 	"encoding/json"

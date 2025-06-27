@@ -1,5 +1,6 @@
 
 import {useEffect, useState } from "react";
+
 import {
   Bell,
   File,
@@ -12,6 +13,7 @@ import {
   ArrowUpDown,
   Download,
   Share,
+
   Send,
   Info,
   MessageCircle,
@@ -41,16 +43,20 @@ import {
   SelectItem
 } from "../../components/ui/select";
 
+
 // Define file structure
 interface FileItem {
   caseId: any;
   id: string;
   name: string;
+
   type: 'executable' | 'log' | 'image' | 'document' | 'memory_dump' | 'network_capture';
+
   size?: string;
   hash?: string;
   created?: string;
   description?: string;
+
   status: 'verified' | 'pending' | 'failed';
   chainOfCustody: string[];
   acquisitionDate: string;
@@ -58,6 +64,7 @@ interface FileItem {
   integrityCheck: 'passed' | 'failed' | 'pending';
   threadCount: number;
   priority: 'high' | 'medium' | 'low';
+
 }
 
 interface AnnotationThread {
@@ -67,12 +74,14 @@ interface AnnotationThread {
   avatar: string;
   time: string;
   messageCount: number;
+
   participantCount: number;
   isActive?: boolean;
   status: 'open' | 'resolved' | 'pending_approval';
   priority: 'high' | 'medium' | 'low';
   tags: string[];
   fileId: string;
+
 }
 
 interface ThreadMessage {
@@ -81,6 +90,7 @@ interface ThreadMessage {
   avatar: string;
   time: string;
   message: string;
+
   isApproved?: boolean;
   reactions: { type: string; count: number; users: string[] }[];
   replies?: ThreadMessage[];
@@ -248,6 +258,7 @@ const caseId = String(useParams().caseId);
 
 
 
+
 useEffect(() => {
   localStorage.setItem('annotationThreads', JSON.stringify(annotationThreads));
 }, [annotationThreads]);
@@ -329,6 +340,7 @@ useEffect(() => {
       default: return 'text-muted-foreground bg-gray-400/10';
     }
   };
+
 
   const filteredThreads = annotationThreads.filter(thread => 
     selectedFile ? thread.fileId === selectedFile.id : true
@@ -430,10 +442,13 @@ function timeAgo(dateString: string): string {
 
 
 
+
   return (
     <div className="min-h-screen bg-background text-foreground flex">
       {/* Sidebar */}
+
       <aside className="fixed left-0 top-0 h-full w-64 bg-background border-r border-border p-4 flex flex-col justify-between z-10">
+
         <div>
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
@@ -444,11 +459,14 @@ function timeAgo(dateString: string): string {
                 className="w-full h-full object-cover"
               />
             </div>
+
             <span className="font-bold text-foreground text-xl">AEGIS</span>
+
           </div>
 
           {/* Navigation */}
           <nav className="space-y-1">
+
             <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
               <Home className="w-5 h-5" />
               <Link to="/dashboard"><span className="text-sm">Dashboard</span></Link>
@@ -464,6 +482,7 @@ function timeAgo(dateString: string): string {
             <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
               <MessageSquare className="w-5 h-5" />
               <Link to="/secure-chat"><span className="text-sm">Secure chat</span></Link>
+
             </div>
           </nav>
         </div>
@@ -471,6 +490,7 @@ function timeAgo(dateString: string): string {
         {/* User Profile */}
         <div className="border-t border-bg-accent pt-4">
           <div className="flex items-center gap-3">
+
             <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
               <Link to="/profile">
                 <span className="text-foreground font-small">{initials}</span>
@@ -479,12 +499,14 @@ function timeAgo(dateString: string): string {
             <div>
               <p className="font-semibold text-foreground">{displayName}</p>
               <p className="text-muted-foreground text-xs">{user?.email || "user@dfir.com"}</p>
+
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
+
       <main className="ml-64 flex-grow bg-background flex">
         {/* Header */}
         <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border-border p-4">
@@ -511,11 +533,13 @@ function timeAgo(dateString: string): string {
                 Secure Chat
               </button></Link>
             </div>
+
             </div>
 
             {/* Right actions */}
             <div className="flex items-center gap-4">
               <div className="relative">
+
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   className="w-64 h-10 bg-card border border-muted rounded-lg pl-10 pr-4 text-foreground placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500"
@@ -526,6 +550,7 @@ function timeAgo(dateString: string): string {
               <Link to="/settings"><Settings className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" /></Link>
               <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                 <Link to="/profile" ><span className="text-foreground font-medium text-xs">{initials}</span></ Link>
+
               </div>
             </div>
           </div>
@@ -533,6 +558,7 @@ function timeAgo(dateString: string): string {
 
         {/* Content Area */}
         <div className="flex-1 flex pt-20">
+
           {/* Evidence Files Panel */}
           <div className="w-80 border-r border-border p-4">
             <div className="flex items-center justify-between mb-4">
@@ -579,7 +605,20 @@ function timeAgo(dateString: string): string {
                   <SelectItem value="oldest">Oldest First</SelectItem>
                 </SelectContent>
               </Select>
+
             </div>
+            
+            {/* Search */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                className="w-full h-10 bg-gray-900 border border-gray-700 rounded-lg pl-10 pr-4 text-white placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500"
+                placeholder="Search Evidence"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
 
 
             {/* File List */}
@@ -619,10 +658,12 @@ function timeAgo(dateString: string): string {
                 </button>
               ))}
             </div>
+
           </div>
 
           {/* Main Viewer Area */}
           <div className="flex-1 flex flex-col">
+
             {selectedFile && (
               <>
                 {/* File Header */}
@@ -682,6 +723,7 @@ function timeAgo(dateString: string): string {
                       }`}
                     >
                       Metadata
+
                     </button>
                   </div>
                 </div>
@@ -1375,17 +1417,21 @@ function timeAgo(dateString: string): string {
 
                       return renderReply(reply);
                     })}
+
                   </div>
                 ))}
               </div>
 
               {/* Message Input */}
+
               <div className="p-4 border-t border-border">
                 <div className="bg-card rounded-lg p-3">
+
                   <input
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
+
                     placeholder="Type your message... (@mention users)"
                     className="w-full bg-transparent text-foreground placeholder-gray-400 text-sm focus:outline-none mb-2"
                     onKeyPress={(e) => { 
@@ -1408,6 +1454,7 @@ function timeAgo(dateString: string): string {
                       <Send className="w-4 h-4" />
                     </button>
                   </div>
+
                 </div>
               </div>
             </div>
