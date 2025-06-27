@@ -16,7 +16,9 @@ COPY . .
 # Build the binary
 RUN go build -o aegis-api main.go
 
-# Run the binary
-CMD ["./aegis-api"]
+# ✅ Ensure the binary is executable
+RUN chmod +x ./aegis-api
 
 EXPOSE 8080
+
+CMD ["./aegis-api"]
