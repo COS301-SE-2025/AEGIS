@@ -1,4 +1,4 @@
-name: Lint, Build
+name: Lint, Build, Test
 
 on:
   push:
@@ -75,3 +75,19 @@ jobs:
         run: go build -o main
 
       - run: go env GOCACHE
+
+  go-test:
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.22.3
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run go test
+        run: |
+          cd api
+          go test ./... -v -race -covermode=atomic -coverprofile=coverage.out
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
