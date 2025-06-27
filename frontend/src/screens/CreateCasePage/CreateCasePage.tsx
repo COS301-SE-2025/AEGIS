@@ -83,13 +83,18 @@ const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
 
   const newId = cases.length > 0 ? Math.max(...cases.map((c: any) => c.id || 0)) + 1 : 1;
 
-  const newCase = {
-    id: newId,
-    ...form,
-    lastActivity: new Date().toISOString().split("T")[0],
-    progress: 0,
-    image: "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
-  };
+  const now = new Date().toISOString();
+
+const newCase = {
+  id: newId,
+  ...form,
+  lastActivity: now.split("T")[0],
+  createdAt: now,
+  updatedAt: now,
+  progress: 0,
+  image:
+    "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
+};
 
   cases.push(newCase);
   localStorage.setItem("cases", JSON.stringify(cases));
@@ -108,6 +113,7 @@ const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
   alert("Case created successfully!");
   navigate(`/case/${newCase.id}/next-steps`);
 };
+
 
 
   return (
