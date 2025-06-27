@@ -8,6 +8,7 @@
   ![Git Structure: Monorepo](https://img.shields.io/badge/Git%20Structure-Monorepo-blue)
   ![Branching: Git Flow](https://img.shields.io/badge/Branching-Git%20Flow-green)
   [![Build Status](https://img.shields.io/badge/Build_Status-GitHub_Actions-brightgreen)](https://github.com/COS301-SE-2025/AEGIS/actions)
+  [![codecov](https://codecov.io/gh/COS301-SE-2025/AEGIS/graph/badge.svg?token=X7J8QMHRW4)](https://codecov.io/gh/COS301-SE-2025/AEGIS)
  
 
 
