@@ -1,4 +1,4 @@
-package unit_tests
+package isolation
 
 import (
 	"testing"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetProfileUser_Success(t *testing.T) {
+func TestGetProfile_Success(t *testing.T) {
 	mockRepo := new(GetUpdate_UserInfo.MockUserRepo)
 	service := GetUpdate_UserInfo.NewUserService(mockRepo)
 

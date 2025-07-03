@@ -1,4 +1,4 @@
-package Evidence_Viewer
+package evidence_viewer
 
 import (
     "io"

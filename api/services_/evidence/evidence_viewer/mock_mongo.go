@@ -1,12 +1,11 @@
-package mocks
+package evidence_viewer
 
 import (
 	"context"
 
 	"github.com/stretchr/testify/mock"
 	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"aegis-api/services/Evidence_Viewer" 
+	
 )
 
 type MockCursor struct {
@@ -36,12 +35,12 @@ type MockCollection struct {
 	mock.Mock
 }
 
-func (m *MockCollection) Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (Evidence_Viewer.Cursor, error) {
+func (m *MockCollection) Find(ctx context.Context, filter interface{}, opts ...*options.FindOptions) (Cursor, error) {
 	args := m.Called(ctx, filter)
-	return args.Get(0).(Evidence_Viewer.Cursor), args.Error(1)
+	return args.Get(0).(Cursor), args.Error(1)
 }
 
-func (m *MockCollection) FindOne(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) Evidence_Viewer.SingleResult {
+func (m *MockCollection) FindOne(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) SingleResult {
 	args := m.Called(ctx, filter)
-	return args.Get(0).(Evidence_Viewer.SingleResult)
+	return args.Get(0).(SingleResult)
 }

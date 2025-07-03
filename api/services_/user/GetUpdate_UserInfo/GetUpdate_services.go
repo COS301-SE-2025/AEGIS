@@ -1,8 +1,9 @@
-package user
+package GetUpdate_UserInfo
 
 import (
 	"errors"
-	"aegis-api/models"
+
+	"github.com/google/uuid"
 )
 
 type UserService struct {
@@ -13,7 +14,7 @@ func NewUserService(repo UserRepository) *UserService {
 	return &UserService{repo: repo}
 }
 
-func (s *UserService) GetProfile(userID string) (*models.UserDTO, error) {
+func (s *UserService) GetProfile(userID uuid.UUID) (*User, error) {
 	user, err := s.repo.GetUserByID(userID)
 	if err != nil {
 		return nil, err
@@ -24,11 +25,11 @@ func (s *UserService) GetProfile(userID string) (*models.UserDTO, error) {
 	return user, nil
 }
 
-func (s *UserService) UpdateProfile(userID string, updates map[string]interface{}) error {
+func (s *UserService) UpdateProfile(userID uuid.UUID, updates map[string]interface{}) error {
 	return s.repo.UpdateUser(userID, updates)
 }
 
-func (s *UserService) Authenticate(email, password string) (*models.UserDTO, error) {
+func (s *UserService) Authenticate(email, password string) (*User, error) {
 	user, err := s.repo.GetUserByEmail(email)
 	if err != nil {
 		return nil, err
@@ -40,10 +41,10 @@ func (s *UserService) Authenticate(email, password string) (*models.UserDTO, err
 	return user, nil
 }
 
-func (s *UserService) GetUserRoles(userID string) ([]string, error) {
+func (s *UserService) GetUserRoles(userID uuid.UUID) ([]string, error) {
 	return s.repo.GetUserRoles(userID)
 }
 
 func (s *UserService) GetRepo() UserRepository {
-    return s.repo
+	return s.repo
 }
