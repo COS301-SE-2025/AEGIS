@@ -1,27 +1,25 @@
-package update_case_stage
+package update_case_Investigation_stage
 
 import (
-	"aegis-api/models"
-	"aegis-api/repositories"
 	"errors"
 	 "github.com/google/uuid"
 	 "fmt"
 )
 
 type CaseService interface {
-    UpdateCaseStage(caseID string, newStage models.InvestigationStage) error
+    UpdateCaseStage(caseID string, newStage InvestigationStage) error
 }
 
 type caseService struct {
-    repo repositories.UpdateCaseStageRepository
+    repo UpdateCaseStageRepository
 }
 
-func NewCaseService(r repositories.UpdateCaseStageRepository) CaseService {
+func NewCaseService(r UpdateCaseStageRepository) CaseService {
     return &caseService{repo: r}
 }
 
 //validates the new stage and checks if the case exists before updating 
-func (s *caseService) UpdateCaseStage(caseID string, newStage models.InvestigationStage) error {
+func (s *caseService) UpdateCaseStage(caseID string, newStage InvestigationStage) error {
    
 	if !newStage.IsValid() {// Assuming IsValid is a method on InvestigationStage that checks if the stage is valid
 		return errors.New("invalid investigation stage")

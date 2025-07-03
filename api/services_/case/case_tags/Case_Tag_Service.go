@@ -1,10 +1,10 @@
-package services
+package case_tags
 
 import (
 	"context"
 
 	"github.com/google/uuid"
-	"aegis-api/repositories"
+	
 )
 
 type CaseTagService interface {
@@ -14,10 +14,10 @@ type CaseTagService interface {
 }
 
 type caseTagService struct {
-	repo repositories.CaseTagRepository
+	repo CaseTagRepository
 }
 
-func NewCaseTagService(repo repositories.CaseTagRepository) CaseTagService {
+func NewCaseTagService(repo CaseTagRepository) CaseTagService {
 	return &caseTagService{repo: repo}
 }
 

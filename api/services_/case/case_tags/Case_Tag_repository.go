@@ -1,4 +1,4 @@
-package repositories
+package case_tags
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"aegis-api/models"
+	
 )
 
 type CaseTagRepository interface {
@@ -40,13 +40,13 @@ func (r *caseTagRepo) AddTagsToCase(ctx context.Context, userID, caseID uuid.UUI
 	for _, raw := range tags {
 		tagName := normalizeTag(raw)
 
-		var tag models.Tag
-		if err := tx.FirstOrCreate(&tag, models.Tag{Name: tagName}).Error; err != nil {
+		var tag Tag
+		if err := tx.FirstOrCreate(&tag, Tag{Name: tagName}).Error; err != nil {
 			tx.Rollback()
 			return err
 		}
 
-		caseTag := models.CaseTag{CaseID: caseID, TagID: tag.ID}
+		caseTag := CaseTag{CaseID: caseID, TagID: tag.ID}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&caseTag).Error; err != nil {
 			tx.Rollback()
 			return err
@@ -69,12 +69,12 @@ func (r *caseTagRepo) RemoveTagsFromCase(ctx context.Context, userID, caseID uui
 	for _, raw := range tags {
 		tagName := normalizeTag(raw)
 
-		var tag models.Tag
+		var tag Tag
 		if err := tx.First(&tag, "name = ?", tagName).Error; err != nil {
 			continue // Tag doesn't exist — skip
 		}
 
-		if err := tx.Delete(&models.CaseTag{}, "case_id = ? AND tag_id = ?", caseID, tag.ID).Error; err != nil {
+		if err := tx.Delete(&CaseTag{}, "case_id = ? AND tag_id = ?", caseID, tag.ID).Error; err != nil {
 			tx.Rollback()
 			return err
 		}

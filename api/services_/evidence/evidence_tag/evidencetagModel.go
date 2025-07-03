@@ -1,4 +1,4 @@
-package models
+package evidence_tag
 
 import "github.com/google/uuid"
 
@@ -7,7 +7,7 @@ type EvidenceTag struct {
 	TagID      int       `json:"tag_id"`
 }
 
-// type Tag struct {
-// 	ID   int    `json:"id"`
-// 	Name string `json:"name"`
-// }
+type Tag struct {
+	ID   int    `gorm:"primaryKey;autoIncrement"`
+	Name string `gorm:"uniqueIndex;not null"`
+}
