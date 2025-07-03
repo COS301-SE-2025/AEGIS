@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"aegis-api/models"
+	"aegis-api/services_/case/update_case_Investigation_stage"
 	service "aegis-api/services_/case/update_case_Investigation_stage"
 
 	"github.com/google/uuid"
@@ -15,7 +15,7 @@ type fakeRepo struct {
 	shouldExist bool
 }
 
-func (f *fakeRepo) UpdateStage(id string, stage models.InvestigationStage) error {
+func (f *fakeRepo) UpdateStage(id string, stage update_case_Investigation_stage.InvestigationStage) error {
 	if !f.shouldExist {
 		return errors.New("case not found")
 	}
@@ -31,7 +31,7 @@ func TestUpdateCaseStage_ValidStage(t *testing.T) {
 	svc := service.NewCaseService(repo)
 
 	validUUID := uuid.New().String()
-	err := svc.UpdateCaseStage(validUUID, models.StageAnalysis)
+	err := svc.UpdateCaseStage(validUUID, update_case_Investigation_stage.StageAnalysis)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -41,7 +41,7 @@ func TestUpdateCaseStage_InvalidStage(t *testing.T) {
 	repo := &fakeRepo{shouldExist: true}
 	svc := service.NewCaseService(repo)
 
-	invalidStage := models.InvestigationStage("badstage")
+	invalidStage := update_case_Investigation_stage.InvestigationStage("badstage")
 	validUUID := uuid.New().String()
 	err := svc.UpdateCaseStage(validUUID, invalidStage)
 	if err == nil {
@@ -53,7 +53,7 @@ func TestUpdateCaseStage_CaseNotFound(t *testing.T) {
 	repo := &fakeRepo{shouldExist: false}
 	svc := service.NewCaseService(repo)
 
-	err := svc.UpdateCaseStage("123", models.StageFinalization)
+	err := svc.UpdateCaseStage("123", update_case_Investigation_stage.StageFinalization)
 	if err == nil {
 		t.Error("expected error for case not found, got nil")
 	}
