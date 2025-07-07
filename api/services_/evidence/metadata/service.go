@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 
@@ -23,22 +24,27 @@ func NewService(repo Repository, ipfs upload.IPFSClientImp) *Service {
 }
 
 // UploadEvidence uploads a file to IPFS and saves evidence data, including metadata.
+// UploadEvidence streams the file to IPFS and computes checksum on-the-fly.
 func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
-	// Upload the file to IPFS and get its CID
-	cid, err := s.ipfs.UploadFile(data.FilePath)
+	// Use TeeReader to compute SHA256 while uploading to IPFS
+	hash := sha256.New()
+	tee := io.TeeReader(data.FileData, hash)
+
+	// Upload to IPFS
+	cid, err := s.ipfs.UploadFile(tee)
 	if err != nil {
-		return err
+		return fmt.Errorf("IPFS upload failed: %w", err)
 	}
-	// Compute SHA-256 checksum
-	checksum, err := computeChecksum(data.FilePath)
-	if err != nil {
-		return err
-	}
+
+	// Compute checksum after stream has been read
+	checksum := fmt.Sprintf("%x", hash.Sum(nil))
+
 	metadataJSON, err := json.Marshal(data.Metadata)
 	if err != nil {
-		return err
+		return fmt.Errorf("metadata JSON marshal failed: %w", err)
 	}
-	// Construct the evidence record
+
+	// Build the evidence record
 	e := &Evidence{
 		ID:         uuid.New(),
 		CaseID:     data.CaseID,
@@ -48,10 +54,9 @@ func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
 		IpfsCID:    cid,
 		FileSize:   data.FileSize,
 		Checksum:   checksum,
-		Metadata:   string(metadataJSON), // Convert map[string]string to datatypes.JSONMap
+		Metadata:   string(metadataJSON),
 	}
 
-	// Save the record
 	return s.repo.SaveEvidence(e)
 }
 

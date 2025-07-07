@@ -84,3 +84,9 @@ func (r *GormUserRepository) GetUserByID(userID string) (*User, error) {
 		IsVerified:          u.IsVerified,
 	}, nil
 }
+
+func (r *GormUserRepository) FindAll() ([]User, error) {
+	var users []User
+	err := r.db.Find(&users).Error
+	return users, err
+}

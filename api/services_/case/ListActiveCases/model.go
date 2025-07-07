@@ -14,6 +14,7 @@ type ActiveCase struct {
 	Status             string    `gorm:"type:varchar(50);not null" json:"status"`
 	InvestigationStage string    `gorm:"type:varchar(50);not null" json:"investigation_stage"`
 	Priority           string    `gorm:"type:varchar(50);not null" json:"priority"`
+	TeamName           string    `gorm:"type:text;not null"`
 	CreatedBy          uuid.UUID `gorm:"type:uuid;not null" json:"created_by"`
 	CreatedAt          time.Time `gorm:"autoCreateTime" json:"created_at"`
 }

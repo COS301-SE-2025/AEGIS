@@ -25,6 +25,7 @@ import (
 type AdminServiceInterface interface {
 	RegisterUser(c *gin.Context)
 	VerifyEmail(c *gin.Context)
+	ListUsers(c *gin.Context)
 }
 type AuthServiceInterface interface {
 	LoginHandler(c *gin.Context)
@@ -102,6 +103,7 @@ func (s *AdminService) RegisterUser(c *gin.Context) {
 }
 
 // GET /api/v1/auth/verify?token=xyz
+// GET /api/v1/auth/verify?token=xyz
 func (s *AdminService) VerifyEmail(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
@@ -112,12 +114,22 @@ func (s *AdminService) VerifyEmail(c *gin.Context) {
 		return
 	}
 
+	// Make sure to assert the error type here
 	err := s.registrationService.VerifyUser(token)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-			Error:   "verification_failed",
-			Message: err.Error(),
-		})
+		// Ensure err is of type error before calling Error()
+		if e, ok := err.(error); ok {
+			c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+				Error:   "verification_failed",
+				Message: e.Error(), // Now calling e.Error() since err is of type error
+			})
+		} else {
+			// Handle unexpected error types that don't implement the error interface
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "unexpected_error",
+				Message: "An unexpected error occurred while verifying the email.",
+			})
+		}
 		return
 	}
 

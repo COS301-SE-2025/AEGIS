@@ -2,7 +2,6 @@ package upload
 
 import (
 	"io"
-	"os"
 
 	shell "github.com/ipfs/go-ipfs-api"
 )
@@ -22,13 +21,7 @@ func NewIPFSClient(api string) IPFSClientImp {
 	}
 }
 
-func (c *ipfsClientImpl) UploadFile(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
+func (c *ipfsClientImpl) UploadFile(file io.Reader) (string, error) {
 	return c.shell.Add(file)
 }
 

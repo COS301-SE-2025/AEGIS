@@ -1,5 +1,7 @@
 package upload
 
+import "io"
+
 // Service handles high-level file operations via IPFS
 
 // NewEvidenceService returns a new upload service using the provided IPFS client.
@@ -12,6 +14,6 @@ func NewEvidenceService(ipfs IPFSClientImp) *Service {
 }
 
 // UploadFile uploads a file to IPFS via the configured IPFS client.
-func (s *Service) UploadFile(path string) (string, error) {
-	return s.ipfs.UploadFile(path)
+func (s *Service) UploadFile(file io.Reader) (string, error) {
+	return s.ipfs.UploadFile(file)
 }

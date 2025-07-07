@@ -10,4 +10,5 @@ type UserRepository interface {
 	GetUserByID(userID string) (*User, error)
 	UpdateUserTokenInfo(user *User) error
 	GetDB() *gorm.DB // Returns the underlying database connection, if needed
+	FindAll() ([]User, error)
 }

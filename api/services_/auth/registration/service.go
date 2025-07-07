@@ -123,3 +123,7 @@ func (r *GormUserRepository) UpdatePassword(userID uuid.UUID, hashedPassword str
 		Update("password_hash", hashedPassword).
 		Error
 }
+
+func (s *RegistrationService) GetAllUsers() ([]User, error) {
+	return s.repo.FindAll()
+}
