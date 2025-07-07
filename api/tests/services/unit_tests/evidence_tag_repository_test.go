@@ -11,7 +11,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"aegis-api/repositories"
+	"aegis-api/services_/evidence/evidence_tag"
 )
 
 func setupEvidenceTestDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, func()) {
@@ -32,7 +32,7 @@ func TestAddTagsToEvidence(t *testing.T) {
 	db, mock, closeFn := setupEvidenceTestDB(t)
 	defer closeFn()
 
-	repo := repositories.NewEvidenceTagRepository(db)
+	repo := evidence_tag.NewEvidenceTagRepository(db)
 
 	evidenceID := uuid.New()
 	userID := uuid.New()
@@ -72,7 +72,7 @@ func TestRemoveTagsFromEvidence(t *testing.T) {
 	db, mock, closeFn := setupEvidenceTestDB(t)
 	defer closeFn()
 
-	repo := repositories.NewEvidenceTagRepository(db)
+	repo := evidence_tag.NewEvidenceTagRepository(db)
 
 	evidenceID := uuid.New()
 	userID := uuid.New()
@@ -101,7 +101,7 @@ func TestGetTagsForEvidence(t *testing.T) {
 	db, mock, closeFn := setupEvidenceTestDB(t)
 	defer closeFn()
 
-	repo := repositories.NewEvidenceTagRepository(db)
+	repo := evidence_tag.NewEvidenceTagRepository(db)
 	evidenceID := uuid.New()
 
 	mock.ExpectQuery(regexp.QuoteMeta(

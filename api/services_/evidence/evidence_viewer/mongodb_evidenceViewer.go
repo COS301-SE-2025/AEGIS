@@ -1,11 +1,10 @@
-package mongodb
+package evidence_viewer
 
 import (
 	"context"
 	"log"
 	"time"
 
-	"aegis-api/models"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -29,7 +28,7 @@ func NewMongoEvidenceRepository(client *mongo.Client, dbName, collectionName str
 }
 
 // GetEvidenceByCase returns all evidence items for a specific case ID.
-func (repo *MongoEvidenceRepository) GetEvidenceByCase(caseID string) ([]models.EvidenceResponse, error) {
+func (repo *MongoEvidenceRepository) GetEvidenceByCase(caseID string) ([]EvidenceResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -41,7 +40,7 @@ func (repo *MongoEvidenceRepository) GetEvidenceByCase(caseID string) ([]models.
 	}
 	defer cursor.Close(ctx)
 
-	var evidences []models.EvidenceResponse
+	var evidences []EvidenceResponse
 	if err = cursor.All(ctx, &evidences); err != nil {
 		log.Printf("Error decoding evidence results: %v", err)
 		return nil, err
@@ -51,12 +50,12 @@ func (repo *MongoEvidenceRepository) GetEvidenceByCase(caseID string) ([]models.
 }
 
 // GetEvidenceByID returns a single evidence item by ID.
-func (repo *MongoEvidenceRepository) GetEvidenceByID(evidenceID string) (*models.EvidenceResponse, error) {
+func (repo *MongoEvidenceRepository) GetEvidenceByID(evidenceID string) (*EvidenceResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	filter := bson.M{"id": evidenceID}
-	var ev models.EvidenceResponse
+	var ev EvidenceResponse
 	err := repo.Collection.FindOne(ctx, filter).Decode(&ev)
 
 	if err == mongo.ErrNoDocuments {
@@ -71,7 +70,7 @@ func (repo *MongoEvidenceRepository) GetEvidenceByID(evidenceID string) (*models
 }
 
 // SearchEvidence performs a case-insensitive search on multiple fields.
-func (repo *MongoEvidenceRepository) SearchEvidence(query string) ([]models.EvidenceResponse, error) {
+func (repo *MongoEvidenceRepository) SearchEvidence(query string) ([]EvidenceResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -99,7 +98,7 @@ func (repo *MongoEvidenceRepository) SearchEvidence(query string) ([]models.Evid
 	}
 	defer cursor.Close(ctx)
 
-	var results []models.EvidenceResponse
+	var results []EvidenceResponse
 	if err = cursor.All(ctx, &results); err != nil {
 		log.Printf("Error decoding search results: %v", err)
 		return nil, err
@@ -109,7 +108,7 @@ func (repo *MongoEvidenceRepository) SearchEvidence(query string) ([]models.Evid
 }
 
 // GetFilteredEvidence returns evidence with filters and sorting.
-func (repo *MongoEvidenceRepository) GetFilteredEvidence(caseID string, filters map[string]interface{}, sortField string, sortOrder string) ([]models.EvidenceResponse, error) {
+func (repo *MongoEvidenceRepository) GetFilteredEvidence(caseID string, filters map[string]interface{}, sortField string, sortOrder string) ([]EvidenceResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -145,7 +144,7 @@ func (repo *MongoEvidenceRepository) GetFilteredEvidence(caseID string, filters 
 	}
 	defer cursor.Close(ctx)
 
-	var results []models.EvidenceResponse
+	var results []EvidenceResponse
 	if err = cursor.All(ctx, &results); err != nil {
 		log.Printf("Error decoding filtered results: %v", err)
 		return nil, err

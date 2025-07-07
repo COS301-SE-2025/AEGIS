@@ -1,19 +1,14 @@
-package Case_Evidence_Totals
-
-
-import (
-    "aegis-api/repositories"
-)
+package case_evidence_totals
 
 type DashboardService interface {
     GetCounts() (caseCount int64, evidenceCount int64, err error)
 }
 
 type dashboardService struct {
-    statsRepo repositories.CountCasesEvidenceRepo
+    statsRepo CountCasesEvidenceRepo
 }
 
-func NewDashboardService(statsRepo repositories.CountCasesEvidenceRepo) DashboardService {
+func NewDashboardService(statsRepo CountCasesEvidenceRepo) DashboardService {
     return &dashboardService{
         statsRepo: statsRepo,
     }

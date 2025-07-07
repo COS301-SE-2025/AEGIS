@@ -1,4 +1,4 @@
-package models
+package update_case_Investigation_stage
 
 import (
 	"time"
@@ -37,8 +37,7 @@ func (s InvestigationStage) IsValid() bool {
 	}
 }
 
-type CaseTag struct {
-	CaseID uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TagID  int       `gorm:"primaryKey"`
+type Tag struct {
+	ID   int    `gorm:"primaryKey;autoIncrement"`
+	Name string `gorm:"uniqueIndex;not null"`
 }
-

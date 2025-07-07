@@ -1,8 +1,8 @@
-package repositories
+package case_evidence_totals
 
 import (
     "gorm.io/gorm"
-    "aegis-api/models"
+    
 )
 
 type CountCasesEvidenceRepo interface {
@@ -20,12 +20,12 @@ func NewCaseEviRepository(db *gorm.DB) CountCasesEvidenceRepo {
 
 func (r *caseEviRepository) CountCases() (int64, error) {
     var count int64
-    err := r.db.Model(&models.Case{}).Count(&count).Error
+    err := r.db.Model(&Case{}).Count(&count).Error
     return count, err
 }
 
 func (r *caseEviRepository) CountEvidence() (int64, error) {
     var count int64
-    err := r.db.Model(&models.EvidenceDTO{}).Count(&count).Error
+    err := r.db.Model(&EvidenceDTO{}).Count(&count).Error
     return count, err
 }

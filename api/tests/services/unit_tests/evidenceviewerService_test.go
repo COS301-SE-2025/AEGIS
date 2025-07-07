@@ -1,4 +1,4 @@
-package tests
+package unit_tests
 
 import (
 	"testing"
@@ -6,16 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	
 
-	"aegis-api/mock"
-	"aegis-api/models"
-	"aegis-api/services/Evidence_Viewer"
+	
+	"aegis-api/services_/evidence/evidence_viewer"
 )
 
 func TestServiceGetEvidenceByCase(t *testing.T) {
-	mockRepo := new(mocks.MockEvidenceViewer)
-	service := &Evidence_Viewer.EvidenceService{Repo: mockRepo}
+	mockRepo := new(evidence_viewer.MockEvidenceViewer)
+	service := &evidence_viewer.EvidenceService{Repo: mockRepo}
 
-	expected := []models.EvidenceResponse{
+	expected := []evidence_viewer.EvidenceResponse{
 		{ID: "ev123", CaseID: "case456", Filename: "photo.jpg"},
 	}
 
@@ -28,10 +27,10 @@ func TestServiceGetEvidenceByCase(t *testing.T) {
 }
 
 func TestServiceGetEvidenceByID(t *testing.T) {
-	mockRepo := new(mocks.MockEvidenceViewer)
-	service := &Evidence_Viewer.EvidenceService{Repo: mockRepo}
+	mockRepo := new(evidence_viewer.MockEvidenceViewer)
+	service := &evidence_viewer.EvidenceService{Repo: mockRepo}
 
-	expected := &models.EvidenceResponse{ID: "ev123", Filename: "file.jpg"}
+	expected := &evidence_viewer.EvidenceResponse{ID: "ev123", Filename: "file.jpg"}
 	mockRepo.On("GetEvidenceByID", "ev123").Return(expected, nil)
 
 	evidence, err := service.GetEvidenceByID("ev123")
@@ -41,10 +40,10 @@ func TestServiceGetEvidenceByID(t *testing.T) {
 }
 
 func TestServiceSearchEvidence(t *testing.T) {
-	mockRepo := new(mocks.MockEvidenceViewer)
-	service := &Evidence_Viewer.EvidenceService{Repo: mockRepo}
+	mockRepo := new(evidence_viewer.MockEvidenceViewer)
+	service := &evidence_viewer.EvidenceService{Repo: mockRepo}
 
-	expected := []models.EvidenceResponse{
+	expected := []evidence_viewer.EvidenceResponse{
 		{ID: "ev001", Filename: "notes.pdf"},
 	}
 	mockRepo.On("SearchEvidence", "notes").Return(expected, nil)
@@ -56,11 +55,11 @@ func TestServiceSearchEvidence(t *testing.T) {
 }
 
 func TestServiceGetFilteredEvidence(t *testing.T) {
-	mockRepo := new(mocks.MockEvidenceViewer)
-	service := &Evidence_Viewer.EvidenceService{Repo: mockRepo}
+	mockRepo := new(evidence_viewer.MockEvidenceViewer)
+	service := &evidence_viewer.EvidenceService{Repo: mockRepo}
 
 	filters := map[string]interface{}{"file_type": "pdf"}
-	expected := []models.EvidenceResponse{
+	expected := []evidence_viewer.EvidenceResponse{
 		{ID: "ev002", Filename: "document.pdf"},
 	}
 

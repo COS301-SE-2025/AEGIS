@@ -7,15 +7,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"aegis-api/mock"
-	"aegis-api/models"
-	"aegis-api/services/Evidence_Viewer"
+	"aegis-api/services_/evidence/evidence_viewer"
 	
 )
 
 func TestFindEvidenceWithMock(t *testing.T) {
-	mockDB := new(mocks.MockCollection)
-	mockCursor := new(mocks.MockCursor)
+	mockDB := new(evidence_viewer.MockCollection)
+	mockCursor := new(evidence_viewer.MockCursor)
 
 	mockDB.On("Find", mock.Anything, mock.Anything).Return(mockCursor, nil)
 	mockCursor.On("All", mock.Anything, mock.Anything).Return(nil)
@@ -28,8 +26,8 @@ func TestFindEvidenceWithMock(t *testing.T) {
 }
 
 func TestFindEvidenceByCaseWithMock(t *testing.T) {
-	mockDB := new(mocks.MockCollection)
-	mockCursor := new(mocks.MockCursor)
+	mockDB := new(evidence_viewer.MockCollection)
+	mockCursor := new(evidence_viewer.MockCursor)
 
 	// Set expectations
 	mockDB.On("Find", mock.Anything, mock.Anything).Return(mockCursor, nil)
@@ -37,8 +35,8 @@ func TestFindEvidenceByCaseWithMock(t *testing.T) {
 	
 	// Fix: Set up the mock to return data and ensure the slice is populated
 	mockCursor.On("All", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(1).(*[]models.EvidenceResponse)
-		*arg = []models.EvidenceResponse{
+		arg := args.Get(1).(*[]evidence_viewer.EvidenceResponse)
+		*arg = []evidence_viewer.EvidenceResponse{
 			{
 				ID:        "ev123",
 				CaseID:    "case456",
@@ -50,7 +48,7 @@ func TestFindEvidenceByCaseWithMock(t *testing.T) {
 		}
 	})
 
-	repo := &Evidence_Viewer.MongoEvidenceRepository{Collection: mockDB}
+	repo := &evidence_viewer.MongoEvidenceRepository{Collection: mockDB}
 
 	evidences, err := repo.GetEvidenceByCase("case123")
 	assert.NoError(t, err)
@@ -60,10 +58,10 @@ func TestFindEvidenceByCaseWithMock(t *testing.T) {
 }
 
 func TestFindEvidenceByIDWithMock(t *testing.T) {
-	mockDB := new(mocks.MockCollection)
-	mockSingleResult := new(mocks.MockSingleResult)
+	mockDB := new(evidence_viewer.MockCollection)
+	mockSingleResult := new(evidence_viewer.MockSingleResult)
 
-	expected := models.EvidenceResponse{
+	expected := evidence_viewer.EvidenceResponse{
 		ID:        "ev123",
 		CaseID:    "case456",
 		Filename:  "file1.jpg",
@@ -74,11 +72,11 @@ func TestFindEvidenceByIDWithMock(t *testing.T) {
 
 	mockDB.On("FindOne", mock.Anything, mock.Anything).Return(mockSingleResult)
 	mockSingleResult.On("Decode", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(0).(*models.EvidenceResponse)
+		arg := args.Get(0).(*evidence_viewer.EvidenceResponse)
 		*arg = expected
 	})
 
-	repo := &Evidence_Viewer.MongoEvidenceRepository{Collection: mockDB}
+	repo := &evidence_viewer.MongoEvidenceRepository{Collection: mockDB}
 
 	result, err := repo.GetEvidenceByID("ev123")
 	assert.NoError(t, err)
@@ -87,13 +85,13 @@ func TestFindEvidenceByIDWithMock(t *testing.T) {
 }
 
 func TestSearchEvidenceWithMock(t *testing.T) {
-	mockDB := new(mocks.MockCollection)
-	mockCursor := new(mocks.MockCursor)
+	mockDB := new(evidence_viewer.MockCollection)
+	mockCursor := new(evidence_viewer.MockCursor)
 
 	mockDB.On("Find", mock.Anything, mock.Anything).Return(mockCursor, nil)
 	mockCursor.On("All", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(1).(*[]models.EvidenceResponse)
-		*arg = []models.EvidenceResponse{
+		arg := args.Get(1).(*[]evidence_viewer.EvidenceResponse)
+		*arg = []evidence_viewer.EvidenceResponse{
 			{
 				ID:        "ev123",
 				CaseID:    "case456",
@@ -106,7 +104,7 @@ func TestSearchEvidenceWithMock(t *testing.T) {
 	})
 	mockCursor.On("Close", mock.Anything).Return(nil)
 
-	repo := &Evidence_Viewer.MongoEvidenceRepository{Collection: mockDB}
+	repo := &evidence_viewer.MongoEvidenceRepository{Collection: mockDB}
 
 	results, err := repo.SearchEvidence("photo")
 	assert.NoError(t, err)
@@ -116,13 +114,13 @@ func TestSearchEvidenceWithMock(t *testing.T) {
 }
 
 func TestGetFilteredEvidenceWithMock(t *testing.T) {
-	mockDB := new(mocks.MockCollection)
-	mockCursor := new(mocks.MockCursor)
+	mockDB := new(evidence_viewer.MockCollection)
+	mockCursor := new(evidence_viewer.MockCursor)
 
 	mockDB.On("Find", mock.Anything, mock.Anything, mock.Anything).Return(mockCursor, nil)
 	mockCursor.On("All", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(1).(*[]models.EvidenceResponse)
-		*arg = []models.EvidenceResponse{
+		arg := args.Get(1).(*[]evidence_viewer.EvidenceResponse)
+		*arg = []evidence_viewer.EvidenceResponse{
 			{
 				ID:        "ev456",
 				CaseID:    "case123",
@@ -135,7 +133,7 @@ func TestGetFilteredEvidenceWithMock(t *testing.T) {
 	})
 	mockCursor.On("Close", mock.Anything).Return(nil)
 
-	repo := &Evidence_Viewer.MongoEvidenceRepository{Collection: mockDB}
+	repo := &evidence_viewer.MongoEvidenceRepository{Collection: mockDB}
 
 	filters := map[string]interface{}{
 		"file_type": "image",
