@@ -30,27 +30,32 @@ export function AssignCaseMembersForm(): JSX.Element {
   const [members, setMembers] = useState<{ user: string; role: string }[]>([]);
   const [availableUsers, setAvailableUsers] = useState<{ id: string; name: string }[]>([]);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const res = await fetch("http://localhost:8080/api/v1/users");
-        if (!res.ok) throw new Error("Failed to fetch users");
-        const data = await res.json();
+useEffect(() => {
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch("http://localhost:8080/api/v1/users", {
+        headers: {
+          "Authorization": `Bearer ${sessionStorage.getItem("authToken") || ""}`
+        }
+      });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      const data = await res.json();
 
-        const users = Array.isArray(data.data)
-          ? data.data
-              .filter((u: any) => u.FullName && u.ID)
-              .map((u: any) => ({ id: u.ID, name: u.FullName }))
-          : [];
+      const users = Array.isArray(data.data)
+        ? data.data
+            .filter((u: any) => u.FullName && u.ID)
+            .map((u: any) => ({ id: u.ID, name: u.FullName }))
+        : [];
 
-        setAvailableUsers(users);
-      } catch (err) {
-        console.error("Fetch failed:", err);
-        alert("Failed to load users");
-      }
-    };
-    fetchUsers();
-  }, []);
+      setAvailableUsers(users);
+    } catch (err) {
+      console.error("Fetch failed:", err);
+      alert("Failed to load users");
+    }
+  };
+  fetchUsers();
+}, []);
+
 
   const handleMemberUserChange = (index: number, value: string) => {
     const updated = [...members];

@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"aegis-api/services_/case/ListActiveCases"
+	"aegis-api/services_/case/ListCases"
 	"fmt"
 	"net/http"
 
@@ -11,11 +11,18 @@ import (
 
 // Assuming your ListCases service looks like this:
 type ListCasesService interface {
-	ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
+	//ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
+	GetAllCases() ([]ListCases.Case, error)
+	GetCasesByUser(userID string) ([]ListCases.Case, error)
+	GetFilteredCases(status, priority, createdBy, teamName, titleTerm, sortBy, order string) ([]ListCases.Case, error)
 }
 
-func (s *CaseServices) ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error) {
-	return s.listCase.ListActiveCases(userID)
+type CaseListHandler struct {
+	Service ListCasesService
+}
+
+func NewCaseListHandler(service ListCasesService) *CaseListHandler {
+	return &CaseListHandler{Service: service}
 }
 
 func (h *CaseHandler) ListActiveCasesHandler(c *gin.Context) {

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"aegis-api/services_/case/ListActiveCases"
+	"aegis-api/services_/case/ListCases"
 	"aegis-api/services_/case/case_assign"
 	"aegis-api/services_/case/case_creation"
 	"fmt"
@@ -12,14 +13,21 @@ import (
 )
 
 type CaseHandler struct {
-	CaseService CaseServiceInterface
+	CaseService         CaseServiceInterface
+	ListCasesService    ListCasesService
+	ListActiveCasesServ ListActiveCasesService
+}
+type ListActiveCasesService interface {
+	ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
 }
 type CaseServices struct {
 	createCase *case_creation.Service
 	//listCase           *ListCases.Service
 	// updateCaseStatus   *case_status_update.CaseStatusService
 	// getCollaborators   *get_collaborators.Service
-	listCase   ListCasesService
+	listCase   *ListCases.Service
+	listActive *ListActiveCases.Service
+
 	assignCase *case_assign.CaseAssignmentService
 	// removeCollaborator *remove_user_from_case.Service
 }
@@ -27,7 +35,8 @@ type CaseServices struct {
 func NewCaseServices(
 	createCase *case_creation.Service,
 	// listCase *ListCases.Service,
-	listCase ListCasesService,
+	listCase *ListCases.Service,
+	listActive *ListActiveCases.Service,
 	// updateCaseStatus *case_status_update.CaseStatusService,
 	// getCollaborators *get_collaborators.Service,
 	assignCase *case_assign.CaseAssignmentService,
@@ -39,9 +48,17 @@ func NewCaseServices(
 		// updateCaseStatus:   updateCaseStatus,
 		// getCollaborators:   getCollaborators,
 		listCase:   listCase,
+		listActive: listActive,
 		assignCase: assignCase,
 		// removeCollaborator: removeCollaborator,
 	}
+}
+func (s *CaseServices) ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error) {
+	return s.listActive.ListActiveCases(userID)
+}
+
+func (s *CaseServices) GetAllCases() ([]ListCases.Case, error) {
+	return s.listCase.GetAllCases()
 }
 
 type CaseServiceInterface interface {
@@ -50,8 +67,16 @@ type CaseServiceInterface interface {
 	ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
 }
 
-func NewCaseHandler(service CaseServiceInterface) *CaseHandler {
-	return &CaseHandler{CaseService: service}
+func NewCaseHandler(
+	caseService CaseServiceInterface,
+	listCasesService ListCasesService,
+	listActiveCasesService ListActiveCasesService,
+) *CaseHandler {
+	return &CaseHandler{
+		CaseService:         caseService,
+		ListCasesService:    listCasesService,
+		ListActiveCasesServ: listActiveCasesService,
+	}
 }
 
 func (s *CaseServices) CreateCase(req *case_creation.CreateCaseRequest) (*case_creation.Case, error) {

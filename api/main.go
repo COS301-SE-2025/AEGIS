@@ -5,23 +5,24 @@ import (
 	"os"
 
 	"aegis-api/db"
+
 	"aegis-api/handlers"
 	"aegis-api/pkg/websocket"
 	"aegis-api/routes"
 	"aegis-api/services_/annotation_threads/messages"
 	"aegis-api/services_/case/ListActiveCases"
+	"aegis-api/services_/case/ListCases"
 	"aegis-api/services_/case/ListUsers"
 	"aegis-api/services_/case/case_assign"
+	"aegis-api/services_/case/case_creation"
 	"aegis-api/services_/evidence/evidence_download"
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
 
-	// Services
 	"aegis-api/middleware"
 	"aegis-api/services_/auth/login"
 	"aegis-api/services_/auth/registration"
 	"aegis-api/services_/auth/reset_password"
-	"aegis-api/services_/case/case_creation"
 
 	"github.com/joho/godotenv"
 )
@@ -54,6 +55,7 @@ func main() {
 	caseRepo := case_creation.NewGormCaseRepository(db.DB)
 	caseAssignRepo := case_assign.NewGormCaseAssignmentRepo(db.DB)
 	listActiveCasesRepo := ListActiveCases.NewActiveCaseRepository(db.DB)
+	listCasesRepo := ListCases.NewGormCaseQueryRepository(db.DB)
 
 	// ─── Email Sender (Mock) ────────────────────────────────────
 	emailSender := reset_password.NewMockEmailSender()
@@ -65,21 +67,30 @@ func main() {
 	caseService := case_creation.NewCaseService(caseRepo)
 	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo)
 	listActiveCasesService := ListActiveCases.NewService(listActiveCasesRepo)
+	listCasesService := ListCases.NewListCasesService(listCasesRepo)
 
+	// ─── Unified Case Services ─────────────────────────────────
 	caseServices := handlers.NewCaseServices(
 		caseService,
+		listCasesService,
 		listActiveCasesService,
 		caseAssignService,
 	)
 
-	// ─── List Users ──────────────────────────────────────────────
+	// ─── List Users ─────────────────────────────────────────────
 	listUserRepo := ListUsers.NewUserRepository(db.DB)
 	listUserService := ListUsers.NewListUserService(listUserRepo)
 
 	// ─── Handlers ───────────────────────────────────────────────
 	adminHandler := handlers.NewAdminService(regService, listUserService, nil, nil)
 	authHandler := handlers.NewAuthHandler(authService, resetService, userRepo)
-	caseHandler := handlers.NewCaseHandler(caseServices)
+
+	// 🔥 ✅ Updated to pass separate services explicitly
+	caseHandler := handlers.NewCaseHandler(
+		caseServices,           // CaseServiceInterface
+		listCasesService,       // ListCasesService
+		listActiveCasesService, // ListActiveCasesService
+	)
 
 	// ─── Evidence Upload/Download/Metadata ──────────────────────
 	metadataRepo := metadata.NewGormRepository(db.DB)
@@ -93,7 +104,7 @@ func main() {
 	metadataHandler := handlers.NewMetadataHandler(metadataService)
 	downloadHandler := handlers.NewDownloadHandler(downloadService)
 
-	// ─── Messages ───────────────────────────────────────────────
+	// ─── Messages / WebSocket ───────────────────────────────────
 	messageRepo := messages.NewMessageRepository(db.DB)
 	messageHub := websocket.NewHub()
 	go messageHub.Run()

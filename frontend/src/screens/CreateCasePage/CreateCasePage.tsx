@@ -82,11 +82,19 @@ export function CreateCaseForm(): JSX.Element {
     };
 
     console.log("Submitting payload:", payload);
+const token = sessionStorage.getItem("authToken");
 
     try {
-      const response = await axios.post("http://localhost:8080/api/v1/cases", payload, {
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await axios.post(
+  "http://localhost:8080/api/v1/cases",
+  payload,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  }
+);
+
 
       if (response.status === 201) {
         alert("Case created successfully!");

@@ -51,22 +51,29 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		api.POST("/upload", h.UploadHandler.Upload)
 		api.GET("/download/:cid", h.DownloadHandler.Download)
 
-		// ─── Admin: Case Management ──────────────────────
-		api.POST("/cases", h.CaseHandler.CreateCase)
-		api.GET("/cases/active", h.CaseHandler.ListActiveCasesHandler)
-		// ─── Metadata Evidence Upload ────────────────────
-		api.POST("/evidence", h.MetadataHandler.UploadEvidence)
-		api.GET("/users", h.AdminService.ListUsers)
-
-		// ─── Case Assignment Routes ─────────────────────
+		// ─── Protected Routes ────────────────────────────
 		protected := api.Group("/")
 		protected.Use(middleware.AuthMiddleware())
 		{
+			// ─── Case Management ──────────────────────────
+			protected.POST("/cases", h.CaseHandler.CreateCase)
+			protected.GET("/cases/active", h.CaseHandler.ListActiveCasesHandler)
 			protected.POST("/cases/assign", h.CaseHandler.AssignUserToCase)
-		}
 
-		// ─── Thread Messaging Routes ─────────────────────
-		RegisterMessageRoutes(api, h.MessageService)
+			// ─── New List / Filter Cases ──────────────────
+			protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)
+			protected.GET("/cases/user/:user_id", h.CaseHandler.GetCasesByUserHandler)
+			protected.GET("/cases/filter", h.CaseHandler.GetFilteredCasesHandler)
+
+			// ─── Metadata Evidence Upload ────────────────
+			protected.POST("/evidence", h.MetadataHandler.UploadEvidence)
+
+			// ─── Admin: Users ────────────────────────────
+			protected.GET("/users", h.AdminService.ListUsers)
+
+			// ─── Thread Messaging ────────────────────────
+			RegisterMessageRoutes(protected, h.MessageService)
+		}
 	}
 
 	return router

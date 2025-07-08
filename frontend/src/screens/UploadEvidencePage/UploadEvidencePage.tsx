@@ -63,8 +63,12 @@ if (!caseId) {
 
     try {
       await axios.post("http://localhost:8080/api/v1/evidence", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+  headers: {
+    "Content-Type": "multipart/form-data",
+    "Authorization": `Bearer ${sessionStorage.getItem("authToken") || ""}`
+  }
+});
+
 
       alert("Evidence uploaded successfully!");
       navigate(-1);
