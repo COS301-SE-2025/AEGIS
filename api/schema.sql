@@ -147,6 +147,32 @@ CREATE TABLE IF NOT EXISTS cases (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE annotation_threads (
+  id UUID PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  file_id UUID NOT NULL,
+  case_id UUID NOT NULL,
+  created_by UUID NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  status VARCHAR(50) DEFAULT 'open',
+  priority VARCHAR(50) DEFAULT 'medium',
+  is_active BOOLEAN DEFAULT true,
+  resolved_at TIMESTAMP
+);
+
+CREATE TABLE thread_tags (
+  id UUID PRIMARY KEY,
+  thread_id UUID NOT NULL REFERENCES annotation_threads(id),
+  tag_name VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE thread_participants (
+  thread_id UUID NOT NULL REFERENCES annotation_threads(id),
+  user_id UUID NOT NULL,
+  joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (thread_id, user_id)
+);
 
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

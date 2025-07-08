@@ -23,7 +23,11 @@ func (r *AnnotationThreadRepository) CreateThread(thread *AnnotationThread, tags
 			return err
 		}
 		for _, tag := range tags {
-			t := ThreadTag{ThreadID: thread.ID, TagName: tag}
+			t := ThreadTag{
+				ID:       uuid.New(), // 🔥 ADD THIS LINE to generate UUID
+				ThreadID: thread.ID,
+				TagName:  tag,
+			}
 			if err := tx.Create(&t).Error; err != nil {
 				return err
 			}

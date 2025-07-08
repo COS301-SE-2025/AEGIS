@@ -1,94 +1,119 @@
 package integration
 
-// import (
-// 	"aegis-api/services_/annotation_threads/messages"
-// 	"encoding/json"
-// 	"net/http"
-// 	"net/http/httptest"
-// 	"strings"
-// 	"testing"
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"testing"
 
-// 	"github.com/gin-gonic/gin"
-// 	"github.com/google/uuid"
-// 	"github.com/stretchr/testify/require"
-// 	"gorm.io/driver/sqlite"
-// 	"gorm.io/gorm"
-// )
+	"github.com/stretchr/testify/require"
+)
 
-// func setupRouterAndServices(t *testing.T) (*gin.Engine, messages.MessageService, uuid.UUID) {
-// 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-// 	require.NoError(t, err)
-// 	require.NoError(t, db.AutoMigrate(&messages.ThreadMessage{}, &messages.MessageMention{}, &messages.MessageReaction{}))
+var (
+	baseURL  = "http://localhost:8080/api/v1"
+	token    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InUyMjY0MDAyMEB0dWtzLmNvLnphIiwiZXhwIjoxNzUyMDk1MjgzLCJpYXQiOjE3NTIwMDg4ODMsInJvbGUiOiJBZG1pbiIsInRva2VuX3ZlcnNpb24iOjEsInVzZXJfaWQiOiJkZGUzOTQwYS1jZTAzLTQwNjItODQ5Mi0wN2JhZGVmMmRmMGUifQ.wcNzEIAS9-oPtAO2zxG75TKjtZvlnub58Qs9k8vCGyo" // your real JWT
+	userID   = "27031538-2795-4095-9adf-59bb7bd3fc19"
+	threadID = "4b06ec77-3959-4e7b-9ec9-8d5941347a65"
+)
 
-// 	// seed thread & user
-// 	threadID := uuid.New()
-// 	userID := uuid.New()
-// 	require.NoError(t, db.Exec("CREATE TABLE threads (id UUID PRIMARY KEY)").Error)
-// 	require.NoError(t, db.Exec("INSERT INTO threads (id) VALUES (?)", threadID).Error)
-// 	require.NoError(t, db.Exec("CREATE TABLE users (id UUID PRIMARY KEY)").Error)
-// 	require.NoError(t, db.Exec("INSERT INTO users (id) VALUES (?)", userID).Error)
+func TestThreadMessagesIntegration(t *testing.T) {
+	// 1. Send message
+	messageID := testSendMessage(t)
 
-// 	// repo := messages.NewMessageRepository(db)
-// 	// hub := messages.NewMessageService(repo, nil) // no websocket hub for integration
-// 	// handler := handlers.NewMessageHandler(hub)
+	// 2. Get messages by thread
+	testGetMessages(t)
 
-// 	//router := gin.New()
-// 	//group := router.Group("/api/v1")
-// 	//handlers.RegisterMessageRoutes(group, hub)
+	// 3. Approve message
+	testApproveMessage(t, messageID)
 
-// 	//return router, hub, threadID
-// }
+	// 4. Add reaction
+	testAddReaction(t, messageID)
 
-// func TestSendAndFetchAndApproveReactionFlow(t *testing.T) {
-// 	// router, svc, threadID := setupRouterAndServices(t)
+	// 5. Remove reaction
+	testRemoveReaction(t, messageID)
+}
 
-// 	// userID := uuid.New()
-// 	// // Insert same user into users table so fk passes
-// 	// //db := svc.(*messages.MessageServiceImpl).repo.DB
-// 	// require.NoError(t, db.Exec("INSERT INTO users (id) VALUES (?)", userID).Error)
+func testSendMessage(t *testing.T) string {
+	payload := map[string]interface{}{
+		"user_id":  userID,
+		"message":  "Integration test message from Go test",
+		"mentions": []string{},
+	}
+	body, _ := json.Marshal(payload)
 
-// 	// 1. Send message
-// 	//messageBody := `{"user_id":"` + userID.String() + `","message":"Hi!","parent_message_id":null,"mentions":[]}`
-// 	//req := httptest.NewRequest(http.MethodPost, "/api/v1/threads/"+threadID.String()+"/messages",
-// 	//	strings.NewReader(messageBody))
-// 	//req.Header.Set("Content-Type", "application/json")
-// 	w := httptest.NewRecorder()
-// 	//router.ServeHTTP(w, req)
-// 	require.Equal(t, http.StatusOK, w.Code)
+	req, _ := http.NewRequest("POST", baseURL+"/threads/"+threadID+"/messages", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 
-// 	// parse returned message id
-// 	var msg messages.ThreadMessage
-// 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &msg))
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-// 	// 2. Fetch messages in thread
-// 	//req2 := httptest.NewRequest(http.MethodGet, "/api/v1/threads/"+threadID.String()+"/messages", nil)
-// 	w2 := httptest.NewRecorder()
-// 	//router.ServeHTTP(w2, req2)
-// 	require.Equal(t, http.StatusOK, w2.Code)
-// 	require.Contains(t, w2.Body.String(), `"Hi!"`)
+	var result map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&result)
+	resp.Body.Close()
 
-// 	// 3. Approve message
-// 	approveBody := `{"approver_id":"` + userID.String() + `"}`
-// 	req3 := httptest.NewRequest(http.MethodPost, "/api/v1/messages/"+msg.ID.String()+"/approve",
-// 		strings.NewReader(approveBody))
-// 	req3.Header.Set("Content-Type", "application/json")
-// 	w3 := httptest.NewRecorder()
-// 	router.ServeHTTP(w3, req3)
-// 	require.Equal(t, http.StatusOK, w3.Code)
+	messageID := result["ID"].(string)
+	require.NotEmpty(t, messageID)
+	t.Logf("✅ Created message ID: %s", messageID)
+	return messageID
+}
 
-// 	// 4. Add reaction
-// 	reactionBody := `{"user_id":"` + userID.String() + `","reaction":"👍"}`
-// 	req4 := httptest.NewRequest(http.MethodPost, "/api/v1/messages/"+msg.ID.String()+"/reactions",
-// 		strings.NewReader(reactionBody))
-// 	req4.Header.Set("Content-Type", "application/json")
-// 	w4 := httptest.NewRecorder()
-// 	router.ServeHTTP(w4, req4)
-// 	require.Equal(t, http.StatusOK, w4.Code)
+func testGetMessages(t *testing.T) {
+	req, _ := http.NewRequest("GET", baseURL+"/threads/"+threadID+"/messages", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 
-// 	// 5. Fetch replies (none yet)
-// 	req5 := httptest.NewRequest(http.MethodGet, "/api/v1/messages/"+msg.ID.String()+"/replies", nil)
-// 	w5 := httptest.NewRecorder()
-// 	router.ServeHTTP(w5, req5)
-// 	require.Equal(t, http.StatusOK, w5.Code)
-// 	require.Equal(t, "[]", w5.Body.String())
-// }
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var messages []map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&messages)
+	resp.Body.Close()
+
+	require.Greater(t, len(messages), 0)
+	t.Logf("✅ Retrieved %d messages", len(messages))
+}
+
+func testApproveMessage(t *testing.T, messageID string) {
+	payload := map[string]interface{}{
+		"approver_id": userID,
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", baseURL+"/messages/"+messageID+"/approve", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	t.Logf("✅ Approved message %s", messageID)
+}
+
+func testAddReaction(t *testing.T, messageID string) {
+	payload := map[string]interface{}{
+		"user_id":  userID,
+		"reaction": "🎉",
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", baseURL+"/messages/"+messageID+"/reactions", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	t.Logf("✅ Added reaction to message %s", messageID)
+}
+
+func testRemoveReaction(t *testing.T, messageID string) {
+	req, _ := http.NewRequest("DELETE", baseURL+"/messages/"+messageID+"/reactions/"+userID, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	t.Logf("✅ Removed reaction from message %s", messageID)
+}

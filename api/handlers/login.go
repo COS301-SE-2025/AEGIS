@@ -30,16 +30,17 @@ func NewAuthHandler(
 }
 
 type Handler struct {
-	AdminService    AdminServiceInterface
-	AuthService     AuthServiceInterface
-	CaseService     CaseServiceInterface
-	EvidenceService EvidenceServiceInterface
-	UserService     UserServiceInterface
-	CaseHandler     *CaseHandler
-	UploadHandler   *UploadHandler
-	DownloadHandler *DownloadHandler
-	MetadataHandler *MetadataHandler
-	MessageService  messages.MessageService
+	AdminService            AdminServiceInterface
+	AuthService             AuthServiceInterface
+	CaseService             CaseServiceInterface
+	EvidenceService         EvidenceServiceInterface
+	UserService             UserServiceInterface
+	CaseHandler             *CaseHandler
+	UploadHandler           *UploadHandler
+	DownloadHandler         *DownloadHandler
+	MetadataHandler         *MetadataHandler
+	MessageService          messages.MessageService
+	AnnotationThreadHandler *AnnotationThreadHandler
 }
 
 func NewHandler(
@@ -53,18 +54,20 @@ func NewHandler(
 	downloadHandler *DownloadHandler, // Optional, if you have a download handler
 	metadataHandler *MetadataHandler, // Optional, if you have a metadata handler
 	messageService messages.MessageService,
+	annotationThreadHandler *AnnotationThreadHandler,
 ) *Handler {
 	return &Handler{
-		AdminService:    adminSvc,
-		AuthService:     authSvc,
-		CaseService:     caseSvc,
-		EvidenceService: evidenceSvc,
-		UserService:     userSvc,
-		CaseHandler:     caseHandler,
-		UploadHandler:   uploadHandler,
-		DownloadHandler: downloadHandler,
-		MetadataHandler: metadataHandler,
-		MessageService:  messageService,
+		AdminService:            adminSvc,
+		AuthService:             authSvc,
+		CaseService:             caseSvc,
+		EvidenceService:         evidenceSvc,
+		UserService:             userSvc,
+		CaseHandler:             caseHandler,
+		UploadHandler:           uploadHandler,
+		DownloadHandler:         downloadHandler,
+		MetadataHandler:         metadataHandler,
+		MessageService:          messageService,
+		AnnotationThreadHandler: annotationThreadHandler,
 	}
 }
 

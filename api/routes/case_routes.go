@@ -6,7 +6,6 @@ import (
 
 	"aegis-api/handlers"
 	"aegis-api/middleware"
-	"aegis-api/services_/annotation_threads/messages"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -73,18 +72,12 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 			// ─── Thread Messaging ────────────────────────
 			RegisterMessageRoutes(protected, h.MessageService)
+
+			// ─── Thread Routes ─────────────────────────────────────
+			RegisterThreadRoutes(protected, h.AnnotationThreadHandler)
+
 		}
 	}
 
 	return router
-}
-
-func RegisterMessageRoutes(r *gin.RouterGroup, svc messages.MessageService) {
-	h := handlers.NewMessageHandler(svc)
-
-	r.POST("/threads/:threadID/messages", h.SendMessage)
-	r.GET("/threads/:threadID/messages", h.GetMessagesByThread)
-	r.POST("/messages/:messageID/approve", h.ApproveMessage)
-	r.POST("/messages/:messageID/reactions", h.AddReaction)
-	r.DELETE("/messages/:messageID/reactions/:userID", h.RemoveReaction)
 }

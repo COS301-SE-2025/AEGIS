@@ -7,9 +7,14 @@ import (
 	"aegis-api/db"
 
 	"aegis-api/handlers"
+	"aegis-api/middleware"
 	"aegis-api/pkg/websocket"
 	"aegis-api/routes"
 	"aegis-api/services_/annotation_threads/messages"
+	annotationthreads "aegis-api/services_/annotation_threads/threads"
+	"aegis-api/services_/auth/login"
+	"aegis-api/services_/auth/registration"
+	"aegis-api/services_/auth/reset_password"
 	"aegis-api/services_/case/ListActiveCases"
 	"aegis-api/services_/case/ListCases"
 	"aegis-api/services_/case/ListUsers"
@@ -18,11 +23,6 @@ import (
 	"aegis-api/services_/evidence/evidence_download"
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
-
-	"aegis-api/middleware"
-	"aegis-api/services_/auth/login"
-	"aegis-api/services_/auth/registration"
-	"aegis-api/services_/auth/reset_password"
 
 	"github.com/joho/godotenv"
 )
@@ -111,6 +111,11 @@ func main() {
 
 	messageService := messages.NewMessageService(*messageRepo, messageHub)
 
+	// ─── Annotation Threads ─────────────────────────────────────
+	annotationRepo := annotationthreads.NewAnnotationThreadRepository(db.DB)
+	annotationService := annotationthreads.NewAnnotationThreadService(*annotationRepo, messageHub)
+	annotationThreadHandler := handlers.NewAnnotationThreadHandler(annotationService)
+
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -123,6 +128,7 @@ func main() {
 		downloadHandler,
 		metadataHandler,
 		messageService,
+		annotationThreadHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────
