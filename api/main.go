@@ -20,6 +20,7 @@ import (
 	"aegis-api/services_/case/ListUsers"
 	"aegis-api/services_/case/case_assign"
 	"aegis-api/services_/case/case_creation"
+	"aegis-api/services_/chat"
 	"aegis-api/services_/evidence/evidence_download"
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
@@ -45,6 +46,12 @@ func main() {
 		log.Fatalf("❌ Database connection failed: %v", err)
 	}
 	log.Println("✅ Connected to the database")
+
+	// Initialize Mongo
+	if err := db.ConnectMongo(); err != nil {
+		log.Fatal("❌ Failed to connect to MongoDB:", err)
+	}
+	mongoDatabase := db.MongoDatabase
 
 	// ─── Debug Logging ──────────────────────────────────────────
 	log.Println("📨 Using SMTP server:", os.Getenv("SMTP_HOST"))
@@ -116,6 +123,15 @@ func main() {
 	annotationService := annotationthreads.NewAnnotationThreadService(*annotationRepo, messageHub)
 	annotationThreadHandler := handlers.NewAnnotationThreadHandler(annotationService)
 
+	// ─── Chat Service ───────────────────────────────────────────
+	// Initialize chat repository, user service, IPFS uploader, WebSocket manager, and chat
+	chatRepo := chat.NewChatRepository(mongoDatabase)
+	userService := chat.NewUserService(mongoDatabase)
+	ipfsUploader := chat.NewIPFSUploader("http://localhost:5001", "")
+	wsManager := chat.NewWebSocketManager(userService, chatRepo)
+	chatService := chat.NewChatService(chatRepo, ipfsUploader, wsManager)
+	chatHandler := handlers.NewChatHandler(chatService)
+
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -129,6 +145,7 @@ func main() {
 		metadataHandler,
 		messageService,
 		annotationThreadHandler,
+		chatHandler, // New ChatHandler
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

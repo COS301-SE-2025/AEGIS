@@ -334,3 +334,15 @@ func (s *userService) GetUserStats(ctx context.Context) (map[string]interface{},
 		"offline_users": totalUsers - onlineUsers,
 	}, nil
 }
+
+func (s *ChatService) Repo() ChatRepository {
+	return s.repo
+}
+
+func (s *ChatService) IPFSUploader() IPFSUploader {
+	return s.ipfsUploader
+}
+
+func (s *ChatService) WsManager() WebSocketManager {
+	return s.wsManager
+}

@@ -41,6 +41,7 @@ type Handler struct {
 	MetadataHandler         *MetadataHandler
 	MessageService          messages.MessageService
 	AnnotationThreadHandler *AnnotationThreadHandler
+	ChatHandler             *ChatHandler
 }
 
 func NewHandler(
@@ -55,6 +56,7 @@ func NewHandler(
 	metadataHandler *MetadataHandler, // Optional, if you have a metadata handler
 	messageService messages.MessageService,
 	annotationThreadHandler *AnnotationThreadHandler,
+	chatHandler *ChatHandler,
 ) *Handler {
 	return &Handler{
 		AdminService:            adminSvc,
@@ -68,6 +70,7 @@ func NewHandler(
 		MetadataHandler:         metadataHandler,
 		MessageService:          messageService,
 		AnnotationThreadHandler: annotationThreadHandler,
+		ChatHandler:             chatHandler,
 	}
 }
 

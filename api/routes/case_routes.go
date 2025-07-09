@@ -76,6 +76,9 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			// ─── Thread Routes ─────────────────────────────────────
 			RegisterThreadRoutes(protected, h.AnnotationThreadHandler)
 
+			// ─── Chat_message Routes ────────────────────────────────
+			RegisterChatRoutes(protected, h.ChatHandler)
+
 		}
 	}
 
