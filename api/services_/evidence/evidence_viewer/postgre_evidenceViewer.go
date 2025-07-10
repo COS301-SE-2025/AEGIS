@@ -1,80 +1,128 @@
 package evidence_viewer
 
 import (
-    "gorm.io/gorm"
     "fmt"
+    "gorm.io/gorm"
 )
 
 type PostgresEvidenceRepository struct {
-    DB *gorm.DB
+    DB         *gorm.DB
+    IPFSClient *IPFSClient
 }
 
-func NewPostgresEvidenceRepository(db *gorm.DB) *PostgresEvidenceRepository {
-    return &PostgresEvidenceRepository{DB: db}
+func NewPostgresEvidenceRepository(db *gorm.DB, ipfsClient *IPFSClient) *PostgresEvidenceRepository {
+    return &PostgresEvidenceRepository{
+        DB:         db,
+        IPFSClient: ipfsClient,
+    }
 }
 
+func (repo *PostgresEvidenceRepository) GetEvidenceFileByID(evidenceID string) (*EvidenceFile, error) {
+    var cid string
+    result := repo.DB.Model(&EvidenceDTO{}).
+        Select("ipfs_cid").
+        Where("id = ?", evidenceID).
+        Scan(&cid)
 
-func (repo *PostgresEvidenceRepository) GetEvidenceByCase(caseID string) ([]EvidenceDTO, error) {
-    var evidences []EvidenceDTO
-    result := repo.DB.Where("case_id = ?", caseID).Find(&evidences)
-    return evidences, result.Error
-}
-
-
-
-func (repo *PostgresEvidenceRepository) GetEvidenceByID(evidenceID string) (*EvidenceDTO, error) {
-    var evidence EvidenceDTO
-    result := repo.DB.First(&evidence, "id = ?", evidenceID)
     if result.Error != nil {
         if result.Error == gorm.ErrRecordNotFound {
             return nil, nil
         }
         return nil, result.Error
     }
-    return &evidence, nil
+
+    if cid == "" {
+        return nil, fmt.Errorf("evidence not found")
+    }
+
+    content, err := repo.IPFSClient.getEvidence(cid)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get file from IPFS: %w", err)
+    }
+
+    return &EvidenceFile{
+        ID:   evidenceID,
+        Data: content,
+    }, nil
 }
 
 
-func (repo *PostgresEvidenceRepository) SearchEvidence(query string) ([]EvidenceResponse, error) {
-    var evidences []EvidenceDTO
-    pattern := "%" + query + "%"
-    result := repo.DB.Where(
-        "filename ILIKE ? OR file_type ILIKE ? OR metadata::text ILIKE ?",
-        pattern, pattern, pattern,
-    ).Find(&evidences)
+func (repo *PostgresEvidenceRepository) GetEvidenceFilesByCaseID(caseID string) ([]EvidenceFile, error) {
+    var pairs []EvidenceCIDPair
+    result := repo.DB.Model(&EvidenceDTO{}).
+        Select("id, ipfs_cid").
+        Where("case_id = ?", caseID).
+        Scan(&pairs)
+
     if result.Error != nil {
         return nil, result.Error
     }
 
-    var responses []EvidenceResponse
-    for _, ev := range evidences {
-        responses = append(responses, EvidenceResponse{
-            ID:         ev.ID,
-            CaseID:     ev.CaseID,
-            Filename:   ev.Filename,
-            FileType:   ev.FileType,
-            IPFSCID:    ev.IPFSCID,
-            UploadedBy: ev.UploadedBy,
-            Metadata:   ev.Metadata,
-            UploadedAt: ev.UploadedAt.String(), // Or format with .Format("2006-01-02T15:04:05Z07:00")
+    var files []EvidenceFile
+    for _, pair := range pairs {
+        content, err := repo.IPFSClient.getEvidence(pair.IPFSCID)
+        if err != nil {
+            return nil, fmt.Errorf("failed to get file for evidence ID %s: %w", pair.ID, err)
+        }
+
+        files = append(files, EvidenceFile{
+            ID:   pair.ID,
+            Data: content,
         })
     }
 
-    return responses, nil
+    return files, nil
 }
 
 
+func (repo *PostgresEvidenceRepository) SearchEvidenceFiles(query string) ([]EvidenceFile, error) {
+    var pairs []EvidenceCIDPair
+
+    pattern := "%" + query + "%"
+    result := repo.DB.Model(&EvidenceDTO{}).
+        Select("id, ipfs_cid").
+        Where(
+            "filename ILIKE ? OR file_type ILIKE ? OR metadata::text ILIKE ?",
+            pattern, pattern, pattern,
+        ).
+        Scan(&pairs)
+
+    if result.Error != nil {
+        return nil, result.Error
+    }
+
+    var files []EvidenceFile
+    for _, pair := range pairs {
+        content, err := repo.IPFSClient.getEvidence(pair.IPFSCID)
+        if err != nil {
+            return nil, fmt.Errorf("failed to get file for evidence ID %s: %w", pair.ID, err)
+        }
+
+        files = append(files, EvidenceFile{
+            ID:   pair.ID,
+            Data: content,
+        })
+    }
+
+    return files, nil
+}
 
 
+type EvidenceCIDPair struct {
+    ID      string `json:"id"`
+    IPFSCID string `json:"ipfs_cid"`
+}
 
-func (repo *PostgresEvidenceRepository) GetFilteredEvidence(
+func (repo *PostgresEvidenceRepository) GetFilteredEvidenceFiles(
     caseID string,
     filters map[string]interface{},
     sortField, sortOrder string,
-) ([]EvidenceResponse, error) {
-    var evidences []EvidenceDTO
+) ([]EvidenceFile, error) {
+    var pairs []EvidenceCIDPair
 
-    tx := repo.DB.Where("case_id = ?", caseID)
+    tx := repo.DB.Model(&EvidenceDTO{}).
+        Select("id, ipfs_cid").
+        Where("case_id = ?", caseID)
 
     for k, v := range filters {
         tx = tx.Where(fmt.Sprintf("%s = ?", k), v)
@@ -84,25 +132,23 @@ func (repo *PostgresEvidenceRepository) GetFilteredEvidence(
         tx = tx.Order(fmt.Sprintf("%s %s", sortField, sortOrder))
     }
 
-    result := tx.Find(&evidences)
+    result := tx.Scan(&pairs)
     if result.Error != nil {
         return nil, result.Error
     }
 
-    //map evidenceDTO to EvidenceResponse
-    var responses []EvidenceResponse
-    for _, ev := range evidences {
-        responses = append(responses, EvidenceResponse{
-            ID:         ev.ID,
-            CaseID:     ev.CaseID,
-            Filename:   ev.Filename,
-            FileType:   ev.FileType,
-            IPFSCID:    ev.IPFSCID,
-            UploadedBy: ev.UploadedBy,
-            Metadata:   ev.Metadata,
-            UploadedAt: ev.UploadedAt.String(),
+    var files []EvidenceFile
+    for _, pair := range pairs {
+        content, err := repo.IPFSClient.getEvidence(pair.IPFSCID)
+        if err != nil {
+            return nil, fmt.Errorf("failed to get file for evidence ID %s: %w", pair.ID, err)
+        }
+
+        files = append(files, EvidenceFile{
+            ID:   pair.ID,
+            Data: content,
         })
     }
 
-    return responses, nil
+    return files, nil
 }

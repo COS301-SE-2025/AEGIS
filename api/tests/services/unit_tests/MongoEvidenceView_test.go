@@ -3,12 +3,11 @@ package unit_tests
 import (
 	"context"
 	"testing"
-	"time"
+
+	"aegis-api/services_/evidence/evidence_viewer"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"aegis-api/services_/evidence/evidence_viewer"
-	
 )
 
 func TestFindEvidenceWithMock(t *testing.T) {
@@ -25,122 +24,104 @@ func TestFindEvidenceWithMock(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestFindEvidenceByCaseWithMock(t *testing.T) {
+func TestGetEvidenceFilesByCaseID(t *testing.T) {
 	mockDB := new(evidence_viewer.MockCollection)
 	mockCursor := new(evidence_viewer.MockCursor)
 
-	// Set expectations
 	mockDB.On("Find", mock.Anything, mock.Anything).Return(mockCursor, nil)
 	mockCursor.On("Close", mock.Anything).Return(nil)
-	
-	// Fix: Set up the mock to return data and ensure the slice is populated
+
 	mockCursor.On("All", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(1).(*[]evidence_viewer.EvidenceResponse)
-		*arg = []evidence_viewer.EvidenceResponse{
+		arg := args.Get(1).(*[]evidence_viewer.EvidenceFile)
+		*arg = []evidence_viewer.EvidenceFile{
 			{
-				ID:        "ev123",
-				CaseID:    "case456",
-				Filename:  "photo.jpg",
-				FileType:  "image",
-				IPFSCID:   "cid123",
-				UploadedAt: time.Now().Format(time.RFC3339),
+				ID:   "ev123",
+				Data: []byte("mock data"),
 			},
 		}
 	})
 
 	repo := &evidence_viewer.MongoEvidenceRepository{Collection: mockDB}
 
-	evidences, err := repo.GetEvidenceByCase("case123")
+	files, err := repo.GetEvidenceFilesByCaseID("case123")
 	assert.NoError(t, err)
-	assert.NotNil(t, evidences)
-	assert.Len(t, evidences, 1) // Add this to verify we got the expected data
-	assert.Equal(t, "ev123", evidences[0].ID)
+	assert.Len(t, files, 1)
+	assert.Equal(t, "ev123", files[0].ID)
+	assert.Equal(t, []byte("mock data"), files[0].Data)
 }
 
-func TestFindEvidenceByIDWithMock(t *testing.T) {
+func TestGetEvidenceFileByID(t *testing.T) {
 	mockDB := new(evidence_viewer.MockCollection)
 	mockSingleResult := new(evidence_viewer.MockSingleResult)
 
-	expected := evidence_viewer.EvidenceResponse{
-		ID:        "ev123",
-		CaseID:    "case456",
-		Filename:  "file1.jpg",
-		FileType:  "image",
-		IPFSCID:   "cid456",
-		UploadedAt: time.Now().Format(time.RFC3339),
+	expected := evidence_viewer.EvidenceFile{
+		ID:   "ev123",
+		Data: []byte("file bytes"),
 	}
 
 	mockDB.On("FindOne", mock.Anything, mock.Anything).Return(mockSingleResult)
 	mockSingleResult.On("Decode", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(0).(*evidence_viewer.EvidenceResponse)
+		arg := args.Get(0).(*evidence_viewer.EvidenceFile)
 		*arg = expected
 	})
 
 	repo := &evidence_viewer.MongoEvidenceRepository{Collection: mockDB}
 
-	result, err := repo.GetEvidenceByID("ev123")
+	result, err := repo.GetEvidenceFileByID("ev123")
 	assert.NoError(t, err)
 	assert.Equal(t, expected.ID, result.ID)
-	assert.Equal(t, expected.Filename, result.Filename)
+	assert.Equal(t, expected.Data, result.Data)
 }
 
-func TestSearchEvidenceWithMock(t *testing.T) {
+func TestSearchEvidenceFiles(t *testing.T) {
 	mockDB := new(evidence_viewer.MockCollection)
 	mockCursor := new(evidence_viewer.MockCursor)
 
 	mockDB.On("Find", mock.Anything, mock.Anything).Return(mockCursor, nil)
+	mockCursor.On("Close", mock.Anything).Return(nil)
+
 	mockCursor.On("All", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(1).(*[]evidence_viewer.EvidenceResponse)
-		*arg = []evidence_viewer.EvidenceResponse{
+		arg := args.Get(1).(*[]evidence_viewer.EvidenceFile)
+		*arg = []evidence_viewer.EvidenceFile{
 			{
-				ID:        "ev123",
-				CaseID:    "case456",
-				Filename:  "photo.jpg",
-				FileType:  "image",
-				IPFSCID:   "cid123",
-				UploadedAt: time.Now().Format(time.RFC3339),
+				ID:   "ev789",
+				Data: []byte("search hit"),
 			},
 		}
 	})
-	mockCursor.On("Close", mock.Anything).Return(nil)
 
 	repo := &evidence_viewer.MongoEvidenceRepository{Collection: mockDB}
 
-	results, err := repo.SearchEvidence("photo")
+	results, err := repo.SearchEvidenceFiles("photo")
 	assert.NoError(t, err)
-	assert.NotNil(t, results)
 	assert.Len(t, results, 1)
-	assert.Equal(t, "ev123", results[0].ID)
+	assert.Equal(t, "ev789", results[0].ID)
 }
 
-func TestGetFilteredEvidenceWithMock(t *testing.T) {
+func TestGetFilteredEvidenceFiles(t *testing.T) {
 	mockDB := new(evidence_viewer.MockCollection)
 	mockCursor := new(evidence_viewer.MockCursor)
 
 	mockDB.On("Find", mock.Anything, mock.Anything, mock.Anything).Return(mockCursor, nil)
+	mockCursor.On("Close", mock.Anything).Return(nil)
+
 	mockCursor.On("All", mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(1).(*[]evidence_viewer.EvidenceResponse)
-		*arg = []evidence_viewer.EvidenceResponse{
+		arg := args.Get(1).(*[]evidence_viewer.EvidenceFile)
+		*arg = []evidence_viewer.EvidenceFile{
 			{
-				ID:        "ev456",
-				CaseID:    "case123",
-				Filename:  "filtered_photo.jpg",
-				FileType:  "image",
-				IPFSCID:   "cid456",
-				UploadedAt: time.Now().Format(time.RFC3339),
+				ID:   "ev456",
+				Data: []byte("filtered content"),
 			},
 		}
 	})
-	mockCursor.On("Close", mock.Anything).Return(nil)
 
 	repo := &evidence_viewer.MongoEvidenceRepository{Collection: mockDB}
 
 	filters := map[string]interface{}{
 		"file_type": "image",
 	}
-	results, err := repo.GetFilteredEvidence("case123", filters, "uploaded_at", "desc")
+	results, err := repo.GetFilteredEvidenceFiles("case456", filters, "uploaded_at", "desc")
 	assert.NoError(t, err)
-	assert.NotNil(t, results)
 	assert.Len(t, results, 1)
 	assert.Equal(t, "ev456", results[0].ID)
 }

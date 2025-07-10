@@ -1,22 +1,30 @@
 package evidence_viewer
 
 type EvidenceService struct {
-	Repo       EvidenceViewer
-	IPFSClient IPFSClient
+    Repo EvidenceViewer
+	
 }
 
-func (s *EvidenceService) GetEvidenceByCase(caseID string) ([]EvidenceResponse, error) {
-	return s.Repo.GetEvidenceByCase(caseID)
+func NewEvidenceService(repo EvidenceViewer) *EvidenceService {
+    return &EvidenceService{Repo: repo}
 }
 
-func (s *EvidenceService) GetEvidenceByID(evidenceID string) (*EvidenceResponse, error) {
-	return s.Repo.GetEvidenceByID(evidenceID)
+func (s *EvidenceService) GetEvidenceFileByID(evidenceID string) (*EvidenceFile, error) {
+    return s.Repo.GetEvidenceFileByID(evidenceID)
 }
 
-func (s *EvidenceService) SearchEvidence(query string) ([]EvidenceResponse, error) {
-	return s.Repo.SearchEvidence(query)
+func (s *EvidenceService) GetEvidenceFilesByCaseID(caseID string) ([]EvidenceFile, error) {
+    return s.Repo.GetEvidenceFilesByCaseID(caseID)
 }
 
-func (s *EvidenceService) GetFilteredEvidence(caseID string, filters map[string]interface{}, sortField string, sortOrder string) ([]EvidenceResponse, error) {
-	return s.Repo.GetFilteredEvidence(caseID, filters, sortField, sortOrder)
+func (s *EvidenceService) GetFilteredEvidenceFiles(
+    caseID string,
+    filters map[string]interface{},
+    sortField, sortOrder string,
+) ([]EvidenceFile, error) {
+    return s.Repo.GetFilteredEvidenceFiles(caseID, filters, sortField, sortOrder)
+}
+
+func (s *EvidenceService) SearchEvidenceFiles(query string) ([]EvidenceFile, error) {
+    return s.Repo.SearchEvidenceFiles(query)
 }

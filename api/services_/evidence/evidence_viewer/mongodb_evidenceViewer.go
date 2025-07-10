@@ -2,7 +2,6 @@ package evidence_viewer
 
 import (
 	"context"
-	"log"
 	"time"
 
 
@@ -27,50 +26,74 @@ func NewMongoEvidenceRepository(client *mongo.Client, dbName, collectionName str
     return &MongoEvidenceRepository{Collection: &RealCollection{Collection: collection}}
 }
 
-// GetEvidenceByCase returns all evidence items for a specific case ID.
-func (repo *MongoEvidenceRepository) GetEvidenceByCase(caseID string) ([]EvidenceResponse, error) {
+func (repo *MongoEvidenceRepository) GetEvidenceFilesByCaseID(caseID string) ([]EvidenceFile, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	filter := bson.M{"case_id": caseID}
-	cursor, err := repo.Collection.Find(ctx, filter)
+	projection := bson.M{
+		"id":   1,
+		"data": 1,
+	}
+
+	opts := options.Find().SetProjection(projection)
+	cursor, err := repo.Collection.Find(ctx, filter, opts)
 	if err != nil {
-		log.Printf("Error finding evidence by case: %v", err)
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	var evidences []EvidenceResponse
-	if err = cursor.All(ctx, &evidences); err != nil {
-		log.Printf("Error decoding evidence results: %v", err)
+	var rawResults []struct {
+		ID   string `bson:"id"`
+		Data []byte `bson:"data"`
+	}
+	if err := cursor.All(ctx, &rawResults); err != nil {
 		return nil, err
 	}
 
-	return evidences, nil
+	var results []EvidenceFile
+	for _, r := range rawResults {
+		results = append(results, EvidenceFile{
+			ID:   r.ID,
+			Data: r.Data,
+		})
+	}
+	return results, nil
 }
 
-// GetEvidenceByID returns a single evidence item by ID.
-func (repo *MongoEvidenceRepository) GetEvidenceByID(evidenceID string) (*EvidenceResponse, error) {
+
+func (repo *MongoEvidenceRepository) GetEvidenceFileByID(evidenceID string) (*EvidenceFile, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	filter := bson.M{"id": evidenceID}
-	var ev EvidenceResponse
-	err := repo.Collection.FindOne(ctx, filter).Decode(&ev)
+	projection := bson.M{
+		"id":   1,
+		"data": 1,
+	}
 
+	opts := options.FindOne().SetProjection(projection)
+
+	var result struct {
+		ID   string `bson:"id"`
+		Data []byte `bson:"data"`
+	}
+
+	err := repo.Collection.FindOne(ctx, filter, opts).Decode(&result)
 	if err == mongo.ErrNoDocuments {
-		log.Printf("No evidence found for ID: %s", evidenceID)
 		return nil, nil
 	} else if err != nil {
-		log.Printf("Error retrieving evidence by ID: %v", err)
 		return nil, err
 	}
 
-	return &ev, nil
+	return &EvidenceFile{
+		ID:   result.ID,
+		Data: result.Data,
+	}, nil
 }
 
-// SearchEvidence performs a case-insensitive search on multiple fields.
-func (repo *MongoEvidenceRepository) SearchEvidence(query string) ([]EvidenceResponse, error) {
+
+func (repo *MongoEvidenceRepository) SearchEvidenceFiles(query string) ([]EvidenceFile, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -84,73 +107,79 @@ func (repo *MongoEvidenceRepository) SearchEvidence(query string) ([]EvidenceRes
 	}
 
 	projection := bson.M{
-		"id":        1,
-		"filename":  1,
-		"file_type": 1,
-		"ipfs_cid":  1,
+		"id":   1,
+		"data": 1,
 	}
 
 	opts := options.Find().SetProjection(projection)
 	cursor, err := repo.Collection.Find(ctx, filter, opts)
 	if err != nil {
-		log.Printf("Search error: %v", err)
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	var results []EvidenceResponse
-	if err = cursor.All(ctx, &results); err != nil {
-		log.Printf("Error decoding search results: %v", err)
+	var rawResults []struct {
+		ID   string `bson:"id"`
+		Data []byte `bson:"data"`
+	}
+	if err := cursor.All(ctx, &rawResults); err != nil {
 		return nil, err
 	}
 
+	var results []EvidenceFile
+	for _, r := range rawResults {
+		results = append(results, EvidenceFile{
+			ID:   r.ID,
+			Data: r.Data,
+		})
+	}
 	return results, nil
 }
 
-// GetFilteredEvidence returns evidence with filters and sorting.
-func (repo *MongoEvidenceRepository) GetFilteredEvidence(caseID string, filters map[string]interface{}, sortField string, sortOrder string) ([]EvidenceResponse, error) {
+
+func (repo *MongoEvidenceRepository) GetFilteredEvidenceFiles(caseID string, filters map[string]interface{}, sortField string, sortOrder string) ([]EvidenceFile, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Defensive copy of filters
-	queryFilter := bson.M{"case_id": caseID}
+	filter := bson.M{"case_id": caseID}
 	for k, v := range filters {
-		queryFilter[k] = v
+		filter[k] = v
 	}
 
-	findOptions := options.Find()
+	projection := bson.M{
+		"id":   1,
+		"data": 1,
+	}
 
-	// Add sorting if provided
+	opts := options.Find().SetProjection(projection)
 	if sortField != "" && (sortOrder == "asc" || sortOrder == "desc") {
 		direction := 1
 		if sortOrder == "desc" {
 			direction = -1
 		}
-		findOptions.SetSort(bson.D{{Key: sortField, Value: direction}})
+		opts.SetSort(bson.D{{Key: sortField, Value: direction}})
 	}
 
-	projection := bson.M{
-		"id":        1,
-		"filename":  1,
-		"file_type": 1,
-		"ipfs_cid":  1,
-	}
-	findOptions.SetProjection(projection)
-
-	cursor, err := repo.Collection.Find(ctx, queryFilter, findOptions)
+	cursor, err := repo.Collection.Find(ctx, filter, opts)
 	if err != nil {
-		log.Printf("Filter query failed: %v", err)
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	var results []EvidenceResponse
-	if err = cursor.All(ctx, &results); err != nil {
-		log.Printf("Error decoding filtered results: %v", err)
+	var rawResults []struct {
+		ID   string `bson:"id"`
+		Data []byte `bson:"data"`
+	}
+	if err := cursor.All(ctx, &rawResults); err != nil {
 		return nil, err
 	}
 
+	var results []EvidenceFile
+	for _, r := range rawResults {
+		results = append(results, EvidenceFile{
+			ID:   r.ID,
+			Data: r.Data,
+		})
+	}
 	return results, nil
 }
-
-

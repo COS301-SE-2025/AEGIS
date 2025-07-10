@@ -16,3 +16,8 @@ type EvidenceDTO struct {
 	Metadata   string    `gorm:"type:jsonb" json:"metadata"`
 	UploadedAt time.Time `gorm:"autoCreateTime" json:"uploaded_at"`
 }
+
+type EvidenceFile struct {
+    ID   string `json:"id"`
+    Data []byte `json:"data"`
+}
