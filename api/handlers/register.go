@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"aegis-api/services/delete_user"
+	"aegis-api/services_/admin/delete_user"
+	"aegis-api/services_/auditlog"
 	"aegis-api/services_/auth/registration"
 	"aegis-api/services_/case/ListUsers"
 	"aegis-api/services_/user/update_user_role"
@@ -56,6 +57,7 @@ type AdminService struct {
 	listUserService     ListUsers.ListUserService
 	userService         *update_user_role.UserService
 	userDeleteService   *delete_user.UserDeleteService
+	auditLogger         *auditlog.AuditLogger
 }
 
 func NewAdminService(
@@ -63,12 +65,14 @@ func NewAdminService(
 	listUserSvc ListUsers.ListUserService,
 	userService *update_user_role.UserService,
 	userDeleteService *delete_user.UserDeleteService,
+	auditLogger *auditlog.AuditLogger,
 ) *AdminService {
 	return &AdminService{
 		registrationService: regService,
 		listUserService:     listUserSvc,
 		userService:         userService,
 		userDeleteService:   userDeleteService,
+		auditLogger:         auditLogger,
 	}
 }
 
@@ -76,6 +80,17 @@ func NewAdminService(
 func (s *AdminService) RegisterUser(c *gin.Context) {
 	var req registration.RegistrationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		s.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "REGISTER_USER",
+			Actor:  auditlog.Actor{}, // anonymous
+			Target: auditlog.Target{
+				Type: "user_email",
+				ID:   req.Email,
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Invalid registration payload",
+		})
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: err.Error(),
@@ -85,6 +100,17 @@ func (s *AdminService) RegisterUser(c *gin.Context) {
 
 	user, err := s.registrationService.Register(req)
 	if err != nil {
+		s.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "REGISTER_USER",
+			Actor:  auditlog.Actor{},
+			Target: auditlog.Target{
+				Type: "user_email",
+				ID:   req.Email,
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Registration failed: " + err.Error(),
+		})
 		log.Printf("Registration error: %v", err)
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "registration_failed",
@@ -92,6 +118,18 @@ func (s *AdminService) RegisterUser(c *gin.Context) {
 		})
 		return
 	}
+
+	s.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "REGISTER_USER",
+		Actor:  auditlog.Actor{}, // or you could pass admin ID if session
+		Target: auditlog.Target{
+			Type: "user",
+			ID:   user.ID.String(),
+		},
+		Service:     "auth",
+		Status:      "SUCCESS",
+		Description: "User registered successfully",
+	})
 
 	userResp := registration.EntityToResponse(user)
 
@@ -107,6 +145,17 @@ func (s *AdminService) RegisterUser(c *gin.Context) {
 func (s *AdminService) VerifyEmail(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
+		s.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "VERIFY_EMAIL",
+			Actor:  auditlog.Actor{},
+			Target: auditlog.Target{
+				Type: "email_verification",
+				ID:   "",
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Missing verification token",
+		})
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "missing_token",
 			Message: "Verification token is required",
@@ -114,17 +163,30 @@ func (s *AdminService) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	// Make sure to assert the error type here
 	err := s.registrationService.VerifyUser(token)
 	if err != nil {
-		// Ensure err is of type error before calling Error()
+		s.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "VERIFY_EMAIL",
+			Actor:  auditlog.Actor{},
+			Target: auditlog.Target{
+				Type: "email_verification",
+				ID:   token,
+			},
+			Service: "auth",
+			Status:  "FAILED",
+			Description: "Verification failed: " + (func() string {
+				if e, ok := err.(error); ok {
+					return e.Error()
+				}
+				return "unknown error"
+			})(),
+		})
 		if e, ok := err.(error); ok {
 			c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 				Error:   "verification_failed",
-				Message: e.Error(), // Now calling e.Error() since err is of type error
+				Message: e.Error(),
 			})
 		} else {
-			// Handle unexpected error types that don't implement the error interface
 			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 				Error:   "unexpected_error",
 				Message: "An unexpected error occurred while verifying the email.",
@@ -132,6 +194,18 @@ func (s *AdminService) VerifyEmail(c *gin.Context) {
 		}
 		return
 	}
+
+	s.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "VERIFY_EMAIL",
+		Actor:  auditlog.Actor{},
+		Target: auditlog.Target{
+			Type: "email_verification",
+			ID:   token,
+		},
+		Service:     "auth",
+		Status:      "SUCCESS",
+		Description: "Email verified successfully",
+	})
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,

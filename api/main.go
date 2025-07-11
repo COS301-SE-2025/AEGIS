@@ -12,6 +12,7 @@ import (
 	"aegis-api/routes"
 	"aegis-api/services_/annotation_threads/messages"
 	annotationthreads "aegis-api/services_/annotation_threads/threads"
+	"aegis-api/services_/auditlog"
 	"aegis-api/services_/auth/login"
 	"aegis-api/services_/auth/registration"
 	"aegis-api/services_/auth/reset_password"
@@ -87,16 +88,21 @@ func main() {
 	// ─── List Users ─────────────────────────────────────────────
 	listUserRepo := ListUsers.NewUserRepository(db.DB)
 	listUserService := ListUsers.NewListUserService(listUserRepo)
+	// ─── Audit Logging ──────────────────────────────────────────
+	mongoLogger := auditlog.NewMongoLogger(mongoDatabase) // mongoDB is your *mongo.Database
+	zapLogger := auditlog.NewZapLogger()
+	auditLogger := auditlog.NewAuditLogger(mongoLogger, zapLogger)
 
 	// ─── Handlers ───────────────────────────────────────────────
-	adminHandler := handlers.NewAdminService(regService, listUserService, nil, nil)
-	authHandler := handlers.NewAuthHandler(authService, resetService, userRepo)
+	adminHandler := handlers.NewAdminService(regService, listUserService, nil, nil, auditLogger)
+	authHandler := handlers.NewAuthHandler(authService, resetService, userRepo, auditLogger)
 
-	// 🔥 ✅ Updated to pass separate services explicitly
+	//pass separate services explicitly
 	caseHandler := handlers.NewCaseHandler(
 		caseServices,           // CaseServiceInterface
 		listCasesService,       // ListCasesService
 		listActiveCasesService, // ListActiveCasesService
+		auditLogger,            // AuditLogger
 	)
 
 	// ─── Evidence Upload/Download/Metadata ──────────────────────
@@ -107,8 +113,8 @@ func main() {
 	metadataService := metadata.NewService(metadataRepo, ipfsClient)
 	downloadService := evidence_download.NewService(metadataRepo, ipfsClient)
 
-	uploadHandler := handlers.NewUploadHandler(uploadService)
-	metadataHandler := handlers.NewMetadataHandler(metadataService)
+	uploadHandler := handlers.NewUploadHandler(uploadService, auditLogger)
+	metadataHandler := handlers.NewMetadataHandler(metadataService, auditLogger)
 	downloadHandler := handlers.NewDownloadHandler(downloadService)
 
 	// ─── Messages / WebSocket ───────────────────────────────────
@@ -118,10 +124,12 @@ func main() {
 
 	messageService := messages.NewMessageService(*messageRepo, messageHub)
 
+	//actual MessageHandler
+	messageHandler := handlers.NewMessageHandler(messageService, auditLogger)
 	// ─── Annotation Threads ─────────────────────────────────────
 	annotationRepo := annotationthreads.NewAnnotationThreadRepository(db.DB)
 	annotationService := annotationthreads.NewAnnotationThreadService(*annotationRepo, messageHub)
-	annotationThreadHandler := handlers.NewAnnotationThreadHandler(annotationService)
+	annotationThreadHandler := handlers.NewAnnotationThreadHandler(annotationService, *auditLogger)
 
 	// ─── Chat Service ───────────────────────────────────────────
 	// Initialize chat repository, user service, IPFS uploader, WebSocket manager, and chat
@@ -130,7 +138,7 @@ func main() {
 	ipfsUploader := chat.NewIPFSUploader("http://localhost:5001", "")
 	wsManager := chat.NewWebSocketManager(userService, chatRepo)
 	chatService := chat.NewChatService(chatRepo, ipfsUploader, wsManager)
-	chatHandler := handlers.NewChatHandler(chatService)
+	chatHandler := handlers.NewChatHandler(chatService, auditLogger)
 
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
@@ -143,7 +151,7 @@ func main() {
 		uploadHandler,
 		downloadHandler,
 		metadataHandler,
-		messageService,
+		messageHandler,
 		annotationThreadHandler,
 		chatHandler, // New ChatHandler
 	)

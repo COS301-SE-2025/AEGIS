@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"aegis-api/services_/auditlog"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -16,6 +18,7 @@ type CaseHandler struct {
 	CaseService         CaseServiceInterface
 	ListCasesService    ListCasesService
 	ListActiveCasesServ ListActiveCasesService
+	auditLogger         *auditlog.AuditLogger
 }
 type ListActiveCasesService interface {
 	ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
@@ -65,17 +68,20 @@ type CaseServiceInterface interface {
 	CreateCase(req *case_creation.CreateCaseRequest) (*case_creation.Case, error)
 	AssignUserToCase(assignerRole string, assigneeID, caseID uuid.UUID, role string) error
 	ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
+	GetCaseByID(caseID string) (*ListCases.Case, error)
 }
 
 func NewCaseHandler(
 	caseService CaseServiceInterface,
 	listCasesService ListCasesService,
 	listActiveCasesService ListActiveCasesService,
+	auditLogger *auditlog.AuditLogger,
 ) *CaseHandler {
 	return &CaseHandler{
 		CaseService:         caseService,
 		ListCasesService:    listCasesService,
 		ListActiveCasesServ: listActiveCasesService,
+		auditLogger:         auditLogger,
 	}
 }
 
@@ -85,6 +91,10 @@ func (s *CaseServices) CreateCase(req *case_creation.CreateCaseRequest) (*case_c
 
 func (s *CaseServices) AssignUserToCase(assignerRole string, assigneeID, caseID uuid.UUID, role string) error {
 	return s.assignCase.AssignUserToCase(assignerRole, assigneeID, caseID, role)
+}
+
+func (s *CaseServices) GetCaseByID(caseID string) (*ListCases.Case, error) {
+	return s.listCase.GetCaseByID(caseID)
 }
 
 // func (cs CaseServices) CreateCase(c *gin.Context) {
@@ -142,9 +152,32 @@ func (s *CaseServices) AssignUserToCase(assignerRole string, assigneeID, caseID 
 func (h *CaseHandler) CreateCase(c *gin.Context) {
 	var req case_creation.CreateCaseRequest
 
-	// Bind JSON
+	// Grab user details from context
+	userID, _ := c.Get("userID")
+	userRole, _ := c.Get("userRole")
+
+	actor := auditlog.Actor{
+		ID:        userID.(string),
+		Role:      userRole.(string),
+		IPAddress: c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fmt.Printf("[CreateCase] Invalid JSON input: %v\n", err)
+
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "CREATE_CASE",
+			Actor:  actor,
+			Target: auditlog.Target{
+				Type: "case",
+				ID:   "",
+			},
+			Service:     "case",
+			Status:      "FAILED",
+			Description: "Invalid JSON input for creating case",
+		})
+
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid_request",
 			"message": "Invalid JSON payload",
@@ -155,12 +188,22 @@ func (h *CaseHandler) CreateCase(c *gin.Context) {
 
 	fmt.Printf("[CreateCase] Received valid request payload: %+v\n", req)
 
-	// Call the service
 	newCase, err := h.CaseService.CreateCase(&req)
 	if err != nil {
 		fmt.Printf("[CreateCase] Failed to create case: %v\n", err)
 
-		// More granular error handling (optional)
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "CREATE_CASE",
+			Actor:  actor,
+			Target: auditlog.Target{
+				Type: "case",
+				ID:   "",
+			},
+			Service:     "case",
+			Status:      "FAILED",
+			Description: "Failed to create case: " + err.Error(),
+		})
+
 		status := http.StatusInternalServerError
 		errorType := "creation_failed"
 		if err.Error() == "title is required" || err.Error() == "team name is required" || err.Error() == "created_by is required" {
@@ -178,7 +221,18 @@ func (h *CaseHandler) CreateCase(c *gin.Context) {
 
 	fmt.Printf("[CreateCase] Successfully created case: %+v\n", newCase)
 
-	// Respond success
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "CREATE_CASE",
+		Actor:  actor,
+		Target: auditlog.Target{
+			Type: "case",
+			ID:   newCase.ID.String(),
+		},
+		Service:     "case",
+		Status:      "SUCCESS",
+		Description: "Case created successfully",
+	})
+
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
 		"message": "Case created successfully",

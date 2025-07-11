@@ -59,7 +59,7 @@ CREATE TYPE user_role AS ENUM (
 );
 
 CREATE TYPE case_status AS ENUM ('open', 'under_review', 'closed');
-CREATE TYPE case_priority AS ENUM ('low', 'medium', 'high', 'critical');
+CREATE TYPE case_priority AS ENUM ('low', 'medium', 'high', 'critical','time-sensitive');
 CREATE TYPE investigation_stage AS ENUM ('analysis', 'research', 'evaluation', 'finalization');
 
 

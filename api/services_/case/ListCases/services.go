@@ -14,14 +14,18 @@ func (s *Service) GetAllCases() ([]Case, error) {
 	result := make([]Case, len(cases))
 	for i, c := range cases {
 		result[i] = Case{
-			ID:        c.ID,
-			Title:     c.Title,
-			Status:    c.Status,
-			Priority:  c.Priority,
-			CreatedBy: c.CreatedBy,
-			TeamName:  c.TeamName,
+			ID:                 c.ID,
+			Title:              c.Title,
+			Description:        c.Description,
+			Status:             c.Status,
+			Priority:           c.Priority,
+			InvestigationStage: c.InvestigationStage,
+			CreatedBy:          c.CreatedBy,
+			TeamName:           c.TeamName,
+			CreatedAt:          c.CreatedAt,
 		}
 	}
+
 	return result, nil
 }
 
@@ -33,14 +37,18 @@ func (s *Service) GetCasesByUser(userID string) ([]Case, error) {
 	result := make([]Case, len(cases))
 	for i, c := range cases {
 		result[i] = Case{
-			ID:        c.ID,
-			Title:     c.Title,
-			Status:    c.Status,
-			Priority:  c.Priority,
-			CreatedBy: c.CreatedBy,
-			TeamName:  c.TeamName,
+			ID:                 c.ID,
+			Title:              c.Title,
+			Description:        c.Description,
+			Status:             c.Status,
+			Priority:           c.Priority,
+			InvestigationStage: c.InvestigationStage,
+			CreatedBy:          c.CreatedBy,
+			TeamName:           c.TeamName,
+			CreatedAt:          c.CreatedAt,
 		}
 	}
+
 	return result, nil
 }
 func (s *Service) GetFilteredCases(status, priority, createdBy, teamName, titleTerm, sortBy, order string) ([]Case, error) {
@@ -54,4 +62,23 @@ func (s *Service) GetFilteredCases(status, priority, createdBy, teamName, titleT
 		SortOrder: order,
 	}
 	return s.repo.QueryCases(filter)
+}
+
+func (s *Service) GetCaseByID(caseID string) (*Case, error) {
+	c, err := s.repo.GetCaseByID(caseID)
+	if err != nil {
+		return nil, err
+	}
+	result := &Case{
+		ID:                 c.ID,
+		Title:              c.Title,
+		Description:        c.Description,
+		Status:             c.Status,
+		Priority:           c.Priority,
+		InvestigationStage: c.InvestigationStage,
+		CreatedBy:          c.CreatedBy,
+		TeamName:           c.TeamName,
+		CreatedAt:          c.CreatedAt,
+	}
+	return result, nil
 }

@@ -20,14 +20,14 @@ func NewGormCaseQueryRepository(db *gorm.DB) *GormCaseQueryRepository {
 // Implements GetAllCases
 func (r *GormCaseQueryRepository) GetAllCases() ([]case_creation.Case, error) {
 	var cases []case_creation.Case
-	err := r.db.Table("cases").Scan(&cases).Error
+	err := r.db.Table("cases").Select("*").Scan(&cases).Error
 	return cases, err
 }
 
 // Implements GetCasesByUser
 func (r *GormCaseQueryRepository) GetCasesByUser(userID string) ([]case_creation.Case, error) {
 	var cases []case_creation.Case
-	err := r.db.Table("cases").Where("created_by = ?", userID).Scan(&cases).Error
+	err := r.db.Table("cases").Select("*").Where("created_by = ?", userID).Scan(&cases).Error
 	return cases, err
 }
 
@@ -55,6 +55,15 @@ func (r *GormCaseQueryRepository) QueryCases(filter CaseFilter) ([]Case, error) 
 		query = query.Order(filter.SortBy + " " + filter.SortOrder)
 	}
 
-	err := query.Scan(&cases).Error
+	err := query.Select("*").Scan(&cases).Error
 	return cases, err
+}
+
+func (r *GormCaseQueryRepository) GetCaseByID(caseID string) (*case_creation.Case, error) {
+	var c case_creation.Case
+	err := r.db.Table("cases").Select("*").Where("id = ?", caseID).First(&c).Error
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
 }

@@ -50,8 +50,12 @@ func (l *MongoLogger) Log(ctx *gin.Context, log AuditLog) error {
 		collection = l.db.Collection("audit_logs_user")
 	case "admin":
 		collection = l.db.Collection("audit_logs_admin")
+	case "annotation_threads":
+		collection = l.db.Collection("audit_logs_annotation_threads")
 	case "chat":
 		collection = l.db.Collection("audit_logs_chat")
+	case "annotation_messages":
+		collection = l.db.Collection("audit_logs_annotation_messages")
 	default:
 		// Fallback to general collection if service type is unrecognized
 		collection = l.db.Collection("audit_logs_general")

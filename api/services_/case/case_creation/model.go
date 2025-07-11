@@ -8,15 +8,15 @@ import (
 
 // Case represents a case record in the database.
 type Case struct {
-	ID                 uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Title              string    `gorm:"not null" json:"title"`
-	Description        string    `json:"description"`
-	Status             string    `gorm:"type:case_status;default:'open'" json:"status"`
-	Priority           string    `gorm:"type:case_priority;default:'medium'" json:"priority"`
-	InvestigationStage string    `gorm:"type:investigation_stage;default:'analysis'" json:"investigation_stage"`
-	CreatedBy          uuid.UUID `gorm:"type:uuid;not null" json:"created_by"`
-	TeamName           string    `gorm:"type:text;not null" json:"team_name"`
-	CreatedAt          time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID                 uuid.UUID `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Title              string    `gorm:"column:title;not null" json:"title"`
+	Description        string    `gorm:"column:description" json:"description"`
+	Status             string    `gorm:"column:status;type:case_status;default:'open'" json:"status"`
+	Priority           string    `gorm:"column:priority;type:case_priority;default:'medium'" json:"priority"`
+	InvestigationStage string    `gorm:"column:investigation_stage;type:investigation_stage;default:'analysis'" json:"investigation_stage"`
+	CreatedBy          uuid.UUID `gorm:"column:created_by;type:uuid;not null" json:"created_by"`
+	TeamName           string    `gorm:"column:team_name;type:text;not null" json:"team_name"`
+	CreatedAt          time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 }
 
 type CreateCaseRequest struct {

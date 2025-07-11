@@ -63,16 +63,17 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)
 			protected.GET("/cases/user/:user_id", h.CaseHandler.GetCasesByUserHandler)
 			protected.GET("/cases/filter", h.CaseHandler.GetFilteredCasesHandler)
-
+			protected.GET("/cases/:case_id", h.CaseHandler.GetCaseByIDHandler)
 			// ─── Metadata Evidence Upload ────────────────
 			protected.POST("/evidence", h.MetadataHandler.UploadEvidence)
 
 			// ─── Admin: Users ────────────────────────────
 			protected.GET("/users", h.AdminService.ListUsers)
 
+			// RegisterMessageRoutes(protected, h.MessageService, auditLogger)
 			// ─── Thread Messaging ────────────────────────
-			RegisterMessageRoutes(protected, h.MessageService)
 
+			RegisterMessageRoutes(protected, h.MessageHandler)
 			// ─── Thread Routes ─────────────────────────────────────
 			RegisterThreadRoutes(protected, h.AnnotationThreadHandler)
 

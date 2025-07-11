@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"aegis-api/services/delete_user"
+	"aegis-api/services_/admin/delete_user"
 	"aegis-api/services_/auth/registration"
 	"aegis-api/services_/case/ListUsers"
 	_ "aegis-api/services_/case/ListUsers"
