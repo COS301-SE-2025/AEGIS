@@ -11,7 +11,7 @@ package integration
 
 // var (
 // 	baseURL  = "http://localhost:8080/api/v1"
-// 	token    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InUyMjY0MDAyMEB0dWtzLmNvLnphIiwiZXhwIjoxNzUyMDk1MjgzLCJpYXQiOjE3NTIwMDg4ODMsInJvbGUiOiJBZG1pbiIsInRva2VuX3ZlcnNpb24iOjEsInVzZXJfaWQiOiJkZGUzOTQwYS1jZTAzLTQwNjItODQ5Mi0wN2JhZGVmMmRmMGUifQ.wcNzEIAS9-oPtAO2zxG75TKjtZvlnub58Qs9k8vCGyo" // your real JWT
+// 	token    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im5ld2FkbWluQGV4YW1wbGUuY29tIiwiZXhwIjoxNzUyMjMxMzUwLCJpYXQiOjE3NTIxNDQ5NTAsInJvbGUiOiJBZG1pbiIsInRva2VuX3ZlcnNpb24iOjEsInVzZXJfaWQiOiI3NmE1NTUxMC01M2QyLTQ0ZTYtODFjNC1kMzI2ZTcyNTNiMmMifQ.o2N0Iv_XfzHtoH7AS5tqvE3Npl1JV3FviKHhB0qVsCM" // your real JWT
 // 	userID   = "27031538-2795-4095-9adf-59bb7bd3fc19"
 // 	threadID = "4b06ec77-3959-4e7b-9ec9-8d5941347a65"
 // )

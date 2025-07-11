@@ -149,7 +149,7 @@ const token = sessionStorage.getItem("authToken");
               </SelectTrigger>
               <SelectContent className="bg-zinc-800 text-popover-foreground">
                 <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="mid">Mid</SelectItem>
+                <SelectItem value="medium">Mid</SelectItem>
                 <SelectItem value="high">High</SelectItem>
                 <SelectItem value="critical">Critical</SelectItem>
                 <SelectItem value="time-sensitive">Time Sensitive</SelectItem>

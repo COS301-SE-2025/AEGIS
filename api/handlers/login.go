@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"aegis-api/services_/annotation_threads/messages"
+	"aegis-api/services_/auditlog"
 	"aegis-api/services_/auth/login"
 	"aegis-api/services_/auth/registration"
 	"aegis-api/services_/auth/reset_password"
@@ -15,17 +15,20 @@ type AuthHandler struct {
 	authService          *login.AuthService
 	passwordResetService *reset_password.PasswordResetService
 	userRepo             registration.UserRepository
+	auditLogger          *auditlog.AuditLogger
 }
 
 func NewAuthHandler(
 	authService *login.AuthService,
 	resetService *reset_password.PasswordResetService,
 	userRepo registration.UserRepository,
+	auditLogger *auditlog.AuditLogger,
 ) *AuthHandler {
 	return &AuthHandler{
 		authService:          authService,
 		passwordResetService: resetService,
 		userRepo:             userRepo,
+		auditLogger:          auditLogger,
 	}
 }
 
@@ -39,7 +42,7 @@ type Handler struct {
 	UploadHandler           *UploadHandler
 	DownloadHandler         *DownloadHandler
 	MetadataHandler         *MetadataHandler
-	MessageService          messages.MessageService
+	MessageHandler          *MessageHandler
 	AnnotationThreadHandler *AnnotationThreadHandler
 	ChatHandler             *ChatHandler
 }
@@ -54,7 +57,7 @@ func NewHandler(
 	uploadHandler *UploadHandler,
 	downloadHandler *DownloadHandler, // Optional, if you have a download handler
 	metadataHandler *MetadataHandler, // Optional, if you have a metadata handler
-	messageService messages.MessageService,
+	MessageHandler *MessageHandler,
 	annotationThreadHandler *AnnotationThreadHandler,
 	chatHandler *ChatHandler,
 ) *Handler {
@@ -68,7 +71,7 @@ func NewHandler(
 		UploadHandler:           uploadHandler,
 		DownloadHandler:         downloadHandler,
 		MetadataHandler:         metadataHandler,
-		MessageService:          messageService,
+		MessageHandler:          MessageHandler,
 		AnnotationThreadHandler: annotationThreadHandler,
 		ChatHandler:             chatHandler,
 	}
@@ -79,6 +82,7 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required"`
 	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
@@ -88,7 +92,23 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 	}
 
 	resp, err := h.authService.Login(req.Email, req.Password)
+	status := "SUCCESS"
 	if err != nil {
+		status = "FAILED"
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "LOGIN_ATTEMPT",
+			Actor: auditlog.Actor{
+				ID:   "", // Unknown until login successful
+				Role: "",
+			},
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   req.Email,
+			},
+			Service:     "auth",
+			Status:      status,
+			Description: "Failed login attempt",
+		})
 		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 			Error:   "authentication_failed",
 			Message: "Invalid email or password",
@@ -96,13 +116,21 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 		return
 	}
 
-	// if !resp.IsVerified {
-	// 	c.JSON(http.StatusForbidden, structs.ErrorResponse{
-	// 		Error:   "email_not_verified",
-	// 		Message: "Please verify your email before logging in.",
-	// 	})
-	// 	return
-	// }
+	// Log successful attempt
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "LOGIN_ATTEMPT",
+		Actor: auditlog.Actor{
+			ID:   resp.ID,
+			Role: resp.Role,
+		},
+		Target: auditlog.Target{
+			Type: "user",
+			ID:   resp.ID,
+		},
+		Service:     "auth",
+		Status:      status,
+		Description: "User logged in successfully",
+	})
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
@@ -116,6 +144,18 @@ func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 		Email string `json:"email" binding:"required,email"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
+		// Invalid request payload
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "REQUEST_PASSWORD_RESET",
+			Actor:  auditlog.Actor{}, // anonymous actor
+			Target: auditlog.Target{
+				Type: "user_email",
+				ID:   req.Email,
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Invalid request payload",
+		})
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: err.Error(),
@@ -125,6 +165,18 @@ func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 
 	user, err := h.userRepo.GetUserByEmail(req.Email)
 	if err != nil {
+		// User not found
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "REQUEST_PASSWORD_RESET",
+			Actor:  auditlog.Actor{}, // unknown user
+			Target: auditlog.Target{
+				Type: "user_email",
+				ID:   req.Email,
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "No user found with provided email",
+		})
 		c.JSON(http.StatusNotFound, structs.ErrorResponse{
 			Error:   "user_not_found",
 			Message: "No user found with that email",
@@ -132,23 +184,50 @@ func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 		return
 	}
 
+	// Defensive: you have an unnecessary check
+	// (uid := user.ID will never fail since it's a string)
 	uid := user.ID
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-			Error:   "internal_error",
-			Message: "Invalid user ID format",
-		})
-		return
-	}
 
+	// Attempt to send reset
 	err = h.passwordResetService.RequestPasswordReset(uid, user.Email)
 	if err != nil {
+		// Failed to send email
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "REQUEST_PASSWORD_RESET",
+			Actor: auditlog.Actor{
+				ID:   user.ID.String(),
+				Role: user.Role,
+			},
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   user.ID.String(),
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Failed to send password reset email",
+		})
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 			Error:   "reset_failed",
 			Message: "Failed to send password reset email",
 		})
 		return
 	}
+
+	// Success
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "REQUEST_PASSWORD_RESET",
+		Actor: auditlog.Actor{
+			ID:   user.ID.String(),
+			Role: user.Role,
+		},
+		Target: auditlog.Target{
+			Type: "user",
+			ID:   user.ID.String(),
+		},
+		Service:     "auth",
+		Status:      "SUCCESS",
+		Description: "Password reset email sent successfully",
+	})
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
@@ -163,6 +242,17 @@ func (h *AuthHandler) ResetPasswordHandler(c *gin.Context) {
 		Token       string `json:"token" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "RESET_PASSWORD",
+			Actor:  auditlog.Actor{}, // unknown actor
+			Target: auditlog.Target{
+				Type: "user_email",
+				ID:   req.Email,
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Invalid request payload for password reset",
+		})
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: err.Error(),
@@ -172,12 +262,35 @@ func (h *AuthHandler) ResetPasswordHandler(c *gin.Context) {
 
 	err := h.passwordResetService.ResetPassword(req.Token, req.NewPassword)
 	if err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "RESET_PASSWORD",
+			Actor:  auditlog.Actor{}, // anonymous actor
+			Target: auditlog.Target{
+				Type: "user_email",
+				ID:   req.Email,
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Password reset failed: " + err.Error(),
+		})
 		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 			Error:   "reset_failed",
 			Message: err.Error(),
 		})
 		return
 	}
+
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "RESET_PASSWORD",
+		Actor:  auditlog.Actor{}, // optionally fill with session user if you have
+		Target: auditlog.Target{
+			Type: "user_email",
+			ID:   req.Email,
+		},
+		Service:     "auth",
+		Status:      "SUCCESS",
+		Description: "Password reset successfully",
+	})
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,

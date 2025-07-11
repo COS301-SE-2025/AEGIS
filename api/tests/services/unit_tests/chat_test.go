@@ -141,10 +141,11 @@ func (m *MockChatRepository) IsUserInGroup(ctx context.Context, groupID primitiv
 	args := m.Called(ctx, groupID, userEmail)
 	return args.Bool(0), args.Error(1)
 }
-func (m *MockChatRepository) GetUndeliveredMessages(ctx context.Context, groupID string, limit int, before *primitive.ObjectID) ([]*chat.Message, error) {
-	args := m.Called(ctx, groupID, limit, before)
-	return args.Get(0).([]*chat.Message), args.Error(1)
-}
+
+// func (m *MockChatRepository) GetUndeliveredMessages(ctx context.Context, groupID string, limit int, before *primitive.ObjectID) ([]*chat.Message, error) {
+// 	args := m.Called(ctx, groupID, limit, before)
+// 	return args.Get(0).([]*chat.Message), args.Error(1)
+// }
 
 type MockIPFSUploader struct {
 	mock.Mock

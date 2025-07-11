@@ -2,14 +2,11 @@ package routes
 
 import (
 	"aegis-api/handlers"
-	"aegis-api/services_/annotation_threads/messages"
 
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterMessageRoutes(r *gin.RouterGroup, svc messages.MessageService) {
-	h := handlers.NewMessageHandler(svc)
-
+func RegisterMessageRoutes(r *gin.RouterGroup, h *handlers.MessageHandler) {
 	r.POST("/threads/:threadID/messages", h.SendMessage)
 	r.GET("/threads/:threadID/messages", h.GetMessagesByThread)
 	r.POST("/messages/:messageID/approve", h.ApproveMessage)
