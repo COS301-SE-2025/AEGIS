@@ -106,10 +106,20 @@ func (r *MongoRepository) GetGroupByID(ctx context.Context, groupID primitive.Ob
 func (r *MongoRepository) GetUserGroups(ctx context.Context, userEmail string) ([]*ChatGroup, error) {
 	collection := r.db.Collection(GroupsCollection)
 
+	// Include groups where user is either a member or the creator
 	filter := bson.M{
-		"members.user_email": userEmail,
-		"members.is_active":  true,
-		"is_active":          true,
+		"$and": []bson.M{
+			{"is_active": true},
+			{"$or": []bson.M{
+				{"members": bson.M{
+					"$elemMatch": bson.M{
+						"user_email": userEmail,
+						"is_active":  true,
+					},
+				}},
+				{"created_by": userEmail},
+			}},
+		},
 	}
 
 	opts := options.Find().SetSort(bson.D{{Key: "updated_at", Value: -1}})
@@ -521,7 +531,7 @@ func (r *MongoRepository) IsGroupAdmin(ctx context.Context, groupID primitive.Ob
 	return count > 0, nil
 }
 
-//mark messages as delivered
+// mark messages as delivered
 // This function marks messages as delivered for a specific group and user.
 func (r *MongoRepository) MarkMessagesAsDelivered(ctx context.Context, groupID primitive.ObjectID, messageIDs []primitive.ObjectID, userEmail string) error {
 	collection := r.db.Collection(MessagesCollection)
@@ -597,4 +607,3 @@ func (r *MongoRepository) GetUndeliveredMessages(ctx context.Context, userEmail 
 
 	return messages, nil
 }
-

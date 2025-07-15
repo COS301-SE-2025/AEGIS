@@ -10,6 +10,7 @@ import (
 	"aegis-api/middleware"
 	"aegis-api/pkg/websocket"
 	"aegis-api/routes"
+	"aegis-api/services_/admin/get_collaborators"
 	"aegis-api/services_/annotation_threads/messages"
 	annotationthreads "aegis-api/services_/annotation_threads/threads"
 	"aegis-api/services_/auditlog"
@@ -25,6 +26,7 @@ import (
 	"aegis-api/services_/evidence/evidence_download"
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
+	"aegis-api/services_/user/profile"
 
 	"github.com/joho/godotenv"
 )
@@ -135,10 +137,20 @@ func main() {
 	// Initialize chat repository, user service, IPFS uploader, WebSocket manager, and chat
 	chatRepo := chat.NewChatRepository(mongoDatabase)
 	userService := chat.NewUserService(mongoDatabase)
-	ipfsUploader := chat.NewIPFSUploader("http://localhost:5001", "")
+	ipfsUploader := chat.NewIPFSUploader("http://ipfs:5001", "")
 	wsManager := chat.NewWebSocketManager(userService, chatRepo)
 	chatService := chat.NewChatService(chatRepo, ipfsUploader, wsManager)
 	chatHandler := handlers.NewChatHandler(chatService, auditLogger)
+
+	// User Profile Service
+	profileRepo := profile.NewGormProfileRepository(db.DB)
+	profileService := profile.NewProfileService(profileRepo)
+	profileHandler := handlers.NewProfileHandler(profileService, auditLogger)
+
+	// Build the get_collaborators repository & service
+	collabRepo := get_collaborators.NewGormRepository(db.DB)
+	collabService := get_collaborators.NewService(collabRepo)
+	getCollaboratorsHandler := handlers.NewGetCollaboratorsHandler(collabService, auditLogger)
 
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
@@ -154,6 +166,8 @@ func main() {
 		messageHandler,
 		annotationThreadHandler,
 		chatHandler, // New ChatHandler
+		profileHandler,
+		getCollaboratorsHandler, // New GetCollaboratorsHandler
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

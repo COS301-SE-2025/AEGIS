@@ -45,6 +45,8 @@ type Handler struct {
 	MessageHandler          *MessageHandler
 	AnnotationThreadHandler *AnnotationThreadHandler
 	ChatHandler             *ChatHandler
+	ProfileHandler          *ProfileHandler
+	GetCollaboratorsHandler *GetCollaboratorsHandler
 }
 
 func NewHandler(
@@ -60,6 +62,8 @@ func NewHandler(
 	MessageHandler *MessageHandler,
 	annotationThreadHandler *AnnotationThreadHandler,
 	chatHandler *ChatHandler,
+	profileHandler *ProfileHandler,
+	getCollaboratorsHandler *GetCollaboratorsHandler,
 ) *Handler {
 	return &Handler{
 		AdminService:            adminSvc,
@@ -74,6 +78,8 @@ func NewHandler(
 		MessageHandler:          MessageHandler,
 		AnnotationThreadHandler: annotationThreadHandler,
 		ChatHandler:             chatHandler,
+		ProfileHandler:          profileHandler,
+		GetCollaboratorsHandler: getCollaboratorsHandler,
 	}
 }
 

@@ -9,6 +9,7 @@ type Claims struct {
 	UserID               string `json:"user_id"`
 	Email                string `json:"email"`
 	Role                 string `json:"role"`
+	FullName             string `json:"full_name"`
 	jwt.RegisteredClaims        // still needed if you want "exp", "iat" etc. validated
 }
 

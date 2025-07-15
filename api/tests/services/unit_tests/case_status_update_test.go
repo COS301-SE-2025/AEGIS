@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"aegis-api/services/case_status_update"
+	"aegis-api/services_/case/case_status_update"
 )
 
 // --- Mocks ---

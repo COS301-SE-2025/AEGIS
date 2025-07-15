@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"aegis-api/services/get_collaborators"
+	"aegis-api/services_/admin/get_collaborators"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

@@ -58,6 +58,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.POST("/cases", h.CaseHandler.CreateCase)
 			protected.GET("/cases/active", h.CaseHandler.ListActiveCasesHandler)
 			protected.POST("/cases/assign", h.CaseHandler.AssignUserToCase)
+			protected.GET("/cases/:case_id/collaborators", h.GetCollaboratorsHandler.GetCollaboratorsByCaseID)
 
 			// ─── New List / Filter Cases ──────────────────
 			protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)
@@ -69,6 +70,10 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 			// ─── Admin: Users ────────────────────────────
 			protected.GET("/users", h.AdminService.ListUsers)
+
+			// ─── Profile Routes ──────────────────────────
+			protected.GET("/profile/:userID", h.ProfileHandler.GetProfileHandler)
+			protected.PATCH("/profile", h.ProfileHandler.UpdateProfileHandler)
 
 			// RegisterMessageRoutes(protected, h.MessageService, auditLogger)
 			// ─── Thread Messaging ────────────────────────

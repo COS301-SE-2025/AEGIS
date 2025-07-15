@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
+	"net/http"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -50,8 +52,16 @@ func (s *ChatService) SendMessageWithAttachment(
 		return errors.New("empty or missing file")
 	}
 
-	ipfsResult, err := s.ipfsUploader.UploadFile(ctx, file, fileHeader.Filename)
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
 
+	// Detect MIME type
+	contentType := http.DetectContentType(data[:512])
+
+	// Upload to IPFS
+	ipfsResult, err := s.ipfsUploader.UploadBytes(ctx, data, fileHeader.Filename)
 	if err != nil {
 		return fmt.Errorf("IPFS upload failed: %w", err)
 	}
@@ -59,12 +69,12 @@ func (s *ChatService) SendMessageWithAttachment(
 	attachment := &Attachment{
 		ID:       primitive.NewObjectID().Hex(),
 		FileName: ipfsResult.FileName,
-		FileType: fileHeader.Header.Get("Content-Type"),
-		FileSize: ipfsResult.Size,
+		FileType: contentType,
+		FileSize: int64(len(data)), // file actual size
 		URL:      ipfsResult.URL,
 		Hash:     ipfsResult.Hash,
 	}
-
+	fmt.Printf("Attachment debug: %+v\n", attachment)
 	message := &Message{
 		GroupID:     groupID,
 		SenderEmail: senderEmail,

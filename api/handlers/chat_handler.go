@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"aegis-api/services_/chat"
+	"encoding/base64"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"aegis-api/services_/auditlog"
 
@@ -121,6 +124,10 @@ func (h *ChatHandler) GetUserGroups(c *gin.Context) {
 		})
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get groups", "details": err.Error()})
 		return
+	}
+	// Ensure non-nil slice
+	if groups == nil {
+		groups = []*chat.ChatGroup{}
 	}
 
 	h.auditLogger.Log(c, auditlog.AuditLog{
@@ -337,6 +344,9 @@ func (h *ChatHandler) RemoveMemberFromGroup(c *gin.Context) {
 
 func (h *ChatHandler) SendMessage(c *gin.Context) {
 	actor := extractActorFromContext(c)
+	email, _ := c.Get("email")
+	fullNameVal, _ := c.Get("fullName")
+	fullName := fullNameVal.(string)
 
 	groupID, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
@@ -352,35 +362,100 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	var msg chat.Message
-	if err := c.ShouldBindJSON(&msg); err != nil {
+	var req struct {
+		Content  string `json:"content"`
+		File     string `json:"file"`     // base64 encoded
+		FileName string `json:"fileName"` // e.g. "photo.png"
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action:      "SEND_GROUP_MESSAGE",
 			Actor:       actor,
 			Target:      auditlog.Target{Type: "group", ID: groupID.Hex()},
 			Service:     "chat",
 			Status:      "FAILED",
-			Description: "Invalid message input",
+			Description: "Invalid input JSON",
 		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
 		return
 	}
-	msg.GroupID = groupID
 
-	if err := h.ChatService.Repo().CreateMessage(c.Request.Context(), &msg); err != nil {
+	var attachments []*chat.Attachment
+	messageType := "text"
+
+	if req.File != "" && req.FileName != "" {
+		data, err := base64.StdEncoding.DecodeString(req.File)
+		if err != nil {
+			h.auditLogger.Log(c, auditlog.AuditLog{
+				Action:      "SEND_GROUP_MESSAGE",
+				Actor:       actor,
+				Target:      auditlog.Target{Type: "group", ID: groupID.Hex()},
+				Service:     "chat",
+				Status:      "FAILED",
+				Description: "Invalid base64 file encoding",
+			})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid base64 file"})
+			return
+		}
+
+		result, err := h.ChatService.IPFSUploader().UploadBytes(
+			c.Request.Context(),
+			data,
+			fmt.Sprintf("%s-%s", primitive.NewObjectID().Hex(), req.FileName),
+		)
+		if err != nil {
+			h.auditLogger.Log(c, auditlog.AuditLog{
+				Action:      "SEND_GROUP_MESSAGE",
+				Actor:       actor,
+				Target:      auditlog.Target{Type: "group", ID: groupID.Hex()},
+				Service:     "chat",
+				Status:      "FAILED",
+				Description: "IPFS upload failed: " + err.Error(),
+			})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "file upload failed", "details": err.Error()})
+			return
+		}
+
+		fileUrl := h.ChatService.IPFSUploader().GetFileURL(result.Hash)
+
+		attachments = []*chat.Attachment{
+			{
+				FileName: req.FileName,
+				URL:      fileUrl,
+				Hash:     result.Hash,
+			},
+		}
+		messageType = "file"
+	}
+
+	msg := &chat.Message{
+		GroupID:       groupID,
+		SenderEmail:   email.(string),
+		SenderName:    fullName, // if you have `Name` on actor
+		Content:       req.Content,
+		MessageType:   messageType,
+		Attachments:   attachments,
+		Status:        chat.MessageStatus{Sent: time.Now()},
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		IsDeleted:     false,
+		AttachmentURL: "", // keep empty unless you want a direct link outside Attachments
+	}
+
+	if err := h.ChatService.Repo().CreateMessage(c.Request.Context(), msg); err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action:      "SEND_GROUP_MESSAGE",
 			Actor:       actor,
 			Target:      auditlog.Target{Type: "group", ID: groupID.Hex()},
 			Service:     "chat",
 			Status:      "FAILED",
-			Description: "Failed to create message: " + err.Error(),
+			Description: "Failed to save message: " + err.Error(),
 		})
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create message", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save message", "details": err.Error()})
 		return
 	}
 
-	_ = h.ChatService.WsManager().BroadcastToGroup(groupID.Hex(), msg)
+	_ = h.ChatService.WsManager().BroadcastToGroup(groupID.Hex(), *msg)
 
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action:      "SEND_GROUP_MESSAGE",
@@ -390,6 +465,7 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		Status:      "SUCCESS",
 		Description: "Message sent",
 	})
+
 	c.JSON(http.StatusOK, msg)
 }
 
