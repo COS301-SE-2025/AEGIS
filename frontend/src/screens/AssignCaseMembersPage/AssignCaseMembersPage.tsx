@@ -129,7 +129,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     }
 
     alert("All members assigned successfully!");
-    navigate("/create-case");
+    navigate(-1);
   } catch (err: any) {
     console.error(err);
     alert(`Error assigning members: ${err.message}`);

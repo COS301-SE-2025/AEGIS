@@ -10,14 +10,28 @@ import {
   CheckCircle,
   Database,
   AlertTriangle,
+  Pencil,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { SetStateAction, useState } from "react";
+import { useState, useEffect } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
-import { useEffect } from "react";
-import { SidebarToggleButton } from '../../context/SidebarToggleContext';
+import { SidebarToggleButton } from "../../context/SidebarToggleContext";
 
+interface CaseCard {
+  id: string;
+  title: string;
+  team_name: string;
+  creator: string;
+  priority: string;
+  description: string;
+  lastActivity: string;
+  progress: number;
+  image: string;
+  attackType?: string;
+  status: string;
+  investigation_stage: string;
+}
 
 
 const metricCards = [
@@ -44,173 +58,11 @@ const metricCards = [
   },
 ];
 
-
-// Default fallback cases (only used if localStorage is empty)
-const defaultCaseCards: SetStateAction<CaseCard[]> = [];
-
-interface CaseCard {
-  id: string;
-  creator: string;
-  team: string;
-  priority: string;
-  attackType: string;
-  description: string;
-  lastActivity: string;
-  progress: number;
-  image: string;
-}
-
-// interface Activity {
-//   icon: React.ElementType;
-//   text: string;
-//   time: string;
-// }
-
-// const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
-
-// useEffect(() => {
-//   const cases = JSON.parse(localStorage.getItem("cases") || "[]");
-//   const evidence = JSON.parse(localStorage.getItem("evidenceFiles") || "[]");
-
-//   const activities: Activity[] = [];
-
-//   // Add case creation activities
-//   cases.forEach((c: any) => {
-//     if (c.createdAt) {
-//       activities.push({
-//         icon: Briefcase,
-//         text: `Case created: ${c.creator} opened "${c.description || c.attackType || 'Untitled'}"`,
-//         time: timeAgo(c.createdAt),
-//       });
-//     }
-//   });
-
-//   // Add evidence upload activities
-//   evidence.forEach((e: any) => {
-//     if (e.uploadedAt) {
-//       const relatedCase = cases.find((c: any) => String(c.id) === String(e.caseId));
-//       const caseName = relatedCase?.description || relatedCase?.attackType || "Unknown Case";
-//       activities.push({
-//         icon: FileText,
-//         text: `Evidence uploaded to case "${caseName}"`,
-//         time: timeAgo(e.uploadedAt),
-//       });
-//     }
-//   });
-
-//   // Sort by time (most recent first)
-//   activities.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-
-//   setRecentActivities(activities);
-// }, []);
-
-// function timeAgo(iso: string): string {
-//   const date = new Date(iso);
-//   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-
-//   if (seconds < 60) return `${seconds}s ago`;
-//   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-//   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-//   return `${Math.floor(seconds / 86400)}d ago`;
-// }
-
-<SidebarToggleButton />
-
-export default function Dashboard() {
-  const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
-
-  useEffect(() => {
-    // Load cases from localStorage
-    const stored = localStorage.getItem("cases");
-    console.log("Loaded from localStorage:", stored);
-
-    if (stored) {
-      try {
-        const parsedCases: CaseCard[] = JSON.parse(stored);
-        console.log("Parsed Cases:", parsedCases);
-        setCaseCards(parsedCases.reverse()); // Show newest first
-      } catch (error) {
-        console.error("Error parsing stored cases:", error);
-        setCaseCards(defaultCaseCards);
-      }
-    } else {
-      // Use default cases if nothing in localStorage
-      console.log("No cases in localStorage, using defaults");
-      setCaseCards(defaultCaseCards);
-    }
-  }, []);
-
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-white mb-6">Dashboard</h1>
-
-      {caseCards.length === 0 ? (
-        <div className="text-center text-muted-foreground py-8">
-          <p>No cases found. Create your first case to get started!</p>
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-6">
-          {caseCards.map((card) => (
-            <div
-              key={card.id}
-              className="flex flex-col justify-between items-center w-[440px] h-[370px] p-4 bg-card border border-[#393D47] rounded-[8px]"
-            >
-              <img
-                src={card.image}
-                alt={card.description}
-                width={331}
-                height={180}
-                className="rounded-md mb-3"
-              />
-
-              <h3 className="text-white text-lg font-bold text-center mb-1">
-                {card.attackType || "Untitled Case"}
-              </h3>
-
-              <div className="text-sm text-muted-foreground text-center mb-2">
-                Team: {card.team} | Last Activity: {card.lastActivity}
-              </div>
-
-              <div className="flex justify-between items-center w-full text-xs mb-1">
-                <div className="flex items-center gap-1">
-                  <span
-                    className={cn(
-                      "w-2 h-2 rounded-full",
-                      card.priority === "critical"
-                        ? "bg-red-500"
-                        : card.priority === "high"
-                        ? "bg-orange-400"
-                        : card.priority === "mid"
-                        ? "bg-yellow-400"
-                        : "bg-green-400"
-                    )}
-                  ></span>
-                  <span className="text-muted-foreground capitalize">{card.priority}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                  <span className="text-muted-foreground">Ongoing</span>
-                </div>
-              </div>
-
-              <Progress
-                value={card.progress}
-                className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
-              />
-
-              <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
-                View Details
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export const DashBoardPage = () => {
+  const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState("active");
+
   const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
@@ -219,71 +71,64 @@ export const DashBoardPage = () => {
     .map((part: string) => part[0])
     .join("")
     .toUpperCase();
-useEffect(() => {
-  try {
-    const stored = localStorage.getItem("caseActivities");
-    const parsed = stored ? JSON.parse(stored) : [];
 
-    const sorted = parsed.sort((a: any, b: any) =>
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
+const [editingCase, setEditingCase] = useState<CaseCard | null>(null);
+const [updatedStatus, setUpdatedStatus] = useState("");
+const [updatedStage, setUpdatedStage] = useState("");
+const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
 
-    setRecentActivities(sorted.slice(0, 10));
-  } catch (err) {
-    console.error("Error loading activities:", err);
-    setRecentActivities([]); // Fallback to empty
-  }
-}, []);
-
-
-
-  const [activeTab, setActiveTab] = useState("active");
-  const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
   useEffect(() => {
-    // Load cases from localStorage for the main dashboard page too
-    const stored = localStorage.getItem("cases");
-    console.log("DashboardPage - Loaded from localStorage:", stored);
-
-    if (stored) {
+    const fetchCases = async () => {
       try {
-        const parsedCases: CaseCard[] = JSON.parse(stored);
-        console.log("DashboardPage - Parsed Cases:", parsedCases);
-        setCaseCards(parsedCases.reverse()); // Show newest first
-      } catch (error) {
-        console.error("Error parsing stored cases:", error);
-        setCaseCards(defaultCaseCards);
+        const status = activeTab === "active" ? "open" : "closed";
+        const res = await fetch(`http://localhost:8080/api/v1/cases/filter?status=${status}`, {
+          headers: {
+            "Authorization": `Bearer ${sessionStorage.getItem("authToken") || ""}`
+          }
+        });
+        if (!res.ok) throw new Error("Failed to load cases");
+        const data = await res.json();
+        console.log("Fetched cases:", data);
+        const mappedCases = data.cases.map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          team_name: c.team_name,
+          creator: c.created_by,
+          priority: c.priority,
+          description: c.description,
+          lastActivity: c.created_at, 
+          progress: c.progress || 0,
+          image: c.image || "https://www.cwilson.com/app/uploads/2022/11/iStock-962094400-1024x565.jpg",
+        }));
+        setCaseCards(mappedCases.reverse());
+      } catch (err) {
+        console.error("Error fetching cases:", err);
+        setCaseCards([]);
       }
-    } else {
-      setCaseCards(defaultCaseCards);
+    };
+    fetchCases();
+  }, [activeTab]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("caseActivities");
+      const parsed = stored ? JSON.parse(stored) : [];
+      const sorted = parsed.sort((a: any, b: any) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+      setRecentActivities(sorted.slice(0, 10));
+    } catch (err) {
+      console.error("Error loading activities:", err);
+      setRecentActivities([]);
     }
   }, []);
 
-  useEffect(() => {
-    // Load cases from localStorage for the main dashboard page too
-    const stored = localStorage.getItem("cases");
-    console.log("DashboardPage - Loaded from localStorage:", stored);
-
-    if (stored) {
-      try {
-        const parsedCases: CaseCard[] = JSON.parse(stored);
-        console.log("DashboardPage - Parsed Cases:", parsedCases);
-        setCaseCards(parsedCases.reverse()); // Show newest first
-      } catch (error) {
-        console.error("Error parsing stored cases:", error);
-        setCaseCards(defaultCaseCards);
-      }
-    } else {
-      setCaseCards(defaultCaseCards);
-    }
-  }, []);
-
-  
   return (
     <div className="min-h-screen bg-background text-white">
       {/* Sidebar */}
       <div className="fixed left-0 top-0 h-full w-80 bg-background border-r border-border p-6 flex flex-col z-10">
         {/* Logo */}
-        <div className=" flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-8">
           <div className="w-14 h-14 rounded-lg overflow-hidden">
             <img
               src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
@@ -296,7 +141,6 @@ useEffect(() => {
 
         {/* Navigation */}
         <nav className="flex-1 space-y-2">
-           
           <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
             <Home className="w-6 h-6" />
             <span className="text-lg">Dashboard</span>
@@ -305,12 +149,10 @@ useEffect(() => {
             <FileText className="w-6 h-6" />
             <Link to="/case-management"><span className="text-lg">Case Management</span></Link>
           </div>
-
           <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <Folder className="w-6 h-6" />
             <Link to="/evidence-viewer"><span className="text-lg">Evidence Viewer</span></Link>
           </div>
-
           <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <MessageSquare className="w-6 h-6" />
             <span className="text-lg">
@@ -341,16 +183,18 @@ useEffect(() => {
         <div className="sticky top-0 bg-background border-b border-border p-4 z-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
-              <SidebarToggleButton/>
-              <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
-                Dashboard
-              </button>
-              <Link to="/evidence-viewer"><button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
-                Evidence Viewer
-              </button></Link>
-              <Link to="/case-management"><button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
-                Case Management
-              </button></Link>
+              <SidebarToggleButton />
+              <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">Dashboard</button>
+              <Link to="/evidence-viewer">
+                <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
+                  Evidence Viewer
+                </button>
+              </Link>
+              <Link to="/case-management">
+                <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
+                  Case Management
+                </button>
+              </Link>
               <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
                 <Link to="/secure-chat">Secure Chat</Link>
               </button>
@@ -367,11 +211,15 @@ useEffect(() => {
               <button className="p-2 text-muted-foreground hover:text-white transition-colors">
                 <Bell className="w-6 h-6" />
               </button>
-              <Link to="/settings" ><button className="p-2 text-muted-foreground hover:text-white transition-colors">
-                <Settings className="w-6 h-6" />
-              </button></Link>
+              <Link to="/settings">
+                <button className="p-2 text-muted-foreground hover:text-white transition-colors">
+                  <Settings className="w-6 h-6" />
+                </button>
+              </Link>
               <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-                <Link to="/profile" ><span className="text-foreground font-medium text-sm">{initials}</span></Link>
+                <Link to="/profile">
+                  <span className="text-foreground font-medium text-sm">{initials}</span>
+                </Link>
               </div>
             </div>
           </div>
@@ -397,177 +245,280 @@ useEffect(() => {
               </div>
             ))}
           </div>
-            {/* Extra spacing before next row */}
-                <div className="mt-[100px] flex gap-6">
-                {/* Threat Landscape Card */}
-                <div className="overflow-hidden w-[550px] h-[366px] rounded-lg border bg-card p-6">
-                  <h2 className="font-bold text-white text-lg mb-2">Threat Landscape</h2>
-                  <p className="text-gray-400 text-sm mb-4">Graph: Evidence relationship between cases</p>
 
-                  <div className="w-full h-[265px] overflow-auto cursor-grab active:cursor-grabbing">
-                    <svg className="min-w-[600px] min-h-[265px]">
-                      {/* Case A */}
-                      <circle cx="100" cy="130" r="28" fill="#3b82f6" className="hover:stroke-white hover:stroke-2" />
-                      <text x="100" y="130" fill="white" textAnchor="middle" dy="4" fontSize="10">Case A</text>
-                      <title>Case A: Malware investigation</title>
+          {/* Threat landscape and recent activities */}
+          <div className="mt-[100px] flex gap-6">
+            <div className="overflow-hidden w-[550px] h-[366px] rounded-lg border bg-card p-6">
+              <h2 className="font-bold text-white text-lg mb-2">Threat Landscape</h2>
+              <p className="text-gray-400 text-sm mb-4">Graph: Evidence relationship between cases</p>
+              <div className="w-full h-[265px] overflow-auto cursor-grab active:cursor-grabbing">
+                <svg className="min-w-[600px] min-h-[265px]">
+                  <circle cx="100" cy="130" r="28" fill="#3b82f6" className="hover:stroke-white hover:stroke-2" />
+                  <text x="100" y="130" fill="white" textAnchor="middle" dy="4" fontSize="10">Case A</text>
+                  <circle cx="450" cy="90" r="28" fill="#6366f1" className="hover:stroke-white hover:stroke-2" />
+                  <text x="450" y="90" fill="white" textAnchor="middle" dy="4" fontSize="10">Case B</text>
+                  <circle cx="270" cy="70" r="20" fill="#ec4899" className="hover:stroke-blue-400 hover:stroke-2" />
+                  <text x="270" y="70" fill="black" textAnchor="middle" dy="4" fontSize="10" fontWeight="600">mem.dmp</text>
+                  <circle cx="270" cy="200" r="20" fill="#a855f7" className="hover:stroke-blue-400 hover:stroke-2" />
+                  <text x="270" y="200" fill="black" textAnchor="middle" dy="4" fontSize="10" fontWeight="600">mal.exe</text>
+                  <line x1="100" y1="130" x2="270" y2="70" stroke="#4b5563" strokeWidth="1.5" />
+                  <line x1="450" y1="90" x2="270" y2="70" stroke="#4b5563" strokeWidth="1.5" />
+                  <line x1="100" y1="130" x2="270" y2="200" stroke="#6b7280" strokeDasharray="4 2" />
+                </svg>
+              </div>
+            </div>
 
-                      {/* Case B */}
-                      <circle cx="450" cy="90" r="28" fill="#6366f1" className="hover:stroke-white hover:stroke-2" />
-                      <text x="450" y="90" fill="white" textAnchor="middle" dy="4" fontSize="10">Case B</text>
-                      <title>Case B: Phishing attack</title>
-
-                      {/* Evidence 1 */}
-                      <circle cx="270" cy="70" r="20" fill="#ec4899" className="hover:stroke-blue-400 hover:stroke-2" />
-                      <text x="270" y="70" fill="black" textAnchor="middle" dy="4" fontSize="10" fontWeight="600">mem.dmp</text>
-                      <title>Evidence: Memory Dump</title>
-
-                      {/* Evidence 2 */}
-                      <circle cx="270" cy="200" r="20" fill="#a855f7" className="hover:stroke-blue-400 hover:stroke-2" />
-                      <text x="270" y="200" fill="black" textAnchor="middle" dy="4" fontSize="10" fontWeight="600">mal.exe</text>
-                      <title>Evidence: Executable Sample</title>
-
-                      {/* Links */}
-                      <line x1="100" y1="130" x2="270" y2="70" stroke="#4b5563" strokeWidth="1.5" />
-                      <line x1="450" y1="90" x2="270" y2="70" stroke="#4b5563" strokeWidth="1.5" />
-                      <line x1="100" y1="130" x2="270" y2="200" stroke="#6b7280" strokeDasharray="4 2" />
-                    </svg>
-                  </div>
-                </div>
-                 {/* Recent Activities Card */}
             <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border bg-card p-6 overflow-auto">
               <h2 className="font-bold text-foreground text-lg mb-4">Recent Activities</h2>
-                <ul className="space-y-4">
-                  {recentActivities.map((activity, index) => {
-                    const getIcon = (action: string) => {
-                      if (action.toLowerCase().includes("alert")) return AlertTriangle;
-                      if (action.toLowerCase().includes("case")) return Briefcase;
-                      return FileText;
-                    };
-
-                    const Icon = getIcon(activity.action);
-                    const timeAgo = activity.timestamp
-                      ? new Date(activity.timestamp).toLocaleString()
-                      : "unknown time";
-
-                    return (
-                      <li key={index}>
-                        <div className="flex items-start gap-3 mb-2">
-                          <Icon className="w-5 h-5 mt-1 text-foreground" />
-                          <div>
-                            <p className="text-foreground text-sm">
-                              <strong>{activity.user}</strong> {activity.action}
-                            </p>
-                            <p className="text-muted-foreground text-xs">{timeAgo}</p>
-                          </div>
+              <ul className="space-y-4">
+                {recentActivities.map((activity, index) => {
+                  const getIcon = (action: string) => {
+                    if (action.toLowerCase().includes("alert")) return AlertTriangle;
+                    if (action.toLowerCase().includes("case")) return Briefcase;
+                    return FileText;
+                  };
+                  const Icon = getIcon(activity.action);
+                  const timeAgo = activity.timestamp
+                    ? new Date(activity.timestamp).toLocaleString()
+                    : "unknown time";
+                  return (
+                    <li key={index}>
+                      <div className="flex items-start gap-3 mb-2">
+                        <Icon className="w-5 h-5 mt-1 text-foreground" />
+                        <div>
+                          <p className="text-foreground text-sm">
+                            <strong>{activity.user}</strong> {activity.action}
+                          </p>
+                          <p className="text-muted-foreground text-xs">{timeAgo}</p>
                         </div>
-                        {index < recentActivities.length - 1 && (
-                          <hr className="w-[500px] border-t-[2px] border-[#8C8D8B]" />
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
+                      </div>
+                      {index < recentActivities.length - 1 && (
+                        <hr className="w-[500px] border-t-[2px] border-[#8C8D8B]" />
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           </div>
-         
+
+          {/* Case cards */}
           <div className="w-full bg-card border border-border rounded-lg mt-8 p-6">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setActiveTab("active")}
-            className={cn(
-              "text-sm rounded-lg h-8 px-4",
-              activeTab === "active"
-                ? "bg-muted text-foreground"
-                : "bg-card text-muted-foreground border border-muted"
-            )}
-          >
-            Active Cases ({caseCards.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("archived")}
-            className={cn(
-              "text-sm rounded-lg h-8 px-4",
-              activeTab === "archived"
-                ? "bg-muted text-white"
-                : "bg-card text-muted-foreground border border-muted"
-            )}
-          >
-            Archived Cases (0)
-          </button>
-        </div>
-        <Link to="/create-case"><button className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700">
-          Create Case
-        </button></Link>
-      </div>
-
-      {caseCards.length === 0 ? (
-        <div className="text-center text-muted-foreground py-8">
-          <p>No cases found. Create your first case to get started!</p>
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-6">
-          {caseCards.map((card) => (
-            <div
-              key={card.id}
-              className="flex flex-col justify-between items-center w-[440px] h-[430px] p-4 bg-card border border rounded-[8px]"
-            >
-              <img
-              src={card.image}
-              alt={card.attackType}
-              width={331}
-              height={180}
-              className="rounded-md mb-3"
-              />
-
-              <h3 className="text-white text-lg font-bold text-center mb-1">
-                {card.attackType || "Untitled Case"}
-              </h3>
-              <div className="text-sm text-muted-foreground text-center mb-2">
-                Team: {card.team} | Last Activity: {card.lastActivity}
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActiveTab("active")}
+                  className={cn(
+                    "text-sm rounded-lg h-8 px-4",
+                    activeTab === "active"
+                      ? "bg-muted text-foreground"
+                      : "bg-card text-muted-foreground border border-muted"
+                  )}
+                >
+                  Active Cases ({caseCards.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("archived")}
+                  className={cn(
+                    "text-sm rounded-lg h-8 px-4",
+                    activeTab === "archived"
+                      ? "bg-muted text-white"
+                      : "bg-card text-muted-foreground border border-muted"
+                  )}
+                >
+                  Archived Cases (0)
+                </button>
               </div>
-              <div className="flex justify-between items-center w-full text-xs mb-1">
-                <div className="flex items-center gap-1">
-                  <span
-                    className={cn(
-                      "w-2 h-2 rounded-full",
-                      card.priority === "critical"
-                        ? "bg-red-500"
-                        : card.priority === "high"
-                        ? "bg-orange-400"
-                        : card.priority === "mid"
-                        ? "bg-yellow-400"
-                        : "bg-green-400"
-                    )}
-                  ></span>
-                  <span className="text-muted-foreground capitalize">{card.priority}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                  <span className="text-muted-foreground">Ongoing</span>
-                </div>
-              </div>
-              <Progress
-              value={card.progress}
-              className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
-              />
-
-              <Link to={`/evidence-viewer/${card.id}`}>
-                <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
-                  View Evidence Details
+              <Link to="/create-case">
+                <button className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700">
+                  Create Case
                 </button>
               </Link>
-              
-              <Link to={`/case-management/${card.id}`}>
-                <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
-                  View Details
-                </button>
-              </Link>             
             </div>
-          ))}
-        </div>
-      )}
-    </div>
+
+            {caseCards.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <p>No cases found. Create your first case to get started!</p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-6">
+                {caseCards.map((card) => (
+                  <div
+                    key={card.id}
+                    className="flex flex-col justify-between items-center w-[440px] h-[430px] p-4 bg-card border border rounded-[8px]"
+                  ><div className="w-full flex justify-end mb-1">
+                    <button
+                      onClick={() => {
+                        setEditingCase(card);
+                        setUpdatedStatus(card.status);
+                        setUpdatedStage(card.investigation_stage);
+                      }}
+                      className="text-muted-foreground hover:text-blue-500 transition-colors"
+                      title="Edit Case"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                    <img
+                      src={card.image || "https://www.cwilson.com/app/uploads/2022/11/iStock-962094400-1024x565.jpg"}
+                      alt={card.description || "Case image"}
+                      width={331}
+                      height={180}
+                      className="rounded-md mb-3"
+                    />
+                    <h3 className="text-white text-lg font-bold text-center mb-1">
+                      {card.title || "Untitled Case"}
+                    </h3>
+                    <div className="text-sm text-muted-foreground text-center mb-2">
+                      Team: {card.team_name} |  Last Activity: {
+                      card.lastActivity
+                        ? new Date(card.lastActivity).toLocaleString("en-GB", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: false
+                          })
+                        : "Unknown"
+                    }
+                    </div>
+                    <div className="flex justify-between items-center w-full text-xs mb-1">
+                      <div className="flex items-center gap-1">
+                        <span
+                          className={cn(
+                            "w-2 h-2 rounded-full",
+                            card.priority === "critical"
+                              ? "bg-red-500"
+                              : card.priority === "high"
+                              ? "bg-orange-400"
+                              : card.priority === "mid"
+                              ? "bg-yellow-400"
+                              : "bg-green-400"
+                          )}
+                        ></span>
+                        <span className="text-muted-foreground capitalize">{card.priority}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                        <span className="text-muted-foreground">Ongoing</span>
+                      </div>
+                    </div>
+                    <Progress
+                      value={card.progress}
+                      className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
+                    />
+                    <Link to={`/evidence-viewer/${card.id}`}>
+                      <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
+                        View Evidence Details
+                      </button>
+                    </Link>
+                    <Link to={`/case-management/${card.id}`}>
+                      <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
+                        View Details
+                      </button>
+                    </Link>
+
+                  </div>
+                ))}
+                  {editingCase && (
+                  <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
+                    <div className="bg-card p-6 rounded-2xl shadow-lg border border-border w-full max-w-md">
+                      <h2 className="text-xl font-semibold text-foreground mb-4">Edit Case</h2>
+
+                      {/* Status Dropdown */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-muted-foreground mb-1">
+                          Status
+                        </label>
+                        <select
+                          className="w-full bg-muted text-foreground p-2 rounded-md border border-border"
+                          value={updatedStatus}
+                          onChange={(e) => setUpdatedStatus(e.target.value)}
+                        >
+                          <option value="open">Open</option>
+                          <option value="ongoing">Ongoing</option>
+                          <option value="closed">Closed</option>
+                          <option value="under_review">Under Review</option>
+                        </select>
+                      </div>
+
+                      {/* Investigation Stage Dropdown */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-muted-foreground mb-1">
+                          Investigation Stage
+                        </label>
+                        <select
+                          className="w-full bg-muted text-foreground p-2 rounded-md border border-border"
+                          value={updatedStage}
+                          onChange={(e) => setUpdatedStage(e.target.value)}
+                        >
+                          <option value="Triage">Triage</option>
+                          <option value="Evidence Collection">Evidence Collection</option>
+                          <option value="Analysis">Analysis</option>
+                          <option value="Correlation & Threat Intelligence">Correlation & Threat Intelligence</option>
+                          <option value="Containment & Eradication">Containment & Eradication</option>
+                          <option value="Recovery">Recovery</option>
+                          <option value="Reporting & Documentation">Reporting & Documentation</option>
+                          <option value="Case Closure & Review">Case Closure & Review</option>
+                        </select>
+                      </div>
+
+                      {/* Upload Button that Navigates */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-muted-foreground mb-1">
+                          Upload Evidence
+                        </label>
+                        <Link
+                          to={`/upload-evidence?caseId=${editingCase.id}`}
+                          className="inline-block w-full"
+                        >
+                          <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                            Go to Upload Evidence Page
+                          </button>
+                        </Link>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          onClick={() => setEditingCase(null)}
+                          className="px-4 py-2 text-sm text-muted-foreground hover:text-white"
+                        >
+                          Cancel
+                        </button>
+
+                        <button
+                          onClick={async () => {
+                            const token = sessionStorage.getItem("authToken") || "";
+                            await fetch(`http://localhost:8080/api/v1/cases/${editingCase.id}`, {
+                              method: "PATCH",
+                              headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${token}`,
+                              },
+                              body: JSON.stringify({
+                                status: updatedStatus,
+                                investigation_stage: updatedStage,
+                              }),
+                            });
+
+                            setEditingCase(null);
+                          }}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+            
+          </div>
         </main>
       </div>
     </div>
