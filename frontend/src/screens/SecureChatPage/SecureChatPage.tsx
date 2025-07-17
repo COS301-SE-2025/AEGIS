@@ -60,7 +60,7 @@ interface Group {
   members: string[];
   avatar: string;
   hasStarted?: boolean;
-
+  caseId?: string;
 }
 
 type ChatMessages = Record<number, Message[]>;
@@ -85,6 +85,33 @@ export const SecureChatPage = (): JSX.Element => {
   const [previewFileData, setPreviewFileData] = useState<string>("");
   const [typingUsers, setTypingUsers] = useState<Record<number, string[]>>({});
   const [hasMounted, setHasMounted] = useState(false);
+
+  interface Case {
+    id: string;
+    title?: string;
+    // Add other properties if needed
+  }
+  const [activeCases, setActiveCases] = useState<Case[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState("");
+
+  useEffect(() => {
+    const fetchActiveCases = async () => {
+      try {
+        const res = await fetch("http://localhost:8080/api/v1/cases/filter?status=open", {
+          headers: {
+            Authorization: `Bearer ${sessionStorage.getItem("authToken") || ""}`,
+          },
+        });
+        const data = await res.json();
+        setActiveCases(data.cases || []);
+      } catch (err) {
+        console.error("Error fetching cases:", err);
+      }
+    };
+
+    fetchActiveCases();
+  }, []);
+
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -156,7 +183,10 @@ const teamMembers = [
     const selectedMember = availableMembers[Math.floor(Math.random() * availableMembers.length)];
     const responses = getContextualResponse(lastMessage?.content || "", lastMessage?.user || "");
     const selectedResponse = responses[Math.floor(Math.random() * responses.length)];
-    
+    if (!selectedMember) {
+      console.warn("No selected member found!");
+      return; // Or fallback logic
+    }
     const newMessage: Message = {
       id: Date.now() + Math.random(),
       user: `${selectedMember.name} (${selectedMember.role})`,
@@ -469,28 +499,33 @@ if (meaningfulGroups.length > 0) {
   };
 
   const handleCreateGroup = (e?: React.MouseEvent | React.KeyboardEvent) => {
-    e?.preventDefault();
-    if (!newGroupName.trim()) return;
+  e?.preventDefault();
+  
+  if (!newGroupName.trim() || !selectedCaseId) return;
 
-    const newGroup: Group = {
-      id: Date.now(),
-      name: newGroupName,
-      lastMessage: "Group created",
-      lastMessageTime: "now",
-      unreadCount: 0,
-      members: ["You"],
-      avatar: "🔒"
-    };
-
-    setGroups(prev => [...prev, newGroup]);
-    setChatMessages(prev => ({
-      ...prev,
-      [newGroup.id]: []
-    }));
-
-    setNewGroupName("");
-    setShowNewGroupModal(false);
+  const newGroup: Group = {
+    id: Date.now(),
+    name: newGroupName,
+    lastMessage: "Group created",
+    lastMessageTime: "now",
+    unreadCount: 0,
+    members: ["You"],
+    avatar: "🔒",
+    caseId: selectedCaseId, 
   };
+
+  console.log("Creating group:", newGroup); 
+  
+  setGroups(prev => [...prev, newGroup]);
+  setChatMessages(prev => ({
+    ...prev,
+    [newGroup.id]: []
+  }));
+
+  setNewGroupName("");
+  setSelectedCaseId(""); // reset selection
+  setShowNewGroupModal(false);
+};
 
   const handleExitGroup = () => {
     if (!activeChat) return;
@@ -824,7 +859,19 @@ if (meaningfulGroups.length > 0) {
                           <Users className="w-4 h-4" />
                           {activeChat.members.length} members
                         </p>
+                        {activeChat.caseId && (
+                          <p className="text-xs text-muted-foreground">
+                            Linked Case:{" "}
+                            <Link
+                              to={`/case-management/${activeChat.caseId}`}
+                              className="text-blue-500 hover:underline"
+                            >
+                              {activeChat.caseId.slice(0, 8)}...
+                            </Link>
+                          </p>
+                        )}
                       </div>
+
                     </div>
                     <div className="relative" ref={moreMenuRef}>
                       <button 
@@ -1078,34 +1125,52 @@ if (meaningfulGroups.length > 0) {
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border-[3px] border-border bg-background shadow-xl">
             <h3 className="text-xl font-bold mb-4">Create New Group</h3>
-            <div>
-              <input
-                type="text"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleCreateGroup(e)}
-                placeholder="Enter group name..."
-                className="w-full p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground mb-4"
-                autoFocus
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setShowNewGroupModal(false)}
-                  className="px-4 py-2 text-muted-foreground hover:text-foreground"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreateGroup}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white"
-                >
-                  Create
-                </button>
-              </div>
+
+            {/* Case Selector */}
+            <label className="block text-sm text-muted-foreground mb-1">Case associated with group chat</label>
+            <select
+              className="w-full p-3 rounded-lg bg-muted text-foreground border border-border mb-4"
+              value={selectedCaseId}
+              onChange={(e) => setSelectedCaseId(e.target.value)}
+            >
+              <option value="">-- Select an active case --</option>
+              {activeCases.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title || "Untitled Case"} ({c.id})
+                </option>
+              ))}
+            </select>
+
+            {/* Group name input */}
+            <input
+              type="text"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleCreateGroup(e)}
+              placeholder="Enter group name..."
+              className="w-full p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground mb-4"
+              autoFocus
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowNewGroupModal(false)}
+                className="px-4 py-2 text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={(e) => handleCreateGroup(e)}
+                disabled={!selectedCaseId}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white disabled:opacity-50"
+              >
+                Create
+              </button>
             </div>
           </div>
         </div>
       )}
+
       {/* Add Members Modal */}
       {showAddMembersModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">

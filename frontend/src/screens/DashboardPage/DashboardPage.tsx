@@ -75,7 +75,7 @@ export const DashBoardPage = () => {
 const [editingCase, setEditingCase] = useState<CaseCard | null>(null);
 const [updatedStatus, setUpdatedStatus] = useState("");
 const [updatedStage, setUpdatedStage] = useState("");
-const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+const [] = useState<File | null>(null);
 
   useEffect(() => {
     const fetchCases = async () => {
