@@ -20,6 +20,8 @@ type ChatGroup struct {
 	IsActive    bool               `bson:"is_active" json:"is_active"`
 	LastMessage *LastMessage       `bson:"last_message,omitempty" json:"last_message,omitempty"`
 	Settings    *GroupSettings     `bson:"settings,omitempty" json:"settings,omitempty"`
+	CaseID      string             `bson:"case_id" json:"case_id"`
+	//Avatar      string             `bson:"-" json:"avatar,omitempty"`
 }
 
 // Member represents a group member
@@ -52,7 +54,7 @@ type LastMessage struct {
 
 // Message represents a chat message
 type Message struct {
-	ID            primitive.ObjectID     `bson:"_id,omitempty" json:"id"`
+	ID            string                 `bson:"_id,omitempty" json:"id"`
 	GroupID       primitive.ObjectID     `bson:"group_id" json:"group_id"`
 	SenderEmail   string                 `bson:"sender_email" json:"sender_email"`
 	SenderName    string                 `bson:"sender_name" json:"sender_name"`

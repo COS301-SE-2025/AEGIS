@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -69,6 +70,10 @@ func (r *MongoRepository) createIndexes() {
 
 // Group operations
 func (r *MongoRepository) CreateGroup(ctx context.Context, group *ChatGroup) error {
+	if group.CaseID == "" {
+		return errors.New("case_id is required to create a group")
+	}
+
 	collection := r.db.Collection(GroupsCollection)
 
 	group.CreatedAt = time.Now()
@@ -157,6 +162,31 @@ func (r *MongoRepository) UpdateGroup(ctx context.Context, group *ChatGroup) err
 	return nil
 }
 
+func (r *MongoRepository) GetGroupsByCaseID(ctx context.Context, caseID primitive.ObjectID) ([]*ChatGroup, error) {
+	collection := r.db.Collection(GroupsCollection)
+
+	filter := bson.M{
+		"case_id":   caseID,
+		"is_active": true,
+	}
+
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get groups for case: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var groups []*ChatGroup
+	for cursor.Next(ctx) {
+		var group ChatGroup
+		if err := cursor.Decode(&group); err == nil {
+			groups = append(groups, &group)
+		}
+	}
+
+	return groups, nil
+}
+
 func (r *MongoRepository) DeleteGroup(ctx context.Context, groupID primitive.ObjectID) error {
 	collection := r.db.Collection(GroupsCollection)
 
@@ -175,10 +205,23 @@ func (r *MongoRepository) DeleteGroup(ctx context.Context, groupID primitive.Obj
 
 	return nil
 }
-
 func (r *MongoRepository) AddMemberToGroup(ctx context.Context, groupID primitive.ObjectID, member *Member) error {
 	collection := r.db.Collection(GroupsCollection)
 
+	// Check if member already exists
+	existing := collection.FindOne(ctx, bson.M{
+		"_id":                groupID,
+		"members.user_email": member.UserEmail,
+	})
+	if existing.Err() == nil {
+		// Member already exists
+		return fmt.Errorf("user already a member of this group")
+	} else if existing.Err() != mongo.ErrNoDocuments {
+		// Some other DB error
+		return existing.Err()
+	}
+
+	// Member doesn't exist — proceed to add
 	member.JoinedAt = time.Now()
 	member.IsActive = true
 
@@ -269,7 +312,11 @@ func (r *MongoRepository) CreateMessage(ctx context.Context, message *Message) e
 		return fmt.Errorf("failed to create message: %w", err)
 	}
 
-	message.ID = result.InsertedID.(primitive.ObjectID)
+	oid, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
+		return fmt.Errorf("failed to convert inserted ID to ObjectID")
+	}
+	message.ID = oid.Hex()
 	return nil
 }
 

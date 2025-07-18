@@ -17,6 +17,7 @@ func RegisterChatRoutes(router *gin.RouterGroup, handler *handlers.ChatHandler) 
 		chat.DELETE("/groups/:id", handler.DeleteGroup)
 		chat.POST("/groups/:id/members", handler.AddMemberToGroup)
 		chat.DELETE("/groups/:id/members/:email", handler.RemoveMemberFromGroup)
+		chat.GET("/groups/case/:caseId", handler.GetGroupsByCaseID)
 
 		// Messages
 		chat.POST("/groups/:id/messages", handler.SendMessage)
