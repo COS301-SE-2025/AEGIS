@@ -15,7 +15,6 @@ import (
 	"github.com/gorilla/websocket"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
-
 )
 
 // MessageType represents different types of WebSocket messages
@@ -35,7 +34,6 @@ const (
 	MessageTypePong          MessageType = "pong"
 	MessageTypeDelivered     MessageType = "delivered"
 	NewMessageType           MessageType = "NEW_MESSAGE"
-
 )
 
 // WebSocketMessage represents a WebSocket message
@@ -65,20 +63,20 @@ type webSocketManager struct {
 	pingInterval time.Duration
 	pongTimeout  time.Duration
 
-	repo         ChatRepository
+	repo ChatRepository
 }
 
 // NewWebSocketManager creates a new WebSocket manager
 func NewWebSocketManager(userService UserService, repo ChatRepository) WebSocketManager {
 
 	manager := &webSocketManager{
-		connections:  make(map[string]*websocket.Conn),
-		groupUsers:   make(map[string][]string),
-		userGroups:   make(map[string][]string),
-		typingUsers:  make(map[string]map[string]time.Time),
-		userService:  userService,
+		connections: make(map[string]*websocket.Conn),
+		groupUsers:  make(map[string][]string),
+		userGroups:  make(map[string][]string),
+		typingUsers: make(map[string]map[string]time.Time),
+		userService: userService,
 
-		repo:         repo,
+		repo: repo,
 
 		pingInterval: 30 * time.Second,
 		pongTimeout:  60 * time.Second,
@@ -171,36 +169,34 @@ func (w *webSocketManager) handleConnectionMessages(userEmail string, conn *webs
 			w.handleTypingIndicator(userEmail, message.GroupID, false)
 
 		case MessageTypeDelivered:
-	var ack struct {
-		MessageID string `json:"message_id"`
-	}
-	if err := json.Unmarshal([]byte(fmt.Sprint(message.Data)), &ack); err == nil {
-		objID, err := primitive.ObjectIDFromHex(ack.MessageID)
-		if err != nil {
-			log.Println("Invalid ObjectID:", ack.MessageID)
-			break
-		}
+			var ack struct {
+				MessageID string `json:"message_id"`
+			}
+			if err := json.Unmarshal([]byte(fmt.Sprint(message.Data)), &ack); err == nil {
+				objID, err := primitive.ObjectIDFromHex(ack.MessageID)
+				if err != nil {
+					log.Println("Invalid ObjectID:", ack.MessageID)
+					break
+				}
 
-		// Retrieve the message to get its GroupID
-		msg, err := w.repo.GetMessageByID(context.TODO(), objID)
-		if err != nil {
-			log.Println("Could not fetch message for delivery ack:", err)
-			break
-		}
+				// Retrieve the message to get its GroupID
+				msg, err := w.repo.GetMessageByID(context.TODO(), objID)
+				if err != nil {
+					log.Println("Could not fetch message for delivery ack:", err)
+					break
+				}
 
-		// Now mark it as delivered
-		err = w.repo.MarkMessagesAsDelivered(
-			context.TODO(),
-			msg.GroupID,
-			[]primitive.ObjectID{msg.ID},
-			userEmail,
-		)
-		if err != nil {
-			log.Printf("Failed to mark message %s as delivered: %v", msg.ID.Hex(), err)
-		}
-	}
-
-
+				// Now mark it as delivered
+				err = w.repo.MarkMessagesAsDelivered(
+					context.TODO(),
+					msg.GroupID,
+					[]primitive.ObjectID{objID},
+					userEmail,
+				)
+				if err != nil {
+					log.Printf("Failed to mark message %s as delivered: %v", msg.ID, err)
+				}
+			}
 
 		case MessageTypePong:
 			// Pong received, connection is alive
@@ -548,7 +544,6 @@ func (w *webSocketManager) notifyUserLeft(groupID, userEmail string) {
 	}
 }
 
-
 // to do thati
 func (w *webSocketManager) deliverQueuedMessages(userEmail string) {
 	ctx := context.TODO()
@@ -571,7 +566,11 @@ func (w *webSocketManager) deliverQueuedMessages(userEmail string) {
 		}
 
 		if err := w.sendMessageToUser(userEmail, event); err == nil {
-			groupMsgMap[msg.GroupID] = append(groupMsgMap[msg.GroupID], msg.ID)
+			if objID, err := primitive.ObjectIDFromHex(msg.ID); err == nil {
+				groupMsgMap[msg.GroupID] = append(groupMsgMap[msg.GroupID], objID)
+			} else {
+				log.Printf("Invalid ObjectID for message: %v", msg.ID)
+			}
 		}
 	}
 
@@ -581,4 +580,3 @@ func (w *webSocketManager) deliverQueuedMessages(userEmail string) {
 		}
 	}
 }
-

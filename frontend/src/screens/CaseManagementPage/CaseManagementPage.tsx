@@ -76,26 +76,86 @@ const { caseId } = useParams<{ caseId: string }>();
 const [caseData, setCaseData] = useState<CaseData | null>(null);
 
 useEffect(() => {
-  const storedCases = localStorage.getItem("cases");
-  if (storedCases && caseId) {
-    const cases = JSON.parse(storedCases);
-    const found = cases.find((c: any) => String(c.id) === caseId);
-    setCaseData(found);
-  }
+  const fetchCaseDetails = async () => {
+    if (!caseId) return;
+    try {
+      const token = sessionStorage.getItem("authToken");
+      const res = await fetch(`http://localhost:8080/api/v1/cases/${caseId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+    const text = await res.text();
+    console.log("Raw response text:", text);
+
+    const raw = JSON.parse(text);
+    const caseDataRaw = raw.case; // ✅ This is the actual case object
+
+  const normalized = {
+    id: caseDataRaw.id,
+    creator: caseDataRaw.created_by,
+    team: caseDataRaw.team_name ? [caseDataRaw.team_name] : [],
+    priority: caseDataRaw.priority,
+    attackType: caseDataRaw.title,
+    description: caseDataRaw.description,
+    createdAt: caseDataRaw.created_at,
+    updatedAt: caseDataRaw.created_at, // assuming no update time
+    lastActivity: caseDataRaw.created_at,
+    progress: caseDataRaw.status === "closed" ? 100 : 50,
+    image: "",
+  };
+
+      console.log("Normalized case data:", normalized);
+      setCaseData(normalized);
+    } catch (err) {
+      console.error("Fetch error:", err);
+    }
+  };
+
+  fetchCaseDetails();
 }, [caseId]);
+
 
 const [assignedMembers, setAssignedMembers] = useState<{ name: string; role: string }[]>([]);
 
 useEffect(() => {
-  const stored = localStorage.getItem("caseMembers");
-  if (stored && caseId) {
-    const parsed = JSON.parse(stored);
-    const entry = parsed.find((e: any) => String(e.caseId) === caseId);
-    if (entry) {
-      setAssignedMembers(entry.members);
+  const fetchCollaborators = async () => {
+    if (!caseId) return;
+    try {
+      const token = sessionStorage.getItem("authToken");
+      const res = await fetch(`http://localhost:8080/api/v1/cases/${caseId}/collaborators`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Failed to fetch collaborators:", res.status, errorText);
+        return;
+      }
+
+      const data = await res.json();
+      console.log("✅ Collaborators full payload:", data);
+
+      // 🔁 Map backend fields to your frontend structure
+      const normalized = (data.data || []).map((collab: any) => ({
+        name: collab.full_name,
+        role: collab.role
+      }));
+
+      setAssignedMembers(normalized);
+    } catch (err) {
+      console.error("❌ Error fetching collaborators:", err);
     }
-  }
+  };
+
+  fetchCollaborators();
 }, [caseId]);
+
 
 const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
 

@@ -27,13 +27,14 @@ import { ShareCaseForm } from "./screens/ShareCasePage/ShareCasePage";
 
 //sidebar toggle
 import { SidebarProvider } from './context/SidebarToggleContext';
-
+import { Toaster } from 'react-hot-toast';
 
 
 export default function App() {
   return (
   <SidebarProvider>
   <ThemeProvider>
+  <Toaster position="top-right" reverseOrder={false} />
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />

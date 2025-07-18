@@ -86,7 +86,9 @@ CREATE TABLE IF NOT EXISTS users (
     external_token_expiry TIMESTAMP, -- expiry for external collaborator token
     external_token_status token_status DEFAULT 'active', -- token status: active, expired, revoked
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    email_verified_at TIMESTAMP NULL,
+    accepted_terms_at TIMESTAMP
 );
 
 CREATE TYPE token_type AS ENUM (
@@ -142,7 +144,7 @@ CREATE TABLE IF NOT EXISTS cases (
     status case_status DEFAULT 'open',
     investigation_stage investigation_stage DEFAULT 'analysis',
     priority case_priority DEFAULT 'medium',
-    TeamName TEXT NOT NULL,
+    team_name TEXT NOT NULL,
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

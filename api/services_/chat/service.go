@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -55,10 +57,36 @@ func (s *ChatService) SendMessageWithAttachment(
 	data, err := io.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
+
 	}
+	fmt.Println("Read bytes sample:", data[:min(20, len(data))], "len:", len(data))
 
 	// Detect MIME type
 	contentType := http.DetectContentType(data[:512])
+
+	// Try to use file extension as a fallback
+	ext := filepath.Ext(fileHeader.Filename)
+	fallbackType := mime.TypeByExtension(ext)
+	if contentType == "application/octet-stream" && fallbackType != "" {
+		contentType = fallbackType
+	}
+
+	fileSize := fileHeader.Size
+	if fileSize == 0 {
+		fileSize = int64(len(data))
+	}
+
+	// fallback to Seek if still unknown
+	if fileSize == 0 {
+		if seeker, ok := file.(io.Seeker); ok {
+			currentPos, _ := seeker.Seek(0, io.SeekCurrent)
+			size, err := seeker.Seek(0, io.SeekEnd)
+			if err == nil {
+				fileSize = size
+				_, _ = seeker.Seek(currentPos, io.SeekStart)
+			}
+		}
+	}
 
 	// Upload to IPFS
 	ipfsResult, err := s.ipfsUploader.UploadBytes(ctx, data, fileHeader.Filename)
@@ -70,7 +98,7 @@ func (s *ChatService) SendMessageWithAttachment(
 		ID:       primitive.NewObjectID().Hex(),
 		FileName: ipfsResult.FileName,
 		FileType: contentType,
-		FileSize: int64(len(data)), // file actual size
+		FileSize: fileSize, // file actual size
 		URL:      ipfsResult.URL,
 		Hash:     ipfsResult.Hash,
 	}

@@ -4,7 +4,9 @@ import (
 	"aegis-api/services_/chat"
 	"encoding/base64"
 	"fmt"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -39,6 +41,20 @@ func (h *ChatHandler) CreateGroup(c *gin.Context) {
 			Description: "Invalid input",
 		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+		return
+	}
+
+	// 🛡️ Validate that CaseID is provided
+	if group.CaseID == "" {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action:      "CREATE_GROUP",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "group", ID: ""},
+			Service:     "chat",
+			Status:      "FAILED",
+			Description: "Missing case ID for group creation",
+		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "case ID is required to create a group"})
 		return
 	}
 
@@ -397,6 +413,23 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid base64 file"})
 			return
 		}
+		contentType := http.DetectContentType(data[:512])
+
+		ext := filepath.Ext(req.FileName)
+		switch ext {
+		case ".docx":
+			contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+		case ".pptx":
+			contentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+		case ".xlsx":
+			contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+		}
+
+		fallbackType := mime.TypeByExtension(ext)
+		if contentType == "application/octet-stream" && fallbackType != "" {
+			contentType = fallbackType
+		}
+		fileSize := int64(len(data))
 
 		result, err := h.ChatService.IPFSUploader().UploadBytes(
 			c.Request.Context(),
@@ -420,7 +453,10 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 
 		attachments = []*chat.Attachment{
 			{
+				ID:       primitive.NewObjectID().Hex(),
 				FileName: req.FileName,
+				FileType: contentType,
+				FileSize: fileSize,
 				URL:      fileUrl,
 				Hash:     result.Hash,
 			},
@@ -460,13 +496,55 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action:      "SEND_GROUP_MESSAGE",
 		Actor:       actor,
-		Target:      auditlog.Target{Type: "group_message", ID: msg.ID.Hex()},
+		Target:      auditlog.Target{Type: "group_message", ID: msg.ID},
 		Service:     "chat",
 		Status:      "SUCCESS",
 		Description: "Message sent",
 	})
 
 	c.JSON(http.StatusOK, msg)
+}
+func (h *ChatHandler) GetGroupsByCaseID(c *gin.Context) {
+	actor := extractActorFromContext(c)
+
+	caseIDHex := c.Param("caseId")
+	caseID, err := primitive.ObjectIDFromHex(caseIDHex)
+	if err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action:      "GET_GROUPS_BY_CASE",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "case", ID: caseIDHex},
+			Service:     "chat",
+			Status:      "FAILED",
+			Description: "Invalid case ID",
+		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid case ID"})
+		return
+	}
+
+	groups, err := h.ChatService.Repo().GetGroupsByCaseID(c.Request.Context(), caseID)
+	if err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action:      "GET_GROUPS_BY_CASE",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "case", ID: caseID.Hex()},
+			Service:     "chat",
+			Status:      "FAILED",
+			Description: "Failed to retrieve groups: " + err.Error(),
+		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve groups", "details": err.Error()})
+		return
+	}
+
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action:      "GET_GROUPS_BY_CASE",
+		Actor:       actor,
+		Target:      auditlog.Target{Type: "case", ID: caseID.Hex()},
+		Service:     "chat",
+		Status:      "SUCCESS",
+		Description: "Retrieved groups by case ID",
+	})
+	c.JSON(http.StatusOK, groups)
 }
 
 func (h *ChatHandler) GetMessages(c *gin.Context) {
@@ -505,6 +583,10 @@ func (h *ChatHandler) GetMessages(c *gin.Context) {
 		})
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get messages", "details": err.Error()})
 		return
+	}
+	// Ensure we return [] not null
+	if messages == nil {
+		messages = []*chat.Message{} // update to actual message type if needed
 	}
 
 	h.auditLogger.Log(c, auditlog.AuditLog{

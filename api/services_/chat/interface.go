@@ -20,6 +20,7 @@ type ChatRepository interface {
 	RemoveMemberFromGroup(ctx context.Context, groupID primitive.ObjectID, userEmail string) error
 	IsUserInGroup(ctx context.Context, groupID primitive.ObjectID, userEmail string) (bool, error)
 	UpdateLastMessage(ctx context.Context, groupID primitive.ObjectID, lastMessage *LastMessage) error
+	GetGroupsByCaseID(ctx context.Context, caseID primitive.ObjectID) ([]*ChatGroup, error)
 
 	// Message operations
 	CreateMessage(ctx context.Context, message *Message) error
@@ -35,10 +36,8 @@ type ChatRepository interface {
 	GetGroupMembers(ctx context.Context, groupID primitive.ObjectID) ([]*Member, error)
 	IsGroupAdmin(ctx context.Context, groupID primitive.ObjectID, userEmail string) (bool, error)
 
-
-	GetUndeliveredMessages(ctx context.Context, userEmail string, limit int, before *primitive.ObjectID) ([]*Message, error) 
+	GetUndeliveredMessages(ctx context.Context, userEmail string, limit int, before *primitive.ObjectID) ([]*Message, error)
 	MarkMessagesAsDelivered(ctx context.Context, groupID primitive.ObjectID, messageIDs []primitive.ObjectID, userEmail string) error
-
 }
 
 // IPFSUploader defines the interface for IPFS file operations

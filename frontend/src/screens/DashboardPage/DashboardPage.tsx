@@ -63,6 +63,7 @@ export const DashBoardPage = () => {
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("active");
 
+
   const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
@@ -195,6 +196,7 @@ const [] = useState<File | null>(null);
                   Case Management
                 </button>
               </Link>
+
               <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
                 <Link to="/secure-chat">Secure Chat</Link>
               </button>
