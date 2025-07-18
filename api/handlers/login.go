@@ -7,6 +7,7 @@ import (
 	"aegis-api/services_/auth/reset_password"
 	"aegis-api/structs"
 	"net/http"
+	"aegis-api/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -47,6 +48,10 @@ type Handler struct {
 	ChatHandler             *ChatHandler
 	ProfileHandler          *ProfileHandler
 	GetCollaboratorsHandler *GetCollaboratorsHandler
+	EvidenceViewerHandler *EvidenceViewerHandler
+	EvidenceTagHandler    *EvidenceTagHandler
+	PermissionChecker     middleware.PermissionChecker
+	CaseTagHandler	   *CaseTagHandler
 }
 
 func NewHandler(
@@ -64,6 +69,10 @@ func NewHandler(
 	chatHandler *ChatHandler,
 	profileHandler *ProfileHandler,
 	getCollaboratorsHandler *GetCollaboratorsHandler,
+	evidenceViewerHandler *EvidenceViewerHandler,
+	evidenceTagHandler *EvidenceTagHandler,
+	permissionChecker middleware.PermissionChecker,
+	caseTagHandler *CaseTagHandler, // Optional, if you have a case tag handler
 ) *Handler {
 	return &Handler{
 		AdminService:            adminSvc,
@@ -80,6 +89,10 @@ func NewHandler(
 		ChatHandler:             chatHandler,
 		ProfileHandler:          profileHandler,
 		GetCollaboratorsHandler: getCollaboratorsHandler,
+		EvidenceViewerHandler: evidenceViewerHandler,
+		EvidenceTagHandler:    evidenceTagHandler,
+		PermissionChecker:     permissionChecker,
+		CaseTagHandler:	   caseTagHandler,
 	}
 }
 

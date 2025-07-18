@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	//"aegis-api/pkg/websocket"
 )
 
 func SetUpRouter(h *handlers.Handler) *gin.Engine {
@@ -84,6 +85,28 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 			// ─── Chat_message Routes ────────────────────────────────
 			RegisterChatRoutes(protected, h.ChatHandler)
+
+			// ─── Evidence Viewer + Tagging ────────────────
+  			RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.PermissionChecker)
+
+			RegisterCaseTagRoutes(protected, h.CaseTagHandler, h.PermissionChecker)
+
+			// protected.GET("/ws/cases/:case_id", func(c *gin.Context) {
+			// caseID := c.Param("case_id")
+
+			// // Extract userID from JWT claims in context
+			// 	userIDVal, exists := c.Get("userID")
+			// 	if !exists {
+			// 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			// 		return
+			// 	}
+
+			// 	userID := userIDVal.(string)
+
+			// 	websocket.ServeWS(wsHub, c.Writer, c.Request, userID, caseID)
+			// })
+
+
 
 		}
 	}

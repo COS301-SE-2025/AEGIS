@@ -27,6 +27,9 @@ import (
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/user/profile"
+	"aegis-api/services_/evidence/evidence_tag"
+	"aegis-api/services_/evidence/evidence_viewer"
+	"aegis-api/services_/case/case_tags"
 
 	"github.com/joho/godotenv"
 )
@@ -58,6 +61,13 @@ func main() {
 
 	// ─── Debug Logging ──────────────────────────────────────────
 	log.Println("📨 Using SMTP server:", os.Getenv("SMTP_HOST"))
+
+	// ─── permission checker──────────────────────
+	sqlDB, err := db.DB.DB()
+	if err != nil {
+		log.Fatalf("❌ Failed to extract SQL DB: %v", err)
+	}
+	permChecker := &middleware.DBPermissionChecker{DB: sqlDB}
 
 	// ─── Repositories ───────────────────────────────────────────
 	userRepo := registration.NewGormUserRepository(db.DB)
@@ -151,6 +161,28 @@ func main() {
 	collabRepo := get_collaborators.NewGormRepository(db.DB)
 	collabService := get_collaborators.NewService(collabRepo)
 	getCollaboratorsHandler := handlers.NewGetCollaboratorsHandler(collabService, auditLogger)
+	// ─── Evidence Tagging ─────────────────────────────
+	evidenceTagRepo := evidence_tag.NewEvidenceTagRepository(db.DB)
+	evidenceTagService := evidence_tag.NewEvidenceTagService(evidenceTagRepo)
+	evidenceTagHandler := &handlers.EvidenceTagHandler{
+		Service: evidenceTagService,
+	}
+
+	// ─── Evidence Viewer ─────────────────────────────
+	viewerIPFSClient := evidence_viewer.NewIPFSClient()
+	evidenceViewerRepo := evidence_viewer.NewPostgresEvidenceRepository(db.DB, viewerIPFSClient)
+	evidenceViewerService := evidence_viewer.NewEvidenceService(evidenceViewerRepo) 
+	evidenceViewerHandler := &handlers.EvidenceViewerHandler{
+		Service: evidenceViewerService,
+	}
+
+	// ─── Case Tagging ─────────────────────────────
+	caseTagRepo := case_tags.NewCaseTagRepository(db.DB)
+	caseTagService := case_tags.NewCaseTagService(caseTagRepo)
+	caseTagHandler := &handlers.CaseTagHandler{
+		Service: caseTagService,
+	}
+
 
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
@@ -168,10 +200,19 @@ func main() {
 		chatHandler, // New ChatHandler
 		profileHandler,
 		getCollaboratorsHandler, // New GetCollaboratorsHandler
+		evidenceViewerHandler, 
+		evidenceTagHandler, 
+		permChecker,
+		caseTagHandler, 
+
+
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────
+	//router := routes.SetUpRouter(mainHandler)
+	// ─── Set Up Router and Launch ───────────────────────────────
 	router := routes.SetUpRouter(mainHandler)
+
 
 	log.Println("🚀 Starting AEGIS API on :8080...")
 	log.Println("📚 Swagger docs: http://localhost:8080/swagger/index.html")
