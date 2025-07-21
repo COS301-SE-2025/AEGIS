@@ -1,21 +1,31 @@
-const updateProfile = async ({ name, email, imageFile }) => {
-  const formData = new FormData();
-  formData.append("name", name);
-  formData.append("email", email);
-  if (imageFile) {
-    formData.append("profile_picture", imageFile);
-  }
+const updateProfile = async ({ id, name, email, imageBase64 }) => {
+  const token = sessionStorage.getItem("authToken");
 
-  const response = await fetch("http://localhost:8080/api/v1/profile/update", {
-    method: "POST",
-    body: formData,
+  const body = {
+    id,
+    name,
+    email,
+    imageBase64: imageBase64 || "", // Ensure it's a string, not undefined
+  };
+
+  const response = await fetch("http://localhost:8080/api/v1/profile", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
   });
 
+  const json = await response.json();
+
   if (!response.ok) {
-    throw new Error("Failed to update profile");
+    console.error("Update failed:", json);
+    throw new Error(json.message || "Profile update failed");
   }
 
-  return await response.json();
+  //console.log("✅ Profile Data:", json);
+  return json.data; // Return the updated profile data
 };
-export default updateProfile;
 
+export default updateProfile;

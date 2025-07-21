@@ -27,6 +27,9 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// Serve /uploads as static file directory
+	router.Static("/uploads", "./uploads")
+
 	// ─── Health Check ─────────────────────────────────────
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})

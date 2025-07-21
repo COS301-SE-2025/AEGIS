@@ -4,7 +4,14 @@ import (
 	"aegis-api/services_/auditlog"
 	"aegis-api/services_/user/profile"
 	"aegis-api/structs"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -87,6 +94,28 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 		return
 	}
 
+	// ✅ Handle base64 image upload
+	if req.ImageBase64 != "" {
+		imageURL, err := SaveBase64Image(req.ID, req.ImageBase64)
+		if err != nil {
+			h.auditLogger.Log(c, auditlog.AuditLog{
+				Action:      "UPDATE_PROFILE",
+				Actor:       auditlog.Actor{ID: req.ID},
+				Target:      auditlog.Target{Type: "user", ID: req.ID},
+				Service:     "profile",
+				Status:      "FAILED",
+				Description: "Failed to save profile picture: " + err.Error(),
+			})
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "image_upload_failed",
+				Message: "Failed to save profile picture",
+			})
+			return
+		}
+		req.ImageURL = imageURL // Set resolved URL for DB update
+	}
+	fmt.Println("📸 ImageBase64 length:", len(req.ImageBase64))
+
 	err := h.profileService.UpdateProfile(&req)
 	status := "SUCCESS"
 	if err != nil {
@@ -105,6 +134,17 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 		})
 		return
 	}
+	fmt.Println("✅ Saved ImageURL:", req.ImageURL)
+
+	updatedProfile, err := h.profileService.GetProfile(req.ID)
+	if err != nil {
+		c.JSON(http.StatusOK, structs.SuccessResponse{
+			Success: true,
+			Message: "Profile updated but failed to fetch updated data",
+			Data:    gin.H{},
+		})
+		return
+	}
 
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action:      "UPDATE_PROFILE",
@@ -118,5 +158,38 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
 		Message: "Profile updated successfully",
+		Data:    updatedProfile,
 	})
+}
+
+// SaveBase64Image decodes a base64 image and stores it in ./uploads/ directory
+func SaveBase64Image(userID string, base64Str string) (string, error) {
+	if base64Str == "" {
+		return "", errors.New("empty image")
+	}
+
+	// Strip metadata if present: "data:image/png;base64,..."
+	split := strings.SplitN(base64Str, ",", 2)
+	if len(split) != 2 {
+		return "", errors.New("invalid base64 image format")
+	}
+	data := split[1]
+
+	decoded, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return "", err
+	}
+
+	// Create folder if not exists
+	if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
+		return "", err
+	}
+
+	filename := "uploads/" + userID + "_" + time.Now().Format("20060102150405") + ".png"
+	if err := ioutil.WriteFile(filename, decoded, 0644); err != nil {
+		return "", err
+	}
+
+	// You can return a full URL if you expose /uploads via static route
+	return "/" + filename, nil
 }
