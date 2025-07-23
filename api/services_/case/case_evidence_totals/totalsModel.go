@@ -58,9 +58,14 @@ type EvidenceDTO struct {
 	Checksum   string    `gorm:"not null" json:"checksum"`
 	Metadata   string    `gorm:"type:jsonb" json:"metadata"`
 	UploadedAt time.Time `gorm:"autoCreateTime" json:"uploaded_at"`
+
 }
 
 type Tag struct {
 	ID   int    `gorm:"primaryKey;autoIncrement"`
 	Name string `gorm:"uniqueIndex;not null"`
+}
+
+func (EvidenceDTO) TableName() string {
+	return "evidence"
 }

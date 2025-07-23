@@ -1,7 +1,7 @@
 package case_evidence_totals
 
 type DashboardService interface {
-    GetCounts() (caseCount int64, evidenceCount int64, err error)
+    GetCounts(string,[]string) (caseCount int64, evidenceCount int64, err error)
 }
 
 type dashboardService struct {
@@ -14,16 +14,18 @@ func NewDashboardService(statsRepo CountCasesEvidenceRepo) DashboardService {
     }
 }
 
-func (s *dashboardService) GetCounts() (int64, int64, error) {
-    caseCount, err := s.statsRepo.CountCases()
-    if err != nil {
-        return 0, 0, err
-    }
 
-    evidenceCount, err := s.statsRepo.CountEvidence()
-    if err != nil {
-        return 0, 0, err
-    }
+func (s *dashboardService) GetCounts(userID string, statuses []string) (int64, int64, error) {
+	caseCount, err := s.statsRepo.CountCases(userID, statuses)
+	if err != nil {
+		return 0, 0, err
+	}
 
-    return caseCount, evidenceCount, nil
+	evidenceCount, err := s.statsRepo.CountEvidence(userID)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return caseCount, evidenceCount, nil
 }
+
