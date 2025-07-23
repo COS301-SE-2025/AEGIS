@@ -79,6 +79,11 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.GET("/profile/:userID", h.ProfileHandler.GetProfileHandler)
 			protected.PATCH("/profile", h.ProfileHandler.UpdateProfileHandler)
 
+
+			// ─── case and evidence totals ──────────────────────────
+			protected.GET("/dashboard/totals", h.CaseEvidenceTotalsHandler.GetDashboardTotals)
+
+
 			// RegisterMessageRoutes(protected, h.MessageService, auditLogger)
 			// ─── Thread Messaging ────────────────────────
 
@@ -94,20 +99,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 			RegisterCaseTagRoutes(protected, h.CaseTagHandler, h.PermissionChecker)
 
-			// protected.GET("/ws/cases/:case_id", func(c *gin.Context) {
-			// caseID := c.Param("case_id")
-
-			// // Extract userID from JWT claims in context
-			// 	userIDVal, exists := c.Get("userID")
-			// 	if !exists {
-			// 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-			// 		return
-			// 	}
-
-			// 	userID := userIDVal.(string)
-
-			// 	websocket.ServeWS(wsHub, c.Writer, c.Request, userID, caseID)
-			// })
 
 
 

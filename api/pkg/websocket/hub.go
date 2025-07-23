@@ -1,5 +1,9 @@
 package websocket
 
+import(
+	"time"
+)
+
 type Hub struct {
 	clients    map[string]map[*Client]bool // caseID -> clients
 	broadcast  chan MessageEnvelope
@@ -46,4 +50,16 @@ func (h *Hub) Run() {
 			}
 		}
 	}
+}
+
+//for integration tests
+func (h *Hub) WaitForClient(caseID string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if clients, ok := h.clients[caseID]; ok && len(clients) > 0 {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
 }

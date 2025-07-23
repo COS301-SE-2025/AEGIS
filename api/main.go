@@ -30,8 +30,10 @@ import (
 	"aegis-api/services_/evidence/evidence_tag"
 	"aegis-api/services_/evidence/evidence_viewer"
 	"aegis-api/services_/case/case_tags"
+	"aegis-api/services_/case/case_evidence_totals"
 
 	"github.com/joho/godotenv"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -68,6 +70,17 @@ func main() {
 		log.Fatalf("❌ Failed to extract SQL DB: %v", err)
 	}
 	permChecker := &middleware.DBPermissionChecker{DB: sqlDB}
+
+	// ─── websocket ─────────────────────────────────
+
+	r := gin.Default()
+
+	// Apply middleware to inject userID into the context
+	r.Use(middleware.AuthMiddleware()) 
+
+	// Create and start WebSocket hub
+	hub := websocket.NewHub()
+	go hub.Run()
 
 	// ─── Repositories ───────────────────────────────────────────
 	userRepo := registration.NewGormUserRepository(db.DB)
@@ -183,6 +196,11 @@ func main() {
 		Service: caseTagService,
 	}
 
+	// ─── Case Evidence Totals ─────────────────────────────
+	caseEviRepo := case_evidence_totals.NewCaseEviRepository(db.DB)
+	dashboardService := case_evidence_totals.NewDashboardService(caseEviRepo)
+	caseEviTotalsHandler := handlers.NewCaseEvidenceTotalsHandler(dashboardService)
+
 
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
@@ -204,6 +222,8 @@ func main() {
 		evidenceTagHandler, 
 		permChecker,
 		caseTagHandler, 
+		caseEviTotalsHandler,
+		hub,
 
 
 	)
@@ -213,6 +233,8 @@ func main() {
 	// ─── Set Up Router and Launch ───────────────────────────────
 	router := routes.SetUpRouter(mainHandler)
 
+	// ─── websocket ─────────────────────────────────
+	websocket.RegisterWebSocketRoutes(r, hub)
 
 	log.Println("🚀 Starting AEGIS API on :8080...")
 	log.Println("📚 Swagger docs: http://localhost:8080/swagger/index.html")

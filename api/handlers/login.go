@@ -10,6 +10,7 @@ import (
 	"aegis-api/middleware"
 
 	"github.com/gin-gonic/gin"
+	"aegis-api/pkg/websocket"
 )
 
 type AuthHandler struct {
@@ -52,6 +53,8 @@ type Handler struct {
 	EvidenceTagHandler    *EvidenceTagHandler
 	PermissionChecker     middleware.PermissionChecker
 	CaseTagHandler	   *CaseTagHandler
+	CaseEvidenceTotalsHandler *CaseEvidenceTotalsHandler
+	WebSocketHub *websocket.Hub
 }
 
 func NewHandler(
@@ -72,7 +75,9 @@ func NewHandler(
 	evidenceViewerHandler *EvidenceViewerHandler,
 	evidenceTagHandler *EvidenceTagHandler,
 	permissionChecker middleware.PermissionChecker,
-	caseTagHandler *CaseTagHandler, // Optional, if you have a case tag handler
+	caseTagHandler *CaseTagHandler, 
+	CaseEvidenceTotalsHandler *CaseEvidenceTotalsHandler,
+	webSocketHub *websocket.Hub, 
 ) *Handler {
 	return &Handler{
 		AdminService:            adminSvc,
@@ -93,6 +98,8 @@ func NewHandler(
 		EvidenceTagHandler:    evidenceTagHandler,
 		PermissionChecker:     permissionChecker,
 		CaseTagHandler:	   caseTagHandler,
+		CaseEvidenceTotalsHandler: CaseEvidenceTotalsHandler,
+		WebSocketHub: webSocketHub,
 	}
 }
 
