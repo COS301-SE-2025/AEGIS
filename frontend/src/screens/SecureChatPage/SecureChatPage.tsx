@@ -85,7 +85,7 @@ export const SecureChatPage = (): JSX.Element => {
   const [attachmentMessage, setAttachmentMessage] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState("");
-  const [previewFileData, setPreviewFileData] = useState<string>("");
+  const [, setPreviewFileData] = useState<string>("");
   const [typingUsers, setTypingUsers] = useState<Record<number, string[]>>({});
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -136,8 +136,8 @@ export const SecureChatPage = (): JSX.Element => {
 const [availableUsers, setAvailableUsers] = useState<{ user_email: string, role: string }[]>([]);
 
 
-const [token, setToken] = useState(sessionStorage.getItem("authToken"));
-const [userEmail, setUserEmail] = useState(() => {
+const [token] = useState(sessionStorage.getItem("authToken"));
+const [userEmail] = useState(() => {
   const userData = sessionStorage.getItem("user");
   if (userData) {
     try {
@@ -159,7 +159,7 @@ const [showEditGroupModal, setShowEditGroupModal] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
 
   const [chatMessages, setChatMessages] = useState<ChatMessages>({});
-const [teamMembers, setTeamMembers] = useState([
+const [teamMembers] = useState([
   { name: "Alex Morgan", role: "Forensics Analyst", color: "text-blue-400" },
   { name: "Jamie Lee", role: "Incident Responder", color: "text-red-400" },
   { name: "Riley Smith", role: "Malware Analyst", color: "text-green-400" }
@@ -173,7 +173,7 @@ const simulateIncomingMessage = (chatId: number, delay: number = 1500) => {
   const currentMessages = chatMessages[chatId] || [];
   const lastMessage = currentMessages[currentMessages.length - 1];
 
-  const getContextualResponse = (lastMsg: string, sender: string) => {
+  const getContextualResponse = (lastMsg: string, _: string) => {
     const lowerMsg = lastMsg.toLowerCase();
     if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
       return ["Hey! Ready to review that evidence file?", "Hi there! Got the forensic data ready."];
@@ -242,7 +242,7 @@ const simulateIncomingMessage = (chatId: number, delay: number = 1500) => {
 
 
 
-const simulateTyping = (chatId: number, userName?: string) => {
+const simulateTyping = (chatId: number, _?: string) => {
   const user = "Alex Morgan (Forensics Analyst)";
 
   
@@ -313,13 +313,16 @@ const simulateTyping = (chatId: number, userName?: string) => {
 }, []);
 
   // Clean up preview URL when component unmounts or preview changes
-  useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
+const previousUrlRef = useRef<string | null>(null);
+
+useEffect(() => {
+  return () => {
+    if (previousUrlRef.current) {
+      URL.revokeObjectURL(previousUrlRef.current);
+    }
+  };
+}, []);
+
 
 // Simulate random chat activity with better conversation flow
   useEffect(() => {
@@ -343,91 +346,7 @@ const simulateTyping = (chatId: number, userName?: string) => {
   return () => clearInterval(interval);
 }, [groups, chatMessages]);
 
-const sendAttachment = async () => {
-  if (!activeChat || !previewFile) return;
 
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    let base64 = "";
-    if (typeof e.target?.result === "string") {
-      base64 = e.target.result.split(",")[1];
-    } else if (e.target?.result instanceof ArrayBuffer) {
-      base64 = btoa(String.fromCharCode(...new Uint8Array(e.target.result)));
-    }
-
-    try {
-      const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          sender_email: userEmail,
-          sender_name: "You",
-          content: attachmentMessage,
-          file: base64,
-          fileName: previewFile.name,
-          message_type: "attachment"
-        })
-      });
-
-      const newMessageData = await res.json();
-
-      // Build local consistent message
-      const newMessage: Message = {
-        id: newMessageData.id || Date.now(),
-        user: "You",
-        self: true,
-        color: "text-blue-400",
-        content: newMessageData.content || (attachmentMessage || `Shared file: ${previewFile.name}`),
-        time: new Date(newMessageData.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: "sent",
-        attachments: [{
-          file_name: previewFile.name,
-          file_type: previewFile.type,
-          file_size: previewFile.size,
-          url: previewUrl,
-          isImage: previewFile.type.startsWith("image/")
-        }],
-        ...(replyingTo && {
-          replyTo: {
-            id: replyingTo.id,
-            user: replyingTo.user,
-            content: replyingTo.content,
-            ...(replyingTo.attachments?.[0] && {
-              attachment: {
-                name: replyingTo.attachments[0].file_name,
-                type: replyingTo.attachments[0].file_type
-              }
-            })
-          }
-        })
-      };
-
-      setChatMessages(prev => ({
-        ...prev,
-        [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
-      }));
-
-      setGroups(prev => prev.map(group =>
-        group.id === activeChat.id
-          ? { ...group, lastMessage: newMessage.content, lastMessageTime: "now" }
-          : group
-      ));
-
-    } catch (err) {
-      console.error("Failed to send attachment:", err);
-    } finally {
-      setShowAttachmentPreview(false);
-      setPreviewFile(null);
-      setPreviewUrl("");
-      setAttachmentMessage("");
-      setReplyingTo(null);
-    }
-  };
-  reader.readAsDataURL(previewFile);
-};
 
 
 
@@ -482,8 +401,9 @@ const fetchGroups = async () => {
   avatar: getAvatar(group.id.toString())
 }));
 
+
       if (Array.isArray(data)) {
-        setGroups(data);
+        setGroups(groupsWithAvatars);
       } else if (Array.isArray(data.groups)) {
         setGroups(data.groups);
       } else {
@@ -602,73 +522,165 @@ if (meaningfulGroups.length > 0) {
 }
 
 
-  const handleSendAttachment = () => {
-  if (!previewFile || !activeChat || !previewFileData) return;
+//   const handleSendAttachment = () => {
+//   if (!previewFile || !activeChat || !previewFileData) return;
 
-  const isImage = previewFile.type.startsWith('image/');
+//   const isImage = previewFile.type.startsWith('image/');
   
-  const newMessage: Message = {
-  id: Date.now(),
-  user: "You",
-  color: "text-green-400",
-  self: true,
-  content: attachmentMessage || `Shared ${isImage ? 'an image' : 'a file'}: ${previewFile.name}`,
-  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  status: "sent",
-  attachments: [
-    {
-      file_name: previewFile.name,
-      file_type: previewFile.type,
-      file_size: previewFile.size,
-      url: previewFileData,
-      isImage
-    }
-  ],
-  ...(replyingTo && {
-    replyTo: {
-      id: replyingTo.id,
-      user: replyingTo.user,
-      content: replyingTo.content,
-      ...(replyingTo.attachments?.[0] && {
-        attachment: {
-          name: replyingTo.attachments[0].file_name,
-          type: replyingTo.attachments[0].file_type
-        }
-      })
-    }
-  })
+//   const newMessage: Message = {
+//   id: Date.now(),
+//   user: "You",
+//   color: "text-green-400",
+//   self: true,
+//   content: attachmentMessage || `Shared ${isImage ? 'an image' : 'a file'}: ${previewFile.name}`,
+//   time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+//   status: "sent",
+//   attachments: [
+//     {
+//       file_name: previewFile.name,
+//       file_type: previewFile.type,
+//       file_size: previewFile.size,
+//       url: previewFileData,
+//       isImage
+//     }
+//   ],
+//   ...(replyingTo && {
+//     replyTo: {
+//       id: replyingTo.id,
+//       user: replyingTo.user,
+//       content: replyingTo.content,
+//       ...(replyingTo.attachments?.[0] && {
+//         attachment: {
+//           name: replyingTo.attachments[0].file_name,
+//           type: replyingTo.attachments[0].file_type
+//         }
+//       })
+//     }
+//   })
+// };
+
+
+//     setChatMessages(prev => ({
+//       ...prev,
+//       [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
+//     }));
+//       // Update last message in group
+//     const lastMessageText = attachmentMessage ? attachmentMessage : `📎 ${previewFile.name}`;
+//     setGroups(prev => prev.map(group =>
+//       group.id === activeChat.id
+//         ? { ...group, lastMessage: lastMessageText, lastMessageTime: "now" }
+//         : group
+//     ));
+//     // Reset states
+//     setShowAttachmentPreview(false);
+//     setPreviewFile(null);
+//     setPreviewUrl("");
+//     setAttachmentMessage("");
+//     setReplyingTo(null);
+//   };
+
+ const handleCancelAttachment = () => {
+  setShowAttachmentPreview(false);
+  setPreviewFile(null);
+  setAttachmentMessage("");
+
+  if (previewUrl) {
+    URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(""); // <-- only after revoking
+  }
 };
 
+const sendAttachment = async () => {
+  if (!activeChat || !previewFile) return;
 
-    setChatMessages(prev => ({
-      ...prev,
-      [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
-    }));
-      // Update last message in group
-    const lastMessageText = attachmentMessage ? attachmentMessage : `📎 ${previewFile.name}`;
-    setGroups(prev => prev.map(group =>
-      group.id === activeChat.id
-        ? { ...group, lastMessage: lastMessageText, lastMessageTime: "now" }
-        : group
-    ));
-    // Reset states
-    setShowAttachmentPreview(false);
-    setPreviewFile(null);
-    setPreviewUrl("");
-    setAttachmentMessage("");
-    setReplyingTo(null);
-  };
-
-  const handleCancelAttachment = () => {
-    setShowAttachmentPreview(false);
-    setPreviewFile(null);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    let base64 = "";
+    if (typeof e.target?.result === "string") {
+      base64 = e.target.result.split(",")[1];
+    } else if (e.target?.result instanceof ArrayBuffer) {
+      base64 = btoa(String.fromCharCode(...new Uint8Array(e.target.result)));
     }
-    setPreviewUrl("");
-    setAttachmentMessage("");
-  };
 
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          sender_email: userEmail,
+          sender_name: "You",
+          content: attachmentMessage,
+          file: base64,
+          fileName: previewFile.name,
+          message_type: "attachment"
+        })
+      });
+
+      const newMessageData = await res.json();
+
+      // Build local consistent message
+      const newMessage: Message = {
+        id: newMessageData.id || Date.now(),
+        user: "You",
+        self: true,
+        color: "text-blue-400",
+        content: newMessageData.content || (attachmentMessage || `Shared file: ${previewFile.name}`),
+        time: new Date(newMessageData.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: "sent",
+        attachments: [{
+          file_name: previewFile.name,
+          file_type: previewFile.type,
+          file_size: previewFile.size,
+          url: previewUrl,
+          isImage: previewFile.type.startsWith("image/")
+        }],
+        ...(replyingTo && {
+          replyTo: {
+            id: replyingTo.id,
+            user: replyingTo.user,
+            content: replyingTo.content,
+            ...(replyingTo.attachments?.[0] && {
+              attachment: {
+                name: replyingTo.attachments[0].file_name,
+                type: replyingTo.attachments[0].file_type
+              }
+            })
+          }
+        })
+      };
+
+      setChatMessages(prev => ({
+        ...prev,
+        [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
+      }));
+
+      setGroups(prev => prev.map(group =>
+        group.id === activeChat.id
+          ? { ...group, lastMessage: newMessage.content, lastMessageTime: "now" }
+          : group
+      ));
+
+    } catch (err) {
+      console.error("Failed to send attachment:", err);
+    } finally {
+      // Cleanup safely
+      setShowAttachmentPreview(false);
+      setPreviewFile(null);
+      setAttachmentMessage("");
+
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(""); // only after revoking
+      }
+
+      setReplyingTo(null);
+    }
+  };
+  reader.readAsDataURL(previewFile);
+};
   function getAvatar(groupId: string): string {
   const icons = ["🔒", "📁", '🧠', '🚨', '👥', '💻', '🕵️', '🔍'];
   const index = groupId.charCodeAt(0) % icons.length;
@@ -736,18 +748,18 @@ setGroups(prev => {
 };
 
 
-  const handleExitGroup = () => {
-    if (!activeChat) return;
+  // const handleExitGroup = () => {
+  //   if (!activeChat) return;
     
-    setGroups(prev => prev.filter(group => group.id !== activeChat.id));
-    setChatMessages(prev => {
-      const newMessages = { ...prev };
-      delete newMessages[activeChat.id];
-      return newMessages;
-    });
-    setActiveChat(null);
-    setShowMoreMenu(false);
-  };
+  //   setGroups(prev => prev.filter(group => group.id !== activeChat.id));
+  //   setChatMessages(prev => {
+  //     const newMessages = { ...prev };
+  //     delete newMessages[activeChat.id];
+  //     return newMessages;
+  //   });
+  //   setActiveChat(null);
+  //   setShowMoreMenu(false);
+  // };
   const handleReplyToMessage = (message: Message) => {
     setReplyingTo(message);
   };
@@ -797,7 +809,7 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
       try {
         const err = await res.json();
         message = err?.message || message;
-      } catch (_) {}
+      } catch {}
       toast.error(message);
       return;
     }
@@ -844,27 +856,27 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
 
 
 
-const createGroup = async () => {
-  const res = await fetch('http://localhost:8080/api/v1/chat/groups', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      name: newGroupName,
-      description: "Group created from frontend",
-      type: "group",
-      created_by: userEmail,
-      members: [{ user_email: userEmail, role: "admin" }],
-      settings: { is_public: false, allow_invites: true }
-    })
-  });
-  const newGroup = await res.json();
-  await fetchGroups();
-  setShowNewGroupModal(false);
-  setNewGroupName("");
-};
+// const createGroup = async () => {
+//   const res = await fetch('http://localhost:8080/api/v1/chat/groups', {
+//     method: 'POST',
+//     headers: {
+//       Authorization: `Bearer ${token}`,
+//       'Content-Type': 'application/json'
+//     },
+//     body: JSON.stringify({
+//       name: newGroupName,
+//       description: "Group created from frontend",
+//       type: "group",
+//       created_by: userEmail,
+//       members: [{ user_email: userEmail, role: "admin" }],
+//       settings: { is_public: false, allow_invites: true }
+//     })
+//   });
+//   const newGroup = await res.json();
+//   await fetchGroups();
+//   setShowNewGroupModal(false);
+//   setNewGroupName("");
+// };
 
 const loadMessages = async (groupId: number) => {
     if (!activeChat?.id) {

@@ -8,8 +8,8 @@ import {
   MessageSquare,
   Search,
   Settings,
-  SlidersHorizontal,
-  ArrowUpDown,
+  // SlidersHorizontal,
+  // ArrowUpDown,
   Download,
   Share,
   Send,
@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
-import { string } from "prop-types";
+//import { string } from "prop-types";
 import { useParams } from "react-router-dom";
 
 // Import Select components from your UI library
@@ -195,16 +195,16 @@ export const EvidenceViewer  =() =>{
     
 const caseId = String(useParams().caseId);
 
-  const [allFiles, setAllFiles] = useState<FileItem[]>(() => {
+  const [allFiles] = useState<FileItem[]>(() => {
     const stored = localStorage.getItem("evidenceFiles");
     return stored ? JSON.parse(stored) : [];
   });
 
   const files = allFiles.filter(file => String(file.caseId) === String(caseId));
 
-  const uniqueTypes = Array.from(
-  new Set(files.map(file => file.type).filter(Boolean))
-);
+//   const uniqueTypes = Array.from(
+//   new Set(files.map(file => file.type).filter(Boolean))
+// );
 
 
   const threadMessages: ThreadMessage[] = [
@@ -293,7 +293,7 @@ useEffect(() => {
   setNewMessage('');
 };
 
-  const [profile, setProfile] = useState({
+  const [profile] = useState({
     name: user?.name || "User",
     email: user?.email || "user@aegis.com",
     role: user?.role || "Admin",

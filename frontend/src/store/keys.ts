@@ -3,8 +3,8 @@ import { create } from 'zustand';
 
 type SharedSecretStore = {
   sharedSecrets: Record<string, Uint8Array>; // Maps userId -> shared secret
-  setSharedSecret: (userId: string, secret: Uint8Array) => void;
-  getSharedSecret: (userId: string) => Uint8Array | undefined;
+  setSharedSecret: (_: string, _unused: Uint8Array) => void;
+  getSharedSecret: (_: string) => Uint8Array | undefined;
   clearAllSecrets: () => void;
 };
 

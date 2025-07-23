@@ -282,13 +282,13 @@ console.log("Current caseId:", caseId);
 
 
   // User data for assigned team
-  const teamMembers = [
-    { id: 1, name: "Agent Benji", role: "Lead Analyst" },
-    { id: 2, name: "Agent Tshepi", role: "Security Expert" },
-    { id: 3, name: "Agent Lwando", role: "Forensics Specialist" },
-    { id: 3, name: "Agent Thati", role: "Network log Specialist" },
-    { id: 3, name: "Agent Tshire", role: "Malware Specialist" },
-  ];
+  // const teamMembers = [
+  //   { id: 1, name: "Agent Benji", role: "Lead Analyst" },
+  //   { id: 2, name: "Agent Tshepi", role: "Security Expert" },
+  //   { id: 3, name: "Agent Lwando", role: "Forensics Specialist" },
+  //   { id: 3, name: "Agent Thati", role: "Network log Specialist" },
+  //   { id: 3, name: "Agent Tshire", role: "Malware Specialist" },
+  // ];
 
   // Evidence data
   // const evidenceItems = [

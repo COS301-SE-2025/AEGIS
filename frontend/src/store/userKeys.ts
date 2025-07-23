@@ -7,7 +7,7 @@ interface PrivateKeyStore {
   ik?: Uint8Array;
   spk?: Uint8Array;
   opks: Uint8Array[];
-  setKeys: (keys: { ik: Uint8Array; spk: Uint8Array; opks: Uint8Array[] }, persist?: boolean) => Promise<void>;
+  setKeys: (_: { ik: Uint8Array; spk: Uint8Array; opks: Uint8Array[] }, _unused?: boolean) => Promise<void>;
   clearKeys: () => Promise<void>;
   loadPersistedKeys: () => Promise<void>;
 }
