@@ -265,7 +265,7 @@ func TestAddMemberToGroup_DBError(t *testing.T) {
 func TestCreateMessage_Success(t *testing.T) {
 	repo := new(MockChatRepository)
 	msg := &chat.Message{
-		ID:      primitive.NewObjectID(),
+		ID:      primitive.NewObjectID().Hex(),
 		Content: "Hello",
 	}
 
@@ -278,7 +278,7 @@ func TestCreateMessage_Success(t *testing.T) {
 func TestCreateMessage_DBError(t *testing.T) {
 	repo := new(MockChatRepository)
 	msg := &chat.Message{
-		ID:      primitive.NewObjectID(),
+		ID:      primitive.NewObjectID().Hex(),
 		Content: "Hello",
 	}
 
@@ -420,7 +420,7 @@ func TestAddMemberToGroup_DuplicateMember(t *testing.T) {
 func TestCreateMessage_EmptyContent(t *testing.T) {
 	repo := new(MockChatRepository)
 	msg := &chat.Message{
-		ID:      primitive.NewObjectID(),
+		ID:      primitive.NewObjectID().Hex(),
 		Content: "",
 	}
 

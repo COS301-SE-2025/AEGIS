@@ -69,6 +69,8 @@ type CaseServiceInterface interface {
 	AssignUserToCase(assignerRole string, assigneeID, caseID uuid.UUID, role string) error
 	ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
 	GetCaseByID(caseID string) (*ListCases.Case, error)
+	UnassignUserFromCase(assignerID *gin.Context, assigneeID, caseID uuid.UUID) error // ← Add this
+
 }
 
 func NewCaseHandler(
@@ -95,6 +97,10 @@ func (s *CaseServices) AssignUserToCase(assignerRole string, assigneeID, caseID 
 
 func (s *CaseServices) GetCaseByID(caseID string) (*ListCases.Case, error) {
 	return s.listCase.GetCaseByID(caseID)
+}
+
+func (s *CaseServices) UnassignUserFromCase(ctx *gin.Context, assigneeID, caseID uuid.UUID) error {
+	return s.assignCase.UnassignUserFromCase(ctx, assigneeID, caseID)
 }
 
 // func (cs CaseServices) CreateCase(c *gin.Context) {

@@ -39,7 +39,10 @@ func TestUploadFile_Success(t *testing.T) {
 	reader := strings.NewReader(fileContent)
 	expectedCID := "Qm123abc"
 
-	mockClient.On("UploadFile", mock.AnythingOfType("*strings.Reader")).Return(expectedCID, nil)
+	mockClient.On("UploadFile", mock.MatchedBy(func(r io.Reader) bool {
+		return r != nil
+	})).Return(expectedCID, nil)
+
 	defer mockClient.AssertExpectations(t)
 
 	cid, err := svc.UploadFile(reader)

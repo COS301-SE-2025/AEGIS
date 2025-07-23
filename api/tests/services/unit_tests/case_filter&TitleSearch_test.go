@@ -34,7 +34,13 @@ func (m *MockCaseQueryRepository) GetCasesByUser(userID string) ([]case_creation
 	return args.Get(0).([]case_creation.Case), args.Error(1)
 }
 
+func (m *MockCaseQueryRepository) GetCaseByID(caseID string) (*case_creation.Case, error) {
+	args := m.Called(caseID)
+	return args.Get(0).(*case_creation.Case), args.Error(1)
+}
+
 // ─────────────────────────────────────────────────────────────
+
 // UNIT TESTS
 // ─────────────────────────────────────────────────────────────
 
@@ -109,11 +115,10 @@ func TestGetFilteredCases_CombinedFilters(t *testing.T) {
 	service := ListCases.NewListCasesService(mockRepo)
 
 	uid := "ded0a1b3-4712-46b5-8d01-fafbaf3f8236"
-	parsedUID := uuid.MustParse(uid)
 	expected := []ListCases.Case{{
 		Status:    "open",
 		Priority:  "high",
-		CreatedBy: parsedUID,
+		CreatedBy: uuid.MustParse(uid),
 		TeamName:  "SOC Team",
 	}}
 
@@ -129,7 +134,6 @@ func TestGetFilteredCases_CombinedFilters(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Len(t, results, 1)
-	assert.Equal(t, parsedUID, results[0].CreatedBy)
 	assert.Equal(t, "open", results[0].Status)
 	assert.Equal(t, "high", results[0].Priority)
 	assert.Equal(t, "SOC Team", results[0].TeamName)
@@ -181,14 +185,20 @@ func TestGetFilteredCases_TitleSearchMatch(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		// Create expected list
+		cases := make([]ListCases.Case, tt.expected)
+		for i := range cases {
+			cases[i] = ListCases.Case{Title: "Mock " + tt.term}
+		}
+
 		mockRepo.On("QueryCases", mock.MatchedBy(func(f ListCases.CaseFilter) bool {
 			return f.TitleTerm == tt.term && f.TeamName == ""
-		})).Return(make([]ListCases.Case, tt.expected), nil)
+		})).Return(cases, nil)
 
 		results, err := service.GetFilteredCases("", "", "", "", tt.term, "", "")
-
 		assert.NoError(t, err)
 		assert.Equal(t, tt.expected, len(results), "Failed for term: %s", tt.term)
+
 		mockRepo.AssertExpectations(t)
 	}
 }

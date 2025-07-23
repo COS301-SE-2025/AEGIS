@@ -32,5 +32,5 @@ func TestListUsers(t *testing.T) {
 	users, err := repo.GetAllUsers(context.Background())
 	assert.NoError(t, err)
 	assert.Len(t, users, 1)
-	assert.Equal(t, "Alice Sonders", users[0].Full_name)
+	assert.Equal(t, "Alice Sonders", users[0].FullName)
 }

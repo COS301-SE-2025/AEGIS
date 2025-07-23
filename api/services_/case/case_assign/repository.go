@@ -23,3 +23,7 @@ func (r *GormCaseAssignmentRepo) AssignRole(userID, caseID uuid.UUID, role strin
 	}
 	return r.db.Create(&entry).Error
 }
+
+func (r *GormCaseAssignmentRepo) UnassignRole(userID, caseID uuid.UUID) error {
+	return r.db.Where("user_id = ? AND case_id = ?", userID, caseID).Delete(&CaseUserRole{}).Error
+}

@@ -36,8 +36,8 @@ type MockIPFS struct {
 	mock.Mock
 }
 
-func (m *MockIPFS) UploadFile(path string) (string, error) {
-	args := m.Called(path)
+func (m *MockIPFS) UploadFile(reader io.Reader) (string, error) {
+	args := m.Called(reader)
 	return args.String(0), args.Error(1)
 }
 

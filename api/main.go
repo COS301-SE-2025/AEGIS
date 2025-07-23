@@ -22,18 +22,18 @@ import (
 	"aegis-api/services_/case/ListUsers"
 	"aegis-api/services_/case/case_assign"
 	"aegis-api/services_/case/case_creation"
+	"aegis-api/services_/case/case_evidence_totals"
+	"aegis-api/services_/case/case_tags"
 	"aegis-api/services_/chat"
 	"aegis-api/services_/evidence/evidence_download"
+	"aegis-api/services_/evidence/evidence_tag"
+	"aegis-api/services_/evidence/evidence_viewer"
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/user/profile"
-	"aegis-api/services_/evidence/evidence_tag"
-	"aegis-api/services_/evidence/evidence_viewer"
-	"aegis-api/services_/case/case_tags"
-	"aegis-api/services_/case/case_evidence_totals"
 
-	"github.com/joho/godotenv"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -76,7 +76,7 @@ func main() {
 	r := gin.Default()
 
 	// Apply middleware to inject userID into the context
-	r.Use(middleware.AuthMiddleware()) 
+	r.Use(middleware.AuthMiddleware())
 
 	// Create and start WebSocket hub
 	hub := websocket.NewHub()
@@ -86,6 +86,7 @@ func main() {
 	userRepo := registration.NewGormUserRepository(db.DB)
 	resetTokenRepo := reset_password.NewGormResetTokenRepository(db.DB)
 	caseRepo := case_creation.NewGormCaseRepository(db.DB)
+
 	caseAssignRepo := case_assign.NewGormCaseAssignmentRepo(db.DB)
 	listActiveCasesRepo := ListActiveCases.NewActiveCaseRepository(db.DB)
 	listCasesRepo := ListCases.NewGormCaseQueryRepository(db.DB)
@@ -98,7 +99,10 @@ func main() {
 	authService := login.NewAuthService(userRepo)
 	resetService := reset_password.NewPasswordResetService(resetTokenRepo, userRepo, emailSender)
 	caseService := case_creation.NewCaseService(caseRepo)
-	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo)
+
+	adminChecker := case_assign.NewContextAdminChecker()
+
+	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo, adminChecker)
 	listActiveCasesService := ListActiveCases.NewService(listActiveCasesRepo)
 	listCasesService := ListCases.NewListCasesService(listCasesRepo)
 
@@ -184,7 +188,7 @@ func main() {
 	// ─── Evidence Viewer ─────────────────────────────
 	viewerIPFSClient := evidence_viewer.NewIPFSClient()
 	evidenceViewerRepo := evidence_viewer.NewPostgresEvidenceRepository(db.DB, viewerIPFSClient)
-	evidenceViewerService := evidence_viewer.NewEvidenceService(evidenceViewerRepo) 
+	evidenceViewerService := evidence_viewer.NewEvidenceService(evidenceViewerRepo)
 	evidenceViewerHandler := &handlers.EvidenceViewerHandler{
 		Service: evidenceViewerService,
 	}
@@ -200,7 +204,6 @@ func main() {
 	caseEviRepo := case_evidence_totals.NewCaseEviRepository(db.DB)
 	dashboardService := case_evidence_totals.NewDashboardService(caseEviRepo)
 	caseEviTotalsHandler := handlers.NewCaseEvidenceTotalsHandler(dashboardService)
-
 
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
@@ -218,14 +221,12 @@ func main() {
 		chatHandler, // New ChatHandler
 		profileHandler,
 		getCollaboratorsHandler, // New GetCollaboratorsHandler
-		evidenceViewerHandler, 
-		evidenceTagHandler, 
+		evidenceViewerHandler,
+		evidenceTagHandler,
 		permChecker,
-		caseTagHandler, 
+		caseTagHandler,
 		caseEviTotalsHandler,
 		hub,
-
-
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

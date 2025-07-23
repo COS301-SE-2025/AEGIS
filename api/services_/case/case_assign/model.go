@@ -7,9 +7,9 @@ import (
 )
 
 type CaseAssignmentService struct {
-	repo CaseAssignmentRepoInterface
+	repo         CaseAssignmentRepoInterface
+	adminChecker AdminChecker
 }
-
 type CaseUserRole struct {
 	UserID     uuid.UUID
 	CaseID     uuid.UUID

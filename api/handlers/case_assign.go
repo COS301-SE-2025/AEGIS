@@ -136,3 +136,98 @@ func (h *CaseHandler) AssignUserToCase(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "user assigned to case successfully"})
 }
+
+func (h *CaseHandler) UnassignUserFromCase(c *gin.Context) {
+	// Extract actor metadata for audit log
+	assignerIDVal, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized: missing user ID in token"})
+		return
+	}
+
+	assignerID, err := uuid.Parse(assignerIDVal.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	actor := auditlog.Actor{
+		ID:        assignerID.String(),
+		IPAddress: c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+	}
+
+	// Bind request JSON
+	var req struct {
+		AssigneeID string `json:"assignee_id" binding:"required,uuid"`
+		CaseID     string `json:"case_id" binding:"required,uuid"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action:      "UNASSIGN_USER_FROM_CASE",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "case_assignment"},
+			Service:     "case",
+			Status:      "FAILED",
+			Description: "Invalid JSON payload",
+		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		return
+	}
+
+	// Parse UUIDs
+	assigneeID, err := uuid.Parse(req.AssigneeID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid assignee ID"})
+		return
+	}
+
+	caseID, err := uuid.Parse(req.CaseID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid case ID"})
+		return
+	}
+
+	// 🚨 Updated: Pass `c` to the service method (instead of assignerID)
+	if err := h.CaseService.UnassignUserFromCase(c, assigneeID, caseID); err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "UNASSIGN_USER_FROM_CASE",
+			Actor:  actor,
+			Target: auditlog.Target{
+				Type: "case_assignment",
+				ID:   caseID.String(),
+				AdditionalInfo: map[string]string{
+					"assignee_id": assigneeID.String(),
+				},
+			},
+			Service:     "case",
+			Status:      "FAILED",
+			Description: err.Error(),
+		})
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Success log
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "UNASSIGN_USER_FROM_CASE",
+		Actor:  actor,
+		Target: auditlog.Target{
+			Type: "case_assignment",
+			ID:   caseID.String(),
+			AdditionalInfo: map[string]string{
+				"assignee_id": assigneeID.String(),
+			},
+		},
+		Service:     "case",
+		Status:      "SUCCESS",
+		Description: "User unassigned from case successfully",
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "user unassigned from case successfully",
+		"case_id":     caseID,
+		"assignee_id": assigneeID,
+	})
+}

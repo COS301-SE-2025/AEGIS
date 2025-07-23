@@ -63,6 +63,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.GET("/cases/active", h.CaseHandler.ListActiveCasesHandler)
 			protected.POST("/cases/assign", h.CaseHandler.AssignUserToCase)
 			protected.GET("/cases/:case_id/collaborators", h.GetCollaboratorsHandler.GetCollaboratorsByCaseID)
+			protected.POST("/cases/unassign", h.CaseHandler.UnassignUserFromCase)
 
 			// ─── New List / Filter Cases ──────────────────
 			protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)
@@ -95,11 +96,9 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			RegisterChatRoutes(protected, h.ChatHandler)
 
 			// ─── Evidence Viewer + Tagging ────────────────
-  			RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.PermissionChecker)
+			RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.PermissionChecker)
 
 			RegisterCaseTagRoutes(protected, h.CaseTagHandler, h.PermissionChecker)
-
-
 
 
 		}
