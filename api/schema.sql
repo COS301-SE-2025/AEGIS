@@ -149,6 +149,18 @@ CREATE TABLE IF NOT EXISTS cases (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Groups table
+CREATE TABLE IF NOT EXISTS groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+
+    case_id UUID REFERENCES cases(id) ON DELETE CASCADE,
+    group_url TEXT, -- emoji or image URL for avatar
+
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE annotation_threads (
   id UUID PRIMARY KEY,
   title VARCHAR(255) NOT NULL,

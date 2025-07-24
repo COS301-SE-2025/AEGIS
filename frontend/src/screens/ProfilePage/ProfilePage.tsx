@@ -81,7 +81,7 @@ const toggleEdit = async () => {
         id: user.id,
         name: profile.name,
         email: profile.email,
-        imageBase64, // ✅ Typed correctly
+        imageBase64, 
       });
 
       if (!updated || !updated.name) {

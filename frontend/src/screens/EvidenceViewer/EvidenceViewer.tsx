@@ -1,4 +1,3 @@
-
 import {useEffect, useState } from "react";
 import {
   Bell,
@@ -27,10 +26,9 @@ import {
   Reply,
   ThumbsUp
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
-//import { string } from "prop-types";
-import { useParams } from "react-router-dom";
+import { string } from "prop-types";
 
 // Import Select components from your UI library
 import {
@@ -193,7 +191,7 @@ export const EvidenceViewer  =() =>{
   ];
 
     
-const caseId = String(useParams().caseId);
+const { caseId } = useParams();
 
   const [allFiles] = useState<FileItem[]>(() => {
     const stored = localStorage.getItem("evidenceFiles");
@@ -269,7 +267,46 @@ useEffect(() => {
   localStorage.setItem('allThreadMessages', JSON.stringify(allThreadMessages));
 }, [allThreadMessages]);
 
+useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = sessionStorage.getItem("authToken");
+        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
+        if (!res.ok) throw new Error("Failed to load profile");
+
+        const result = await res.json();
+
+        // Update both the state and sessionStorage
+        setProfile({
+          name: result.data.name,
+          email: result.data.email,
+          role: result.data.role,
+          image: result.data.image_url,
+        });
+
+        // Update sessionStorage
+        sessionStorage.setItem(
+          "user",
+          JSON.stringify({
+            ...user,
+            name: result.data.name,
+            email: result.data.email,
+            image_url: result.data.image_url,
+          })
+        );
+      } catch (err) {
+        console.error("Error fetching profile:", err);
+      }
+    };
+
+    if (user?.id) fetchProfile();
+  }, [user?.id]);
+  
   const handleSendMessage = () => {
   if (!newMessage.trim() || !selectedThread) return;
 
@@ -471,11 +508,23 @@ function timeAgo(dateString: string): string {
         {/* User Profile */}
         <div className="border-t border-bg-accent pt-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
-              <Link to="/profile">
-                <span className="text-foreground font-small">{initials}</span>
-              </Link>
-            </div>
+            <Link to="/profile">
+              {user?.image_url ? (
+                <img
+                  src={
+                    user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                      ? user.image_url
+                      : `http://localhost:8080${user.image_url}`
+                  }
+                  alt="Profile"
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                  <span className="text-foreground font-medium">{initials}</span>
+                </div>
+              )}
+            </Link>
             <div>
               <p className="font-semibold text-foreground">{displayName}</p>
               <p className="text-muted-foreground text-xs">{user?.email || "user@dfir.com"}</p>
@@ -486,8 +535,10 @@ function timeAgo(dateString: string): string {
 
       {/* Main Content */}
       <main className="ml-64 flex-grow bg-background flex">
+        
         {/* Header */}
         <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border-border p-4">
+          
           <div className="flex items-center justify-between">
             {/* Case Number and Tabs */}
             <div className="flex items-center gap-4">
@@ -524,15 +575,36 @@ function timeAgo(dateString: string): string {
               </div>
               <Bell className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
               <Link to="/settings"><Settings className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" /></Link>
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                <Link to="/profile" ><span className="text-foreground font-medium text-xs">{initials}</span></ Link>
-              </div>
+              <Link to="/profile">
+                {user?.image_url ? (
+                  <img
+                    src={
+                      user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                        ? user.image_url
+                        : `http://localhost:8080${user.image_url}`
+                    }
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                    <span className="text-foreground font-medium text-sm">{initials}</span>
+                  </div>
+                )}
+              </Link>
             </div>
           </div>
         </div>
 
         {/* Content Area */}
         <div className="flex-1 flex pt-20">
+          {!caseId || caseId === "undefined" ? (
+            <div className="flex flex-col items-center justify-center w-full h-[60vh] text-center text-muted-foreground">
+              <h2 className="text-2xl font-semibold mb-4">No case, no load</h2>
+              <p>Select a case from the dashboard to view its details.</p>
+            </div>
+          ) : (
+            <>
           {/* Evidence Files Panel */}
           <div className="w-80 border-r border-border p-4">
             <div className="flex items-center justify-between mb-4">
@@ -1412,6 +1484,8 @@ function timeAgo(dateString: string): string {
               </div>
             </div>
           )}
+          </>
+        )}
         </div>
       </main>
     </div>

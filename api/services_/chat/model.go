@@ -21,7 +21,7 @@ type ChatGroup struct {
 	LastMessage *LastMessage       `bson:"last_message,omitempty" json:"last_message,omitempty"`
 	Settings    *GroupSettings     `bson:"settings,omitempty" json:"settings,omitempty"`
 	CaseID      string             `bson:"case_id" json:"case_id"`
-	//Avatar      string             `bson:"-" json:"avatar,omitempty"`
+	GroupURL    string             `bson:"group_url,omitempty" json:"group_url,omitempty"`
 }
 
 // Member represents a group member

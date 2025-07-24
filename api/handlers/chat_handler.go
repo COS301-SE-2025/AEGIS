@@ -4,6 +4,7 @@ import (
 	"aegis-api/services_/chat"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -599,4 +600,55 @@ func (h *ChatHandler) GetMessages(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, messages)
+}
+
+// UpdateGroupImage handles updating a group's image.
+func (h *ChatHandler) UpdateGroupImage(c *gin.Context) {
+	extractActorFromContext(c)
+
+	groupID, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group ID"})
+		return
+	}
+
+	file, err := c.FormFile("group_url")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open file"})
+		return
+	}
+	defer src.Close()
+
+	// Read file into []byte
+	data, err := io.ReadAll(src)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read file"})
+		return
+	}
+
+	// Upload to IPFS or your storage
+	result, err := h.ChatService.IPFSUploader().UploadBytes(
+		c.Request.Context(),
+		data,
+		file.Filename,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "image upload failed", "details": err.Error()})
+		return
+	}
+	imageURL := h.ChatService.IPFSUploader().GetFileURL(result.Hash)
+
+	// Update group image in DB
+	if err := h.ChatService.Repo().UpdateGroupImage(c.Request.Context(), groupID, imageURL); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update group image", "details": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"group_url": imageURL})
 }

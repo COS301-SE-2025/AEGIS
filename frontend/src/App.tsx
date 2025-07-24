@@ -50,6 +50,9 @@ export default function App() {
       <Route path = "/assign-case-members" element={<AssignCaseMembersForm />} />
       <Route path="/evidence-viewer/:caseId" element={<EvidenceViewer />} />
       <Route path="/case-management/:caseId" element={<CaseManagementPage />} />
+      <Route path="/case-management" element={<CaseManagementPage />} />
+      <Route path="/evidence-viewer" element={<EvidenceViewer />} />
+
       <Route path="/case/:caseId/next-steps" element={<NextStepsPage />} />
 
       <Route path="/landing-page" element={<LandingPage />} />

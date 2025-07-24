@@ -11,6 +11,7 @@ import {
   Database,
   AlertTriangle,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -62,6 +63,7 @@ export const DashBoardPage = () => {
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("active");
+  const [, setProfile] = useState<{ name: string; email: string; role: string; image: string } | null>(null);
 
 
   const storedUser = sessionStorage.getItem("user");
@@ -77,6 +79,9 @@ const [editingCase, setEditingCase] = useState<CaseCard | null>(null);
 const [updatedStatus, setUpdatedStatus] = useState("");
 const [updatedStage, setUpdatedStage] = useState("");
 const [] = useState<File | null>(null);
+const [updatedTitle, setUpdatedTitle] = useState("");
+const [updatedDescription, setUpdatedDescription] = useState("");
+
 
   useEffect(() => {
     const fetchCases = async () => {
@@ -124,6 +129,47 @@ const [] = useState<File | null>(null);
     }
   }, []);
 
+    useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = sessionStorage.getItem("authToken");
+        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) throw new Error("Failed to load profile");
+
+        const result = await res.json();
+
+        // Update both the state and sessionStorage
+        setProfile({
+          name: result.data.name,
+          email: result.data.email,
+          role: result.data.role,
+          image: result.data.image_url,
+        });
+
+        // Update sessionStorage
+        sessionStorage.setItem(
+          "user",
+          JSON.stringify({
+            ...user,
+            name: result.data.name,
+            email: result.data.email,
+            image_url: result.data.image_url,
+          })
+        );
+      } catch (err) {
+        console.error("Error fetching profile:", err);
+      }
+    };
+
+    if (user?.id) fetchProfile();
+  }, [user?.id]);
+
+
   return (
     <div className="min-h-screen bg-background text-white">
       {/* Sidebar */}
@@ -165,11 +211,24 @@ const [] = useState<File | null>(null);
         {/* User Profile */}
         <div className="border-t border-bg-accent pt-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
-              <Link to="/profile">
-                <span className="text-foreground font-medium">{initials}</span>
-              </Link>
-            </div>
+            <Link to="/profile">
+              {user?.image_url ? (
+                <img
+                  src={
+                    user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                      ? user.image_url
+                      : `http://localhost:8080${user.image_url}`
+                  }
+                  alt="Profile"
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                  <span className="text-foreground font-medium">{initials}</span>
+                </div>
+              )}
+            </Link>
+
             <div>
               <p className="font-semibold text-foreground">{displayName}</p>
               <p className="text-muted-foreground text-sm">{user?.email || "user@dfir.com"}</p>
@@ -181,22 +240,21 @@ const [] = useState<File | null>(null);
       {/* Main Content */}
       <div className="ml-80 min-h-screen bg-background">
         {/* Topbar */}
-        <div className="sticky top-0 bg-background border-b border-border p-4 z-5">
+        <div className="sticky top-0 bg-background bg-opacity-100 border-b border-border p-4 z-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <SidebarToggleButton />
               <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">Dashboard</button>
-              <Link to="/evidence-viewer">
-                <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
-                  Evidence Viewer
-                </button>
-              </Link>
               <Link to="/case-management">
                 <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
                   Case Management
                 </button>
               </Link>
-
+              <Link to="/evidence-viewer">
+                <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
+                  Evidence Viewer
+                </button>
+              </Link>
               <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
                 <Link to="/secure-chat">Secure Chat</Link>
               </button>
@@ -218,11 +276,24 @@ const [] = useState<File | null>(null);
                   <Settings className="w-6 h-6" />
                 </button>
               </Link>
-              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-                <Link to="/profile">
-                  <span className="text-foreground font-medium text-sm">{initials}</span>
-                </Link>
-              </div>
+              <Link to="/profile">
+                {user?.image_url ? (
+                  <img
+                    src={
+                      user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                        ? user.image_url
+                        : `http://localhost:8080${user.image_url}`
+                    }
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                    <span className="text-foreground font-medium text-sm">{initials}</span>
+                  </div>
+                )}
+              </Link>
+
             </div>
           </div>
         </div>
@@ -270,7 +341,7 @@ const [] = useState<File | null>(null);
               </div>
             </div>
 
-            <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border-[3px] border bg-card p-6 overflow-auto">
+            <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border border bg-card p-6 overflow-auto">
               <h2 className="font-bold text-foreground text-lg mb-4">Recent Activities</h2>
               <ul className="space-y-4">
                 {recentActivities.map((activity, index) => {
@@ -330,6 +401,17 @@ const [] = useState<File | null>(null);
                 >
                   Archived Cases (0)
                 </button>
+                <button
+                  onClick={() => setActiveTab("closed")}
+                  className={cn(
+                    "text-sm rounded-lg h-8 px-4",
+                    activeTab === "closed"
+                      ? "bg-muted text-white"
+                      : "bg-card text-muted-foreground border border-muted"
+                  )}
+                >
+                  Closed Cases (0)
+                </button>
               </div>
               <Link to="/create-case">
                 <button className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700">
@@ -347,20 +429,59 @@ const [] = useState<File | null>(null);
                 {caseCards.map((card) => (
                   <div
                     key={card.id}
-                    className="flex flex-col justify-between items-center w-[440px] h-[430px] p-4 bg-card border border rounded-[8px]"
-                  ><div className="w-full flex justify-end mb-1">
-                    <button
-                      onClick={() => {
-                        setEditingCase(card);
-                        setUpdatedStatus(card.status);
-                        setUpdatedStage(card.investigation_stage);
-                      }}
-                      className="text-muted-foreground hover:text-blue-500 transition-colors"
-                      title="Edit Case"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  </div>
+                    className="relative flex flex-col justify-between items-center w-[460px] h-[450px] p-4 bg-card border border rounded-[8px]"
+                  >
+                    <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2 z-10">
+                      {/* Edit button (below) */}
+                      <button
+                        onClick={() => {
+                          setEditingCase(card);
+                          setUpdatedStatus(card.status);
+                          setUpdatedStage(card.investigation_stage);
+                          setUpdatedTitle(card.title);
+                          setUpdatedDescription(card.description);
+                        }}
+                        className="text-muted-foreground hover:text-blue-500 transition-colors"
+                        title="Edit Case"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      {/* Delete button  */}
+                      <button
+                        onClick={async () => {
+                          const confirmed = window.confirm("Are you sure you want to archive this case?");
+                          if (!confirmed) return;
+
+                          const token = sessionStorage.getItem("authToken") || "";
+
+                          try {
+                            const res = await fetch(`http://localhost:8080/api/v1/cases/${card.id}`, {
+                              method: "PATCH",
+                              headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${token}`,
+                              },
+                              body: JSON.stringify({ status: "archived" }),
+                            });
+
+                            if (res.ok) {
+                              // Remove from active list immediately
+                              setCaseCards(prev => prev.filter(c => c.id !== card.id));
+                            } else {
+                              alert("Failed to archive the case.");
+                            }
+                          } catch (error) {
+                            console.error("Archive error:", error);
+                            alert("An error occurred.");
+                          }
+                        }}
+                        className="text-muted-foreground hover:text-red-500 transition-colors"
+                        title="Archive Case"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+
+                    </div>
 
                     <img
                       src={card.image || "https://www.cwilson.com/app/uploads/2022/11/iStock-962094400-1024x565.jpg"}
@@ -424,98 +545,137 @@ const [] = useState<File | null>(null);
 
                   </div>
                 ))}
-                  {editingCase && (
-                  <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
-                    <div className="bg-card p-6 rounded-2xl shadow-lg border border-border w-full max-w-md">
-                      <h2 className="text-xl font-semibold text-foreground mb-4">Edit Case</h2>
+                {editingCase && (
+                <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
+                  <div className="bg-card p-6 rounded-2xl shadow-lg border border-border w-full max-w-md">
+                    <h2 className="text-xl font-semibold text-foreground mb-4">Edit Case</h2>
 
-                      {/* Status Dropdown */}
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">
-                          Status
-                        </label>
-                        <select
-                          className="w-full bg-muted text-foreground p-2 rounded-md border border-border"
-                          value={updatedStatus}
-                          onChange={(e) => setUpdatedStatus(e.target.value)}
-                        >
-                          <option value="open">Open</option>
-                          <option value="ongoing">Ongoing</option>
-                          <option value="closed">Closed</option>
-                          <option value="under_review">Under Review</option>
-                        </select>
-                      </div>
+                    {/* Case Title */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-muted-foreground mb-1">
+                        Case Title
+                      </label>
+                      <input
+                        type="text"
+                        value={updatedTitle}
+                        onChange={(e) => setUpdatedTitle(e.target.value)}
+                        className="w-full bg-muted text-foreground p-2 rounded-md border border-border"
+                      />
+                    </div>
 
-                      {/* Investigation Stage Dropdown */}
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">
-                          Investigation Stage
-                        </label>
-                        <select
-                          className="w-full bg-muted text-foreground p-2 rounded-md border border-border"
-                          value={updatedStage}
-                          onChange={(e) => setUpdatedStage(e.target.value)}
-                        >
-                          <option value="Triage">Triage</option>
-                          <option value="Evidence Collection">Evidence Collection</option>
-                          <option value="Analysis">Analysis</option>
-                          <option value="Correlation & Threat Intelligence">Correlation & Threat Intelligence</option>
-                          <option value="Containment & Eradication">Containment & Eradication</option>
-                          <option value="Recovery">Recovery</option>
-                          <option value="Reporting & Documentation">Reporting & Documentation</option>
-                          <option value="Case Closure & Review">Case Closure & Review</option>
-                        </select>
-                      </div>
+                    {/* Case Description */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-muted-foreground mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={updatedDescription}
+                        onChange={(e) => setUpdatedDescription(e.target.value)}
+                        className="w-full bg-muted text-foreground p-2 rounded-md border border-border resize-none"
+                      />
+                    </div>
 
-                      {/* Upload Button that Navigates */}
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">
-                          Upload Evidence
-                        </label>
-                        <Link
-                          to={`/upload-evidence?caseId=${editingCase.id}`}
-                          className="inline-block w-full"
-                        >
-                          <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
-                            Go to Upload Evidence Page
-                          </button>
-                        </Link>
-                      </div>
+                    {/* Status Dropdown */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-muted-foreground mb-1">
+                        Status
+                      </label>
+                      <select
+                        className="w-full bg-muted text-foreground p-2 rounded-md border border-border"
+                        value={updatedStatus}
+                        onChange={(e) => setUpdatedStatus(e.target.value)}
+                      >
+                        <option value="open">Open</option>
+                        <option value="ongoing">Ongoing</option>
+                        <option value="closed">Closed</option>
+                        <option value="under_review">Under Review</option>
+                      </select>
+                    </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex justify-end gap-3 pt-2">
-                        <button
-                          onClick={() => setEditingCase(null)}
-                          className="px-4 py-2 text-sm text-muted-foreground hover:text-white"
-                        >
-                          Cancel
+                    {/* Investigation Stage Dropdown */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-muted-foreground mb-1">
+                        Investigation Stage
+                      </label>
+                      <select
+                        className="w-full bg-muted text-foreground p-2 rounded-md border border-border"
+                        value={updatedStage}
+                        onChange={(e) => setUpdatedStage(e.target.value)}
+                      >
+                        <option value="Triage">Triage</option>
+                        <option value="Evidence Collection">Evidence Collection</option>
+                        <option value="Analysis">Analysis</option>
+                        <option value="Correlation & Threat Intelligence">Correlation & Threat Intelligence</option>
+                        <option value="Containment & Eradication">Containment & Eradication</option>
+                        <option value="Recovery">Recovery</option>
+                        <option value="Reporting & Documentation">Reporting & Documentation</option>
+                        <option value="Case Closure & Review">Case Closure & Review</option>
+                      </select>
+                    </div>
+
+                    {/* Upload Evidence Button */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-muted-foreground mb-1">
+                        Upload Evidence
+                      </label>
+                      <Link to={`/upload-evidence?caseId=${editingCase.id}`} className="inline-block w-full">
+                        <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                          Go to Upload Evidence Page
                         </button>
+                      </Link>
+                    </div>
 
-                        <button
-                          onClick={async () => {
-                            const token = sessionStorage.getItem("authToken") || "";
-                            await fetch(`http://localhost:8080/api/v1/cases/${editingCase.id}`, {
-                              method: "PATCH",
-                              headers: {
-                                "Content-Type": "application/json",
-                                Authorization: `Bearer ${token}`,
-                              },
-                              body: JSON.stringify({
-                                status: updatedStatus,
-                                investigation_stage: updatedStage,
-                              }),
-                            });
-
-                            setEditingCase(null);
-                          }}
-                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                        >
-                          Save Changes
+                    {/* Assign Members Button */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-muted-foreground mb-1">
+                        Assign Members
+                      </label>
+                      <Link to={`/assign-case-members?caseId=${editingCase.id}`} className="inline-block w-full">
+                        <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                          Go to Assign Members Page
                         </button>
-                      </div>
+                      </Link>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        onClick={() => setEditingCase(null)}
+                        className="px-4 py-2 text-sm text-muted-foreground hover:text-white"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          const token = sessionStorage.getItem("authToken") || "";
+
+                          await fetch(`http://localhost:8080/api/v1/cases/${editingCase.id}`, {
+                            method: "PATCH",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({
+                              title: updatedTitle,
+                              description: updatedDescription,
+                              status: updatedStatus,
+                              investigation_stage: updatedStage,
+                            }),
+                          });
+
+                          setEditingCase(null);
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                      >
+                        Save Changes
+                      </button>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
+
 
               </div>
             )}

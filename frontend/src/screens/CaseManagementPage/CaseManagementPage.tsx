@@ -33,6 +33,9 @@ const storedUser = sessionStorage.getItem("user");
     .toUpperCase();
 
 const userRole = "admin"; // for now
+
+// Profile state
+const [, setProfile] = useState<{ name: string; email: string; role: string; image: string } | null>(null);
  
 // Define the CaseData type
 type CaseData = {
@@ -231,7 +234,47 @@ useEffect(() => {
   }
 }, [timelineEvents, caseId, hasLoaded]);
 
-  
+
+    useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = sessionStorage.getItem("authToken");
+        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) throw new Error("Failed to load profile");
+
+        const result = await res.json();
+
+        // Update both the state and sessionStorage
+        setProfile({
+          name: result.data.name,
+          email: result.data.email,
+          role: result.data.role,
+          image: result.data.image_url,
+        });
+
+        // Update sessionStorage
+        sessionStorage.setItem(
+          "user",
+          JSON.stringify({
+            ...user,
+            name: result.data.name,
+            email: result.data.email,
+            image_url: result.data.image_url,
+          })
+        );
+      } catch (err) {
+        console.error("Error fetching profile:", err);
+      }
+    };
+
+    if (user?.id) fetchProfile();
+  }, [user?.id]);
+
   
   const [newEventDescription, setNewEventDescription] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -260,7 +303,7 @@ useEffect(() => {
         setNewEventDescription('');
         setShowAddForm(false);
         console.log("Adding event:", newEvent);
-console.log("Current caseId:", caseId);
+        console.log("Current caseId:", caseId);
 
       }
       
@@ -281,14 +324,7 @@ console.log("Current caseId:", caseId);
   };
 
 
-  // User data for assigned team
-  // const teamMembers = [
-  //   { id: 1, name: "Agent Benji", role: "Lead Analyst" },
-  //   { id: 2, name: "Agent Tshepi", role: "Security Expert" },
-  //   { id: 3, name: "Agent Lwando", role: "Forensics Specialist" },
-  //   { id: 3, name: "Agent Thati", role: "Network log Specialist" },
-  //   { id: 3, name: "Agent Tshire", role: "Malware Specialist" },
-  // ];
+
 
   // Evidence data
   // const evidenceItems = [
@@ -342,11 +378,23 @@ console.log("Current caseId:", caseId);
         {/* User Profile */}
         <div className="border-t border-bg-accent pt-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
-              <Link to="/profile">
-                <span className="text-foreground font-medium">{initials}</span>
-              </Link>
-            </div>
+            <Link to="/profile">
+              {user?.image_url ? (
+                <img
+                  src={
+                    user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                      ? user.image_url
+                      : `http://localhost:8080${user.image_url}`
+                  }
+                  alt="Profile"
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                  <span className="text-foreground font-medium">{initials}</span>
+                </div>
+              )}
+            </Link>
             <div>
               <p className="font-semibold text-foreground">{displayName}</p>
               <p className="text-muted-foreground text-sm">{user?.email || "user@dfir.com"}</p>
@@ -392,23 +440,41 @@ console.log("Current caseId:", caseId);
               <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
                <Link to="/settings" > <Settings className="w-6 h-6" /></Link>
               </button>
-              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-                <Link to="/profile" ><span className="text-foreground font-medium text-sm">{initials}</span></Link>
-              </div>
+              <Link to="/profile">
+                {user?.image_url ? (
+                  <img
+                    src={
+                      user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                        ? user.image_url
+                        : `http://localhost:8080${user.image_url}`
+                    }
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                    <span className="text-foreground font-medium text-sm">{initials}</span>
+                  </div>
+                )}
+              </Link>
             </div>
           </div>
         </div>
 
         {/* Page Content */}
         <div className="p-6">
+          {!caseId ? (
+            <div className="text-center text-muted-foreground mt-24">
+              <h2 className="text-2xl font-semibold mb-4">No case, no load</h2>
+              <p>Select a case from the dashboard to view its details.</p>
+            </div>
+          ) : (
+            <>
           {/* Page Header */}
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-3xl font-bold text-foreground">Case Details & Timeline</h1>
             <div className="flex gap-4">
-              <Link to="/create-case"><button className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500">
-                <Plus className="w-4 h-4" />
-                 Create Case
-              </button></Link>
+
               <button className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500">
                 <Share2 className="w-4 h-4" />
                   {userRole === "admin" && (
@@ -562,30 +628,30 @@ console.log("Current caseId:", caseId);
                 </div>
               </div>
 
-    {/* Associated Evidence */}
-    <div>
-      <Link to={`/evidence-viewer/${caseId}`} className="block" onClick={() => updateCaseTimestamp(caseId!)}>
-        <h3 className="text-muted-foreground mb-4 hover:text-gray-300 cursor-pointer transition-colors">
-          Associated Evidence:
-        </h3>
-      </Link>
-      <div className="space-y-3">
-        {Array.isArray(evidenceItems) && evidenceItems.length > 0 ? (
-        evidenceItems.map((item: any, index: number) => (
-            <div key={index} className="flex items-center gap-3">
-              <Paperclip className="w-5 h-5 text-blue-500" />
-              <span className="text-blue-500 hover:text-blue-400 cursor-pointer">
-                {item.name || `Evidence #${index + 1}`}
-              </span>
+              {/* Associated Evidence */}
+              <div>
+                <Link to={`/evidence-viewer/${caseId}`} className="block" onClick={() => updateCaseTimestamp(caseId!)}>
+                  <h3 className="text-muted-foreground mb-4 hover:text-gray-300 cursor-pointer transition-colors">
+                    Associated Evidence:
+                  </h3>
+                </Link>
+                <div className="space-y-3">
+                  {Array.isArray(evidenceItems) && evidenceItems.length > 0 ? (
+                  evidenceItems.map((item: any, index: number) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <Paperclip className="w-5 h-5 text-blue-500" />
+                        <span className="text-blue-500 hover:text-blue-400 cursor-pointer">
+                          {item.name || `Evidence #${index + 1}`}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground">No evidence attached.</p>
+                  )}
+                </div>
+              </div>
             </div>
-          ))
-        ) : (
-          <p className="text-muted-foreground">No evidence attached.</p>
-        )}
-      </div>
-    </div>
-  </div>
-</div>
+          </div>
 
 
             {/* Investigation Timeline Section */}
@@ -694,6 +760,8 @@ console.log("Current caseId:", caseId);
               </div>
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

@@ -82,7 +82,7 @@ export function CreateCaseForm(): JSX.Element {
     };
 
     console.log("Submitting payload:", payload);
-const token = sessionStorage.getItem("authToken");
+   const token = sessionStorage.getItem("authToken");
 
     try {
       const response = await axios.post(
@@ -119,17 +119,7 @@ const token = sessionStorage.getItem("authToken");
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block mb-1 text-sm">Name of Person Creating the Case</label>
-            <Input
-              className="bg-muted border-border text-foreground placeholder-muted-foreground"
-              placeholder="e.g. Alice Johnson"
-              value={form.creator}
-              onChange={handleChange("creator")}
-              required
-            />
-          </div>
-
+    
           <div>
             <label className="block mb-1 text-sm">Team Name</label>
             <Input
@@ -178,13 +168,24 @@ const token = sessionStorage.getItem("authToken");
               rows={4}
             />
           </div>
-
+          <div className="flex justify-between items-center pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(-1)}
+              className="border-muted-foreground text-muted-foreground hover:bg-muted"
+            >
+              Cancel
+            </Button>
+          
+          
           <Button
             type="submit"
             className="bg-cyan-600 hover:bg-cyan-700 text-white"
           >
             Create Case
           </Button>
+          </div>
         </form>
       </div>
     </div>

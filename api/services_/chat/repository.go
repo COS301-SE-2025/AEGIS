@@ -31,6 +31,23 @@ func NewChatRepository(db *mongo.Database) ChatRepository {
 
 	return repo
 }
+func (r *MongoRepository) UpdateGroupImage(ctx context.Context, groupID primitive.ObjectID, imageURL string) error {
+	collection := r.db.Collection(GroupsCollection)
+	filter := bson.M{"_id": groupID}
+	update := bson.M{
+		"$set": bson.M{
+			"group_url":  imageURL,
+			"updated_at": time.Now(),
+		},
+	}
+
+	_, err := collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to update group image: %w", err)
+	}
+
+	return nil
+}
 
 // createIndexes creates necessary MongoDB indexes
 func (r *MongoRepository) createIndexes() {

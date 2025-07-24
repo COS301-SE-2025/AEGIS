@@ -61,7 +61,7 @@ interface Group {
   lastMessageTime: string;
   unreadCount: number;
   members: string[];
-  avatar: string;
+  group_url: string;
   hasStarted?: boolean;
   caseId?: string;
 }
@@ -88,7 +88,6 @@ export const SecureChatPage = (): JSX.Element => {
   const [, setPreviewFileData] = useState<string>("");
   const [typingUsers, setTypingUsers] = useState<Record<number, string[]>>({});
   const [hasMounted, setHasMounted] = useState(false);
-
   interface Case {
     id: string;
     title?: string;
@@ -159,15 +158,15 @@ const [showEditGroupModal, setShowEditGroupModal] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
 
   const [chatMessages, setChatMessages] = useState<ChatMessages>({});
-const [teamMembers] = useState([
+  const [teamMembers] = useState([
   { name: "Alex Morgan", role: "Forensics Analyst", color: "text-blue-400" },
   { name: "Jamie Lee", role: "Incident Responder", color: "text-red-400" },
   { name: "Riley Smith", role: "Malware Analyst", color: "text-green-400" }
-]);
+  ]);
 
   // Add this function to simulate incoming messages
-// Add this enhanced function to simulate realistic flowing conversations
-const simulateIncomingMessage = (chatId: number, delay: number = 1500) => {
+  // Add this enhanced function to simulate realistic flowing conversations
+  const simulateIncomingMessage = (chatId: number, delay: number = 1500) => {
   // Get current conversation context
   
   const currentMessages = chatMessages[chatId] || [];
@@ -244,9 +243,6 @@ const simulateIncomingMessage = (chatId: number, delay: number = 1500) => {
 
 const simulateTyping = (chatId: number, _?: string) => {
   const user = "Alex Morgan (Forensics Analyst)";
-
-  
-  
    setTypingUsers(prev => ({
     ...prev,
     [chatId]: [user]
@@ -260,7 +256,6 @@ const simulateTyping = (chatId: number, _?: string) => {
   },  15000 + Math.random() * 25000);
 
 };
-
 
   const filteredGroups = groups.filter(group =>
     group.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -349,6 +344,51 @@ useEffect(() => {
 
 
 
+const fileInputGroupRef = useRef<HTMLInputElement>(null);
+
+const handleGroupImageClick = () => {
+  if (activeChat?.id) {
+    fileInputGroupRef.current?.click();
+  }
+};
+
+const handleGroupImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file || !activeChat) return;
+
+  const formData = new FormData();
+  formData.append('group_url', file);
+
+  try {
+    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/image`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData
+    });
+
+    if (!res.ok) throw new Error("Upload failed");
+
+    const data = await res.json();
+    const newImageUrl = data.group_url;
+
+    setActiveChat(prev =>
+      prev ? { ...prev, group_url: newImageUrl } : prev
+    );
+
+    setGroups(prev =>
+      prev.map(group =>
+        group.id === activeChat.id
+          ? { ...group, group_url: newImageUrl }
+          : group
+      )
+    );
+
+  } catch (err) {
+    console.error("Failed to upload group image", err);
+  }
+};
 
 
 // Save to localStorage
@@ -395,11 +435,12 @@ const fetchGroups = async () => {
 
       const data = await res.json();
       console.log("Fetched groups data:", data);
-       const groupsWithAvatars = data.map((group: Group) => ({
-  ...group,
-  caseId: group.case_id || group.caseId,
-  avatar: getAvatar(group.id.toString())
-}));
+      const groupsWithAvatars = data.map((group: Group) => ({
+        ...group,
+        caseId: group.case_id || group.caseId,
+        group_url: group.group_url || getAvatar(group.id.toString()) //  use DB image if present
+      }));
+
 
 
       if (Array.isArray(data)) {
@@ -445,6 +486,8 @@ const sendMessage = async () => {
         message_type: "text"
       })
     });
+
+
 
     const newMessage = await res.json();
     
@@ -681,11 +724,10 @@ const sendAttachment = async () => {
   };
   reader.readAsDataURL(previewFile);
 };
-  function getAvatar(groupId: string): string {
-  const icons = ["🔒", "📁", '🧠', '🚨', '👥', '💻', '🕵️', '🔍'];
-  const index = groupId.charCodeAt(0) % icons.length;
-  return icons[index];
-}
+
+  function getAvatar(_groupId: string): string {
+    return ""; // Let the fallback image handle it
+  }
 
 const handleCreateGroup = async (e?: React.MouseEvent | React.KeyboardEvent) => {
   e?.preventDefault();
@@ -707,7 +749,7 @@ const handleCreateGroup = async (e?: React.MouseEvent | React.KeyboardEvent) => 
         created_by: userEmail,
         members: [{ user_email: userEmail, role: "admin" }],
         settings: { is_public: false, allow_invites: true },
-        avatar: getAvatar(newGroupName)
+        group_url: ""
       })
     });
 
@@ -719,10 +761,10 @@ const handleCreateGroup = async (e?: React.MouseEvent | React.KeyboardEvent) => 
 
     const createdGroup = await res.json();
 
-    // Assign avatar using getAvatar (based on UUID string)
+    // Assign group_url using getAvatar (based on UUID string)
     const groupWithAvatar = {
       ...createdGroup,
-      avatar: getAvatar(createdGroup.id), // 🧠 deterministic emoji
+      group_url: createdGroup.group_url || "/default-group-avatar.png",
       unreadCount: 0,
       lastMessage: "Group created",
       lastMessageTime: "now",
@@ -1276,9 +1318,14 @@ const handleDeleteGroup = async () => {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-accent rounded-full flex items-center justify-center text-xl">
-                    {group.avatar}
+                  <div className="w-12 h-12 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition" onClick={handleGroupImageClick}>
+                    <img
+                      src={group.group_url || "/default-group-avatar.png"}  // fallback image
+                      alt="Group Avatar"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-foreground truncate">{group.name}</h3>
@@ -1331,16 +1378,39 @@ const handleDeleteGroup = async () => {
                 ) : (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-accent rounded-full flex items-center justify-center text-lg">
-                        {activeChat.avatar}
+                      <div className="relative">
+                        {/* Group Avatar (clickable) */}
+                        <div
+                          className="w-10 h-10 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition"
+                          onClick={handleGroupImageClick}
+                        >
+                          <img
+                            src={activeChat.group_url || "/default-group-avatar.png"}
+                            alt="Group Avatar"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+
+                        {/* Hidden File Input */}
+                        <input
+                          ref={fileInputGroupRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleGroupImageUpload}
+                        />
                       </div>
+
                       <div>
                         <h3 className="font-semibold text-foreground">{activeChat.name}</h3>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <p
+                          className="text-sm text-muted-foreground flex items-center gap-1 cursor-pointer hover:underline"
+                          onClick={() => setShowAddMembersModal(true)}
+                        >
                           <Users className="w-4 h-4" />
-                      {activeChat?.members?.length ?? 0} members
-
+                          {activeChat?.members?.length ?? 0} members
                         </p>
+
                         {activeChat.caseId && (
                           <p className="text-xs text-muted-foreground">
                             Linked Case:{" "}

@@ -28,7 +28,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 	}))
 
 	// Serve /uploads as static file directory
-	router.Static("/uploads", "./uploads")
+	router.Static("/uploads", "/app/uploads")
 
 	// ─── Health Check ─────────────────────────────────────
 	router.GET("/ping", func(c *gin.Context) {
@@ -85,7 +85,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 			// ─── case and evidence totals ──────────────────────────
 			protected.GET("/dashboard/totals", h.CaseEvidenceTotalsHandler.GetDashboardTotals)
-
 			// ─── Recent Activities ───────────────────────────────
 			protected.GET("/auditlogs/recent/:userId", h.RecentActivityHandler.GetRecentActivities)
 

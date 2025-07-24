@@ -181,15 +181,16 @@ func SaveBase64Image(userID string, base64Str string) (string, error) {
 	}
 
 	// Create folder if not exists
-	if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
+	uploadDir := "/app/uploads" // matches docker-compose volume
+	os.MkdirAll(uploadDir, os.ModePerm)
+
+	filenameOnly := userID + "_" + time.Now().Format("20060102150405") + ".png"
+	fullPath := fmt.Sprintf("%s/%s", uploadDir, filenameOnly)
+
+	if err := ioutil.WriteFile(fullPath, decoded, 0644); err != nil {
 		return "", err
 	}
 
-	filename := "uploads/" + userID + "_" + time.Now().Format("20060102150405") + ".png"
-	if err := ioutil.WriteFile(filename, decoded, 0644); err != nil {
-		return "", err
-	}
+	return "/uploads/" + filenameOnly, nil
 
-	// You can return a full URL if you expose /uploads via static route
-	return "/" + filename, nil
 }

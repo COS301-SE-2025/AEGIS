@@ -21,6 +21,7 @@ type ChatRepository interface {
 	IsUserInGroup(ctx context.Context, groupID primitive.ObjectID, userEmail string) (bool, error)
 	UpdateLastMessage(ctx context.Context, groupID primitive.ObjectID, lastMessage *LastMessage) error
 	GetGroupsByCaseID(ctx context.Context, caseID primitive.ObjectID) ([]*ChatGroup, error)
+	UpdateGroupImage(ctx context.Context, groupID primitive.ObjectID, imageURL string) error
 
 	// Message operations
 	CreateMessage(ctx context.Context, message *Message) error
