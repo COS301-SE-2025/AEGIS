@@ -72,6 +72,9 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.GET("/cases/:case_id", h.CaseHandler.GetCaseByIDHandler)
 			// ─── Metadata Evidence Upload ────────────────
 			protected.POST("/evidence", h.MetadataHandler.UploadEvidence)
+			// ─── Metadata Evidence Retrieval ─────────────
+			protected.GET("/evidence-metadata/:id", h.MetadataHandler.GetEvidenceByID)
+			protected.GET("/evidence-metadata/case/:case_id", h.MetadataHandler.GetEvidenceByCaseID)
 
 			// ─── Admin: Users ────────────────────────────
 			protected.GET("/users", h.AdminService.ListUsers)
@@ -80,10 +83,11 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.GET("/profile/:userID", h.ProfileHandler.GetProfileHandler)
 			protected.PATCH("/profile", h.ProfileHandler.UpdateProfileHandler)
 
-
 			// ─── case and evidence totals ──────────────────────────
 			protected.GET("/dashboard/totals", h.CaseEvidenceTotalsHandler.GetDashboardTotals)
 
+			// ─── Recent Activities ───────────────────────────────
+			protected.GET("/auditlogs/recent/:userId", h.RecentActivityHandler.GetRecentActivities)
 
 			// RegisterMessageRoutes(protected, h.MessageService, auditLogger)
 			// ─── Thread Messaging ────────────────────────
@@ -99,7 +103,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.PermissionChecker)
 
 			RegisterCaseTagRoutes(protected, h.CaseTagHandler, h.PermissionChecker)
-
 
 		}
 	}

@@ -26,3 +26,10 @@ func (r *GormRepository) FindEvidenceByID(id uuid.UUID) (*Evidence, error) {
 	err := r.db.First(&evidence, "id = ?", id).Error
 	return &evidence, err
 }
+
+// FindEvidenceByCaseID retrieves all evidence records associated with a specific case ID.
+func (r *GormRepository) FindEvidenceByCaseID(caseID uuid.UUID) ([]Evidence, error) {
+	var evidences []Evidence
+	err := r.db.Where("case_id = ?", caseID).Find(&evidences).Error
+	return evidences, err
+}

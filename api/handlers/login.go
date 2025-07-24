@@ -1,16 +1,17 @@
 package handlers
 
 import (
+	"aegis-api/middleware"
 	"aegis-api/services_/auditlog"
 	"aegis-api/services_/auth/login"
 	"aegis-api/services_/auth/registration"
 	"aegis-api/services_/auth/reset_password"
 	"aegis-api/structs"
 	"net/http"
-	"aegis-api/middleware"
+
+	"aegis-api/pkg/websocket"
 
 	"github.com/gin-gonic/gin"
-	"aegis-api/pkg/websocket"
 )
 
 type AuthHandler struct {
@@ -35,26 +36,27 @@ func NewAuthHandler(
 }
 
 type Handler struct {
-	AdminService            AdminServiceInterface
-	AuthService             AuthServiceInterface
-	CaseService             CaseServiceInterface
-	EvidenceService         EvidenceServiceInterface
-	UserService             UserServiceInterface
-	CaseHandler             *CaseHandler
-	UploadHandler           *UploadHandler
-	DownloadHandler         *DownloadHandler
-	MetadataHandler         *MetadataHandler
-	MessageHandler          *MessageHandler
-	AnnotationThreadHandler *AnnotationThreadHandler
-	ChatHandler             *ChatHandler
-	ProfileHandler          *ProfileHandler
-	GetCollaboratorsHandler *GetCollaboratorsHandler
-	EvidenceViewerHandler *EvidenceViewerHandler
-	EvidenceTagHandler    *EvidenceTagHandler
-	PermissionChecker     middleware.PermissionChecker
-	CaseTagHandler	   *CaseTagHandler
+	AdminService              AdminServiceInterface
+	AuthService               AuthServiceInterface
+	CaseService               CaseServiceInterface
+	EvidenceService           EvidenceServiceInterface
+	UserService               UserServiceInterface
+	CaseHandler               *CaseHandler
+	UploadHandler             *UploadHandler
+	DownloadHandler           *DownloadHandler
+	MetadataHandler           *MetadataHandler
+	MessageHandler            *MessageHandler
+	AnnotationThreadHandler   *AnnotationThreadHandler
+	ChatHandler               *ChatHandler
+	ProfileHandler            *ProfileHandler
+	GetCollaboratorsHandler   *GetCollaboratorsHandler
+	EvidenceViewerHandler     *EvidenceViewerHandler
+	EvidenceTagHandler        *EvidenceTagHandler
+	PermissionChecker         middleware.PermissionChecker
+	CaseTagHandler            *CaseTagHandler
 	CaseEvidenceTotalsHandler *CaseEvidenceTotalsHandler
-	WebSocketHub *websocket.Hub
+	WebSocketHub              *websocket.Hub
+	RecentActivityHandler     *RecentActivityHandler
 }
 
 func NewHandler(
@@ -75,31 +77,33 @@ func NewHandler(
 	evidenceViewerHandler *EvidenceViewerHandler,
 	evidenceTagHandler *EvidenceTagHandler,
 	permissionChecker middleware.PermissionChecker,
-	caseTagHandler *CaseTagHandler, 
+	caseTagHandler *CaseTagHandler,
 	CaseEvidenceTotalsHandler *CaseEvidenceTotalsHandler,
-	webSocketHub *websocket.Hub, 
+	webSocketHub *websocket.Hub,
+	recentActivityHandler *RecentActivityHandler,
 ) *Handler {
 	return &Handler{
-		AdminService:            adminSvc,
-		AuthService:             authSvc,
-		CaseService:             caseSvc,
-		EvidenceService:         evidenceSvc,
-		UserService:             userSvc,
-		CaseHandler:             caseHandler,
-		UploadHandler:           uploadHandler,
-		DownloadHandler:         downloadHandler,
-		MetadataHandler:         metadataHandler,
-		MessageHandler:          MessageHandler,
-		AnnotationThreadHandler: annotationThreadHandler,
-		ChatHandler:             chatHandler,
-		ProfileHandler:          profileHandler,
-		GetCollaboratorsHandler: getCollaboratorsHandler,
-		EvidenceViewerHandler: evidenceViewerHandler,
-		EvidenceTagHandler:    evidenceTagHandler,
-		PermissionChecker:     permissionChecker,
-		CaseTagHandler:	   caseTagHandler,
+		AdminService:              adminSvc,
+		AuthService:               authSvc,
+		CaseService:               caseSvc,
+		EvidenceService:           evidenceSvc,
+		UserService:               userSvc,
+		CaseHandler:               caseHandler,
+		UploadHandler:             uploadHandler,
+		DownloadHandler:           downloadHandler,
+		MetadataHandler:           metadataHandler,
+		MessageHandler:            MessageHandler,
+		AnnotationThreadHandler:   annotationThreadHandler,
+		ChatHandler:               chatHandler,
+		ProfileHandler:            profileHandler,
+		GetCollaboratorsHandler:   getCollaboratorsHandler,
+		EvidenceViewerHandler:     evidenceViewerHandler,
+		EvidenceTagHandler:        evidenceTagHandler,
+		PermissionChecker:         permissionChecker,
+		CaseTagHandler:            caseTagHandler,
 		CaseEvidenceTotalsHandler: CaseEvidenceTotalsHandler,
-		WebSocketHub: webSocketHub,
+		WebSocketHub:              webSocketHub,
+		RecentActivityHandler:     recentActivityHandler,
 	}
 }
 

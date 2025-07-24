@@ -184,3 +184,128 @@ func (h *MetadataHandler) UploadEvidence(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Evidence uploaded successfully"})
 }
+
+// GetEvidenceByID retrieves evidence metadata by its ID.
+func (h *MetadataHandler) GetEvidenceByID(c *gin.Context) {
+	userID, _ := c.Get("userID")
+	userRole, _ := c.Get("userRole")
+	actor := auditlog.Actor{
+		ID:        userID.(string),
+		Role:      userRole.(string),
+		IPAddress: c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+	}
+
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "GET_EVIDENCE_BY_ID",
+			Actor:  actor,
+			Target: auditlog.Target{
+				Type: "evidence",
+				ID:   idStr,
+			},
+			Service:     "evidence",
+			Status:      "FAILED",
+			Description: "Invalid evidence ID format: " + err.Error(),
+		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid evidence ID format", "details": err.Error()})
+		return
+	}
+
+	evidence, err := h.service.FindEvidenceByID(id)
+	if err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "GET_EVIDENCE_BY_ID",
+			Actor:  actor,
+			Target: auditlog.Target{
+				Type: "evidence",
+				ID:   idStr,
+			},
+			Service:     "evidence",
+			Status:      "FAILED",
+			Description: "Evidence not found or retrieval failed: " + err.Error(),
+		})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Evidence not found", "details": err.Error()})
+		return
+	}
+
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "GET_EVIDENCE_BY_ID",
+		Actor:  actor,
+		Target: auditlog.Target{
+			Type: "evidence",
+			ID:   evidence.ID.String(),
+		},
+		Service:     "evidence",
+		Status:      "SUCCESS",
+		Description: "Successfully retrieved evidence by ID",
+	})
+
+	c.JSON(http.StatusOK, evidence)
+}
+
+// / GetEvidenceByCaseID retrieves all evidence records for a given case.
+func (h *MetadataHandler) GetEvidenceByCaseID(c *gin.Context) {
+	userID, _ := c.Get("userID")
+	userRole, _ := c.Get("userRole")
+	actor := auditlog.Actor{
+		ID:        userID.(string),
+		Role:      userRole.(string),
+		IPAddress: c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+	}
+
+	caseIDStr := c.Param("case_id")
+	caseID, err := uuid.Parse(caseIDStr)
+	if err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "GET_EVIDENCE_BY_CASE_ID",
+			Actor:  actor,
+			Target: auditlog.Target{
+				Type: "case",
+				ID:   caseIDStr,
+			},
+			Service:     "evidence",
+			Status:      "FAILED",
+			Description: "Invalid case ID format: " + err.Error(),
+		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid case ID format", "details": err.Error()})
+		return
+	}
+
+	evidences, err := h.service.GetEvidenceByCaseID(caseID)
+	if err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "GET_EVIDENCE_BY_CASE_ID",
+			Actor:  actor,
+			Target: auditlog.Target{
+				Type: "case",
+				ID:   caseID.String(),
+			},
+			Service:     "evidence",
+			Status:      "FAILED",
+			Description: "Failed to retrieve evidence list: " + err.Error(),
+		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve evidence", "details": err.Error()})
+		return
+	}
+
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "GET_EVIDENCE_BY_CASE_ID",
+		Actor:  actor,
+		Target: auditlog.Target{
+			Type: "case",
+			ID:   caseID.String(),
+			AdditionalInfo: map[string]string{
+				"result_count": fmt.Sprintf("%d", len(evidences)),
+			},
+		},
+		Service:     "evidence",
+		Status:      "SUCCESS",
+		Description: fmt.Sprintf("Successfully retrieved %d evidence records for case", len(evidences)),
+	})
+
+	c.JSON(http.StatusOK, evidences)
+}

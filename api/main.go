@@ -205,6 +205,10 @@ func main() {
 	dashboardService := case_evidence_totals.NewDashboardService(caseEviRepo)
 	caseEviTotalsHandler := handlers.NewCaseEvidenceTotalsHandler(dashboardService)
 
+	// ─── AuditLog Service and Handler ─────────────────────────────
+	auditLogService := auditlog.NewAuditLogService(mongoDatabase)
+	recentActivityHandler := handlers.NewRecentActivityHandler(auditLogService)
+
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -227,6 +231,7 @@ func main() {
 		caseTagHandler,
 		caseEviTotalsHandler,
 		hub,
+		recentActivityHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

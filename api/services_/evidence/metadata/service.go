@@ -60,6 +60,16 @@ func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
 	return s.repo.SaveEvidence(e)
 }
 
+// GetEvidenceByCaseID returns all evidence records for a given case.
+func (s *Service) GetEvidenceByCaseID(caseID uuid.UUID) ([]Evidence, error) {
+	return s.repo.FindEvidenceByCaseID(caseID)
+}
+
+// FindEvidenceByID retrieves an evidence record by its ID.
+func (s *Service) FindEvidenceByID(id uuid.UUID) (*Evidence, error) {
+	return s.repo.FindEvidenceByID(id)
+}
+
 // convertToJSONMap converts a map[string]string to map[string]interface{} for use with datatypes.JSONMap.
 func convertToJSONMap(m map[string]string) map[string]interface{} {
 	result := make(map[string]interface{}, len(m))

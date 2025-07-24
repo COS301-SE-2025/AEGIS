@@ -39,6 +39,7 @@ func (m *MockAdminChecker) IsAdminFromContext(ctx *gin.Context) (bool, error) {
 
 // ---- Tests ----
 
+// TestAssignUserToCase_Authorized tests assigning a user to a case when the user is an admin.
 func TestUnassignUserFromCase_Authorized(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx := &gin.Context{}
@@ -61,6 +62,7 @@ func TestUnassignUserFromCase_Authorized(t *testing.T) {
 	repo.AssertExpectations(t)
 }
 
+// TestUnassignUserFromCase_Forbidden tests unassigning a user from a case when the user is not an admin.
 func TestUnassignUserFromCase_Forbidden(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx := &gin.Context{}
@@ -82,6 +84,7 @@ func TestUnassignUserFromCase_Forbidden(t *testing.T) {
 	repo.AssertNotCalled(t, "UnassignRole")
 }
 
+// TestUnassignUserFromCase_AdminCheckFails tests the case where the admin check fails.
 func TestUnassignUserFromCase_AdminCheckFails(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx := &gin.Context{}
