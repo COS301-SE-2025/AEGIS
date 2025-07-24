@@ -144,7 +144,7 @@ func main() {
 
 	uploadHandler := handlers.NewUploadHandler(uploadService, auditLogger)
 	metadataHandler := handlers.NewMetadataHandler(metadataService, auditLogger)
-	downloadHandler := handlers.NewDownloadHandler(downloadService)
+	downloadHandler := handlers.NewDownloadHandler(downloadService, auditLogger)
 
 	// ─── Messages / WebSocket ───────────────────────────────────
 	messageRepo := messages.NewMessageRepository(db.DB)
@@ -206,7 +206,8 @@ func main() {
 	caseEviTotalsHandler := handlers.NewCaseEvidenceTotalsHandler(dashboardService)
 
 	// ─── AuditLog Service and Handler ─────────────────────────────
-	auditLogService := auditlog.NewAuditLogService(mongoDatabase)
+	auditLogService := auditlog.NewAuditLogService(mongoDatabase, userRepo)
+
 	recentActivityHandler := handlers.NewRecentActivityHandler(auditLogService)
 
 	// ─── Compose Handler Struct ─────────────────────────────────

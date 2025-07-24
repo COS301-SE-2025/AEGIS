@@ -111,7 +111,7 @@ func TestGetEvidenceByCaseID_Success(t *testing.T) {
 	mockService.On("GetEvidenceByCaseID", caseID).Return(expected, nil)
 	router, rec := setupTestRouter(mockService)
 
-	req := httptest.NewRequest("GET", "/evidence/case/"+caseID.String(), nil)
+	req := httptest.NewRequest("GET", "/evidence/-metadatacase/"+caseID.String(), nil)
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)

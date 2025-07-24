@@ -2,6 +2,8 @@ package registration
 
 import (
 	// Assuming verifyemail package exists for email verification
+	"aegis-api/services_/auditlog"
+	"context"
 	"fmt"
 	"log"
 
@@ -126,4 +128,17 @@ func (r *GormUserRepository) UpdatePassword(userID uuid.UUID, hashedPassword str
 
 func (s *RegistrationService) GetAllUsers() ([]User, error) {
 	return s.repo.FindAll()
+}
+
+func (r *GormUserRepository) GetByID(ctx context.Context, userID string) (*auditlog.User, error) {
+	var user User
+	if err := r.db.WithContext(ctx).First(&user, "id = ?", userID).Error; err != nil {
+		return nil, err
+	}
+
+	return &auditlog.User{
+		ID:    user.ID.String(),
+		Email: user.Email,
+		//Role:  user.Role, // Only include this if auditlog.User struct has a Role field
+	}, nil
 }

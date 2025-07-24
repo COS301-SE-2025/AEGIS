@@ -13,11 +13,14 @@ import (
 func (h *CaseHandler) GetAllCasesHandler(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	userRole, _ := c.Get("userRole")
+	email, _ := c.Get("email") // Optional, if you have this set
 	actor := auditlog.Actor{
 		ID:        userID.(string),
 		Role:      userRole.(string),
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
+		Email:     email.(string), // Optional, if you have this set
+
 	}
 
 	cases, err := h.ListCasesService.GetAllCases()
@@ -59,13 +62,15 @@ func (h *CaseHandler) GetAllCasesHandler(c *gin.Context) {
 func (h *CaseHandler) GetCasesByUserHandler(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	userRole, _ := c.Get("userRole")
+	email, _ := c.Get("email") // Optional, if you have this set
 	actor := auditlog.Actor{
 		ID:        userID.(string),
 		Role:      userRole.(string),
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
-	}
+		Email:     email.(string), // Optional, if you have this set
 
+	}
 	paramUserID := c.Param("user_id")
 	if paramUserID == "" {
 		h.auditLogger.Log(c, auditlog.AuditLog{
@@ -120,11 +125,14 @@ func (h *CaseHandler) GetCasesByUserHandler(c *gin.Context) {
 func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	userRole, _ := c.Get("userRole")
+	email, _ := c.Get("email") // Optional, if you have this set
 	actor := auditlog.Actor{
 		ID:        userID.(string),
 		Role:      userRole.(string),
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
+		Email:     email.(string), // Optional, if you have this set
+
 	}
 
 	status := c.Query("status")
@@ -192,11 +200,14 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 func (h *CaseHandler) GetCaseByIDHandler(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	userRole, _ := c.Get("userRole")
+	email, _ := c.Get("email") // Optional, if you have this set
 	actor := auditlog.Actor{
 		ID:        userID.(string),
 		Role:      userRole.(string),
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
+		Email:     email.(string), // Optional, if you have this set
+
 	}
 
 	caseID := c.Param("case_id")

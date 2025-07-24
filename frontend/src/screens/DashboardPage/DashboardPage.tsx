@@ -115,19 +115,70 @@ const [updatedDescription, setUpdatedDescription] = useState("");
     fetchCases();
   }, [activeTab]);
 
-  useEffect(() => {
+useEffect(() => {
+  const fetchRecentActivities = async () => {
     try {
-      const stored = localStorage.getItem("caseActivities");
-      const parsed = stored ? JSON.parse(stored) : [];
-      const sorted = parsed.sort((a: any, b: any) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      const token = sessionStorage.getItem("authToken") || "";
+      const res = await fetch(`http://localhost:8080/api/v1/auditlogs/recent/${user.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const json = await res.json();
+      console.log("Fetched recent activities:", json); // Should contain { data: [...], success: true }
+
+      const activities = json.data || []; // ✅ Use the correct key
+      const sorted = activities.sort((a: any, b: any) =>
+        new Date(b.Timestamp).getTime() - new Date(a.Timestamp).getTime()
       );
-      setRecentActivities(sorted.slice(0, 10));
+
+      setRecentActivities(sorted.slice(0, 20));
     } catch (err) {
-      console.error("Error loading activities:", err);
+      console.error("Error fetching recent activities:", err);
       setRecentActivities([]);
     }
-  }, []);
+  };
+
+  fetchRecentActivities();
+}, []);
+
+// Define getIcon ABOVE the .map
+const getIcon = (action: string) => {
+  if (action.toLowerCase().includes("alert")) return AlertTriangle;
+  if (action.toLowerCase().includes("case")) return Briefcase;
+  if (action.toLowerCase().includes("evidence")) return FileText;
+  if (action.toLowerCase().includes("login")) return Pencil;
+  return FileText;
+};
+
+
+
+<ul className="space-y-4">
+  {recentActivities.map((activity, index) => {
+    const Icon = getIcon(activity.Action);
+    const timeAgo = activity.Timestamp
+      ? new Date(activity.Timestamp).toLocaleString()
+      : "unknown time";
+
+    return (
+      <li key={index}>
+        <div className="flex items-start gap-3 mb-2">
+          <Icon className="w-5 h-5 mt-1 text-foreground" />
+          <div>
+            <p className="text-foreground text-sm">
+              <strong>{activity.Actor?.email}</strong> {activity.Description}
+            </p>
+            <p className="text-muted-foreground text-xs">{timeAgo}</p>
+          </div>
+        </div>
+        {index < recentActivities.length - 1 && (
+          <hr className="w-[500px] border-t-[2px] border-[#8C8D8B]" />
+        )}
+      </li>
+    );
+  })}
+</ul>
 
     useEffect(() => {
     const fetchProfile = async () => {
@@ -345,14 +396,9 @@ const [updatedDescription, setUpdatedDescription] = useState("");
               <h2 className="font-bold text-foreground text-lg mb-4">Recent Activities</h2>
               <ul className="space-y-4">
                 {recentActivities.map((activity, index) => {
-                  const getIcon = (action: string) => {
-                    if (action.toLowerCase().includes("alert")) return AlertTriangle;
-                    if (action.toLowerCase().includes("case")) return Briefcase;
-                    return FileText;
-                  };
-                  const Icon = getIcon(activity.action);
-                  const timeAgo = activity.timestamp
-                    ? new Date(activity.timestamp).toLocaleString()
+                  const Icon = getIcon(activity.Action); // use capitalized field
+                  const timeAgo = activity.Timestamp
+                    ? new Date(activity.Timestamp).toLocaleString()
                     : "unknown time";
                   return (
                     <li key={index}>
@@ -360,17 +406,15 @@ const [updatedDescription, setUpdatedDescription] = useState("");
                         <Icon className="w-5 h-5 mt-1 text-foreground" />
                         <div>
                           <p className="text-foreground text-sm">
-                            <strong>{activity.user}</strong> {activity.action}
+                            <strong>{activity.Actor?.email}</strong> {activity.Description}
                           </p>
                           <p className="text-muted-foreground text-xs">{timeAgo}</p>
                         </div>
                       </div>
-                      {index < recentActivities.length - 1 && (
-                        <hr className="w-[500px] border-t-[2px] border-[#8C8D8B]" />
-                      )}
                     </li>
                   );
                 })}
+
               </ul>
             </div>
           </div>

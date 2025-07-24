@@ -42,32 +42,13 @@ func (h *ProfileHandler) GetProfileHandler(c *gin.Context) {
 	}
 
 	profileData, err := h.profileService.GetProfile(userID)
-	status := "SUCCESS"
 	if err != nil {
-		status = "FAILED"
-		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action:      "GET_PROFILE",
-			Actor:       auditlog.Actor{ID: userID},
-			Target:      auditlog.Target{Type: "user", ID: userID},
-			Service:     "profile",
-			Status:      status,
-			Description: "Failed to retrieve user profile",
-		})
 		c.JSON(http.StatusNotFound, structs.ErrorResponse{
 			Error:   "not_found",
 			Message: "User profile not found",
 		})
 		return
 	}
-
-	h.auditLogger.Log(c, auditlog.AuditLog{
-		Action:      "GET_PROFILE",
-		Actor:       auditlog.Actor{ID: userID},
-		Target:      auditlog.Target{Type: "user", ID: userID},
-		Service:     "profile",
-		Status:      status,
-		Description: "User profile retrieved successfully",
-	})
 
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
@@ -81,7 +62,7 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action:      "UPDATE_PROFILE",
-			Actor:       auditlog.Actor{ID: req.ID},
+			Actor:       auditlog.Actor{ID: req.ID, Email: req.Email},
 			Target:      auditlog.Target{Type: "user", ID: req.ID},
 			Service:     "profile",
 			Status:      "FAILED",
@@ -94,13 +75,13 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 		return
 	}
 
-	// ✅ Handle base64 image upload
+	//  Handle base64 image upload
 	if req.ImageBase64 != "" {
 		imageURL, err := SaveBase64Image(req.ID, req.ImageBase64)
 		if err != nil {
 			h.auditLogger.Log(c, auditlog.AuditLog{
 				Action:      "UPDATE_PROFILE",
-				Actor:       auditlog.Actor{ID: req.ID},
+				Actor:       auditlog.Actor{ID: req.ID, Email: req.Email},
 				Target:      auditlog.Target{Type: "user", ID: req.ID},
 				Service:     "profile",
 				Status:      "FAILED",
@@ -122,7 +103,7 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 		status = "FAILED"
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action:      "UPDATE_PROFILE",
-			Actor:       auditlog.Actor{ID: req.ID},
+			Actor:       auditlog.Actor{ID: req.ID, Email: req.Email},
 			Target:      auditlog.Target{Type: "user", ID: req.ID},
 			Service:     "profile",
 			Status:      status,
@@ -134,7 +115,7 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 		})
 		return
 	}
-	fmt.Println("✅ Saved ImageURL:", req.ImageURL)
+	fmt.Println(" Saved ImageURL:", req.ImageURL)
 
 	updatedProfile, err := h.profileService.GetProfile(req.ID)
 	if err != nil {
@@ -148,7 +129,7 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action:      "UPDATE_PROFILE",
-		Actor:       auditlog.Actor{ID: req.ID},
+		Actor:       auditlog.Actor{ID: req.ID, Email: req.Email},
 		Target:      auditlog.Target{Type: "user", ID: req.ID},
 		Service:     "profile",
 		Status:      status,

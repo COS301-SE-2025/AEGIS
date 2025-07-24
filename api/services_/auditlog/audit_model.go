@@ -10,6 +10,7 @@ type Actor struct {
 	Role      string `bson:"role"`
 	UserAgent string `bson:"user_agent"`
 	IPAddress string `bson:"ip_address"`
+	Email     string `bson:"email,omitempty" json:"email,omitempty"`
 }
 
 type Target struct {
@@ -28,4 +29,11 @@ type AuditLog struct {
 	Status      string // e.g., "SUCCESS"
 	Description string
 	Metadata    map[string]string // route, method, etc.
+}
+
+// Inside auditlog/user_repository.go or similar
+
+type User struct {
+	ID    string
+	Email string
 }

@@ -57,7 +57,7 @@ func TestDownloadEvidenceIntegration(t *testing.T) {
 
 	// --- Setup router with download handler ---
 	downloadService := evidence_download.NewService(repo, ipfsClient)
-	handler := handlers.NewDownloadHandler(downloadService)
+	handler := handlers.NewDownloadHandler(downloadService, nil)
 
 	router := gin.Default()
 	router.GET("/download/:id", handler.Download)

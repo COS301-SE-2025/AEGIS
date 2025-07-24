@@ -29,7 +29,7 @@ func NewChatHandler(chatService *chat.ChatService, logger *auditlog.AuditLogger)
 // ───── Groups ───────────────────────────────────────────────
 
 func (h *ChatHandler) CreateGroup(c *gin.Context) {
-	actor := extractActorFromContext(c)
+	actor := auditlog.MakeActor(c)
 
 	var group chat.ChatGroup
 	if err := c.ShouldBindJSON(&group); err != nil {
@@ -84,7 +84,7 @@ func (h *ChatHandler) CreateGroup(c *gin.Context) {
 }
 
 func (h *ChatHandler) GetGroupByID(c *gin.Context) {
-	actor := extractActorFromContext(c)
+	actor := auditlog.MakeActor(c)
 
 	groupID, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
@@ -126,7 +126,7 @@ func (h *ChatHandler) GetGroupByID(c *gin.Context) {
 }
 
 func (h *ChatHandler) GetUserGroups(c *gin.Context) {
-	actor := extractActorFromContext(c)
+	actor := auditlog.MakeActor(c)
 	email := c.Param("email")
 
 	groups, err := h.ChatService.Repo().GetUserGroups(c.Request.Context(), email)
@@ -160,7 +160,7 @@ func (h *ChatHandler) GetUserGroups(c *gin.Context) {
 }
 
 func (h *ChatHandler) UpdateGroup(c *gin.Context) {
-	actor := extractActorFromContext(c)
+	actor := auditlog.MakeActor(c)
 
 	groupID, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
@@ -217,7 +217,7 @@ func (h *ChatHandler) UpdateGroup(c *gin.Context) {
 }
 
 func (h *ChatHandler) DeleteGroup(c *gin.Context) {
-	actor := extractActorFromContext(c)
+	actor := auditlog.MakeActor(c)
 
 	groupID, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
@@ -259,7 +259,7 @@ func (h *ChatHandler) DeleteGroup(c *gin.Context) {
 }
 
 func (h *ChatHandler) AddMemberToGroup(c *gin.Context) {
-	actor := extractActorFromContext(c)
+	actor := auditlog.MakeActor(c)
 
 	groupID, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
@@ -315,7 +315,7 @@ func (h *ChatHandler) AddMemberToGroup(c *gin.Context) {
 }
 
 func (h *ChatHandler) RemoveMemberFromGroup(c *gin.Context) {
-	actor := extractActorFromContext(c)
+	actor := auditlog.MakeActor(c)
 
 	groupID, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
@@ -360,7 +360,7 @@ func (h *ChatHandler) RemoveMemberFromGroup(c *gin.Context) {
 // ───── Messages ─────────────────────────────────────────────
 
 func (h *ChatHandler) SendMessage(c *gin.Context) {
-	actor := extractActorFromContext(c)
+	actor := auditlog.MakeActor(c)
 	email, _ := c.Get("email")
 	fullNameVal, _ := c.Get("fullName")
 	fullName := fullNameVal.(string)
@@ -506,7 +506,7 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, msg)
 }
 func (h *ChatHandler) GetGroupsByCaseID(c *gin.Context) {
-	actor := extractActorFromContext(c)
+	actor := auditlog.MakeActor(c)
 
 	caseIDHex := c.Param("caseId")
 	caseID, err := primitive.ObjectIDFromHex(caseIDHex)
@@ -549,7 +549,7 @@ func (h *ChatHandler) GetGroupsByCaseID(c *gin.Context) {
 }
 
 func (h *ChatHandler) GetMessages(c *gin.Context) {
-	actor := extractActorFromContext(c)
+	actor := auditlog.MakeActor(c)
 
 	groupID, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {

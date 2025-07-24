@@ -11,12 +11,13 @@ import (
 
 // AuditLogService provides methods to retrieve logs for users.
 type AuditLogService struct {
-	db *mongo.Database
+	db       *mongo.Database
+	userRepo UserRepository
 }
 
 // NewAuditLogService creates a new instance of AuditLogService
-func NewAuditLogService(db *mongo.Database) *AuditLogService {
-	return &AuditLogService{db: db}
+func NewAuditLogService(db *mongo.Database, userRepo UserRepository) *AuditLogService {
+	return &AuditLogService{db: db, userRepo: userRepo}
 }
 
 // Compile-time check
@@ -63,6 +64,14 @@ func (s *AuditLogService) GetRecentUserActivities(ctx context.Context, userID st
 
 	// Optional: sort and deduplicate merged logs
 	logs = sortAndLimitLogs(logs, 20)
+	for i, log := range logs {
+		user, err := s.userRepo.GetByID(ctx, log.Actor.ID)
+		if err == nil && user != nil {
+			logs[i].Actor.Email = user.Email
+		} else {
+			logs[i].Actor.Email = "(unknown)"
+		}
+	}
 
 	return logs, nil
 }

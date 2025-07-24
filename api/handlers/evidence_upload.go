@@ -29,6 +29,7 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 		Role:      userRole.(string),
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
+		Email:     c.GetHeader("X-User-Email"),
 	}
 
 	form, err := c.MultipartForm()

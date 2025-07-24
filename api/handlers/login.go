@@ -150,8 +150,9 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action: "LOGIN_ATTEMPT",
 		Actor: auditlog.Actor{
-			ID:   resp.ID,
-			Role: resp.Role,
+			ID:    resp.ID,
+			Role:  resp.Role,
+			Email: resp.Email,
 		},
 		Target: auditlog.Target{
 			Type: "user",
@@ -225,8 +226,9 @@ func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action: "REQUEST_PASSWORD_RESET",
 			Actor: auditlog.Actor{
-				ID:   user.ID.String(),
-				Role: user.Role,
+				ID:    user.ID.String(),
+				Role:  user.Role,
+				Email: user.Email, // Include email for better tracking
 			},
 			Target: auditlog.Target{
 				Type: "user",
@@ -247,8 +249,9 @@ func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action: "REQUEST_PASSWORD_RESET",
 		Actor: auditlog.Actor{
-			ID:   user.ID.String(),
-			Role: user.Role,
+			ID:    user.ID.String(),
+			Role:  user.Role,
+			Email: user.Email, // Include email for better tracking
 		},
 		Target: auditlog.Target{
 			Type: "user",

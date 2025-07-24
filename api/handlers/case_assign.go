@@ -12,12 +12,14 @@ import (
 func (h *CaseHandler) AssignUserToCase(c *gin.Context) {
 	assignerRole, exists := c.Get("userRole")
 	userID, _ := c.Get("userID")
+	email, _ := c.Get("email")
 
 	actor := auditlog.Actor{
 		ID:        userID.(string),
 		Role:      "",
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
+		Email:     email.(string),
 	}
 
 	if exists {
@@ -150,11 +152,13 @@ func (h *CaseHandler) UnassignUserFromCase(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
 		return
 	}
+	Email, exists := c.Get("email")
 
 	actor := auditlog.Actor{
 		ID:        assignerID.String(),
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
+		Email:     Email.(string),
 	}
 
 	// Bind request JSON

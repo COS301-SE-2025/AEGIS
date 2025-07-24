@@ -161,12 +161,14 @@ func (h *CaseHandler) CreateCase(c *gin.Context) {
 	// Grab user details from context
 	userID, _ := c.Get("userID")
 	userRole, _ := c.Get("userRole")
+	email, _ := c.Get("email") // Optional, if you have this set
 
 	actor := auditlog.Actor{
 		ID:        userID.(string),
 		Role:      userRole.(string),
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
+		Email:     email.(string), // Optional, if you have this header set
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {

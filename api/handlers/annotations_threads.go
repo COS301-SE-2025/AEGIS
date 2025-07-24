@@ -48,10 +48,7 @@ func (h *AnnotationThreadHandler) CreateThread(c *gin.Context) {
 	thread, err := h.service.CreateThread(caseID, fileID, userID, req.Title, req.Tags, priority)
 	log := auditlog.AuditLog{
 		Action: "CREATE_THREAD",
-		Actor: auditlog.Actor{
-			ID:   req.UserID,
-			Role: "user",
-		},
+		Actor:  auditlog.MakeActor(c),
 		Target: auditlog.Target{
 			Type: "thread",
 			ID:   "", // will fill below
@@ -80,14 +77,11 @@ func (h *AnnotationThreadHandler) CreateThread(c *gin.Context) {
 }
 
 func (h *AnnotationThreadHandler) GetThreadsByFile(c *gin.Context) {
-	userID := c.GetString("userID")
+
 	fileID, err := uuid.Parse(c.Param("fileID"))
 	log := auditlog.AuditLog{
 		Action: "GET_THREADS_BY_FILE",
-		Actor: auditlog.Actor{
-			ID:   userID,
-			Role: "user",
-		},
+		Actor:  auditlog.MakeActor(c),
 		Target: auditlog.Target{
 			Type: "file",
 			ID:   c.Param("fileID"),
@@ -120,14 +114,11 @@ func (h *AnnotationThreadHandler) GetThreadsByFile(c *gin.Context) {
 }
 
 func (h *AnnotationThreadHandler) GetThreadsByCase(c *gin.Context) {
-	userID := c.GetString("userID")
+
 	caseID, err := uuid.Parse(c.Param("caseID"))
 	log := auditlog.AuditLog{
 		Action: "GET_THREADS_BY_CASE",
-		Actor: auditlog.Actor{
-			ID:   userID,
-			Role: "user",
-		},
+		Actor:  auditlog.MakeActor(c),
 		Target: auditlog.Target{
 			Type: "case",
 			ID:   c.Param("caseID"),
@@ -160,14 +151,11 @@ func (h *AnnotationThreadHandler) GetThreadsByCase(c *gin.Context) {
 }
 
 func (h *AnnotationThreadHandler) GetThreadByID(c *gin.Context) {
-	userID := c.GetString("userID")
+
 	threadID, err := uuid.Parse(c.Param("threadID"))
 	log := auditlog.AuditLog{
 		Action: "GET_THREAD_BY_ID",
-		Actor: auditlog.Actor{
-			ID:   userID,
-			Role: "user",
-		},
+		Actor:  auditlog.MakeActor(c),
 		Target: auditlog.Target{
 			Type: "thread",
 			ID:   c.Param("threadID"),
@@ -216,10 +204,7 @@ func (h *AnnotationThreadHandler) UpdateThreadStatus(c *gin.Context) {
 	err := h.service.UpdateThreadStatus(threadID, annotationthreads.ThreadStatus(req.Status), userID)
 	log := auditlog.AuditLog{
 		Action: "UPDATE_THREAD_STATUS",
-		Actor: auditlog.Actor{
-			ID:   req.UserID,
-			Role: "user",
-		},
+		Actor:  auditlog.MakeActor(c),
 		Target: auditlog.Target{
 			Type: "thread",
 			ID:   threadID.String(),
@@ -259,10 +244,7 @@ func (h *AnnotationThreadHandler) UpdateThreadPriority(c *gin.Context) {
 	err := h.service.UpdateThreadPriority(threadID, annotationthreads.ThreadPriority(req.Priority), userID)
 	log := auditlog.AuditLog{
 		Action: "UPDATE_THREAD_PRIORITY",
-		Actor: auditlog.Actor{
-			ID:   req.UserID,
-			Role: "user",
-		},
+		Actor:  auditlog.MakeActor(c),
 		Target: auditlog.Target{
 			Type: "thread",
 			ID:   threadID.String(),
@@ -301,10 +283,7 @@ func (h *AnnotationThreadHandler) AddParticipant(c *gin.Context) {
 	err := h.service.AddParticipant(threadID, userID)
 	log := auditlog.AuditLog{
 		Action: "ADD_THREAD_PARTICIPANT",
-		Actor: auditlog.Actor{
-			ID:   req.UserID,
-			Role: "user",
-		},
+		Actor:  auditlog.MakeActor(c),
 		Target: auditlog.Target{
 			Type: "thread",
 			ID:   threadID.String(),
@@ -328,14 +307,11 @@ func (h *AnnotationThreadHandler) AddParticipant(c *gin.Context) {
 }
 
 func (h *AnnotationThreadHandler) GetThreadParticipants(c *gin.Context) {
-	userID := c.GetString("userID")
+
 	threadID, err := uuid.Parse(c.Param("threadID"))
 	log := auditlog.AuditLog{
 		Action: "GET_THREAD_PARTICIPANTS",
-		Actor: auditlog.Actor{
-			ID:   userID,
-			Role: "user",
-		},
+		Actor:  auditlog.MakeActor(c),
 		Target: auditlog.Target{
 			Type: "thread",
 			ID:   c.Param("threadID"),

@@ -16,3 +16,7 @@ type ZapLoggerInterface interface {
 type AuditLogReader interface {
 	GetRecentUserActivities(ctx context.Context, userID string) ([]AuditLog, error)
 }
+
+type UserRepository interface {
+	GetByID(ctx context.Context, id string) (*User, error)
+}

@@ -44,6 +44,7 @@ func (m *MockCaseQueryRepository) GetCaseByID(caseID string) (*case_creation.Cas
 // UNIT TESTS
 // ─────────────────────────────────────────────────────────────
 
+// TestGetFilteredCases_ByStatus tests filtering cases by status.
 func TestGetFilteredCases_ByStatus(t *testing.T) {
 	mockRepo := new(MockCaseQueryRepository)
 	service := ListCases.NewListCasesService(mockRepo)
@@ -66,6 +67,7 @@ func TestGetFilteredCases_ByStatus(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
+// TestGetFilteredCases_ByCreatedBy tests filtering cases by the user who created them.
 func TestGetFilteredCases_ByPriority(t *testing.T) {
 	mockRepo := new(MockCaseQueryRepository)
 	service := ListCases.NewListCasesService(mockRepo)
