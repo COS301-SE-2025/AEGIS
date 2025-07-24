@@ -319,9 +319,10 @@ const getIcon = (action: string) => {
                   placeholder="Search cases, evidence, users"
                 />
               </div>
+              <Link to="/notifications">
               <button className="p-2 text-muted-foreground hover:text-white transition-colors">
                 <Bell className="w-6 h-6" />
-              </button>
+              </button></Link>
               <Link to="/settings">
                 <button className="p-2 text-muted-foreground hover:text-white transition-colors">
                   <Settings className="w-6 h-6" />

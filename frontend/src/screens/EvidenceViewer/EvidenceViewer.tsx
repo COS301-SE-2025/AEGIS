@@ -26,9 +26,10 @@ import {
   Reply,
   ThumbsUp
 } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, } from "react-router-dom";
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
-import { string } from "prop-types";
+//import { string } from "prop-types";
+import { useParams } from "react-router-dom";
 
 // Import Select components from your UI library
 import {
@@ -330,7 +331,7 @@ useEffect(() => {
   setNewMessage('');
 };
 
-  const [profile] = useState({
+  const [profile, setProfile] = useState({
     name: user?.name || "User",
     email: user?.email || "user@aegis.com",
     role: user?.role || "Admin",
@@ -573,7 +574,9 @@ function timeAgo(dateString: string): string {
                   placeholder="Search cases, evidence, users"
                 />
               </div>
+              <Link to="/notifications">
               <Bell className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
+              </Link>
               <Link to="/settings"><Settings className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" /></Link>
               <Link to="/profile">
                 {user?.image_url ? (

@@ -434,9 +434,10 @@ useEffect(() => {
                   placeholder="Search cases, evidence, users"
                 />
               </div>
+              <Link to="/notifications">
               <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
                 <Bell className="w-6 h-6" />
-              </button>
+              </button></Link>
               <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
                <Link to="/settings" > <Settings className="w-6 h-6" /></Link>
               </button>

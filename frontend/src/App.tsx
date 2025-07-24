@@ -18,6 +18,7 @@ import {FAQ} from "./screens/FAQ"
 import {About} from "./screens/About"
 import { TutorialsPage } from "./screens/TutorialsPage";  
 import NextStepsPage from "./screens/NextStepsPage/NextStepsPage";
+import { NotificationsPage } from "./screens/NotificationsPage";
 //FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
 import { UploadEvidenceForm } from "./screens/UploadEvidencePage/UploadEvidencePage";
@@ -62,6 +63,7 @@ export default function App() {
       <Route path="/faq" element={<FAQ />} />
       <Route path="/about" element={<About />} />
       <Route path="/tutorials" element={<TutorialsPage />} />
+      <Route path="/notifications" element={<NotificationsPage />} />
 
     </Routes>
     </ThemeProvider>

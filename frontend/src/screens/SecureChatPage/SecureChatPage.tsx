@@ -96,13 +96,25 @@ export const SecureChatPage = (): JSX.Element => {
   const [activeCases, setActiveCases] = useState<Case[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState("");
 
-  const handleSelectGroup = (group: any) => {
+const handleSelectGroup = (group: any) => {
+  const id = group.id || group._id;
+  if (!id) {
+    console.warn("Invalid group object: missing id");
+    return;
+  }
+
   setActiveChat({
     ...group,
-    caseId: group.caseId || group.case_id || null,
-    id: group.id || group._id || null
+    caseId: group.caseId || group.case_id || "",
+    id, // ✅ now always a number
   });
+  localStorage.setItem("activeChat", JSON.stringify({
+    ...group,
+    caseId: group.caseId || group.case_id || "",
+    id,
+  }));
 };
+
 
   useEffect(() => {
     const fetchActiveCases = async () => {
@@ -536,28 +548,21 @@ const handleSendMessage = async (e?: React.MouseEvent | React.KeyboardEvent) => 
   if (!files || files.length === 0) return;
 
   const file = files[0];
-  
-  // Convert file to base64 for persistent storage
-  const fileData = await new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target?.result as string);
-    reader.readAsDataURL(file);
-  });
-  
+
   const url = URL.createObjectURL(file);
-  
   setPreviewFile(file);
   setPreviewUrl(url);
   setShowAttachmentPreview(true);
   setAttachmentMessage("");
 
-  // Store the base64 data for later use
-  setPreviewFileData(fileData);
+  // Store base64 
+  const fileData = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.readAsDataURL(file);
+  });
 
-  // Reset file input
-  if (fileInputRef.current) {
-    fileInputRef.current.value = '';
-  }
+  setPreviewFileData(fileData);
 };
   const meaningfulGroups = groups.filter(g => g.hasStarted);
 if (meaningfulGroups.length > 0) {
@@ -989,6 +994,12 @@ if (!activeChat?.id) {
 }
 }, [activeChat, showAddMembersModal]);
 
+useEffect(() => {
+  if (!previewFile) {
+    setPreviewUrl(""); // ensure consistency
+  }
+}, [previewFile]);
+
 
 const updateGroup = async () => {
   if (!activeChat) {
@@ -1075,6 +1086,18 @@ useEffect(() => {
 
   fetchCollaborators();
 }, [activeChat, token]);
+
+useEffect(() => {
+  const storedChat = localStorage.getItem("activeChat");
+  if (storedChat) {
+    const parsed = JSON.parse(storedChat);
+    // Ensure it matches current group IDs
+    const match = groups.find(g => g.id === parsed.id);
+    if (match) {
+      setActiveChat(parsed);
+    }
+  }
+}, [groups]);
 
 const handleOpenAddMembersModal = async () => {
   if (!activeChat?.caseId) {
