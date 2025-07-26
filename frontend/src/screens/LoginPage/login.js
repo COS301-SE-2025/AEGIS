@@ -33,47 +33,60 @@ const useLoginForm = () => {
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!validate()) return;
 
-    try {
-      const res = await fetch("http://localhost:8080/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      const payload = await res.json();
+  try {
+    const res = await fetch("http://localhost:8080/api/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
+    const payload = await res.json();
 
-      if (res.ok && payload.success && payload.data?.token) {
-        // Store the real token
-        sessionStorage.setItem("authToken", payload.data.token);
-        sessionStorage.setItem(
-          "user",
-          JSON.stringify({ email: payload.data.email, id: payload.data.id })
-        );
-        // 1. Create audit entry
-        const loginAuditEntry = {
-          timestamp: new Date().toISOString(),
-          user: payload.data.email,
-          action: "User logged in",
-          userId: payload.data.id,
-        };
+    if (res.ok && payload.success && payload.data?.token) {
+      const userData = {
+        email: payload.data.email,
+        id: payload.data.id,
+        role: payload.data.role, // Make sure your backend includes this!
+      };
 
-        // 2. Store in localStorage under "audit-log"
-        const previousLogs = JSON.parse(localStorage.getItem("caseActivities") || "[]");
-        const updatedLogs = [loginAuditEntry, ...previousLogs];
-        localStorage.setItem("caseActivities", JSON.stringify(updatedLogs));
+      // Store token & user info
+      sessionStorage.setItem("authToken", payload.data.token);
+      sessionStorage.setItem("user", JSON.stringify(userData));
 
-        navigate("/dashboard");
-      } else {
-        // Use general so your UI reads errors.general
-        setErrors({ general: payload.message || "Login failed" });
+      // Audit logging
+      const loginAuditEntry = {
+        timestamp: new Date().toISOString(),
+        user: userData.email,
+        action: "User logged in",
+        userId: userData.id,
+      };
+      const previousLogs = JSON.parse(localStorage.getItem("caseActivities") || "[]");
+      localStorage.setItem("caseActivities", JSON.stringify([loginAuditEntry, ...previousLogs]));
+
+      // Role-based redirect
+      switch (userData.role) {
+        case "System Admin":
+          navigate("/system-admin-dashboard");
+          break;
+        case "Tenant Admin":
+          navigate("/tenant-admin-dashboard");
+          break;
+        case "DFIR Admin":
+        default:
+          navigate("/dashboard");
+          break;
       }
-    } catch (err) {
-      setErrors({ general: err.message || "Network error" });
+    } else {
+      setErrors({ general: payload.message || "Login failed" });
     }
-  };
+  } catch (err) {
+    setErrors({ general: err.message || "Network error" });
+  }
+};
+
 
   return { formData, handleChange, handleSubmit, errors };
 };

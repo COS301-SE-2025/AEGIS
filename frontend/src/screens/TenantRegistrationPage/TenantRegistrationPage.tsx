@@ -12,7 +12,7 @@ import { Link } from "react-router-dom";
 // @ts-ignore
 import useRegistrationForm from "./register";
 
-export const RegistrationPage = (): JSX.Element => {
+export const TenantRegistrationPage = (): JSX.Element => {
   const { formData, errors, handleChange, handleSubmit } = useRegistrationForm();
 
   return (
@@ -26,19 +26,49 @@ export const RegistrationPage = (): JSX.Element => {
               className="w-16 h-16 mx-auto mb-4"
             />
             <CardTitle className="text-2xl font-semibold drop-shadow-sm">
-              Create your AEGIS account
+              Create an Organization Account
             </CardTitle>
             <p className="text-muted-foreground text-sm">
-              Enter your details to get started
+              Enter organization details to get started
             </p>
           </CardHeader>
 
           <CardContent className="px-6 py-8">
             <form onSubmit={handleSubmit} className="space-y-6">
+              
+              {/* Organization */}
+              <div>
+                <Label htmlFor="organization_name" className="text-sm font-medium">
+                  Organization Name
+                </Label>
+                <Input
+                  id="organization_name"
+                  placeholder="Company Name"
+                  value={formData.organization_name}
+                  onChange={handleChange}
+                  className="h-11 bg-white/10 border border-white/20 placeholder-white/70 text-white"
+                />
+                {errors.organization_name && <p className="text-red-300 text-xs mt-1">{errors.organizationName}</p>}
+              </div>
+              
+              {/* Domain */}
+              <div>
+                <Label htmlFor="domain_name" className="text-sm font-medium">
+                  Domain
+                </Label>
+                <Input
+                  id="domain_name"
+                  placeholder="example.aegis.com"
+                  value={formData.domain_name}
+                  onChange={handleChange}
+                  className="h-11 bg-white/10 border border-white/20 placeholder-white/70 text-white"
+                />
+                {errors.domain_name && <p className="text-red-300 text-xs mt-1">{errors.domainName}</p>}
+              </div>
               {/* Name */}
               <div>
                 <Label htmlFor="full_name" className="text-sm font-medium">
-                  Full Name
+                  Full Name (Organization Admin)
                 </Label>
                 <Input
                   id="full_name"
@@ -49,7 +79,6 @@ export const RegistrationPage = (): JSX.Element => {
                 />
                 {errors.full_name && <p className="text-red-300 text-xs mt-1">{errors.fullName}</p>}
               </div>
-
               {/* Email */}
               <div>
                 <Label htmlFor="email" className="text-sm font-medium">
@@ -79,6 +108,7 @@ export const RegistrationPage = (): JSX.Element => {
                   onChange={handleChange}
                   className="h-11 bg-white/10 border border-white/20 placeholder-white/70 text-white"
                 />
+
                 {errors.password && <p className="text-red-300 text-xs mt-1">{errors.password}</p>}
               </div>
 
@@ -95,39 +125,8 @@ export const RegistrationPage = (): JSX.Element => {
                 >
                   <option value="" disabled hidden>Select your role</option>
                   {[
-                    "Audit Reviewer",
-                    "Cloud Forensics Specialist",
-                    "Compliance Officer",
-                    "Detection Engineer",
-                    "DFIR Manager",
-                    "Digital Evidence Technician",
-                    "Disk Forensics Analyst",
-                    "Endpoint Forensics Analyst",
-                    "Evidence Archivist",
-                    "Forensic Analyst",
-                    "Forensics Analyst",
-                    "Generic user",
-                    "Image Forensics Analyst",
-                    "Incident Commander",
-                    "Incident Responder",
-                    "IT Infrastructure Liaison",
-                    "Legal Counsel",
-                    "Legal/Compliance Liaison",
-                    "Log Analyst",
-                    "Malware Analyst",
-                    "Memory Forensics Analyst",
-                    "Mobile Device Analyst",
-                    "Network Evidence Analyst",
-                    "Packet Analyst",
-                    "Policy Analyst",
-                    "Reverse Engineer",
-                    "SIEM Analyst",
-                    "SOC Analyst",
-                    "Threat Hunter",
-                    "Threat Intelligence Analyst",
-                    "Triage Analyst",
-                    "Training Coordinator",
-                    "Vulnerability Analyst"
+                    "Tenant Admin",
+                    
                   ].map((role) => (
                     <option key={role} value={role} className="text-black">
                       {role}
@@ -140,33 +139,7 @@ export const RegistrationPage = (): JSX.Element => {
               {errors.general && (
                 <p className="text-center text-red-400 text-sm">{errors.general}</p>
               )}
-              {/* Team */}
-              <div>
-                <Label htmlFor="team" className="text-sm font-medium">
-                  Team
-                </Label>
-                <select
-                  id="team"
-                  value={formData.team}
-                  onChange={handleChange}
-                  className="h-11 bg-white/10 border border-white/20 text-white placeholder-white/70 w-full rounded-lg px-4 focus:outline-none"
-                >
-                  <option value="" disabled hidden>Select your Team</option>
-                  {[
-                    
-                  ].map((team) => (
-                    <option key={team} value={team} className="text-black">
-                      {team}
-                    </option>
-                  ))}
-                </select>
-                {errors.team && <p className="text-red-300 text-xs mt-1">{errors.team}</p>}
-              </div>
-
-              {errors.general && (
-                <p className="text-center text-red-400 text-sm">{errors.general}</p>
-              )}
-
+              
               {/* Submit */}
               <Button
                 type="submit"

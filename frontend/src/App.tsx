@@ -19,6 +19,12 @@ import {About} from "./screens/About"
 import { TutorialsPage } from "./screens/TutorialsPage";  
 import NextStepsPage from "./screens/NextStepsPage/NextStepsPage";
 import { NotificationsPage } from "./screens/NotificationsPage";
+import {TenantsPage} from "./screens/TenantsPage";
+import { TenantRegistrationPage } from "./screens/TenantRegistrationPage/TenantRegistrationPage";
+import { TeamRegistrationPage } from "./screens/TeamRegistrationPage";
+import { SystemAdminDashboard } from "./screens/SystemAdminDashboard";
+import { TenantAdminDashboard } from "./screens/TenantAdminDashboard";
+import { TeamsPage } from "./screens/TeamsPage";
 //FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
 import { UploadEvidenceForm } from "./screens/UploadEvidencePage/UploadEvidencePage";
@@ -64,7 +70,14 @@ export default function App() {
       <Route path="/about" element={<About />} />
       <Route path="/tutorials" element={<TutorialsPage />} />
       <Route path="/notifications" element={<NotificationsPage />} />
-
+      <Route path="/tenants" element={<TenantsPage />} />
+      <Route path="/tenant-registration" element={<TenantRegistrationPage />} />
+      <Route path="/team-registration" element={<TeamRegistrationPage />} />
+      <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
+      <Route path="/tenant-admin-dashboard" element={<TenantAdminDashboard />} />
+      <Route path="/teams" element={<TeamsPage />} />
+      
+      {/* Fallback route */}
     </Routes>
     </ThemeProvider>
     </SidebarProvider>

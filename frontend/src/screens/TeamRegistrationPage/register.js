@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 const useRegistrationForm = () => {
   const [formData, setFormData] = useState({
     full_name: "",
+    team_name: "",
     email: "",
     password: "",
     role: "",
@@ -15,10 +16,12 @@ const useRegistrationForm = () => {
   const validate = () => {
     const newErrors = {};
 
+    if (!formData.team_name.trim()) {
+      newErrors.team_name = "Team name is required";
+    }
     if (!formData.full_name.trim()) {
       newErrors.full_name = "Full name is required";
     }
-
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {

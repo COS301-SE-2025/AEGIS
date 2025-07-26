@@ -1,0 +1,1 @@
+export {TenantAdminDashboard} from "./TenantAdminDashboard";

@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 const useRegistrationForm = () => {
   const [formData, setFormData] = useState({
     full_name: "",
+    organization_name: "",
+    domain_name: "",
     email: "",
     password: "",
     role: "",
@@ -18,7 +20,12 @@ const useRegistrationForm = () => {
     if (!formData.full_name.trim()) {
       newErrors.full_name = "Full name is required";
     }
-
+    if (!formData.organization_name.trim()) {
+      newErrors.organization_name = "Organization name is required";
+    }
+    if (!formData.domain_name.trim()) {
+      newErrors.domain_name = "Domain name is required";
+    }
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -53,6 +60,7 @@ const handleChange = (e) => {
 
   setFormData(newFormData);
 };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
