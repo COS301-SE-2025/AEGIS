@@ -30,6 +30,9 @@ import { Link, } from "react-router-dom";
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 //import { string } from "prop-types";
 import { useParams } from "react-router-dom";
+import { fetchEvidenceByCaseId } from "./api";
+
+
 
 // Import Select components from your UI library
 import {
@@ -41,22 +44,44 @@ import {
 } from "../../components/ui/select";
 
 // Define file structure
+// interface FileItem {
+//   caseId: any;
+//   id: string;
+//   name: string;
+//   type: 'executable' | 'log' | 'image' | 'document' | 'memory_dump' | 'network_capture';
+//   size?: string;
+//   hash?: string;
+//   created?: string;
+//   description?: string;
+//   status: 'verified' | 'pending' | 'failed';
+//   chainOfCustody: string[];
+//   acquisitionDate: string;
+//   acquisitionTool: string;
+//   integrityCheck: 'passed' | 'failed' | 'pending';
+//   threadCount: number;
+//   priority: 'high' | 'medium' | 'low';
+// }
+
+
 interface FileItem {
-  caseId: any;
-  id: string;
-  name: string;
-  type: 'executable' | 'log' | 'image' | 'document' | 'memory_dump' | 'network_capture';
-  size?: string;
-  hash?: string;
-  created?: string;
-  description?: string;
-  status: 'verified' | 'pending' | 'failed';
-  chainOfCustody: string[];
-  acquisitionDate: string;
-  acquisitionTool: string;
-  integrityCheck: 'passed' | 'failed' | 'pending';
-  threadCount: number;
-  priority: 'high' | 'medium' | 'low';
+  id: string; // Corresponds to Go's `ID` (uuid.UUID)
+  caseId: string; // Corresponds to Go's `CaseID` (uuid.UUID)
+  uploaded_by: string; // Corresponds to Go's `UploadedBy` (uuid.UUID)
+  filename: string; // Corresponds to Go's `Filename`
+  file_type: string; // Corresponds to Go's `FileType`
+  ipfs_cid: string; // Corresponds to Go's `IpfsCID`
+  file_size: number; // Corresponds to Go's `FileSize` (int64)
+  checksum: string; // Corresponds to Go's `Checksum`
+  metadata: string; // Corresponds to Go's `Metadata` (JSON string)
+  uploaded_at: string; // Corresponds to Go's `UploadedAt` (time.Time)
+  description?: string; // These would likely be parsed from 'metadata' JSON
+  status?: 'verified' | 'pending' | 'failed' | string; // Parsed from 'metadata'
+  chainOfCustody?: string[]; // Parsed from 'metadata'
+  acquisitionDate?: string; // Parsed from 'metadata'
+  acquisitionTool?: string; // Parsed from 'metadata'
+  integrityCheck?: 'passed' | 'failed' | 'pending' | string; // Parsed from 'metadata'
+  threadCount?: number; // Parsed from 'metadata'
+  priority?: 'high' | 'medium' | 'low' | string; // Parsed from 'metadata'
 }
 
 interface AnnotationThread {
@@ -147,6 +172,8 @@ export const EvidenceViewer  =() =>{
   //   }
   // ];
 
+  
+
   const initialAnnotationThreads: AnnotationThread[] = [
     
     {
@@ -194,12 +221,41 @@ export const EvidenceViewer  =() =>{
     
 const { caseId } = useParams();
 
-  const [allFiles] = useState<FileItem[]>(() => {
-    const stored = localStorage.getItem("evidenceFiles");
-    return stored ? JSON.parse(stored) : [];
-  });
+  // const [allFiles] = useState<FileItem[]>(() => {
+  //   const stored = localStorage.getItem("evidenceFiles");
+  //   return stored ? JSON.parse(stored) : [];
+  // });
 
-  const files = allFiles.filter(file => String(file.caseId) === String(caseId));
+  // const files = allFiles.filter(file => String(file.caseId) === String(caseId));
+
+
+  const [files, setFiles] = useState<FileItem[]>([]);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+
+useEffect(() => {
+  async function loadEvidence() {
+      if (!caseId) {
+      setLoading(false); // Stop loading if caseId is not available
+      setError("Case ID is not available.");
+      return; // Exit the function early if caseId is undefined
+    }
+    try {
+      const data = await fetchEvidenceByCaseId(caseId);
+      console.log("fetched evidence:",data)
+      setFiles(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to load evidence");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  loadEvidence();
+}, [caseId]);
+
+
+
 
 //   const uniqueTypes = Array.from(
 //   new Set(files.map(file => file.type).filter(Boolean))
@@ -268,46 +324,8 @@ useEffect(() => {
   localStorage.setItem('allThreadMessages', JSON.stringify(allThreadMessages));
 }, [allThreadMessages]);
 
-useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = sessionStorage.getItem("authToken");
-        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
 
-        if (!res.ok) throw new Error("Failed to load profile");
 
-        const result = await res.json();
-
-        // Update both the state and sessionStorage
-        setProfile({
-          name: result.data.name,
-          email: result.data.email,
-          role: result.data.role,
-          image: result.data.image_url,
-        });
-
-        // Update sessionStorage
-        sessionStorage.setItem(
-          "user",
-          JSON.stringify({
-            ...user,
-            name: result.data.name,
-            email: result.data.email,
-            image_url: result.data.image_url,
-          })
-        );
-      } catch (err) {
-        console.error("Error fetching profile:", err);
-      }
-    };
-
-    if (user?.id) fetchProfile();
-  }, [user?.id]);
-  
   const handleSendMessage = () => {
   if (!newMessage.trim() || !selectedThread) return;
 
@@ -378,13 +396,13 @@ useEffect(() => {
   let filteredFiles = [...files];
 
   if (typeFilter) {
-    filteredFiles = filteredFiles.filter(file => file.type === typeFilter);
+    filteredFiles = filteredFiles.filter(file => file.file_type === typeFilter);
   }
 
   if (timeFilter === 'recent') {
-    filteredFiles.sort((a, b) => new Date(b.created || '').getTime() - new Date(a.created || '').getTime());
+    filteredFiles.sort((a, b) => new Date(b.uploaded_at || '').getTime() - new Date(a.uploaded_at || '').getTime());
   } else if (timeFilter === 'oldest') {
-    filteredFiles.sort((a, b) => new Date(a.created || '').getTime() - new Date(b.created || '').getTime());
+    filteredFiles.sort((a, b) => new Date(a.uploaded_at || '').getTime() - new Date(b.uploaded_at || '').getTime());
   }
 
   function addNestedReply(messages: ThreadMessage[], parentId: string, reply: ThreadMessage): ThreadMessage[] {
@@ -465,6 +483,9 @@ function timeAgo(dateString: string): string {
 
   return "just now";
 }
+
+if (loading) return <div className="p-4">Loading evidence files...</div>;
+if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
 
 
 
@@ -672,18 +693,18 @@ function timeAgo(dateString: string): string {
                   <div className="flex items-start gap-3">
                     <File className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="flex-1 text-left">
-                      <div className="font-medium text-sm truncate mb-1">{file.name}</div>
+                      <div className="font-medium text-sm truncate mb-1">{file.filename}</div>
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`inline-flex items-center gap-1 text-xs ${getStatusColor(file.status)}`}>
-                          {getStatusIcon(file.status)}
-                          {file.status}
+                        <span className={`inline-flex items-center gap-1 text-xs ${getStatusColor(file.status || "pending")}`}>
+                          {getStatusIcon(file.status || "pending")}
+                          {file.status || "pending"}
                         </span>
-                        <span className={`px-2 py-0.5 rounded text-xs ${getPriorityColor(file.priority)}`}>
-                          {file.priority}
+                        <span className={`px-2 py-0.5 rounded text-xs ${getPriorityColor(file.priority || "low")}`}>
+                          {file.priority || "low"}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{file.size}</span>
+                        <span>{file.file_size}</span>
                         <div className="flex items-center gap-1">
                           <MessageCircle className="w-3 h-3" />
                           <span>{file.threadCount}</span>
@@ -704,10 +725,10 @@ function timeAgo(dateString: string): string {
                 <div className="border-b border-border p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <h1 className="text-2xl font-semibold">{selectedFile.name}</h1>
-                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-sm ${getStatusColor(selectedFile.status)}`}>
-                        {getStatusIcon(selectedFile.status)}
-                        {selectedFile.status}
+                      <h1 className="text-2xl font-semibold">{selectedFile.filename}</h1>
+                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-sm ${getStatusColor(selectedFile.status || "pending")}`}>
+                        {getStatusIcon(selectedFile.status || "pending")}
+                        {selectedFile.status || "pending"}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -779,17 +800,17 @@ function timeAgo(dateString: string): string {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-muted-foreground">Size:</span>
-                              <p className="text-muted-foreground">{selectedFile.size}</p>
+                              <p className="text-muted-foreground">{selectedFile.file_size}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Type:</span>
-                              <p className="text-muted-foreground capitalize">{selectedFile.type.replace('_', ' ')}</p>
+                              <p className="text-muted-foreground capitalize">{selectedFile.file_type.replace('_', ' ')}</p>
                             </div>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Integrity Check:</span>
-                            <div className={`inline-flex items-center gap-1 ml-2 ${getStatusColor(selectedFile.integrityCheck)}`}>
-                              {getStatusIcon(selectedFile.integrityCheck)}
+                            <div className={`inline-flex items-center gap-1 ml-2 ${getStatusColor(selectedFile.integrityCheck || "pending")}`}>
+                              {getStatusIcon(selectedFile.integrityCheck  || "pending")}
                               <span className="capitalize">{selectedFile.integrityCheck}</span>
                             </div>
                           </div>
@@ -828,7 +849,7 @@ function timeAgo(dateString: string): string {
                         <div className="space-y-3 text-sm">
                           <div>
                             <span className="text-muted-foreground">Acquisition Date:</span>
-                            <p className="text-muted-foreground">{new Date(selectedFile.acquisitionDate).toLocaleString()}</p>
+                            <p className="text-muted-foreground">{new Date(selectedFile.uploaded_at).toLocaleString()}</p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Tool Used:</span>
@@ -985,11 +1006,11 @@ function timeAgo(dateString: string): string {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-muted-foreground">File Name:</span>
-                              <p className="text-muted-foreground font-mono">{selectedFile.name}</p>
+                              <p className="text-muted-foreground font-mono">{selectedFile.filename}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">File Size:</span>
-                              <p className="text-muted-foreground">{selectedFile.size}</p>
+                              <p className="text-muted-foreground">{selectedFile.file_size}</p>
                             </div>
                           </div>
                           
@@ -1014,7 +1035,7 @@ function timeAgo(dateString: string): string {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-muted-foreground">Created:</span>
-                              <p className="text-muted-foreground">{new Date(selectedFile.created || '').toLocaleString()}</p>
+                              <p className="text-muted-foreground">{new Date(selectedFile.uploaded_at || '').toLocaleString()}</p> /* created */
                             </div>
                             <div>
                               <span className="text-muted-foreground">Modified:</span>
