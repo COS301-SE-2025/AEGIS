@@ -69,7 +69,7 @@ func createTestUser(t *testing.T, db *gorm.DB) uuid.UUID {
 func createTestCase(t *testing.T, db *gorm.DB, createdBy uuid.UUID) uuid.UUID {
 	caseID := uuid.New()
 	sql := `
-		INSERT INTO cases (id, title, description, teamname, created_by)
+		INSERT INTO cases (id, title, description, team_name, created_by)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (id) DO NOTHING
 	`
