@@ -18,6 +18,8 @@ import { useState, useEffect } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
 import { SidebarToggleButton } from "../../context/SidebarToggleContext";
+import axios from "axios";
+
 
 interface CaseCard {
   id: string;
@@ -35,29 +37,9 @@ interface CaseCard {
 }
 
 
-const metricCards = [
-  {
-    value: "45",
-    label: "Cases ongoing",
-    increase: "8%",
-    color: "text-[#636ae8]",
-    icon: <Briefcase className="w-[75px] h-[52px] text-[#636ae8] flex-shrink-0" />,
-  },
-  {
-    value: "120",
-    label: "Cases Closed",
-    increase: "15%",
-    color: "text-green-500",
-    icon: <CheckCircle className="w-[75px] h-[52px] text-green-500 flex-shrink-0" />,
-  },
-  {
-    value: "875",
-    label: "Evidence Collected",
-    increase: "12%",
-    color: "text-sky-500",
-    icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
-  },
-];
+
+
+
 
 export const DashBoardPage = () => {
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
@@ -81,6 +63,11 @@ const [updatedStage, setUpdatedStage] = useState("");
 const [] = useState<File | null>(null);
 const [updatedTitle, setUpdatedTitle] = useState("");
 const [updatedDescription, setUpdatedDescription] = useState("");
+
+const [openCases, setOpenCases] = useState([]);
+const [closedCases, setClosedCases] = useState([]);
+const [evidenceCount, setEvidenceCount] = useState(0);
+
 
 
   useEffect(() => {
@@ -142,6 +129,64 @@ useEffect(() => {
 
   fetchRecentActivities();
 }, []);
+
+
+useEffect(() => {
+  const fetchCasesCount = async () => {
+    const token = sessionStorage.getItem("authToken") || "";
+
+    try {
+      const [openRes, closedRes] = await Promise.all([
+        fetch("http://localhost:8080/api/v1/cases/filter?status=open", {
+          headers: { "Authorization": `Bearer ${token}` }
+        }),
+        fetch("http://localhost:8080/api/v1/cases/filter?status=closed", {
+          headers: { "Authorization": `Bearer ${token}` }
+        }),
+      ]);
+
+      const openData = await openRes.json();
+      const closedData = await closedRes.json();
+
+      setOpenCases(openData.cases || []);
+      setClosedCases(closedData.cases || []);
+
+      
+      const totalEvidence = [...(openData.cases || []), ...(closedData.cases || [])]
+        .reduce((acc, curr) => acc + (curr.evidence?.length || 0), 0);
+
+      setEvidenceCount(totalEvidence);
+
+    } catch (error) {
+      console.error("Failed to fetch cases:", error);
+    }
+  };
+
+  fetchCasesCount();
+}, []);
+
+const metricCards = [
+  {
+    value: openCases.length.toString(),
+    label: "Cases ongoing",
+    color: "text-[#636ae8]",
+    icon: <Briefcase className="w-[75px] h-[52px] text-[#636ae8] flex-shrink-0" />,
+  },
+  {
+    value: closedCases.length.toString(),
+    label: "Cases Closed",
+    color: "text-green-500",
+    icon: <CheckCircle className="w-[75px] h-[52px] text-green-500 flex-shrink-0" />,
+  },
+  {
+    value: evidenceCount.toString(),
+    label: "Evidence Collected",
+    color: "text-sky-500",
+    icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
+  },
+];
+
+
 
 // Define getIcon ABOVE the .map
 const getIcon = (action: string) => {
@@ -364,7 +409,6 @@ const getIcon = (action: string) => {
                 <div>
                   <p className={`text-3xl font-bold ${card.color}`}>{card.value}</p>
                   <p className="text-foreground text-sm">{card.label}</p>
-                  <p className="text-foreground text-xs mt-1">↑ {card.increase} from last week</p>
                 </div>
                 {card.icon}
               </div>
@@ -577,7 +621,7 @@ const getIcon = (action: string) => {
                       value={card.progress}
                       className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
                     />
-                    <Link to={`/evidence-viewer/${card.id}`}>
+                    <Link  to={`/evidence-viewer/${card.id}`}>
                       <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
                         View Evidence Details
                       </button>

@@ -53,14 +53,14 @@ func TestGetDashboardTotals(t *testing.T) {
 
 	// Insert one valid case (status = open)
 	err = tx.Exec(`
-		INSERT INTO cases (id, title, teamname, created_by,status)
+		INSERT INTO cases (id, title, team_name, created_by,status)
 		VALUES (?, 'Included Case', 'TeamX', ?, 'open')
 	`, caseID, userID).Error
 	assert.NoError(t, err)
 
 	// Insert one excluded case (status = archived)
 	err = tx.Exec(`
-		INSERT INTO cases (id, title, teamname, created_by,status)
+		INSERT INTO cases (id, title, team_name, created_by,status)
 		VALUES (?, 'Excluded Case', 'TeamX', ?, 'archived')
 	`, uuid.New(), userID).Error
 	assert.NoError(t, err)
