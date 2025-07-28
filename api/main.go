@@ -32,9 +32,14 @@ import (
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/user/profile"
 
-	"github.com/gin-gonic/gin"
+	//"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/mongo"
 )
+
+func InitCollections(db *mongo.Database) {
+	chat.MessageCollection = db.Collection("chat_messages")
+}
 
 func main() {
 	// ─── Load Environment Variables ──────────────────────────────
@@ -60,7 +65,7 @@ func main() {
 		log.Fatal("❌ Failed to connect to MongoDB:", err)
 	}
 	mongoDatabase := db.MongoDatabase
-
+	InitCollections(mongoDatabase) // Initialize MongoDB collections
 	// ─── Debug Logging ──────────────────────────────────────────
 	log.Println("📨 Using SMTP server:", os.Getenv("SMTP_HOST"))
 
@@ -73,10 +78,10 @@ func main() {
 
 	// ─── websocket ─────────────────────────────────
 
-	r := gin.Default()
+	// r := gin.Default()
 
-	// Apply middleware to inject userID into the context
-	r.Use(middleware.AuthMiddleware())
+	// // Apply middleware to inject userID into the context
+	// r.Use(middleware.AuthMiddleware())
 
 	// Create and start WebSocket hub
 	hub := websocket.NewHub()
@@ -241,7 +246,9 @@ func main() {
 	router := routes.SetUpRouter(mainHandler)
 
 	// ─── websocket ─────────────────────────────────
-	websocket.RegisterWebSocketRoutes(r, hub)
+	wsGroup := router.Group("/ws")
+	wsGroup.Use(middleware.WebSocketAuthMiddleware()) // ✅ For ws://.../cases/:id?token=...
+	websocket.RegisterWebSocketRoutes(wsGroup, hub)
 
 	log.Println("🚀 Starting AEGIS API on :8080...")
 	log.Println("📚 Swagger docs: http://localhost:8080/swagger/index.html")

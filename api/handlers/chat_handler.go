@@ -492,7 +492,12 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	_ = h.ChatService.WsManager().BroadcastToGroup(groupID.Hex(), *msg)
+	_ = h.ChatService.WsManager().BroadcastToGroup(groupID.Hex(), chat.WebSocketMessage{
+		Type:      "NEW_MESSAGE", // ✅ correct message type
+		GroupID:   groupID.Hex(),
+		Payload:   msg, // ✅ fixed field name
+		Timestamp: time.Now(),
+	})
 
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action:      "SEND_GROUP_MESSAGE",

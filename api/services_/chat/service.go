@@ -122,7 +122,13 @@ func (s *ChatService) SendMessageWithAttachment(
 		return fmt.Errorf("failed to store message: %w", err)
 	}
 
-	_ = s.wsManager.BroadcastToGroup(groupID.Hex(), message)
+	_ = s.wsManager.BroadcastToGroup(groupID.Hex(), WebSocketMessage{
+		Type:      "new_message",
+		GroupID:   groupID.Hex(),
+		Payload:   message,
+		Timestamp: time.Now(),
+		UserEmail: senderEmail,
+	})
 
 	return nil
 }
@@ -236,6 +242,48 @@ func (s *userService) CreateUser(ctx context.Context, user *User) error {
 	return nil
 }
 
+var MessageCollection *mongo.Collection // Inject this from main.go or init
+
+func SaveMessageToDB(payload NewMessagePayload) error {
+	parsedTime, err := time.Parse(time.RFC3339, payload.Timestamp)
+	if err != nil {
+		return err
+	}
+
+	groupID := primitive.NewObjectID()
+	if payload.GroupID != "" {
+		var err error
+		// Convert the GroupID string to a primitive ObjectID
+		groupID, err = primitive.ObjectIDFromHex(payload.GroupID)
+		if err != nil {
+			return fmt.Errorf("invalid group ID: %w", err)
+		}
+	}
+
+	message := Message{
+		ID:          payload.MessageID,
+		GroupID:     groupID,
+		SenderEmail: payload.SenderName,
+		SenderName:  payload.SenderName,
+		Content:     payload.Text,
+		CreatedAt:   parsedTime,
+		UpdatedAt:   parsedTime,
+		IsDeleted:   false,
+		Status: MessageStatus{
+			Sent: parsedTime,
+		},
+		MessageType: "text",
+	}
+
+	if len(payload.Attachments) > 0 {
+		message.Attachments = payload.Attachments
+		message.MessageType = "file"
+	}
+
+	_, err = MessageCollection.InsertOne(context.Background(), message)
+	return err
+}
+
 // UpdateUserStatus updates a user's online/offline status
 func (s *userService) UpdateUserStatus(ctx context.Context, email string, status string) error {
 	collection := s.db.Collection(UsersCollection)
@@ -280,6 +328,60 @@ func (s *userService) GetOnlineUsers(ctx context.Context) ([]*User, error) {
 	}
 
 	return users, nil
+}
+
+// In services_/chat/chat_service.go
+func (s *ChatService) HandleMessage(
+	ctx context.Context,
+	senderEmail, senderName, content, fileName, contentType string,
+	fileBytes []byte,
+	groupID primitive.ObjectID,
+) error {
+	// IPFS upload
+	ipfsResult, err := s.ipfsUploader.UploadBytes(ctx, fileBytes, fileName)
+	if err != nil {
+		return fmt.Errorf("IPFS upload failed: %w", err)
+	}
+
+	// Construct attachment
+	attachment := &Attachment{
+		ID:       primitive.NewObjectID().Hex(),
+		FileName: fileName,
+		FileType: contentType,
+		FileSize: int64(len(fileBytes)),
+		URL:      ipfsResult.URL,
+		Hash:     ipfsResult.Hash,
+	}
+
+	// Build message
+	msg := &Message{
+		GroupID:     groupID,
+		SenderEmail: senderEmail,
+		SenderName:  senderName,
+		Content:     content,
+		MessageType: "file",
+		Attachments: []*Attachment{attachment},
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		IsDeleted:   false,
+		Status:      MessageStatus{Sent: time.Now()},
+	}
+
+	// Save to DB
+	if err := s.repo.CreateMessage(ctx, msg); err != nil {
+		return fmt.Errorf("failed to store message: %w", err)
+	}
+
+	// Broadcast via WebSocket
+	_ = s.wsManager.BroadcastToGroup(groupID.Hex(), WebSocketMessage{
+		Type:      MessageType(EventNewMessage),
+		GroupID:   groupID.Hex(),
+		Payload:   msg,
+		Timestamp: time.Now(),
+		UserEmail: senderEmail,
+	})
+
+	return nil
 }
 
 // SearchUsers searches for users by name or email

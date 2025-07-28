@@ -51,6 +51,15 @@ type LastMessage struct {
 	Timestamp   time.Time          `bson:"timestamp" json:"timestamp"`
 	MessageType string             `bson:"message_type" json:"message_type"`
 }
+type NewMessagePayload struct {
+	MessageID   string        `json:"messageId"`
+	Text        string        `json:"text"`
+	SenderID    string        `json:"senderId"`
+	SenderName  string        `json:"senderName"`
+	GroupID     string        `json:"groupId"`
+	Timestamp   string        `json:"timestamp"`
+	Attachments []*Attachment `json:"attachments,omitempty"`
+}
 
 // Message represents a chat message
 type Message struct {
@@ -135,8 +144,8 @@ const (
 type WebSocketEvent struct {
 	Type      EventType   `json:"type"`
 	GroupID   string      `json:"group_id,omitempty"`
-	Data      interface{} `json:"data"`
-	Timestamp int64       `json:"timestamp"`
+	Payload   interface{} `json:"payload"`
+	Timestamp time.Time   `json:"timestamp"`
 	UserEmail string      `json:"user_email,omitempty"`
 }
 
