@@ -67,7 +67,7 @@ const handleChange = (e) => {
     if (!validate()) return;
 
     try {
-      const res = await fetch("http://localhost:8080/api/v1/register", {
+      const res = await fetch("http://localhost:8080/api/v1/register/tenant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

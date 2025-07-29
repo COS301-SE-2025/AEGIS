@@ -62,16 +62,24 @@ const handleChange = (e) => {
     if (!validate()) return;
 
     try {
-      const res = await fetch("http://localhost:8080/api/v1/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const token = sessionStorage.getItem("authToken");
+      if (!token) {
+        setErrors({ general: "No auth token found, please login again" });
+        return;
+      }
+      const res = await fetch("http://localhost:8080/api/v1/register/team", {
+         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`, 
+        },
         body: JSON.stringify(formData),
       });
 
       const payload = await res.json();
 
       if (res.ok && payload.success) {
-        navigate("/login");
+        navigate("/teams");
       } else {
         setErrors({ general: payload.message || "Registration failed" });
       }
