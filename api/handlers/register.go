@@ -10,6 +10,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,8 +27,12 @@ import (
 // "aegis-api/services_/user/update_user_role"
 type AdminServiceInterface interface {
 	RegisterUser(c *gin.Context)
+	RegisterTenantUser(c *gin.Context)
+	RegisterTeamUser(c *gin.Context)
 	VerifyEmail(c *gin.Context)
 	ListUsers(c *gin.Context)
+	CreateTenant(c *gin.Context)
+	CreateTeam(c *gin.Context)
 }
 type AuthServiceInterface interface {
 	LoginHandler(c *gin.Context)
@@ -51,7 +57,14 @@ type UserServiceInterface interface {
 	UpdateUserInfo(c *gin.Context)
 	GetUserCases(c *gin.Context)
 }
+type CreateTenantRequest struct {
+	Name string `json:"name" binding:"required"`
+}
 
+type CreateTeamRequest struct {
+	TeamName string     `json:"team_name" binding:"required"`
+	TenantID *uuid.UUID `json:"tenant_id" binding:"required"`
+}
 type AdminService struct {
 	registrationService *registration.RegistrationService
 	listUserService     ListUsers.ListUserService
@@ -210,5 +223,131 @@ func (s *AdminService) VerifyEmail(c *gin.Context) {
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
 		Message: "Email verified successfully",
+	})
+}
+
+func (s *AdminService) CreateTenant(c *gin.Context) {
+	var req CreateTenantRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	tenant, err := s.registrationService.CreateTenant(req.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "create_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, structs.SuccessResponse{
+		Success: true,
+		Message: "Tenant created successfully",
+		Data:    tenant,
+	})
+}
+
+func (s *AdminService) CreateTeam(c *gin.Context) {
+	var req CreateTeamRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	team, err := s.registrationService.CreateTeam(req.TeamName, req.TenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "create_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, structs.SuccessResponse{
+		Success: true,
+		Message: "Team created successfully",
+		Data:    team,
+	})
+}
+func (s *AdminService) RegisterTenantUser(c *gin.Context) {
+	var req registration.RegistrationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+	user, err := s.registrationService.RegisterTenantUser(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "registration_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusCreated, structs.SuccessResponse{
+		Success: true,
+		Message: "Tenant and user registered successfully.",
+		Data:    registration.EntityToResponse(user),
+	})
+}
+
+func (s *AdminService) RegisterTeamUser(c *gin.Context) {
+	var req registration.RegistrationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: err.Error(),
+		})
+		return
+	}
+	tenantIDVal, exists := c.Get("tenantID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "Tenant ID missing from token",
+		})
+		return
+	}
+
+	tenantIDStr, ok := tenantIDVal.(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "Tenant ID is not a string",
+		})
+		return
+	}
+
+	tenantID, err := uuid.Parse(tenantIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid tenant ID format",
+		})
+		return
+	}
+	req.TenantID = &tenantID
+	user, err := s.registrationService.RegisterTeamUser(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+			Error:   "registration_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusCreated, structs.SuccessResponse{
+		Success: true,
+		Message: "User registered successfully",
+		Data:    user,
 	})
 }

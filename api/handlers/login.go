@@ -57,6 +57,9 @@ type Handler struct {
 	CaseEvidenceTotalsHandler *CaseEvidenceTotalsHandler
 	WebSocketHub              *websocket.Hub
 	RecentActivityHandler     *RecentActivityHandler
+	TeamRepo                  registration.TeamRepository //
+	TenantRepo                registration.TenantRepository
+	UserRepo                  registration.UserRepository // Optional, if you have a user repository
 }
 
 func NewHandler(
@@ -81,6 +84,9 @@ func NewHandler(
 	CaseEvidenceTotalsHandler *CaseEvidenceTotalsHandler,
 	webSocketHub *websocket.Hub,
 	recentActivityHandler *RecentActivityHandler,
+	teamRepo registration.TeamRepository,
+	tenantRepo registration.TenantRepository, // Optional, if you have a tenant repository
+	userRepo registration.UserRepository, // Optional, if you have a user repository
 ) *Handler {
 	return &Handler{
 		AdminService:              adminSvc,
@@ -104,6 +110,9 @@ func NewHandler(
 		CaseEvidenceTotalsHandler: CaseEvidenceTotalsHandler,
 		WebSocketHub:              webSocketHub,
 		RecentActivityHandler:     recentActivityHandler,
+		TeamRepo:                  teamRepo,
+		TenantRepo:                tenantRepo, // Optional, if you have a tenant repository
+		UserRepo:                  userRepo,   // Optional, if you have a user repository
 	}
 }
 

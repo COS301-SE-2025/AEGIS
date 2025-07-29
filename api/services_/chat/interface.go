@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"net/http"
 
+	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -58,10 +59,12 @@ type UserService interface {
 
 // WebSocketManager defines the interface for real-time communication
 type WebSocketManager interface {
-	BroadcastToGroup(groupID string, message interface{}) error
+	BroadcastToGroup(groupID string, message WebSocketMessage) error
 	SendToUser(userEmail string, message interface{}) error
-	AddUserToGroup(userEmail, groupID string) error
+	AddUserToGroup(userEmail string, groupID, caseID string, conn *websocket.Conn) error
 	RemoveUserFromGroup(userEmail, groupID string) error
 	GetActiveUsers(groupID string) []string
-	HandleConnection(userEmail string, w http.ResponseWriter, r *http.Request) error
+	HandleConnection(wr http.ResponseWriter, r *http.Request) error
+	BroadcastToCase(caseID string, message WebSocketMessage) error
+	AddConnection(userID, caseID string, conn *websocket.Conn)
 }

@@ -2,7 +2,9 @@
 package chat
 
 import (
+	"aegis-api/pkg/sharedws"
 	"context"
+	"os"
 
 	"encoding/json"
 
@@ -12,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -41,7 +44,7 @@ type WebSocketMessage struct {
 	Type      MessageType `json:"type"`
 	GroupID   string      `json:"group_id,omitempty"`
 	UserEmail string      `json:"user_email,omitempty"`
-	Data      interface{} `json:"data,omitempty"`
+	Payload   interface{} `json:"payload"`
 	Timestamp time.Time   `json:"timestamp"`
 }
 
@@ -53,10 +56,16 @@ type TypingIndicator struct {
 
 // webSocketManager implements the WebSocketManager interface
 type webSocketManager struct {
-	connections  map[string]*websocket.Conn      // userEmail -> connection
-	groupUsers   map[string][]string             // groupID -> []userEmail
-	userGroups   map[string][]string             // userEmail -> []groupID
-	typingUsers  map[string]map[string]time.Time // groupID -> userEmail -> lastTypingTime
+	connections      map[string]*websocket.Conn      // userEmail -> connection
+	groupUsers       map[string][]string             // groupID -> []userEmail
+	userGroups       map[string][]string             // userEmail -> []groupID
+	typingUsers      map[string]map[string]time.Time // groupID -> userEmail -> lastTypingTime
+	groupConnections map[string]map[string]*websocket.Conn
+	caseGroups       map[string][]string // caseID → groupIDs
+	// caseID → groupIDs
+	clients    map[string]*sharedws.Client
+	connection map[string]map[string]*websocket.Conn // caseID → userEmail → Conn
+
 	mutex        sync.RWMutex
 	upgrader     websocket.Upgrader
 	userService  UserService
@@ -70,11 +79,12 @@ type webSocketManager struct {
 func NewWebSocketManager(userService UserService, repo ChatRepository) WebSocketManager {
 
 	manager := &webSocketManager{
-		connections: make(map[string]*websocket.Conn),
-		groupUsers:  make(map[string][]string),
-		userGroups:  make(map[string][]string),
-		typingUsers: make(map[string]map[string]time.Time),
-		userService: userService,
+		connections:      make(map[string]*websocket.Conn),
+		groupUsers:       make(map[string][]string),
+		userGroups:       make(map[string][]string),
+		typingUsers:      make(map[string]map[string]time.Time),
+		groupConnections: make(map[string]map[string]*websocket.Conn),
+		userService:      userService,
 
 		repo: repo,
 
@@ -95,48 +105,144 @@ func NewWebSocketManager(userService UserService, repo ChatRepository) WebSocket
 
 	return manager
 }
+func (w *webSocketManager) AddConnection(userEmail, caseID string, conn *websocket.Conn) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	// Create map for caseID if not present
+	if w.connections == nil {
+		w.connection = make(map[string]map[string]*websocket.Conn)
+	}
+
+	if _, exists := w.connections[caseID]; !exists {
+		w.connection[caseID] = make(map[string]*websocket.Conn)
+	}
+
+	// Close any previous connection for this user in this case
+	if oldConn, exists := w.connection[caseID][userEmail]; exists {
+		oldConn.Close()
+	}
+
+	// Save new connection
+	w.connection[caseID][userEmail] = conn
+}
+
+func (w *webSocketManager) BroadcastToCase(caseID string, message WebSocketMessage) error {
+	w.mutex.RLock()
+	groupIDs, exists := w.caseGroups[caseID]
+	w.mutex.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("no groups found for case %s", caseID)
+	}
+
+	for _, groupID := range groupIDs {
+		if err := w.BroadcastToGroup(groupID, message); err != nil {
+			log.Printf("❌ Failed to broadcast to group %s: %v", groupID, err)
+		}
+	}
+	return nil
+}
 
 // HandleConnection upgrades HTTP connection to WebSocket and manages it
-func (w *webSocketManager) HandleConnection(userEmail string, wr http.ResponseWriter, r *http.Request) error {
-	// Validate user exists
+var jwtSecret = []byte(os.Getenv("JWT_SECRET_KEY"))
+
+func (w *webSocketManager) HandleConnection(wr http.ResponseWriter, r *http.Request) error {
+	// 1. Extract token from query params
+	tokenStr := r.URL.Query().Get("token")
+	if tokenStr == "" {
+		http.Error(wr, "Missing token", http.StatusUnauthorized)
+		return fmt.Errorf("missing JWT token")
+	}
+
+	// 2. Parse and validate token
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		// Validate signing method
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		http.Error(wr, "Invalid token", http.StatusUnauthorized)
+		return fmt.Errorf("invalid JWT: %w", err)
+	}
+
+	// 3. Extract claims
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		http.Error(wr, "Invalid claims", http.StatusUnauthorized)
+		return fmt.Errorf("invalid JWT claims")
+	}
+
+	// 4. Extract userEmail from claims
+	userEmailRaw, ok := claims["email"]
+	if !ok {
+		http.Error(wr, "Missing email in token", http.StatusUnauthorized)
+		return fmt.Errorf("email not found in token claims")
+	}
+	userEmail := fmt.Sprint(userEmailRaw)
+
+	// 5. Validate user exists
 	exists, err := w.userService.ValidateUserExists(context.Background(), userEmail)
 	if err != nil {
 		return fmt.Errorf("failed to validate user: %w", err)
 	}
 	if !exists {
+		http.Error(wr, "User not found", http.StatusUnauthorized)
 		return fmt.Errorf("user not found: %s", userEmail)
 	}
 
-	// Upgrade connection
+	// ✅ 5.5 Get groupID from query param
+	groupID := r.URL.Query().Get("groupId")
+	if groupID == "" {
+		http.Error(wr, "Missing groupId", http.StatusBadRequest)
+		return fmt.Errorf("groupId query param is required")
+	}
+
+	// 6. Upgrade to WebSocket
 	conn, err := w.upgrader.Upgrade(wr, r, nil)
 	if err != nil {
 		return fmt.Errorf("failed to upgrade connection: %w", err)
 	}
 
-	// Store connection
+	// 7. Register connection
 	w.mutex.Lock()
-	// Close existing connection if any
 	if existingConn, exists := w.connections[userEmail]; exists {
 		existingConn.Close()
 	}
 	w.connections[userEmail] = conn
 	w.mutex.Unlock()
 
-	log.Printf("User %s connected", userEmail)
+	log.Printf("✅ User %s connected via WebSocket", userEmail)
+	caseID := r.URL.Query().Get("caseId") // Also add this above the call
+	if caseID == "" {
+		http.Error(wr, "Missing caseId", http.StatusBadRequest)
+		return fmt.Errorf("caseId query param is required")
+	}
 
-	// Start connection management
-	go w.handleConnectionMessages(userEmail, conn)
+	if err := w.AddUserToGroup(userEmail, groupID, caseID, conn); err != nil {
+		log.Printf("Failed to add user %s to group %s: %v", userEmail, groupID, err)
+	}
+
+	log.Printf("✅ User %s connected via WebSocket to group %s", userEmail, groupID)
+
+	// 8. Start listener & ping routines
+	go w.handleConnectionMessages(userEmail, groupID, conn)
 	go w.pingConnection(userEmail, conn)
+
+	// 9. Optionally deliver queued messages
+	go w.deliverQueuedMessages(userEmail)
 
 	return nil
 }
 
 // handleConnectionMessages handles incoming messages from a WebSocket connection
-func (w *webSocketManager) handleConnectionMessages(userEmail string, conn *websocket.Conn) {
+func (w *webSocketManager) handleConnectionMessages(userEmail, groupID string, conn *websocket.Conn) {
 	defer func() {
 		w.removeConnection(userEmail)
 		conn.Close()
-		log.Printf("User %s disconnected", userEmail)
+		log.Printf("⚠️ WebSocket closed for user %s (group %s)", userEmail, groupID)
 	}()
 
 	// Set pong handler
@@ -172,7 +278,7 @@ func (w *webSocketManager) handleConnectionMessages(userEmail string, conn *webs
 			var ack struct {
 				MessageID string `json:"message_id"`
 			}
-			if err := json.Unmarshal([]byte(fmt.Sprint(message.Data)), &ack); err == nil {
+			if err := json.Unmarshal([]byte(fmt.Sprint(message.Payload)), &ack); err == nil {
 				objID, err := primitive.ObjectIDFromHex(ack.MessageID)
 				if err != nil {
 					log.Println("Invalid ObjectID:", ack.MessageID)
@@ -252,7 +358,7 @@ func (w *webSocketManager) removeConnection(userEmail string) {
 }
 
 // BroadcastToGroup sends a message to all users in a group
-func (w *webSocketManager) BroadcastToGroup(groupID string, message interface{}) error {
+func (w *webSocketManager) BroadcastToGroup(groupID string, message WebSocketMessage) error {
 	w.mutex.RLock()
 	users, exists := w.groupUsers[groupID]
 	w.mutex.RUnlock()
@@ -261,22 +367,19 @@ func (w *webSocketManager) BroadcastToGroup(groupID string, message interface{})
 		return fmt.Errorf("group %s not found", groupID)
 	}
 
-	wsMessage := WebSocketMessage{
-		Type:      MessageTypeChat,
-		GroupID:   groupID,
-		Data:      message,
-		Timestamp: time.Now(),
+	encoded, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to encode message: %w", err)
 	}
 
 	var failedUsers []string
 	for _, userEmail := range users {
-		if err := w.sendMessageToUser(userEmail, wsMessage); err != nil {
+		if err := w.sendMessageToUser(userEmail, encoded); err != nil {
 			failedUsers = append(failedUsers, userEmail)
-			log.Printf("Failed to send message to user %s: %v", userEmail, err)
+			log.Printf("❌ Failed to send message to user %s: %v", userEmail, err)
 		}
 	}
 
-	// Remove failed users from group
 	if len(failedUsers) > 0 {
 		w.mutex.Lock()
 		for _, userEmail := range failedUsers {
@@ -293,62 +396,122 @@ func (w *webSocketManager) SendToUser(userEmail string, message interface{}) err
 	wsMessage := WebSocketMessage{
 		Type:      MessageTypeChat,
 		UserEmail: userEmail,
-		Data:      message,
+		Payload:   message,
 		Timestamp: time.Now(),
 	}
 
-	return w.sendMessageToUser(userEmail, wsMessage)
+	// 🔄 Convert to []byte
+	data, err := json.Marshal(wsMessage)
+	if err != nil {
+		return fmt.Errorf("failed to marshal WebSocketMessage: %w", err)
+	}
+
+	return w.sendMessageToUser(userEmail, data)
 }
 
 // sendMessageToUser sends a WebSocket message to a specific user
-func (w *webSocketManager) sendMessageToUser(userEmail string, message WebSocketMessage) error {
-	w.mutex.RLock()
-	conn, exists := w.connections[userEmail]
-	w.mutex.RUnlock()
-
-	if !exists {
-		return fmt.Errorf("user %s not connected", userEmail)
+func (w *webSocketManager) sendMessageToUser(userEmail string, data []byte) error {
+	client, ok := w.clients[userEmail]
+	if !ok {
+		return fmt.Errorf("no client for %s", userEmail)
 	}
 
-	conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	return conn.WriteJSON(message)
+	select {
+	case client.Send <- data:
+		return nil
+	default:
+		return fmt.Errorf("client send buffer full for %s", userEmail)
+	}
 }
 
 // AddUserToGroup adds a user to a group
-func (w *webSocketManager) AddUserToGroup(userEmail, groupID string) error {
+// func (w *webSocketManager) AddUserToGroup(userEmail, groupID string) error {
+// 	w.mutex.Lock()
+// 	defer w.mutex.Unlock()
+
+// 	// Add user to group
+// 	if users, exists := w.groupUsers[groupID]; exists {
+// 		// Check if user is already in group
+// 		for _, user := range users {
+// 			if user == userEmail {
+// 				return nil // User already in group
+// 			}
+// 		}
+// 		w.groupUsers[groupID] = append(users, userEmail)
+// 	} else {
+// 		w.groupUsers[groupID] = []string{userEmail}
+// 	}
+
+// 	// Add group to user's groups
+// 	if groups, exists := w.userGroups[userEmail]; exists {
+// 		// Check if group is already in user's groups
+// 		for _, group := range groups {
+// 			if group == groupID {
+// 				return nil // Group already in user's groups
+// 			}
+// 		}
+// 		w.userGroups[userEmail] = append(groups, groupID)
+// 	} else {
+// 		w.userGroups[userEmail] = []string{groupID}
+// 	}
+
+// 	// Notify other users in the group
+// 	go w.notifyUserJoined(groupID, userEmail)
+
+//		return nil
+//	}
+func (w *webSocketManager) AddUserToGroup(userEmail, groupID, caseID string, conn *websocket.Conn) error {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	// Add user to group
-	if users, exists := w.groupUsers[groupID]; exists {
-		// Check if user is already in group
-		for _, user := range users {
-			if user == userEmail {
-				return nil // User already in group
-			}
+	// Check and add user to groupUsers
+	userAlreadyInGroup := false
+	users := w.groupUsers[groupID]
+	for _, u := range users {
+		if u == userEmail {
+			userAlreadyInGroup = true
+			break
 		}
+	}
+	if !userAlreadyInGroup {
 		w.groupUsers[groupID] = append(users, userEmail)
-	} else {
-		w.groupUsers[groupID] = []string{userEmail}
 	}
 
-	// Add group to user's groups
-	if groups, exists := w.userGroups[userEmail]; exists {
-		// Check if group is already in user's groups
-		for _, group := range groups {
-			if group == groupID {
-				return nil // Group already in user's groups
-			}
+	// Check and add group to userGroups
+	groupAlreadyInUser := false
+	groups := w.userGroups[userEmail]
+	for _, g := range groups {
+		if g == groupID {
+			groupAlreadyInUser = true
+			break
 		}
+	}
+	if !groupAlreadyInUser {
 		w.userGroups[userEmail] = append(groups, groupID)
-	} else {
-		w.userGroups[userEmail] = []string{groupID}
 	}
 
-	// Notify other users in the group
+	// ✅ Save connection
+	if w.groupConnections[groupID] == nil {
+		w.groupConnections[groupID] = make(map[string]*websocket.Conn)
+	}
+	w.groupConnections[groupID][userEmail] = conn
+
+	// Notify others
 	go w.notifyUserJoined(groupID, userEmail)
 
+	// Track group under caseID
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+	w.caseGroups[caseID] = appendUnique(w.caseGroups[caseID], groupID)
 	return nil
+}
+func appendUnique(slice []string, value string) []string {
+	for _, v := range slice {
+		if v == value {
+			return slice
+		}
+	}
+	return append(slice, value)
 }
 
 // RemoveUserFromGroup removes a user from a group
@@ -454,7 +617,7 @@ func (w *webSocketManager) broadcastTypingIndicator(groupID, userEmail string, i
 	message := WebSocketMessage{
 		Type:    MessageTypeTyping,
 		GroupID: groupID,
-		Data: TypingIndicator{
+		Payload: TypingIndicator{
 			UserEmail: userEmail,
 			IsTyping:  isTyping,
 		},
@@ -467,7 +630,13 @@ func (w *webSocketManager) broadcastTypingIndicator(groupID, userEmail string, i
 
 	for _, user := range users {
 		if user != userEmail { // Don't send to the typing user
-			w.sendMessageToUser(user, message)
+			data, err := json.Marshal(message)
+			if err != nil {
+				log.Printf("❌ Failed to marshal typing indicator: %v", err)
+				continue
+			}
+			w.sendMessageToUser(user, data)
+
 		}
 	}
 }
@@ -515,7 +684,13 @@ func (w *webSocketManager) notifyUserJoined(groupID, userEmail string) {
 
 	for _, user := range users {
 		if user != userEmail {
-			w.sendMessageToUser(user, message)
+			data, err := json.Marshal(message)
+			if err != nil {
+				log.Printf("❌ Failed to marshal typing indicator: %v", err)
+				continue
+			}
+			w.sendMessageToUser(user, data)
+
 		}
 	}
 }
@@ -539,7 +714,13 @@ func (w *webSocketManager) notifyUserLeft(groupID, userEmail string) {
 
 	for _, user := range users {
 		if user != userEmail {
-			w.sendMessageToUser(user, message)
+			data, err := json.Marshal(message)
+			if err != nil {
+				log.Printf("❌ Failed to marshal typing indicator: %v", err)
+				continue
+			}
+			w.sendMessageToUser(user, data)
+
 		}
 	}
 }
@@ -561,11 +742,17 @@ func (w *webSocketManager) deliverQueuedMessages(userEmail string) {
 			Type:      NewMessageType,
 			GroupID:   msg.GroupID.Hex(),
 			UserEmail: msg.SenderEmail,
-			Data:      msg,
+			Payload:   msg,
 			Timestamp: time.Now(),
 		}
 
-		if err := w.sendMessageToUser(userEmail, event); err == nil {
+		data, err := json.Marshal(event)
+		if err != nil {
+			log.Printf("❌ Failed to marshal message for user %s: %v", userEmail, err)
+			continue
+		}
+
+		if err := w.sendMessageToUser(userEmail, data); err == nil {
 			if objID, err := primitive.ObjectIDFromHex(msg.ID); err == nil {
 				groupMsgMap[msg.GroupID] = append(groupMsgMap[msg.GroupID], objID)
 			} else {

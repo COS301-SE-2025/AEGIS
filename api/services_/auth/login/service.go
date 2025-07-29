@@ -16,6 +16,16 @@ func NewAuthService(repo registration.UserRepository) *AuthService {
 
 func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 	user, err := s.repo.GetUserByEmail(email)
+	var tenantID, teamID string
+
+	if user.TenantID != nil {
+		tenantID = user.TenantID.String()
+	}
+
+	if user.TeamID != nil {
+		teamID = user.TeamID.String()
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("invalid credentials")
 	}
@@ -33,7 +43,16 @@ func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 		}
 	}
 
-	token, err := GenerateJWT(user.ID.String(), user.Email, user.Role, user.TokenVersion, user.ExternalTokenExpiry)
+	token, err := GenerateJWT(
+		user.ID.String(),
+		user.Email,
+		user.Role,
+		user.FullName,
+		tenantID,
+		teamID,
+		user.TokenVersion,
+		user.ExternalTokenExpiry,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token")
 	}
@@ -77,7 +96,16 @@ func (s *AuthService) RegenerateExternalToken(adminID, targetUserID string, req 
 	}
 
 	// Generate new JWT
-	token, err := GenerateJWT(user.ID.String(), user.Email, user.Role, user.TokenVersion, user.ExternalTokenExpiry)
+	token, err := GenerateJWT(
+		user.ID.String(),
+		user.Email,
+		user.Role,
+		user.FullName,
+		user.TenantID.String(),
+		user.TeamID.String(),
+		user.TokenVersion,
+		user.ExternalTokenExpiry,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token")
 	}

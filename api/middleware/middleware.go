@@ -14,6 +14,7 @@ func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		fmt.Println("Authorization Header:", c.GetHeader("Authorization"))
 		authHeader := c.GetHeader("Authorization")
+
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
@@ -24,8 +25,8 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-
-		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		fmt.Println("Parsed Token String:", tokenString)
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
@@ -41,17 +42,82 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims, ok := token.Claims.(*Claims)
-		if !ok || claims.UserID == "" || claims.Email == "" || claims.Role == "" {
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
-				Message: "Invalid token claims",
+				Message: "Invalid token claims format",
+			})
+			c.Abort()
+			return
+		}
+
+		// Extract claims from MapClaims
+		userID, _ := claims["user_id"].(string)
+		email, _ := claims["email"].(string)
+		role, _ := claims["role"].(string)
+		fullName, _ := claims["full_name"].(string)
+		tenantID, _ := claims["tenant_id"].(string)
+		teamID, _ := claims["team_id"].(string)
+
+		if userID == "" || email == "" || role == "" || tenantID == "" {
+			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+				Error:   "unauthorized",
+				Message: "Missing required token claims",
 			})
 			c.Abort()
 			return
 		}
 
 		// Attach claims to context
+		c.Set("userID", userID)
+		c.Set("email", email)
+		c.Set("userRole", role)
+		c.Set("fullName", fullName)
+		c.Set("tenantID", tenantID)
+		c.Set("teamID", teamID)
+
+		c.Next()
+	}
+}
+
+func WebSocketAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Check token from query param
+		tokenString := c.Query("token")
+		if tokenString == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, structs.ErrorResponse{
+				Error:   "unauthorized",
+				Message: "Missing token in query string",
+			})
+			return
+		}
+
+		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return GetJWTSecret(), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, structs.ErrorResponse{
+				Error:   "unauthorized",
+				Message: "Invalid or expired token",
+			})
+			return
+		}
+
+		claims, ok := token.Claims.(*Claims)
+		if !ok || claims.UserID == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, structs.ErrorResponse{
+				Error:   "unauthorized",
+				Message: "Invalid token claims",
+			})
+			return
+		}
+
+		// ✅ Inject claims into context
 		c.Set("userID", claims.UserID)
 		c.Set("email", claims.Email)
 		c.Set("userRole", claims.Role)

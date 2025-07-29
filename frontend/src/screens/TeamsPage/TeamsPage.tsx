@@ -1,13 +1,7 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "../../components/ui/input";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "../../components/ui/select";
 import { Pagination } from "../../components/ui/pagination";
+import { jwtDecode } from "jwt-decode";
 
 interface Team {
   id: string;
@@ -17,40 +11,79 @@ interface Team {
   status: "Active" | "Inactive";
 }
 
-const mockTeams: Team[] = Array.from({ length: 23 }).map((_, i) => ({
-  id: `team-${i + 1}`,
-  name: `DFIR Team ${i + 1}`,
-  manager: `Manager ${i + 1}`,
-  members: Math.floor(Math.random() * 10) + 3,
-  status: Math.random() > 0.5 ? "Active" : "Inactive",
-}));
-
 export const TeamsPage = () => {
-  const [teams, setTeams] = useState<Team[]>(mockTeams);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [filteredTeams, setFilteredTeams] = useState<Team[]>([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Inactive">("All");
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
+const statuses = ["Active", "Inactive"];
 
   useEffect(() => {
-    let filtered = mockTeams;
+    const fetchTeams = async () => {
+      const token = sessionStorage.getItem("authToken");
+      if (!token) {
+        console.error("No token found");
+        return;
+      }
 
-    if (search) {
-      filtered = filtered.filter((t) =>
-        t.name.toLowerCase().includes(search.toLowerCase())
-      );
-    }
+      let tenantId: string | null = null;
+      try {
+        const decoded: any = jwtDecode(token);
+        tenantId = decoded.tenant_id;
+      } catch (e) {
+        console.error("Failed to decode token", e);
+        return;
+      }
 
-    if (statusFilter !== "All") {
-      filtered = filtered.filter((t) => t.status === statusFilter);
-    }
+      if (!tenantId) {
+        console.error("No tenant ID found in token");
+        return;
+      }
 
-    setTeams(filtered);
-    setPage(1);
-  }, [search, statusFilter]);
+      try {
+        const res = await fetch(`http://localhost:8080/api/v1/teams?tenant_id=${tenantId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-  const totalPages = Math.ceil(teams.length / itemsPerPage);
-  const paginated = teams.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+        if (!res.ok) {
+          const errPayload = await res.json();
+          console.error("Failed to fetch teams:", errPayload.message);
+          return;
+        }
+        const teamsData = await res.json();
+        const mapped = teamsData.map((team: any) => ({
+        id: team.id,
+        name: team.name,
+        manager: team.manager,         // Or dynamically derive from backend later
+        members: 0,             // Placeholder for now
+        status: statuses[Math.floor(Math.random() * statuses.length)], // Random status for demo
+      }));
+      setTeams(mapped);
+        setFilteredTeams(teamsData);
+      } catch (err) {
+        console.error("Error fetching teams:", err);
+      }
+    };
+
+    fetchTeams();
+  }, []);
+
+useEffect(() => {
+  const filtered = teams.filter(
+    (t) =>
+      typeof t.name === "string" &&
+      t.name.toLowerCase().includes(search.toLowerCase())
+  );
+  setFilteredTeams(filtered);
+  setPage(1);
+}, [search, teams]);
+
+
+  const totalPages = Math.ceil(filteredTeams.length / itemsPerPage);
+  const paginated = filteredTeams.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6">
@@ -64,16 +97,6 @@ export const TeamsPage = () => {
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-sm"
           />
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Statuses</SelectItem>
-              <SelectItem value="Active">Active</SelectItem>
-              <SelectItem value="Inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
@@ -94,12 +117,18 @@ export const TeamsPage = () => {
                 <div className="text-sm text-muted-foreground">
                   Members: {team.members}
                 </div>
-                <div
-                  className={`text-sm font-medium ${
-                    team.status === "Active" ? "text-green-500" : "text-red-500"
-                  }`}
-                >
-                  {team.status}
+                <div>
+                  <span
+                    className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                      team.status === "Active"
+                        ? "bg-green-100 text-green-800"
+                        : team.status === "Inactive"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {team.status}
+                  </span>
                 </div>
               </div>
             ))

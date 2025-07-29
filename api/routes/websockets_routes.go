@@ -1,4 +1,4 @@
- package routes
+package routes
 
 // import (
 // 	"aegis-api/pkg/websocket"

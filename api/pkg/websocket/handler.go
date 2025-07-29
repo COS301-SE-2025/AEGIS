@@ -1,13 +1,20 @@
 package websocket
 
 import (
+	"aegis-api/services_/chat"
+	"log"
+
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterWebSocketRoutes(r *gin.Engine, hub *Hub) {
-	r.GET("/ws/cases/:caseID", func(c *gin.Context) {
-		caseID := c.Param("caseID")
-		userID := c.GetString("userID") // Requires middleware to set
-		ServeWS(hub, c.Writer, c.Request, userID, caseID)
+func RegisterWebSocketRoutes(rg *gin.RouterGroup, manager chat.WebSocketManager) {
+	rg.GET("/cases/:caseId", func(c *gin.Context) {
+		log.Println("📥 WebSocket route hit")
+
+		// This must be handled inside manager.HandleConnection
+		err := manager.HandleConnection(c.Writer, c.Request)
+		if err != nil {
+			log.Println("❌ Failed to handle WebSocket connection:", err)
+		}
 	})
 }

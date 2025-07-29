@@ -22,6 +22,9 @@ import {
 import {Link} from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { toast } from 'react-hot-toast';
+// lib/websocket/connectWebSocket.ts
+//
+import { MutableRefObject } from "react";
 
 // Type definitions
 interface Message {
@@ -51,6 +54,13 @@ interface Message {
   };
 }
 
+interface JwtPayload {
+  user_id: string;
+  email: string;
+  role?: string;
+  exp: number;
+  iat: number;
+}
 
 interface Group {
   id: number;
@@ -66,7 +76,120 @@ interface Group {
   caseId?: string;
 }
 
+interface Thread {
+  thread_id: string;
+  title: string;
+  case_id: string;
+  file_id: string;
+  created_by: string;
+  created_at: string;
+  priority: string;
+  new_status?: string;
+}
+
+// --- WebSocket Types ---
+
+type WebSocketMessage = {
+  type: WebSocketMessageType;
+  payload: any;
+  groupId?: string;
+  userEmail?: string;
+  timestamp?: string;
+};
+
+
+type WebSocketMessageType =
+  | "new_message"
+  | "typing"
+  | "read_receipt"
+  | "message_reaction"
+  | "message_reply"
+  | "user_joined"
+  | "user_left"
+  | "file_attachment"
+  | "system_alert";
+
+type NewMessagePayload = {
+  messageId: string;
+  text: string;
+  senderId: string;
+  senderName: string;
+  groupId: string;
+  timestamp: string;
+  attachments?: Attachment[];
+  replyingTo?: string;
+};
+
+type Attachment = {
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  url: string;
+  hash?: string;
+  isImage?: boolean;
+};
+
 type ChatMessages = Record<number, Message[]>;
+
+export const connectWebSocket = (
+  caseId: string,
+  token: string,
+  socketRef: MutableRefObject<WebSocket | null>,
+  reconnectTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>,
+  onMessage: (msg: WebSocketMessage) => void,
+  onOpen?: () => void,
+  onClose?: () => void
+) => {
+  if (!caseId || !token) return;
+
+  // Prevent reconnect if already open
+  if (socketRef.current?.readyState === WebSocket.OPEN) {
+    console.log("📡 WebSocket already connected.");
+    return;
+  }
+
+  const ws = new WebSocket(`ws://localhost:8080/ws/cases/${caseId}?token=${token}`);
+
+  ws.onopen = () => {
+    console.log("✅ WebSocket connected");
+    onOpen?.(); // Optional callback
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const parsed: WebSocketMessage = JSON.parse(event.data);
+      if (!parsed?.type || !parsed?.payload) throw new Error("Malformed WS message");
+
+      // ✅ Log latency (optional)
+      const receivedAt = Date.now();
+      const sentAt = Date.parse(parsed.payload.timestamp);
+      console.log("📥 WS message latency:", receivedAt - sentAt, "ms");
+
+      onMessage(parsed);
+    } catch (err) {
+      console.error("❌ Error parsing WebSocket message:", err);
+    }
+  };
+
+  ws.onclose = () => {
+    if (reconnectTimeoutRef.current) return;
+
+    console.warn("⚠️ WebSocket closed. Retrying in 3s...");
+    onClose?.();
+
+    reconnectTimeoutRef.current = setTimeout(() => {
+      reconnectTimeoutRef.current = null;
+      connectWebSocket(caseId, token, socketRef, reconnectTimeoutRef, onMessage, onOpen, onClose);
+    }, 3000);
+  };
+
+  ws.onerror = (err) => {
+    console.error("❌ WebSocket error:", err);
+    ws.close(); // Triggers onclose
+  };
+
+  socketRef.current = ws;
+};
 
 export const SecureChatPage = (): JSX.Element => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -88,6 +211,12 @@ export const SecureChatPage = (): JSX.Element => {
   const [, setPreviewFileData] = useState<string>("");
   const [typingUsers, setTypingUsers] = useState<Record<number, string[]>>({});
   const [hasMounted, setHasMounted] = useState(false);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const socketRef = useRef<WebSocket | null>(null);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const previousUrlRef = useRef<string | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   interface Case {
     id: string;
     title?: string;
@@ -95,6 +224,8 @@ export const SecureChatPage = (): JSX.Element => {
   }
   const [activeCases, setActiveCases] = useState<Case[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 5;
 
 const handleSelectGroup = (group: any) => {
   const id = group.id || group._id;
@@ -114,6 +245,148 @@ const handleSelectGroup = (group: any) => {
     id,
   }));
 };
+
+// const connectWebSocket = (caseId: string) => {
+//   if (!activeChat?.id) return; // prevent runtime errors
+
+//    if (!caseId) {
+//     console.warn("⚠️ Skipping WebSocket connection: caseId is undefined");
+//     return;
+//   }
+//   if (socketRef.current) {
+//     socketRef.current.close();
+//   }
+//   if (socketRef.current?.readyState === WebSocket.OPEN) {
+//   console.log("WebSocket already connected — skipping reconnect.");
+//   return;
+// }
+// if (socketRef.current?.readyState === WebSocket.OPEN) {
+//   socketRef.current.send(JSON.stringify(message));
+// } else {
+//   console.warn("WebSocket not open, message dropped.");
+// }
+
+
+
+//   const token = sessionStorage.getItem("authToken");
+// const ws = new WebSocket(`ws://localhost:8080/ws/cases/${caseId}?token=${token}`);
+
+
+
+//   ws.onopen = () => {
+//   console.log("✅ WebSocket connected for case", caseId);
+//   setSocketConnected(true);
+//   setRetryCount(0); // reset on successful connect
+// };
+
+
+// //   ws.onclose = (event: CloseEvent) => {
+// //   console.warn(`⚠️ WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`);
+// //   setSocketConnected(false);
+
+// //   if (retryCount < MAX_RETRIES) {
+// //     const delay = Math.pow(2, retryCount) * 1000;
+// //     setTimeout(() => {
+// //       console.log(`🔁 Reconnecting in ${delay / 1000}s...`);
+// //       setRetryCount(retryCount + 1);
+// //       connectWebSocket(caseId);
+// //     }, delay);
+// //   } else {
+// //     console.error("❌ Max WebSocket reconnect attempts reached.");
+// //     toast.error("Failed to reconnect to chat. Please refresh or try again later.");
+// //   }
+// // };
+
+
+// ws.onclose = (event) => {
+//   console.warn(`⚠️ WebSocket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}`);
+// };
+// ws.onerror = (err) => {
+//   console.error("❌ WebSocket error:", err);
+  
+// };
+
+
+//   ws.onmessage = (event) => {
+//     try {
+//       const message: WebSocketMessage = JSON.parse(event.data);
+//       if (!message?.type || !message?.payload) throw new Error("Malformed message");
+
+//       switch (message.type) {
+//         case "NEW_MESSAGE":
+//           const msg = message.payload;
+//           const mapped: Message = {
+//             id: msg.id,
+//             user: msg.sender_name || msg.sender_email,
+//             content: msg.content,
+//             color: msg.sender_email === userEmail ? "text-green-400" : "text-blue-400",
+//             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+//             status: "read",
+//             self: msg.sender_email === userEmail,
+//             attachments: msg.attachments || [],
+//           };
+//           setChatMessages(prev => ({
+//             ...prev,
+//             [activeChat!.id]: [...(prev[activeChat!.id] || []), mapped]
+//           }));
+//           break;
+
+//         case "THREAD_CREATED":
+//           const thread: Thread = message.payload;
+//           setThreads(prev => [...prev, thread]);
+//           toast.success(`🧵 New thread created: "${thread.title}"`);
+//           break;
+
+//         case "MESSAGE_APPROVED":
+//           const approved = message.payload;
+//           setChatMessages(prev => {
+//             const current = [...(prev[activeChat!.id] || [])];
+//             const updated = current.map(m =>
+//               m.id === approved.message_id ? { ...m, status: "approved" } : m
+//             );
+//             return { ...prev, [activeChat!.id]: updated };
+//           });
+//           break;
+
+//         case "REACTION_UPDATED":
+//           const reactionUpdate = message.payload;
+//           setChatMessages(prev => {
+//             const current = [...(prev[activeChat!.id] || [])];
+//             const updated = current.map(m =>
+//               m.id === reactionUpdate.message_id
+//                 ? { ...m, reactions: reactionUpdate.reactions }
+//                 : m
+//             );
+//             return { ...prev, [activeChat!.id]: updated };
+//           });
+//           break;
+
+//         case "THREAD_RESOLVED":
+//           const resolved = message.payload;
+//           setThreads(prev =>
+//             prev.map(t =>
+//               t.thread_id === resolved.thread_id ? { ...t, new_status: "resolved" } : t
+//             )
+//           );
+//           toast(`📌 Thread "${resolved.title}" marked as resolved`);
+//         break;
+
+//         case "THREAD_PARTICIPANT_ADDED":
+//           const participant = message.payload;
+//           toast.success(`👤 ${participant.user_name} joined thread`);
+//           break;
+
+//         default:
+//           console.warn("⚠️ Unhandled WebSocket type:", message.type);
+//       }
+
+//     } catch (err) {
+//       console.error("❌ Failed to handle WebSocket message:", err);
+//     }
+//   };
+
+//   socketRef.current = ws;
+// };
 
 
   useEffect(() => {
@@ -148,17 +421,19 @@ const [availableUsers, setAvailableUsers] = useState<{ user_email: string, role:
 
 
 const [token] = useState(sessionStorage.getItem("authToken"));
-const [userEmail] = useState(() => {
-  const userData = sessionStorage.getItem("user");
-  if (userData) {
-    try {
-      return JSON.parse(userData).email;
-    } catch (err) {
-      console.error("Failed to parse user data:", err);
-    }
+const [userEmail, setUserEmail] = useState(() => {
+  try {
+    const token = sessionStorage.getItem("authToken");
+    if (!token) return null;
+
+    const base64Payload = token.split(".")[1];
+    const decodedPayload = JSON.parse(atob(base64Payload)) as JwtPayload;
+    return decodedPayload?.email || null;
+  } catch {
+    return null;
   }
-  return null;
 });
+
 
 
 const [editGroupName, setEditGroupName] = useState("");
@@ -320,7 +595,6 @@ const simulateTyping = (chatId: number, _?: string) => {
 }, []);
 
   // Clean up preview URL when component unmounts or preview changes
-const previousUrlRef = useRef<string | null>(null);
 
 useEffect(() => {
   return () => {
@@ -536,10 +810,70 @@ const sendMessage = async () => {
     console.error("Failed to send message:", err);
   }
 };
+const [userId] = useState(() => {
+  try {
+    const token = sessionStorage.getItem("authToken");
+    if (!token) return null;
+
+    const base64Payload = token.split(".")[1];
+    const decodedPayload = JSON.parse(atob(base64Payload)) as JwtPayload;
+    return decodedPayload?.user_id || null;
+  } catch (err) {
+    console.error("❌ Failed to decode token:", err);
+    return null;
+  }
+});
+
+
+const sendWebSocketMessage = async () => {
+  if (!activeChat || !message.trim() || !userId || !userEmail) return;
+
+  const payload: NewMessagePayload = {
+    messageId: crypto.randomUUID(),
+    text: message.trim(),
+    senderId: userId,
+    senderName: userEmail,
+    groupId: String(activeChat.id), 
+    timestamp: new Date().toISOString(),
+  };
+
+  const wsMessage: WebSocketMessage = {
+    type: "new_message",
+    payload,
+    timestamp: payload.timestamp,
+    groupId: String(activeChat.id), 
+    userEmail,
+  };
+
+  if (socketRef.current?.readyState !== WebSocket.OPEN) {
+    toast.error("WebSocket is disconnected. Falling back to HTTP.");
+    await sendMessage(); // fallback HTTP
+    return;
+  }
+
+  socketRef.current.send(JSON.stringify(wsMessage));
+
+  const newMessage: Message = {
+   id: payload.messageId as unknown as number,
+    user: payload.senderName,
+    color: "text-green-400",
+    content: payload.text,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: "sending",
+    self: true,
+  };
+
+  setChatMessages(prev => ({
+    ...prev,
+    [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
+  }));
+
+  setMessage(""); // clear input
+};
 
 const handleSendMessage = async (e?: React.MouseEvent | React.KeyboardEvent) => {
   e?.preventDefault();
-  await sendMessage();
+  await sendWebSocketMessage();
 };
 
 
@@ -1000,6 +1334,67 @@ useEffect(() => {
   }
 }, [previewFile]);
 
+// useEffect(() => {
+//   if (!activeChat?.caseId) return;
+
+//   connectWebSocket(activeChat.caseId); // only once per case
+
+//   return () => {
+//     if (socketRef.current) {
+//       socketRef.current.close();
+//       socketRef.current = null;
+//     }
+//   };
+// }, [activeChat?.caseId]);
+useEffect(() => {
+  if (!activeChat?.caseId || !token) return;
+
+  connectWebSocket(
+    activeChat.caseId,
+    token,
+    socketRef,
+      reconnectTimeoutRef,
+ (msg) => {
+  console.log("📨 WebSocket received:", Date.now(), msg);
+
+if (msg.type === "new_message" && msg.payload.groupId === activeChat.id) {
+  const incoming = msg.payload;
+
+  const mappedMessage: Message = {
+    id: incoming.messageId,
+    user: incoming.senderName || incoming.senderId,
+    color: incoming.senderId === userId ? "text-green-400" : "text-blue-400",
+    content: incoming.text,
+    time: new Date(incoming.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: "read",
+    self: incoming.senderId === userId,
+    attachments: incoming.attachments || []
+  };
+
+  setChatMessages(prev => {
+    const existing = prev[activeChat.id] || [];
+    const alreadyExists = existing.some(m => m.id === mappedMessage.id);
+    if (alreadyExists) return prev;
+
+    return {
+      ...prev,
+      [activeChat.id]: [...existing, mappedMessage]
+    };
+  });
+}
+ },
+    () => setSocketConnected(true),
+    () => setSocketConnected(false)
+  );
+
+  return () => {
+    if (socketRef.current) {
+      console.log("🔌 Cleaning up WebSocket...");
+      socketRef.current.close();
+      socketRef.current = null;
+    }
+  };
+}, [activeChat?.caseId, token]);
 
 const updateGroup = async () => {
   if (!activeChat) {
