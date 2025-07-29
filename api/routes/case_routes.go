@@ -54,6 +54,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		api.POST("/tenant", h.AdminService.CreateTenant)
 		api.POST("/team", h.AdminService.CreateTeam)
 		api.GET("/teams", h.GetTeamsByTenant)
+		api.GET("/tenants", h.GetAllTenants)
 
 		// ─── Public Evidence Upload/Download ─────────────
 		api.POST("/upload", h.UploadHandler.Upload)

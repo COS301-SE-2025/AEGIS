@@ -76,7 +76,7 @@ const handleChange = (e) => {
       const payload = await res.json();
 
       if (res.ok && payload.success) {
-        navigate("/login");
+        navigate("/tenants");
       } else {
         setErrors({ general: payload.message || "Registration failed" });
       }

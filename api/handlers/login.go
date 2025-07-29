@@ -58,6 +58,7 @@ type Handler struct {
 	WebSocketHub              *websocket.Hub
 	RecentActivityHandler     *RecentActivityHandler
 	TeamRepo                  registration.TeamRepository //
+	TenantRepo                registration.TenantRepository
 	UserRepo                  registration.UserRepository // Optional, if you have a user repository
 }
 
@@ -84,6 +85,7 @@ func NewHandler(
 	webSocketHub *websocket.Hub,
 	recentActivityHandler *RecentActivityHandler,
 	teamRepo registration.TeamRepository,
+	tenantRepo registration.TenantRepository, // Optional, if you have a tenant repository
 	userRepo registration.UserRepository, // Optional, if you have a user repository
 ) *Handler {
 	return &Handler{
@@ -109,7 +111,8 @@ func NewHandler(
 		WebSocketHub:              webSocketHub,
 		RecentActivityHandler:     recentActivityHandler,
 		TeamRepo:                  teamRepo,
-		UserRepo:                  userRepo, // Optional, if you have a user repository
+		TenantRepo:                tenantRepo, // Optional, if you have a tenant repository
+		UserRepo:                  userRepo,   // Optional, if you have a user repository
 	}
 }
 

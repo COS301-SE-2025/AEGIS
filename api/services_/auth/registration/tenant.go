@@ -30,3 +30,10 @@ func (r *GormTenantRepository) Exists(id uuid.UUID) bool {
 	r.db.Model(&Tenant{}).Where("id = ?", id).Count(&count)
 	return count > 0
 }
+func (r *GormTenantRepository) GetAll() ([]Tenant, error) {
+	var tenants []Tenant
+	if err := r.db.Find(&tenants).Error; err != nil {
+		return nil, err
+	}
+	return tenants, nil
+}

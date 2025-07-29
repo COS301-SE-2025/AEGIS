@@ -1,23 +1,20 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Modal } from "../../components/ui/Modal";
 
 interface Tenant {
   id: string;
   name: string;
   createdAt: string;
+  status?: "active" | "inactive" | "pending"; // Optional status field
+  
 }
 
 const ITEMS_PER_PAGE = 5;
 
 export const TenantsPage = () => {
-  const [tenants, setTenants] = useState<Tenant[]>([
-    { id: "1", name: "Acme Corp", createdAt: "2025-07-01" },
-    { id: "2", name: "CyberForensics Inc.", createdAt: "2025-07-15" },
-    { id: "3", name: "DataSec Solutions", createdAt: "2025-07-10" },
-    { id: "4", name: "InfoShield", createdAt: "2025-06-28" },
-    { id: "5", name: "SafeNet", createdAt: "2025-07-05" },
-    { id: "6", name: "TrustGuard", createdAt: "2025-07-12" },
-  ]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [loading, setLoading] = useState(true);
+
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newTenantName, setNewTenantName] = useState("");
@@ -28,17 +25,58 @@ export const TenantsPage = () => {
   const [removeModalOpen, setRemoveModalOpen] = useState(false);
   const [tenantToRemove, setTenantToRemove] = useState<Tenant | null>(null);
 
-  const filteredTenants = useMemo(() => {
-    return tenants.filter((t) =>
-      t.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [tenants, searchTerm]);
+const filteredTenants = useMemo(() => {
+  return tenants.filter((t) =>
+    (t.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+}, [tenants, searchTerm]);
+const paginatedTenants = useMemo(() => {
+  const start = (currentPage - 1) * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  return filteredTenants.slice(start, end);
+}, [filteredTenants, currentPage]);
+
+const mockStatus = () => {
+  const statuses = ["active", "inactive", "pending"];
+  return statuses[Math.floor(Math.random() * statuses.length)];
+};
+
+  
+useEffect(() => {
+  const fetchTenants = async () => {
+    try {
+      const res = await fetch("http://localhost:8080/api/v1/tenants");
+      const data = await res.json();
+
+      const tenantsRaw = Array.isArray(data) ? data : data.tenants;
+
+      if (tenantsRaw) {
+      const tenantsWithStatus = tenantsRaw.map((tenant: any) => ({
+      id: tenant.ID,
+      name: tenant.Name,
+      createdAt: tenant.CreatedAt,
+      updatedAt: tenant.UpdatedAt,
+      status: mockStatus(),
+      }));
+      setTenants(tenantsWithStatus);
+
+        console.log("Tenants fetched:", tenantsWithStatus); // ✅ HERE
+      }
+
+    } catch (error) {
+      console.error("Failed to fetch tenants:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchTenants();
+}, []); 
+  if (loading) {
+    return <div className="text-center text-muted-foreground">Loading tenants...</div>;
+  }
 
   const totalPages = Math.ceil(filteredTenants.length / ITEMS_PER_PAGE);
-  const paginatedTenants = filteredTenants.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
 
   const handleAddTenant = (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,12 +118,7 @@ export const TenantsPage = () => {
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-semibold">Tenants</h1>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className={`${btnBase} bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600`}
-          >
-            Add Tenant
-          </button>
+          
         </div>
 
         {/* Search */}
@@ -104,38 +137,52 @@ export const TenantsPage = () => {
 
         {/* Tenants List */}
         <div className="space-y-4">
-          {paginatedTenants.length === 0 ? (
+          {filteredTenants.length === 0 ? (
             <p className="text-muted-foreground text-center">
               No tenants found.
             </p>
           ) : (
-            paginatedTenants.map((tenant) => (
-              <div
-                key={tenant.id}
-                className="flex justify-between items-center border rounded-xl p-4 shadow-md bg-card dark:bg-gray-900"
-              >
-                <div>
-                  <p className="text-lg font-medium">{tenant.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Created: {tenant.createdAt}
-                  </p>
+              paginatedTenants.map((tenant) => {
+              if (!tenant.name || !tenant.createdAt || !tenant.status) return null;
+
+              return (
+                <div key={tenant.id} className="flex justify-between items-center border rounded-xl p-4 shadow-md bg-card dark:bg-gray-900">
+                  <div>
+                    <p className="text-lg font-medium">{tenant.name}</p>
+                    <p className="text-sm text-muted-foreground">Created: {tenant.createdAt ? new Date(tenant.createdAt).toLocaleString() :"Unknown"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Status:{" "}
+                      <span
+                        className={`font-semibold ${
+                          tenant.status === "active"
+                            ? "text-green-600"
+                            : tenant.status === "inactive"
+                            ? "text-gray-500"
+                            : "text-yellow-600"
+                        }`}
+                      >
+                        {tenant.status}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => alert(`Viewing details for ${tenant.name}`)}
+                      className={`${btnBase} border border-border bg-muted hover:bg-muted/80 text-foreground`}
+                    >
+                      View Details
+                    </button>
+                    <button
+                      onClick={() => confirmRemoveTenant(tenant)}
+                      className={`${btnBase} bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600`}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => alert(`Viewing details for ${tenant.name}`)}
-                    className={`${btnBase} border border-border bg-muted hover:bg-muted/80 text-foreground`}
-                  >
-                    View Details
-                  </button>
-                  <button
-                    onClick={() => confirmRemoveTenant(tenant)}
-                    className={`${btnBase} bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600`}
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))
+              );
+              })
           )}
         </div>
 
@@ -162,7 +209,6 @@ export const TenantsPage = () => {
           </div>
         )}
 
-        {/* Add Tenant Modal */}
         <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)}>
           <h2 className="text-xl font-semibold mb-4">Add a New Tenant</h2>
           <form onSubmit={handleAddTenant} className="space-y-4">

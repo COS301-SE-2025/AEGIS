@@ -62,6 +62,7 @@ type User struct {
 type TenantRepository interface {
 	Exists(id uuid.UUID) bool
 	CreateTenant(tenant *Tenant) error
+	GetAll() ([]Tenant, error)
 }
 
 type TeamRepository interface {

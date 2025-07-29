@@ -240,8 +240,9 @@ func main() {
 		caseEviTotalsHandler,
 		hub,
 		recentActivityHandler,
-		teamRepo, // Pass the team repository
-		userRepo, // Pass the user repository
+		teamRepo,   // Pass the team repository
+		tenantRepo, // Pass the tenant repository
+		userRepo,   // Pass the user repository
 
 	)
 
