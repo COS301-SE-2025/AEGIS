@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 
+	verifyemail "aegis-api/services_/auth/verify_email"
+
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -104,15 +106,15 @@ func (s *RegistrationService) Register(req RegistrationRequest) (User, error) {
 	}
 
 	// 🔕 Email verification disabled
-	// token, err := verifyemail.CreateEmailVerificationToken(s.repo.GetDB(), id)
-	// if err != nil {
-	// 	log.Printf("❌ Failed to create email verification token for %s: %v", req.Email, err)
-	// 	return User{}, err
-	// }
+	token, err := verifyemail.CreateEmailVerificationToken(s.repo.GetDB(), id)
+	if err != nil {
+		log.Printf("❌ Failed to create email verification token for %s: %v", req.Email, err)
+		return User{}, err
+	}
 
-	// if err := verifyemail.SendVerificationEmail(entity.Email, token); err != nil {
-	// 	log.Printf("❌ Failed to send verification email to %s: %v", entity.Email, err)
-	// }
+	if err := verifyemail.SendVerificationEmail(entity.Email, token); err != nil {
+		log.Printf("❌ Failed to send verification email to %s: %v", entity.Email, err)
+	}
 
 	log.Printf("✅ Registered new user: %s (%s %s)", entity.Email, entity.FullName, entity.Role)
 	return entity, nil

@@ -10,7 +10,7 @@ import (
 
 func SendVerificationEmail(to string, token string) error {
 	fmt.Println("📧 Sending verification email to:", to)
-	verifyURL := fmt.Sprintf("https://capstone-aegis.dns.net.za/verify-email?token=%s", token)
+	verifyURL := fmt.Sprintf("http://localhost:5173/verify-email?token=%s", token)
 	subject := "Welcome to AEGIS — Verify Your Email"
 	body := fmt.Sprintf(`Hello,
 

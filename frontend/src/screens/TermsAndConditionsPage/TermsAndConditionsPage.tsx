@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+const [searchParams] = useSearchParams();
+const token = searchParams.get("token");
 
 export const TermsAndConditionsPage = () => {
   const [accepted, setAccepted] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = () => {
-    fetch("/api/auth/accept-terms", { method: "POST" })
+    fetch("/api/auth/accept-terms", {
+       method: "POST", 
+       headers: { "Content-Type": "application/json" }, 
+       body: JSON.stringify({ token }) })
       .then(() => navigate("/login"))
       .catch(() => alert("Something went wrong."));
   };
