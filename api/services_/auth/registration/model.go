@@ -13,14 +13,22 @@ type UserModel struct {
 	FullName     string
 	Email        string
 	PasswordHash string
-	Role         string // ENUM: Incident Responder, Forensic Analyst, etc.
+	Role         string     // ENUM: Incident Responder, Forensic Analyst, etc.
+	TenantID     *uuid.UUID // Nullable for multi-tenant support
+	TeamID       *uuid.UUID // Nullable for team association
 }
 
 type RegistrationRequest struct {
-	FullName string `json:"full_name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Role     string `json:"role"`
+	FullName         string     `json:"full_name"`
+	Email            string     `json:"email"`
+	Password         string     `json:"password"`
+	Role             string     `json:"role"`
+	TenantID         *uuid.UUID `json:"tenant_id,omitempty"`         // Nullable for multi-tenant support
+	TeamID           *uuid.UUID `json:"team_id,omitempty"`           // Nullable for team association
+	OrganizationName string     `json:"organization_name,omitempty"` // for tenant creation
+	Domain           string     `json:"domain,omitempty"`            // optional
+	TeamName         string     `json:"team_name,omitempty"`         // for team creation
+
 	/*
 		Password is required to be hashed.
 		From client side, password is sent in plain text.
@@ -34,13 +42,14 @@ type UserResponse struct {
 	FullName string `json:"full_name"`
 	Email    string `json:"email"`
 }
-
 type User struct {
 	ID                  uuid.UUID `gorm:"type:uuid;primaryKey"`
 	FullName            string    `gorm:"not null"` // This is a derived field, not stored in the DB
 	Email               string    `gorm:"uniqueIndex"`
 	PasswordHash        string
-	Role                string `gorm:"type:user_role"`
+	Role                string     `gorm:"type:user_role"`
+	TenantID            *uuid.UUID `gorm:"type:uuid;index"` // Nullable
+	TeamID              *uuid.UUID `gorm:"type:uuid;index"` // Nullable
 	IsVerified          bool
 	EmailVerifiedAt     *time.Time
 	AcceptedTermsAt     *time.Time
@@ -49,6 +58,16 @@ type User struct {
 	ExternalTokenExpiry *time.Time
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+}
+type TenantRepository interface {
+	Exists(id uuid.UUID) bool
+	CreateTenant(tenant *Tenant) error
+}
+
+type TeamRepository interface {
+	Exists(id uuid.UUID) bool
+	CreateTeam(team *Team) error
+	FindByTenantID(tenantID uuid.UUID) ([]Team, error)
 }
 
 type Token struct {

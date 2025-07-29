@@ -12,7 +12,10 @@
 -- Create ENUM types
 CREATE TYPE user_role AS ENUM (
     -- 🔐 Core Operational & Admin Roles
-    'Admin',                             -- Full system access and configuration control
+    'Admin', 
+    'System Admin',
+    'DFIR Admin',  
+    'Tenant Admin',                  -- Manages tenant-level operations, teams, and users                         
     'External Collaborator',                      -- Basic access, limited permissions
 
     -- 🛡️ Incident Response & Forensics Roles
@@ -88,13 +91,31 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     email_verified_at TIMESTAMP NULL,
-    accepted_terms_at TIMESTAMP
+    accepted_terms_at TIMESTAMP,
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
+    team_id UUID REFERENCES teams(id) ON DELETE SET NULL -- Link to team
 );
 
 CREATE TYPE token_type AS ENUM (
     'EMAIL_VERIFY',
     'RESET_PASSWORD',
     'COLLAB_INVITE'
+);
+
+CREATE TABLE tenants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE teams (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_name TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_teams_tenant FOREIGN KEY (tenant_id),
+    REFERENCES tenants(id) ON DELETE CASCADE
 );
 
 CREATE TABLE tokens (
@@ -146,7 +167,9 @@ CREATE TABLE IF NOT EXISTS cases (
     priority case_priority DEFAULT 'medium',
     team_name TEXT NOT NULL,
     created_by UUID REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- New Fields
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
 );
 
 -- Groups table
@@ -158,7 +181,9 @@ CREATE TABLE IF NOT EXISTS groups (
     group_url TEXT, -- emoji or image URL for avatar
 
     created_by UUID REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- New Fields
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
 );
 
 CREATE TABLE annotation_threads (
@@ -172,7 +197,9 @@ CREATE TABLE annotation_threads (
   status VARCHAR(50) DEFAULT 'open',
   priority VARCHAR(50) DEFAULT 'medium',
   is_active BOOLEAN DEFAULT true,
-  resolved_at TIMESTAMP
+  resolved_at TIMESTAMP,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
+    -- New Fields
 );
 
 CREATE TABLE thread_tags (
@@ -202,27 +229,34 @@ CREATE TABLE thread_messages (
     approved_by UUID,
     approved_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- New Fields
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
 );
 
 CREATE TABLE message_mentions (
     message_id UUID NOT NULL,
     mentioned_user_id UUID NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (message_id, mentioned_user_id)
+    PRIMARY KEY (message_id, mentioned_user_id),
+    -- New Fields
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
 );
 CREATE TABLE message_reactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     message_id UUID NOT NULL,
     user_id UUID NOT NULL,
     reaction TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- New Fields   
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
 );
 
 CREATE TABLE threads (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
 );
 
 ALTER TABLE thread_messages
@@ -250,6 +284,8 @@ CREATE TABLE IF NOT EXISTS evidence (
     checksum TEXT NOT NULL,
     metadata JSONB, -- stores metadata as a key-value JSON object
     uploaded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    -- New Fields
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
 );
 
 
@@ -409,7 +445,9 @@ CREATE TABLE case_user_roles (
     case_id UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
     role user_role NOT NULL,
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, case_id)
+    PRIMARY KEY (user_id, case_id),
+    -- New Fields
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
 );
 
 -- Indexes to support performance (optional but recommended)

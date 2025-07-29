@@ -89,6 +89,8 @@ func main() {
 
 	// ─── Repositories ───────────────────────────────────────────
 	userRepo := registration.NewGormUserRepository(db.DB)
+	tenantRepo := registration.NewGormTenantRepository(db.DB)
+	teamRepo := registration.NewGormTeamRepository(db.DB)
 	resetTokenRepo := reset_password.NewGormResetTokenRepository(db.DB)
 	caseRepo := case_creation.NewGormCaseRepository(db.DB)
 
@@ -100,7 +102,7 @@ func main() {
 	emailSender := reset_password.NewMockEmailSender()
 
 	// ─── Services ───────────────────────────────────────────────
-	regService := registration.NewRegistrationService(userRepo)
+	regService := registration.NewRegistrationService(userRepo, tenantRepo, teamRepo)
 	authService := login.NewAuthService(userRepo)
 	resetService := reset_password.NewPasswordResetService(resetTokenRepo, userRepo, emailSender)
 	caseService := case_creation.NewCaseService(caseRepo)
@@ -238,6 +240,9 @@ func main() {
 		caseEviTotalsHandler,
 		hub,
 		recentActivityHandler,
+		teamRepo, // Pass the team repository
+		userRepo, // Pass the user repository
+
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

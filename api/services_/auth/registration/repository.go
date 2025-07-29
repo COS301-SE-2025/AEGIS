@@ -5,6 +5,8 @@ import (
 	"log"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"gorm.io/gorm"
 )
 
@@ -16,8 +18,16 @@ type GormUserRepository struct {
 	db *gorm.DB
 }
 
-func NewRegistrationService(repo UserRepository) *RegistrationService {
-	return &RegistrationService{repo: repo}
+func NewRegistrationService(
+	userRepo UserRepository,
+	tenantRepo TenantRepository,
+	teamRepo TeamRepository,
+) *RegistrationService {
+	return &RegistrationService{
+		repo:       userRepo,
+		tenantRepo: tenantRepo,
+		teamRepo:   teamRepo,
+	}
 }
 
 func NewGormUserRepository(db *gorm.DB) *GormUserRepository {
@@ -36,6 +46,35 @@ func (r *GormUserRepository) CreateUser(user *User) error {
 		}
 	}
 	return err
+}
+func (r *GormTenantRepository) CreateTenant(tenant *Tenant) error {
+	return r.db.Create(tenant).Error
+}
+func (r *GormTeamRepository) FindByTenantID(tenantID uuid.UUID) ([]Team, error) {
+	var teams []Team
+	err := r.db.Where("tenant_id = ?", tenantID).Find(&teams).Error
+	return teams, err
+}
+func (r *GormUserRepository) FindByTenantID(tenantID uuid.UUID) ([]User, error) {
+	var users []User
+	err := r.db.Where("tenant_id = ?", tenantID).Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func (r *GormUserRepository) FindByTeamIDAndRole(teamID uuid.UUID, role string) (*User, error) {
+	var user User
+	err := r.db.Where("team_id = ? AND role = ?", teamID, role).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *GormTeamRepository) CreateTeam(team *Team) error {
+	return r.db.Create(team).Error
 }
 
 func (r *GormUserRepository) GetUserByEmail(email string) (*User, error) {

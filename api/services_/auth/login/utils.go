@@ -34,7 +34,7 @@ func HashPassword(password string) (string, error) {
 }
 
 // GenerateJWT issues a token with claims including version and expiration logic.
-func GenerateJWT(userID, email, role string, tokenVersion int, customExpiry *time.Time) (string, error) {
+func GenerateJWT(userID, email, role string, fullName, tenantID, teamID string, tokenVersion int, customExpiry *time.Time) (string, error) {
 	var exp time.Time
 
 	// External users default to 10 days unless a custom expiry is provided
@@ -53,6 +53,9 @@ func GenerateJWT(userID, email, role string, tokenVersion int, customExpiry *tim
 		"user_id":       userID,
 		"email":         email,
 		"role":          role,
+		"full_name":     fullName,
+		"tenant_id":     tenantID,
+		"team_id":       teamID,
 		"token_version": tokenVersion,
 		"iat":           time.Now().Unix(),
 		"exp":           exp.Unix(),
