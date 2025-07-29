@@ -8,6 +8,7 @@ import (
 	"log"
 	"time"
 
+	"aegis-api/services_/auth/accept_terms"
 	verifyemail "aegis-api/services_/auth/verify_email"
 
 	"github.com/google/uuid"
@@ -26,8 +27,20 @@ type RegistrationService struct {
 	teamRepo   TeamRepository   // Assuming TeamRepository exists
 }
 
-func (s *RegistrationService) VerifyUser(token string) any {
-	panic("unimplemented")
+// VerifyUser method verifies the user's email using the provided token
+func (s *RegistrationService) VerifyUser(token string) error {
+	return verifyemail.VerifyEmail(s.repo.GetDB(), token)
+}
+
+// AcceptTerms method handles the acceptance of terms and conditions
+func (s *RegistrationService) AcceptTerms(token string) error {
+	// Look up token and get the associated user ID
+	validToken, err := verifyemail.GetValidToken(s.repo.GetDB(), token)
+	if err != nil {
+		return err // invalid or expired token
+	}
+	//Use the UserID to mark the user as having accepted terms
+	return accept_terms.AcceptTerms(s.repo.GetDB(), validToken.UserID.String())
 }
 
 // NewRegistrationService returns a new instance of the RegistrationService,
@@ -132,7 +145,7 @@ func (s *RegistrationService) Register(req RegistrationRequest) (User, error) {
 	if err := verifyemail.SendVerificationEmail(entity.Email, token); err != nil {
 		log.Printf("❌ Failed to send verification email to %s: %v", entity.Email, err)
 	}
-
+	log.Printf("✅ Sent email verification to new user: %s", entity.Email)
 	log.Printf("✅ Registered new user: %s (%s %s)", entity.Email, entity.FullName, entity.Role)
 	return entity, nil
 }

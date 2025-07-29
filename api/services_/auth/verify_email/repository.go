@@ -35,11 +35,11 @@ func GetValidToken(db *gorm.DB, rawToken string) (*Token, error) {
 }
 
 func IncrementTokenUse(db *gorm.DB, token *Token) error {
-	update := db.Model(token).Update("uses", gorm.Expr("uses + 1"))
+	//update := db.Model(token).Update("uses", gorm.Expr("uses + 1"))
 	// if token.MaxUses != nil && *token.MaxUses == 1 {
 	// 	update = update.Update("used", true)
 	// }
-	return update.Error
+	return nil
 }
 
 func CreateEmailVerificationToken(db *gorm.DB, userID uuid.UUID) (string, error) {

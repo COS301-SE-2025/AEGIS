@@ -45,6 +45,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			auth.POST("/request-password-reset", h.AuthService.RequestPasswordReset)
 			auth.POST("/reset-password", h.AuthService.ResetPasswordHandler)
 			auth.GET("/verify", h.AdminService.VerifyEmail)
+			auth.POST("/accept-terms", h.AdminService.AcceptTerms)
 		}
 
 		// ─── Registration ────────────────────────────────

@@ -13,8 +13,8 @@ type User struct {
 	PasswordHash      string
 	Role              string    `gorm:"type:user_role"`
 	CreatedAt         time.Time `gorm:"autoCreateTime"`
-	IsVerified        bool
-	VerificationToken string //We send the token to the user’s email as a verification link, e.g.:
+	IsVerified        bool      `gorm:"column:is_verified"`
+	VerificationToken string    //We send the token to the user’s email as a verification link, e.g.:
 	EmailVerifiedAt   *time.Time
 	AcceptedTermsAt   *time.Time
 }

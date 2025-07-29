@@ -30,6 +30,7 @@ type AdminServiceInterface interface {
 	RegisterTenantUser(c *gin.Context)
 	RegisterTeamUser(c *gin.Context)
 	VerifyEmail(c *gin.Context)
+	AcceptTerms(c *gin.Context)
 	ListUsers(c *gin.Context)
 	CreateTenant(c *gin.Context)
 	CreateTeam(c *gin.Context)
@@ -188,23 +189,16 @@ func (s *AdminService) VerifyEmail(c *gin.Context) {
 			Service: "auth",
 			Status:  "FAILED",
 			Description: "Verification failed: " + (func() string {
-				if e, ok := err.(error); ok {
-					return e.Error()
+				if err != nil {
+					return err.Error()
 				}
 				return "unknown error"
 			})(),
 		})
-		if e, ok := err.(error); ok {
-			c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-				Error:   "verification_failed",
-				Message: e.Error(),
-			})
-		} else {
-			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-				Error:   "unexpected_error",
-				Message: "An unexpected error occurred while verifying the email.",
-			})
-		}
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "verification_failed",
+			Message: err.Error(),
+		})
 		return
 	}
 
@@ -223,6 +217,75 @@ func (s *AdminService) VerifyEmail(c *gin.Context) {
 	c.JSON(http.StatusOK, structs.SuccessResponse{
 		Success: true,
 		Message: "Email verified successfully",
+	})
+}
+
+// POST /api/v1/auth/accept-terms
+func (s *AdminService) AcceptTerms(c *gin.Context) {
+	var req struct {
+		Token string `json:"token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "ACCEPT_TERMS",
+			Actor:  auditlog.Actor{},
+			Target: auditlog.Target{
+				Type: "terms_acceptance",
+				ID:   "",
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Missing or invalid token: " + err.Error(),
+		})
+
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Token is required",
+		})
+		return
+	}
+
+	err := s.registrationService.AcceptTerms(req.Token)
+	if err != nil {
+		s.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "ACCEPT_TERMS",
+			Actor:  auditlog.Actor{},
+			Target: auditlog.Target{
+				Type: "terms_acceptance",
+				ID:   req.Token,
+			},
+			Service: "auth",
+			Status:  "FAILED",
+			Description: "Terms acceptance failed: " + (func() string {
+				if err != nil {
+					return err.Error()
+				}
+				return "unknown error"
+			})(),
+		})
+
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "accept_terms_failed",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	s.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "ACCEPT_TERMS",
+		Actor:  auditlog.Actor{},
+		Target: auditlog.Target{
+			Type: "terms_acceptance",
+			ID:   req.Token,
+		},
+		Service:     "auth",
+		Status:      "SUCCESS",
+		Description: "Terms and conditions accepted successfully",
+	})
+
+	c.JSON(http.StatusOK, structs.SuccessResponse{
+		Success: true,
+		Message: "Terms accepted successfully",
 	})
 }
 
