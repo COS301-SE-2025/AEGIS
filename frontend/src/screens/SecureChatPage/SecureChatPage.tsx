@@ -22,8 +22,7 @@ import {
 import {Link} from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { toast } from 'react-hot-toast';
-// lib/websocket/connectWebSocket.ts
-//
+import {jwtDecode} from "jwt-decode";
 import { MutableRefObject } from "react";
 
 // Type definitions
@@ -100,14 +99,16 @@ type WebSocketMessage = {
 
 type WebSocketMessageType =
   | "new_message"
-  | "typing"
+  | "typing_start"
   | "read_receipt"
   | "message_reaction"
   | "message_reply"
   | "user_joined"
   | "user_left"
   | "file_attachment"
-  | "system_alert";
+  | "system_alert"
+  |"typing_stop"
+  | "typing_start";
 
 type NewMessagePayload = {
   messageId: string;
@@ -131,6 +132,7 @@ type Attachment = {
 
 type ChatMessages = Record<number, Message[]>;
 
+
 export const connectWebSocket = (
   caseId: string,
   token: string,
@@ -138,7 +140,8 @@ export const connectWebSocket = (
   reconnectTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>,
   onMessage: (msg: WebSocketMessage) => void,
   onOpen?: () => void,
-  onClose?: () => void
+  onClose?: () => void,
+  onTypingStatus?: (msg: WebSocketMessage) => void
 ) => {
   if (!caseId || !token) return;
 
@@ -156,20 +159,44 @@ export const connectWebSocket = (
   };
 
   ws.onmessage = (event) => {
-    try {
-      const parsed: WebSocketMessage = JSON.parse(event.data);
-      if (!parsed?.type || !parsed?.payload) throw new Error("Malformed WS message");
+  try {
+    const parsed: WebSocketMessage = JSON.parse(event.data);
 
-      // ✅ Log latency (optional)
-      const receivedAt = Date.now();
-      const sentAt = Date.parse(parsed.payload.timestamp);
-      console.log("📥 WS message latency:", receivedAt - sentAt, "ms");
-
-      onMessage(parsed);
-    } catch (err) {
-      console.error("❌ Error parsing WebSocket message:", err);
+    if (!parsed?.type || !parsed?.payload) {
+      throw new Error("Malformed WebSocket message");
     }
-  };
+
+    // Latency tracking
+    const receivedAt = Date.now();
+    const sentAt = Date.parse(parsed.payload.timestamp || "");
+    if (!isNaN(sentAt)) {
+      console.log("📥 WS message latency:", receivedAt - sentAt, "ms");
+    } else {
+      console.warn("⏱️ Could not parse message timestamp.");
+    }
+
+    // ✅ Handle typing events separately
+    if (parsed.type === "typing_start") {
+      console.log(`✍️ Typing started by ${parsed.payload.userEmail} in group ${parsed.groupId}`);
+      onTypingStatus?.(parsed);
+      return;
+    }
+
+    if (parsed.type === "typing_stop") {
+      console.log(`🛑 Typing stopped by ${parsed.payload.userEmail} in group ${parsed.groupId}`);
+      onTypingStatus?.(parsed);
+      return;
+    }
+
+    // ✅ Default to message handler
+    onMessage(parsed);
+
+  } catch (err) {
+    console.error("❌ Error handling WebSocket message:", err);
+  }
+};
+
+
 
   ws.onclose = () => {
     if (reconnectTimeoutRef.current) return;
@@ -227,6 +254,39 @@ export const SecureChatPage = (): JSX.Element => {
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 5;
 
+
+  const handleTypingStatus = (msg: WebSocketMessage) => {
+  const { type, payload } = msg;
+  const groupId = activeChat?.id;
+  if (!groupId || payload.userEmail === userEmail) return;
+
+  if (type === "typing_start") {
+    // Add user to typing list (without duplicates)
+    setTypingUsers(prev => {
+      const users = new Set([...(prev[groupId] || []), payload.userEmail]);
+      return { ...prev, [groupId]: Array.from(users) };
+    });
+
+    // Clear existing timeout
+    if (typingTimeoutsRef.current[groupId]?.[payload.userEmail]) {
+      clearTimeout(typingTimeoutsRef.current[groupId][payload.userEmail]);
+    }
+
+    // Set new timeout to remove user
+    const timeout = setTimeout(() => {
+      setTypingUsers(prev => ({
+        ...prev,
+        [groupId]: (prev[groupId] || []).filter(u => u !== payload.userEmail),
+      }));
+    }, 3000);
+
+    // Store the timeout
+    typingTimeoutsRef.current[groupId] = {
+      ...(typingTimeoutsRef.current[groupId] || {}),
+      [payload.userEmail]: timeout,
+    };
+  }
+};
 const handleSelectGroup = (group: any) => {
   const id = group.id || group._id;
   if (!id) {
@@ -245,148 +305,6 @@ const handleSelectGroup = (group: any) => {
     id,
   }));
 };
-
-// const connectWebSocket = (caseId: string) => {
-//   if (!activeChat?.id) return; // prevent runtime errors
-
-//    if (!caseId) {
-//     console.warn("⚠️ Skipping WebSocket connection: caseId is undefined");
-//     return;
-//   }
-//   if (socketRef.current) {
-//     socketRef.current.close();
-//   }
-//   if (socketRef.current?.readyState === WebSocket.OPEN) {
-//   console.log("WebSocket already connected — skipping reconnect.");
-//   return;
-// }
-// if (socketRef.current?.readyState === WebSocket.OPEN) {
-//   socketRef.current.send(JSON.stringify(message));
-// } else {
-//   console.warn("WebSocket not open, message dropped.");
-// }
-
-
-
-//   const token = sessionStorage.getItem("authToken");
-// const ws = new WebSocket(`ws://localhost:8080/ws/cases/${caseId}?token=${token}`);
-
-
-
-//   ws.onopen = () => {
-//   console.log("✅ WebSocket connected for case", caseId);
-//   setSocketConnected(true);
-//   setRetryCount(0); // reset on successful connect
-// };
-
-
-// //   ws.onclose = (event: CloseEvent) => {
-// //   console.warn(`⚠️ WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`);
-// //   setSocketConnected(false);
-
-// //   if (retryCount < MAX_RETRIES) {
-// //     const delay = Math.pow(2, retryCount) * 1000;
-// //     setTimeout(() => {
-// //       console.log(`🔁 Reconnecting in ${delay / 1000}s...`);
-// //       setRetryCount(retryCount + 1);
-// //       connectWebSocket(caseId);
-// //     }, delay);
-// //   } else {
-// //     console.error("❌ Max WebSocket reconnect attempts reached.");
-// //     toast.error("Failed to reconnect to chat. Please refresh or try again later.");
-// //   }
-// // };
-
-
-// ws.onclose = (event) => {
-//   console.warn(`⚠️ WebSocket closed. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}`);
-// };
-// ws.onerror = (err) => {
-//   console.error("❌ WebSocket error:", err);
-  
-// };
-
-
-//   ws.onmessage = (event) => {
-//     try {
-//       const message: WebSocketMessage = JSON.parse(event.data);
-//       if (!message?.type || !message?.payload) throw new Error("Malformed message");
-
-//       switch (message.type) {
-//         case "NEW_MESSAGE":
-//           const msg = message.payload;
-//           const mapped: Message = {
-//             id: msg.id,
-//             user: msg.sender_name || msg.sender_email,
-//             content: msg.content,
-//             color: msg.sender_email === userEmail ? "text-green-400" : "text-blue-400",
-//             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-//             status: "read",
-//             self: msg.sender_email === userEmail,
-//             attachments: msg.attachments || [],
-//           };
-//           setChatMessages(prev => ({
-//             ...prev,
-//             [activeChat!.id]: [...(prev[activeChat!.id] || []), mapped]
-//           }));
-//           break;
-
-//         case "THREAD_CREATED":
-//           const thread: Thread = message.payload;
-//           setThreads(prev => [...prev, thread]);
-//           toast.success(`🧵 New thread created: "${thread.title}"`);
-//           break;
-
-//         case "MESSAGE_APPROVED":
-//           const approved = message.payload;
-//           setChatMessages(prev => {
-//             const current = [...(prev[activeChat!.id] || [])];
-//             const updated = current.map(m =>
-//               m.id === approved.message_id ? { ...m, status: "approved" } : m
-//             );
-//             return { ...prev, [activeChat!.id]: updated };
-//           });
-//           break;
-
-//         case "REACTION_UPDATED":
-//           const reactionUpdate = message.payload;
-//           setChatMessages(prev => {
-//             const current = [...(prev[activeChat!.id] || [])];
-//             const updated = current.map(m =>
-//               m.id === reactionUpdate.message_id
-//                 ? { ...m, reactions: reactionUpdate.reactions }
-//                 : m
-//             );
-//             return { ...prev, [activeChat!.id]: updated };
-//           });
-//           break;
-
-//         case "THREAD_RESOLVED":
-//           const resolved = message.payload;
-//           setThreads(prev =>
-//             prev.map(t =>
-//               t.thread_id === resolved.thread_id ? { ...t, new_status: "resolved" } : t
-//             )
-//           );
-//           toast(`📌 Thread "${resolved.title}" marked as resolved`);
-//         break;
-
-//         case "THREAD_PARTICIPANT_ADDED":
-//           const participant = message.payload;
-//           toast.success(`👤 ${participant.user_name} joined thread`);
-//           break;
-
-//         default:
-//           console.warn("⚠️ Unhandled WebSocket type:", message.type);
-//       }
-
-//     } catch (err) {
-//       console.error("❌ Failed to handle WebSocket message:", err);
-//     }
-//   };
-
-//   socketRef.current = ws;
-// };
 
 
   useEffect(() => {
@@ -453,78 +371,7 @@ const [showEditGroupModal, setShowEditGroupModal] = useState(false);
 
   // Add this function to simulate incoming messages
   // Add this enhanced function to simulate realistic flowing conversations
-  const simulateIncomingMessage = (chatId: number, delay: number = 1500) => {
-  // Get current conversation context
-  
-  const currentMessages = chatMessages[chatId] || [];
-  const lastMessage = currentMessages[currentMessages.length - 1];
 
-  const getContextualResponse = (lastMsg: string, _: string) => {
-    const lowerMsg = lastMsg.toLowerCase();
-    if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
-      return ["Hey! Ready to review that evidence file?", "Hi there! Got the forensic data ready."];
-    }
-    if (lowerMsg.includes('evidence') || lowerMsg.includes('file') || lowerMsg.includes('case')) {
-      return [
-        "Hash verified. Clean sample.",
-        "Metadata extracted successfully.", 
-        "Found deleted files in slack space.",
-        "Timeline established. 3 access points.",
-        "Registry analysis complete.",
-        "Network logs show suspicious activity."
-      ];
-    }
-    return ["Got it.", "Confirmed.", "Checking now.", "Analysis complete.", "Roger that.", "On it."];
-  };
-
-  setTimeout(() => {
-    // Choose team member safely
-    let availableMembers = teamMembers;
-    const lastSender = lastMessage?.user;
-
-    // Don't let same user respond twice
-    if (lastSender && lastSender !== "You") {
-      availableMembers = teamMembers.filter(member => `${member.name} (${member.role})` !== lastSender);
-    }
-
-    // Fallback to avoid crash
-    const selectedMember = availableMembers.length > 0 
-      ? availableMembers[Math.floor(Math.random() * availableMembers.length)]
-      : teamMembers[0];
-
-    const responses = getContextualResponse(lastMessage?.content || "", lastSender || "");
-    const selectedResponse = responses[Math.floor(Math.random() * responses.length)];
-    if (!selectedMember) {
-      console.warn("No selected member found!");
-      return; // Or fallback logic
-    }
-    const newMessage: Message = {
-      id: Date.now() + Math.random(),
-      user: `${selectedMember.name} (${selectedMember.role})`,
-      color: selectedMember.color,
-      content: selectedResponse,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: "read"
-    };
-
-    setChatMessages(prev => ({
-      ...prev,
-      [chatId]: [...(prev[chatId] || []), newMessage]
-    }));
-
-    setGroups(prev => prev.map(group =>
-      group.id === chatId
-        ? { 
-            ...group, 
-            lastMessage: selectedResponse, 
-            lastMessageTime: "now", 
-            unreadCount: group.id === activeChat?.id ? 0 : group.unreadCount + 1,
-            hasStarted: true
-          }
-        : group
-    ));
-  }, delay);
-};
 
 
 
@@ -605,29 +452,6 @@ useEffect(() => {
 }, []);
 
 
-// Simulate random chat activity with better conversation flow
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (groups.length === 0) return;
-      
-      // Randomly pick a chat to add activity to
-      const randomChat = groups[Math.floor(Math.random() * groups.length)];
-      const teamMembers = [
-    { name: "Alex Morgan", role: "Forensics Analyst", color: "text-blue-400" }
-  ];
-  const randomUser = `${teamMembers[0].name} (${teamMembers[0].role})`;    
-    // 30% chance of just typing, 70% chance of sending message
-    if (Math.random() > 0.7) {
-      simulateTyping(randomChat.id, randomUser);
-    } else {
-      simulateIncomingMessage(randomChat.id, 1000);
-    }
-  }, 15000 + Math.random() * 25000); // Every 15-40 seconds
-
-  return () => clearInterval(interval);
-}, [groups, chatMessages]);
-
-
 
 
 const fileInputGroupRef = useRef<HTMLInputElement>(null);
@@ -637,6 +461,89 @@ const handleGroupImageClick = () => {
     fileInputGroupRef.current?.click();
   }
 };
+
+const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const typingTimeoutsRef = useRef<{
+  [groupId: string]: { [email: string]: ReturnType<typeof setTimeout> };
+}>({});
+
+const sendTypingNotification = (type: "typing_start" | "typing_stop") => {
+  if (!activeChat?.id || !socketRef.current) return;
+
+  const message = {
+    type,
+    payload: { userEmail },
+    groupId: String(activeChat.id),
+    userEmail,
+  };
+
+  socketRef.current.send(JSON.stringify(message));
+
+  if (type === "typing_start") {
+    // Debounce sending "typing_stop"
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      const stopMessage = {
+        type: "typing_stop",
+        payload: { userEmail },
+        groupId: String(activeChat.id),
+        userEmail,
+      };
+      socketRef.current?.send(JSON.stringify(stopMessage));
+    }, 3000); // 3s of inactivity
+  }
+};
+
+
+
+
+
+
+//  useEffect(() => {
+//     if (!activeChat?.caseId) return;
+
+//      // Replace with actual token retrieval logic
+//     const socket = new WebSocket(`ws://localhost:8080/ws/cases/${activeChat.caseId}?token=${token}`);
+//     socketRef.current = socket;
+
+//     socket.onmessage = (event) => {
+//       try {
+//         const parsed: WebSocketMessage = JSON.parse(event.data);
+//         if (!parsed?.type || !parsed?.payload) throw new Error("Malformed WS message");
+
+//         handleTypingStatus(parsed);
+//       } catch (err) {
+//         console.error("Error parsing WebSocket message:", err);
+//       }
+//     };
+
+//     socket.onopen = () => {
+//       console.log("WebSocket connected.");
+//     };
+
+//     socket.onclose = () => {
+//       console.warn("WebSocket closed. Retrying...");
+//     };
+
+//     socket.onerror = (err) => {
+//       console.error("WebSocket error:", err);
+//     };
+
+//     return () => {
+//       socket.close();
+//     };
+//   }, [activeChat?.caseId]);
+
+useEffect(() => {
+  return () => {
+    Object.values(typingTimeoutsRef.current).forEach(group =>
+      Object.values(group).forEach(timeout => clearTimeout(timeout))
+    );
+  };
+}, []);
+
+
 
 const handleGroupImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -904,62 +811,6 @@ if (meaningfulGroups.length > 0) {
 }
 
 
-//   const handleSendAttachment = () => {
-//   if (!previewFile || !activeChat || !previewFileData) return;
-
-//   const isImage = previewFile.type.startsWith('image/');
-  
-//   const newMessage: Message = {
-//   id: Date.now(),
-//   user: "You",
-//   color: "text-green-400",
-//   self: true,
-//   content: attachmentMessage || `Shared ${isImage ? 'an image' : 'a file'}: ${previewFile.name}`,
-//   time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-//   status: "sent",
-//   attachments: [
-//     {
-//       file_name: previewFile.name,
-//       file_type: previewFile.type,
-//       file_size: previewFile.size,
-//       url: previewFileData,
-//       isImage
-//     }
-//   ],
-//   ...(replyingTo && {
-//     replyTo: {
-//       id: replyingTo.id,
-//       user: replyingTo.user,
-//       content: replyingTo.content,
-//       ...(replyingTo.attachments?.[0] && {
-//         attachment: {
-//           name: replyingTo.attachments[0].file_name,
-//           type: replyingTo.attachments[0].file_type
-//         }
-//       })
-//     }
-//   })
-// };
-
-
-//     setChatMessages(prev => ({
-//       ...prev,
-//       [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
-//     }));
-//       // Update last message in group
-//     const lastMessageText = attachmentMessage ? attachmentMessage : `📎 ${previewFile.name}`;
-//     setGroups(prev => prev.map(group =>
-//       group.id === activeChat.id
-//         ? { ...group, lastMessage: lastMessageText, lastMessageTime: "now" }
-//         : group
-//     ));
-//     // Reset states
-//     setShowAttachmentPreview(false);
-//     setPreviewFile(null);
-//     setPreviewUrl("");
-//     setAttachmentMessage("");
-//     setReplyingTo(null);
-//   };
 
  const handleCancelAttachment = () => {
   setShowAttachmentPreview(false);
@@ -1236,29 +1087,6 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
 };
 
 
-
-// const createGroup = async () => {
-//   const res = await fetch('http://localhost:8080/api/v1/chat/groups', {
-//     method: 'POST',
-//     headers: {
-//       Authorization: `Bearer ${token}`,
-//       'Content-Type': 'application/json'
-//     },
-//     body: JSON.stringify({
-//       name: newGroupName,
-//       description: "Group created from frontend",
-//       type: "group",
-//       created_by: userEmail,
-//       members: [{ user_email: userEmail, role: "admin" }],
-//       settings: { is_public: false, allow_invites: true }
-//     })
-//   });
-//   const newGroup = await res.json();
-//   await fetchGroups();
-//   setShowNewGroupModal(false);
-//   setNewGroupName("");
-// };
-
 const loadMessages = async (groupId: number) => {
     if (!activeChat?.id) {
     console.warn("❌  ID available, skipping message load.");
@@ -1353,48 +1181,40 @@ useEffect(() => {
     activeChat.caseId,
     token,
     socketRef,
-      reconnectTimeoutRef,
- (msg) => {
-  console.log("📨 WebSocket received:", Date.now(), msg);
+    reconnectTimeoutRef,
+    (msg) => {
+      if (msg.type === "new_message" && msg.payload.groupId === String(activeChat.id)) {
+        const incoming = msg.payload;
 
-if (msg.type === "new_message" && msg.payload.groupId === activeChat.id) {
-  const incoming = msg.payload;
+        const mappedMessage: Message = {
+          id: incoming.messageId,
+          user: incoming.senderName || incoming.senderId,
+          color: incoming.senderId === userId ? "text-green-400" : "text-blue-400",
+          content: incoming.text,
+          time: new Date(incoming.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: "read",
+          self: incoming.senderId === userId,
+          attachments: incoming.attachments || []
+        };
 
-  const mappedMessage: Message = {
-    id: incoming.messageId,
-    user: incoming.senderName || incoming.senderId,
-    color: incoming.senderId === userId ? "text-green-400" : "text-blue-400",
-    content: incoming.text,
-    time: new Date(incoming.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    status: "read",
-    self: incoming.senderId === userId,
-    attachments: incoming.attachments || []
-  };
+        setChatMessages(prev => {
+          const existing = prev[activeChat.id] || [];
+          const alreadyExists = existing.some(m => m.id === mappedMessage.id);
+          if (alreadyExists) return prev;
 
-  setChatMessages(prev => {
-    const existing = prev[activeChat.id] || [];
-    const alreadyExists = existing.some(m => m.id === mappedMessage.id);
-    if (alreadyExists) return prev;
-
-    return {
-      ...prev,
-      [activeChat.id]: [...existing, mappedMessage]
-    };
-  });
-}
- },
+          return {
+            ...prev,
+            [activeChat.id]: [...existing, mappedMessage]
+          };
+        });
+      }
+    },
     () => setSocketConnected(true),
-    () => setSocketConnected(false)
+    () => setSocketConnected(false),
+    handleTypingStatus // ✅ pass handler here
   );
-
-  return () => {
-    if (socketRef.current) {
-      console.log("🔌 Cleaning up WebSocket...");
-      socketRef.current.close();
-      socketRef.current = null;
-    }
-  };
 }, [activeChat?.caseId, token]);
+
 
 const updateGroup = async () => {
   if (!activeChat) {
@@ -1525,6 +1345,35 @@ const handleOpenAddMembersModal = async () => {
     console.error("❌ Error fetching collaborators:", err);
   }
 };
+
+const decoded = token ? jwtDecode<{ userId: string; name: string }>(token) : null;
+
+const handleSend = () => {
+  if (!message.trim() || !activeChat || !socketRef.current) return;
+
+  const userId = decoded?.userId || "";
+  const username = decoded?.name || "Unknown";
+
+  const newMessage = {
+    text: message,
+    groupId: String(activeChat.id),
+    senderId: userId,
+    senderName: username,
+    timestamp: new Date().toISOString(),
+    attachments: [] // Add file support later if needed
+  };
+
+  const wsMessage: WebSocketMessage = {
+    type: "new_message",
+    payload: newMessage
+  };
+
+  socketRef.current.send(JSON.stringify(wsMessage));
+
+  // Clear input
+  setMessage("");
+};
+
 
 
 
@@ -1936,45 +1785,56 @@ const handleDeleteGroup = async () => {
                 </div>
               )}
 
-            {/* Typing Indicator */}
-            {typingUsers[activeChat.id]?.length > 0 && (
-              <div className="px-4 py-2 text-sm text-muted-foreground">
-                {typingUsers[activeChat.id].join(", ")} {typingUsers[activeChat.id].length === 1 ? "is" : "are"} typing...
-              </div>
-            )}
-              {/* Message Input */}
-              <div className="p-4 border-t border-border bg-card">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-3 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                    title="Attach file"
-                  >
-                    <Paperclip className="w-5 h-5" />
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    onChange={handleFileSelection}
-                    className="hidden"
-                    accept="*/*"
-                  />
-                  <input
-                    type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(e)}
-                    placeholder="Type a secure message..."
-                    className="flex-1 p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    className="px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center justify-center transition-colors"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
+         {/* ✅ Message Input + Typing Indicator */}
+<div className="p-4 border-t border-border bg-card">
+  {/* Typing Indicator for other users */}
+  {typingUsers[activeChat?.id]?.filter((email) => email !== userEmail).length > 0 && (
+    <div className="text-sm text-muted-foreground mb-1 ml-2">
+      {typingUsers[activeChat.id]
+        .filter((email) => email !== userEmail)
+        .join(", ")}{" "}
+      {typingUsers[activeChat.id].length > 2 ? "are" : "is"} typing...
+    </div>
+  )}
+
+  {/* Input Row */}
+  <div className="flex items-center gap-2">
+    <button
+      onClick={() => fileInputRef.current?.click()}
+      className="p-3 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+      title="Attach file"
+    >
+      <Paperclip className="w-5 h-5" />
+    </button>
+    <input
+      ref={fileInputRef}
+      type="file"
+      onChange={handleFileSelection}
+      className="hidden"
+      accept="*/*"
+    />
+    <input
+      type="text"
+      value={message}
+      onChange={(e) => {
+        setMessage(e.target.value);
+        sendTypingNotification("typing_start");
+      }}
+      onBlur={() => sendTypingNotification("typing_stop")}
+      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(e)}
+      placeholder="Type a secure message..."
+      className="flex-1 p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
+    />
+    <button
+      onClick={handleSendMessage}
+      className="px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center justify-center transition-colors"
+    >
+      <Send className="w-5 h-5" />
+    </button>
+  </div>
+</div>
+{/* ✅ Old Message Input (Preserved) */}
+
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">

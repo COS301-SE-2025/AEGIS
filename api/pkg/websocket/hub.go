@@ -177,6 +177,77 @@ func (h *Hub) BroadcastToGroup(groupID string, message chat.WebSocketMessage) er
 		return fmt.Errorf("broadcast channel full or not ready")
 	}
 }
+func toWebSocketMessage(event chat.WebSocketEvent) chat.WebSocketMessage {
+	return chat.WebSocketMessage{
+		Type:      chat.MessageType(event.Type),
+		Payload:   event.Payload,
+		GroupID:   event.GroupID,
+		UserEmail: event.UserEmail,
+		Timestamp: event.Timestamp,
+	}
+}
+
+// Send typing start notification
+// Send typing start notification
+func (h *Hub) BroadcastTypingStart(groupID string, userEmail string) error {
+	typingPayload := TypingPayload{
+		UserEmail: userEmail,
+		CaseID:    groupID,
+	}
+
+	typingMessage := chat.WebSocketEvent{
+		Type:      chat.EventTypingStart, // 👈 this is of type EventType, as expected
+		Payload:   typingPayload,
+		GroupID:   groupID,
+		UserEmail: userEmail,
+		Timestamp: time.Now(),
+	}
+
+	log.Printf("📤 Broadcasting typing_start for user %s in group %s", userEmail, groupID)
+
+	encoded, err := json.Marshal(typingMessage)
+	if err != nil {
+		log.Printf("❌ Failed to marshal typing_start message: %v", err)
+		return err
+	}
+
+	h.broadcast <- MessageEnvelope{
+		CaseID: groupID,
+		Data:   encoded,
+	}
+	return nil
+}
+
+// Send typing stop notification
+// Send typing stop notification
+func (h *Hub) BroadcastTypingStop(groupID string, userEmail string) error {
+	typingPayload := TypingPayload{
+		UserEmail: userEmail,
+		CaseID:    groupID,
+	}
+
+	typingMessage := chat.WebSocketEvent{
+		Type:      chat.EventTypingStop, // ✅ correct EventType
+		Payload:   typingPayload,
+		GroupID:   groupID,
+		UserEmail: userEmail,
+		Timestamp: time.Now(),
+	}
+
+	log.Printf("📤 Broadcasting typing_stop for user %s in group %s", userEmail, groupID)
+
+	encoded, err := json.Marshal(typingMessage)
+	if err != nil {
+		log.Printf("❌ Failed to marshal typing_stop message: %v", err)
+		return err
+	}
+
+	h.broadcast <- MessageEnvelope{
+		CaseID: groupID,
+		Data:   encoded,
+	}
+	return nil
+}
 
 func (h *Hub) BroadcastToCase(caseID string, message chat.WebSocketMessage) error {
 	// Marshal message to JSON bytes
@@ -338,6 +409,26 @@ func (c *Client) readPump() {
 				CaseID: c.CaseID,
 				Data:   encoded,
 			}
+
+		case chat.EventTypingStart:
+			payloadBytes, _ := json.Marshal(msg.Payload)
+			var payload TypingPayload
+			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+				log.Printf("❌ Failed to decode typing_start payload: %v", err)
+				continue
+			}
+			log.Printf("✍️ Typing START received from %s in case %s", payload.UserEmail, c.CaseID)
+			c.Hub.BroadcastTypingStart(c.CaseID, payload.UserEmail)
+
+		case chat.EventTypingStop:
+			payloadBytes, _ := json.Marshal(msg.Payload)
+			var payload TypingPayload
+			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+				log.Printf("❌ Failed to decode typing_stop payload: %v", err)
+				continue
+			}
+			log.Printf("🛑 Typing STOP received from %s in case %s", payload.UserEmail, c.CaseID)
+			c.Hub.BroadcastTypingStop(c.CaseID, payload.UserEmail)
 
 		default:
 			log.Printf("⚠️ Unsupported WebSocket message type: %s", msg.Type)

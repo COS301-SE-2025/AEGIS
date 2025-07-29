@@ -118,6 +118,12 @@ func (c *Client) WritePump() {
 	}
 }
 
+// TypingPayload represents the data associated with a typing event
+type TypingPayload struct {
+	UserEmail string `json:"userEmail"`
+	CaseID    string `json:"caseId"`
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
