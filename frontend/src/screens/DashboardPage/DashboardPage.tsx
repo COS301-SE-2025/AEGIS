@@ -18,7 +18,6 @@ import { useState, useEffect } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
 import { SidebarToggleButton } from "../../context/SidebarToggleContext";
-import axios from "axios";
 
 
 interface CaseCard {

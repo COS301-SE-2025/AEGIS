@@ -24,7 +24,6 @@ const useRegistrationForm = () => {
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = "Email is invalid";
     }
-
     if (!formData.password.trim()) {
       newErrors.password = "Password is required";
     } else if (formData.password.length < 6) {
@@ -59,16 +58,24 @@ const handleChange = (e) => {
     if (!validate()) return;
 
     try {
+      const token = sessionStorage.getItem("authToken");
+      if (!token) {
+        setErrors({ general: "No auth token found, please login again" });
+        return;
+      }
       const res = await fetch("http://localhost:8080/api/v1/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`, 
+        },
         body: JSON.stringify(formData),
       });
 
       const payload = await res.json();
 
       if (res.ok && payload.success) {
-        navigate("/login");
+        navigate(-1); // Go back to previous page
       } else {
         setErrors({ general: payload.message || "Registration failed" });
       }

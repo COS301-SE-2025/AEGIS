@@ -32,7 +32,6 @@ const useLoginForm = () => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
-
 const handleSubmit = async (e) => {
   e.preventDefault();
   if (!validate()) return;
@@ -46,17 +45,26 @@ const handleSubmit = async (e) => {
     const payload = await res.json();
 
     if (res.ok && payload.success && payload.data?.token) {
+      const token = payload.data.token;
+
+      // 🔓 Decode JWT
+      const base64Payload = token.split(".")[1];
+      const decodedPayload = JSON.parse(atob(base64Payload));
+
       const userData = {
-        email: payload.data.email,
-        id: payload.data.id,
-        role: payload.data.role, // Make sure your backend includes this!
+        id: decodedPayload.user_id,
+        email: decodedPayload.email,
+        name: decodedPayload.full_name,
+        role: decodedPayload.role,
+        tenantId: decodedPayload.tenant_id,
+        teamId: decodedPayload.team_id,
       };
 
       // Store token & user info
-      sessionStorage.setItem("authToken", payload.data.token);
+      sessionStorage.setItem("authToken", token);
       sessionStorage.setItem("user", JSON.stringify(userData));
 
-      // Audit logging
+      // Audit log
       const loginAuditEntry = {
         timestamp: new Date().toISOString(),
         user: userData.email,
@@ -86,7 +94,6 @@ const handleSubmit = async (e) => {
     setErrors({ general: err.message || "Network error" });
   }
 };
-
 
   return { formData, handleChange, handleSubmit, errors };
 };

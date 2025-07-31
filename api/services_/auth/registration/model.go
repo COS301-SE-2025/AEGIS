@@ -69,6 +69,7 @@ type TeamRepository interface {
 	Exists(id uuid.UUID) bool
 	CreateTeam(team *Team) error
 	FindByTenantID(tenantID uuid.UUID) ([]Team, error)
+	FindByID(id uuid.UUID) (*Team, error)
 }
 
 type Token struct {

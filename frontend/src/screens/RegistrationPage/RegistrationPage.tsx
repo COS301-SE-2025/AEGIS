@@ -8,12 +8,54 @@ import {
 } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { Link } from "react-router-dom";
+//import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { jwtDecode } from "jwt-decode";
+
 // @ts-ignore
 import useRegistrationForm from "./register";
 
 export const RegistrationPage = (): JSX.Element => {
   const { formData, errors, handleChange, handleSubmit } = useRegistrationForm();
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+
+useEffect(() => {
+  const fetchTeams = async () => {
+    try {
+      const token = sessionStorage.getItem("authToken");
+      if (!token) {
+        console.error("No auth token found");
+        return;
+      }
+      const decoded: any = jwtDecode(token);
+      const teamId = decoded.team_id;
+      if (!teamId) {
+        console.error("No tenant ID found in token");
+        return;
+      }
+
+      const res = await fetch(`http://localhost:8080/api/v1/teams/${teamId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+    if (!res.ok) {
+      console.error("Failed to fetch teams:", data);
+      return;
+    }      
+    setTeams([{ id: data.id, name: data.name }]);
+
+    } catch (error) {
+      console.error("Fetch error:", error);
+    }
+  };
+
+  fetchTeams();
+}, []);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] flex items-center justify-center px-4">
@@ -152,14 +194,12 @@ export const RegistrationPage = (): JSX.Element => {
                   className="h-11 bg-white/10 border border-white/20 text-white placeholder-white/70 w-full rounded-lg px-4 focus:outline-none"
                 >
                   <option value="" disabled hidden>Select your Team</option>
-                  {[
-                    
-                  ].map((team) => (
-                    <option key={team} value={team} className="text-black">
-                      {team}
-                    </option>
-                  ))}
-                </select>
+                  {teams.map((team) => (
+                      <option key={team.id} value={team.name}>
+                        {team.name}
+                  </option>
+                ))}
+              </select>
                 {errors.team && <p className="text-red-300 text-xs mt-1">{errors.team}</p>}
               </div>
 
@@ -175,13 +215,7 @@ export const RegistrationPage = (): JSX.Element => {
                 Sign Up
               </Button>
 
-              {/* Redirect to login */}
-              <p className="text-center text-white/80 text-sm pt-2">
-                Already have an account?{" "}
-                <Link to="/" className="text-blue-300 hover:underline font-medium">
-                  Sign in
-                </Link>
-              </p>
+      
             </form>
           </CardContent>
         </Card>

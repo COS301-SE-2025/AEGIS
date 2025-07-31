@@ -12,9 +12,13 @@ import {
 import { ShieldAlert } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import axios from "axios";
+import { jwtDecode } from "jwt-decode";
+
 
 export function CreateCaseForm(): JSX.Element {
   const navigate = useNavigate();
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+
 
   const [form, setForm] = useState({
     creator: "",
@@ -23,35 +27,76 @@ export function CreateCaseForm(): JSX.Element {
     attackType: "",
     description: "",
     creatorId: "", // from session storage
+    tenantId: "", // from session storage
+    
   });
 
-  type CreateCaseFormField = keyof typeof form;
+    type CreateCaseFormField = keyof typeof form;
+    type DecodedToken = {
+    user_id: string;
+    tenant_id: string;
+    team_id: string;
+    team_name: string;
+    full_name: string;
+    role: string;
+    exp: number;
+    email: string;
+  };
 
   useEffect(() => {
-    const savedFormData = localStorage.getItem("tempCreateCaseForm");
-    if (savedFormData) {
-      try {
-        setForm(JSON.parse(savedFormData));
-      } catch (error) {
-        console.error("Error loading saved form data:", error);
-      }
+  const savedFormData = localStorage.getItem("tempCreateCaseForm");
+  if (savedFormData) {
+    try {
+      setForm(JSON.parse(savedFormData));
+    } catch (error) {
+      console.error("Error loading saved form data:", error);
     }
+  }
 
-    // Load user from sessionStorage
-    const userStr = sessionStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setForm((prev) => ({ ...prev, creatorId: user.id }));
-      } catch (err) {
-        console.error("Failed to parse user from session storage:", err);
-      }
+  const userStr = sessionStorage.getItem("user");
+  const token = sessionStorage.getItem("authToken");
+
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      setForm(prev => ({ ...prev, creatorId: user.id }));
+    } catch (err) {
+      console.error("Failed to parse user:", err);
     }
-  }, []);
+  }
+
+  if (token) {
+    try {
+      const decoded = jwtDecode<DecodedToken>(token);
+      setForm(prev => ({
+      ...prev,
+      tenantId: decoded.tenant_id,
+      team: decoded.team_name, 
+    }));
+    } catch (err) {
+      console.error("Failed to decode token:", err);
+    }
+  }
+}, []);
 
   useEffect(() => {
-    localStorage.setItem("tempCreateCaseForm", JSON.stringify(form));
-  }, [form]);
+  const token = sessionStorage.getItem("authToken");
+  if (!token) return;
+
+  const decoded = jwtDecode<DecodedToken>(token);
+  setForm(prev => ({ ...prev, tenantId: decoded.tenant_id }));
+
+  // Use team_id here, NOT tenant_id
+axios.get<{ id: string; name: string }>(`http://localhost:8080/api/v1/teams/${decoded.team_id}`)
+  .then((res) => {
+    setTeams([res.data]);  // wrap in array so you can map safely
+  })
+  .catch(err => {
+    console.error("Failed to load teams:", err);
+  });
+
+}, []);
+
 
   const clearSavedFormData = () => {
     localStorage.removeItem("tempCreateCaseForm");
@@ -71,18 +116,28 @@ export function CreateCaseForm(): JSX.Element {
       return;
     }
 
-    const payload = {
-      title: form.attackType,
-      description: form.description,
-      status: "open",
-      priority: form.priority || "low",
-      investigation_stage: "analysis",
-      created_by: form.creatorId, // direct from session storage
-      team_name: form.team,
-    };
+const user = JSON.parse(sessionStorage.getItem("user") || "{}");
+console.log("User from session:", user);
+
+const payload = {
+  title: form.attackType,
+  description: form.description,
+  status: "open",
+  priority: form.priority || "low",
+  investigation_stage: "analysis",
+  created_by: user.id,
+  team_name: form.team,
+  tenant_id: form.tenantId, // 🛠️ ADD THIS LINE
+};
 
     console.log("Submitting payload:", payload);
    const token = sessionStorage.getItem("authToken");
+   console.log("Token:", token);
+   if (token) {
+  const base64Payload = token.split('.')[1];
+  const decoded = JSON.parse(atob(base64Payload));
+  console.log("Decoded token payload:", decoded);
+}
 
     try {
       const response = await axios.post(
@@ -120,16 +175,22 @@ export function CreateCaseForm(): JSX.Element {
 
         <form onSubmit={handleSubmit} className="space-y-5">
     
-          <div>
-            <label className="block mb-1 text-sm">Team Name</label>
-            <Input
-              className="bg-muted border-border text-foreground placeholder-muted-foreground"
-              placeholder="e.g. AEGIS Forensics"
-              value={form.team}
-              onChange={handleChange("team")}
-              required
-            />
-          </div>
+      <div>
+        <label className="block mb-1 text-sm">Team Name</label>
+        <select
+          className="w-full p-2 border rounded bg-muted text-foreground"
+          value={form.team}
+          onChange={(e) => setForm({ ...form, team: e.target.value })}
+          required
+        >
+          <option value="">Select a team</option>
+          {teams.map((team) => (
+            <option key={team.id} value={team.name}>
+              {team.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
           <div>
             <label className="block mb-1 text-sm">Case Priority</label>

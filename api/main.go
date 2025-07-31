@@ -93,8 +93,10 @@ func main() {
 	teamRepo := registration.NewGormTeamRepository(db.DB)
 	resetTokenRepo := reset_password.NewGormResetTokenRepository(db.DB)
 	caseRepo := case_creation.NewGormCaseRepository(db.DB)
+	caseAssignRepo := case_assign.NewGormCaseAssignmentRepo(db.DB) //caseAssignRepo := case_assign.NewCaseAssignmentRepo(db.DB) // Use the ne
+	userAdapter := case_assign.NewUserAdapter(userRepo)
+	adminChecker := case_assign.NewContextAdminChecker()
 
-	caseAssignRepo := case_assign.NewGormCaseAssignmentRepo(db.DB)
 	listActiveCasesRepo := ListActiveCases.NewActiveCaseRepository(db.DB)
 	listCasesRepo := ListCases.NewGormCaseQueryRepository(db.DB)
 
@@ -106,10 +108,8 @@ func main() {
 	authService := login.NewAuthService(userRepo)
 	resetService := reset_password.NewPasswordResetService(resetTokenRepo, userRepo, emailSender)
 	caseService := case_creation.NewCaseService(caseRepo)
+	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo, adminChecker, userAdapter)
 
-	adminChecker := case_assign.NewContextAdminChecker()
-
-	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo, adminChecker)
 	listActiveCasesService := ListActiveCases.NewService(listActiveCasesRepo)
 	listCasesService := ListCases.NewListCasesService(listCasesRepo)
 
@@ -139,6 +139,7 @@ func main() {
 		listCasesService,       // ListCasesService
 		listActiveCasesService, // ListActiveCasesService
 		auditLogger,            // AuditLogger
+		userAdapter,            // UserRepo
 	)
 
 	// ─── Evidence Upload/Download/Metadata ──────────────────────

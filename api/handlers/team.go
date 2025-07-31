@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -41,6 +42,42 @@ func (h *Handler) GetTeamsByTenant(c *gin.Context) {
 			TenantID: team.TenantID,
 			Manager:  managerName,
 		})
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) GetTeamByID(c *gin.Context) {
+	teamIDStr := c.Param("id")
+	teamID, err := uuid.Parse(teamIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid team ID"})
+		return
+	}
+	fmt.Println("Parsed teamID:", teamID) // 🔍
+
+	team, err := h.TeamRepo.FindByID(teamID)
+	if err != nil {
+		fmt.Println("Team not found error:", err) // 🔍
+		c.JSON(http.StatusNotFound, gin.H{"error": "Team not found"})
+		return
+	}
+	fmt.Println("Fetched team ID from DB:", team.ID) // 🔍
+
+	managerName := "N/A"
+	user, err := h.UserRepo.FindByTeamIDAndRole(team.ID, "DFIR Admin")
+	if err == nil && user != nil {
+		managerName = user.FullName
+		fmt.Println("User found:", user.FullName, "with team ID:", user.TeamID) // 🔍
+	} else {
+		fmt.Println("No DFIR Admin found for team ID:", team.ID, "Error:", err) // 🔍
+	}
+
+	result := TeamWithManager{
+		ID:       team.ID,
+		Name:     team.Name,
+		TenantID: team.TenantID,
+		Manager:  managerName,
 	}
 
 	c.JSON(http.StatusOK, result)

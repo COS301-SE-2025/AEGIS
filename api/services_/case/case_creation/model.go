@@ -16,6 +16,8 @@ type Case struct {
 	InvestigationStage string    `gorm:"column:investigation_stage;type:investigation_stage;default:'analysis'" json:"investigation_stage"`
 	CreatedBy          uuid.UUID `gorm:"column:created_by;type:uuid;not null" json:"created_by"`
 	TeamName           string    `gorm:"column:team_name;type:text;not null" json:"team_name"`
+	TenantID           uuid.UUID `gorm:"column:tenant_id;type:uuid;not null" json:"tenant_id"`
+	TeamID             uuid.UUID `gorm:"column:team_id;type:uuid" json:"team_id"`
 	CreatedAt          time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 }
 
@@ -27,4 +29,6 @@ type CreateCaseRequest struct {
 	InvestigationStage string    `json:"investigation_stage"`
 	CreatedBy          uuid.UUID `json:"created_by" binding:"required"`
 	TeamName           string    `json:"team_name" binding:"required"`
+	TenantID           uuid.UUID `json:"tenant_id" `
+	TeamID             uuid.UUID `json:"team_id"`
 }

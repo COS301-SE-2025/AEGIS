@@ -24,5 +24,5 @@ func (c *ContextAdminChecker) IsAdminFromContext(ctx *gin.Context) (bool, error)
 	if !ok {
 		return false, errors.New("invalid role type in context")
 	}
-	return role == "Admin", nil
+	return role == "DFIR Admin", nil
 }

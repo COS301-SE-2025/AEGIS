@@ -53,14 +53,14 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Extract claims from MapClaims
-		userID, _ := claims["user_id"].(string)
-		email, _ := claims["email"].(string)
-		role, _ := claims["role"].(string)
-		fullName, _ := claims["full_name"].(string)
-		tenantID, _ := claims["tenant_id"].(string)
-		teamID, _ := claims["team_id"].(string)
+		userID, ok1 := getStringClaim(claims, "user_id")
+		email, ok2 := getStringClaim(claims, "email")
+		role, ok3 := getStringClaim(claims, "role")
+		fullName, _ := getStringClaim(claims, "full_name")
+		tenantID, ok4 := getStringClaim(claims, "tenant_id")
+		teamID, ok5 := getStringClaim(claims, "team_id")
 
-		if userID == "" || email == "" || role == "" || tenantID == "" {
+		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || userID == "" || email == "" || role == "" || tenantID == "" || teamID == "" {
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
 				Message: "Missing required token claims",
@@ -79,6 +79,14 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+func getStringClaim(claims jwt.MapClaims, key string) (string, bool) {
+	val, ok := claims[key]
+	if !ok {
+		return "", false
+	}
+	str, ok := val.(string)
+	return str, ok
 }
 
 func WebSocketAuthMiddleware() gin.HandlerFunc {

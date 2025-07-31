@@ -5,6 +5,7 @@ import (
 	"aegis-api/services_/case/ListCases"
 	"aegis-api/services_/case/case_assign"
 	"aegis-api/services_/case/case_creation"
+
 	"fmt"
 	"net/http"
 
@@ -19,6 +20,7 @@ type CaseHandler struct {
 	ListCasesService    ListCasesService
 	ListActiveCasesServ ListActiveCasesService
 	auditLogger         *auditlog.AuditLogger
+	UserRepo            case_assign.UserRepo // Add UserRepo here
 }
 type ListActiveCasesService interface {
 	ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
@@ -66,7 +68,7 @@ func (s *CaseServices) GetAllCases() ([]ListCases.Case, error) {
 
 type CaseServiceInterface interface {
 	CreateCase(req *case_creation.CreateCaseRequest) (*case_creation.Case, error)
-	AssignUserToCase(assignerRole string, assigneeID, caseID uuid.UUID, role string) error
+	AssignUserToCase(assignerRole string, assigneeID, caseID, assignerID uuid.UUID, role string) error
 	ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
 	GetCaseByID(caseID string) (*ListCases.Case, error)
 	UnassignUserFromCase(assignerID *gin.Context, assigneeID, caseID uuid.UUID) error // ← Add this
@@ -78,12 +80,14 @@ func NewCaseHandler(
 	listCasesService ListCasesService,
 	listActiveCasesService ListActiveCasesService,
 	auditLogger *auditlog.AuditLogger,
+	userRepo case_assign.UserRepo, // Inject UserRepo here
 ) *CaseHandler {
 	return &CaseHandler{
 		CaseService:         caseService,
 		ListCasesService:    listCasesService,
 		ListActiveCasesServ: listActiveCasesService,
 		auditLogger:         auditLogger,
+		UserRepo:            userRepo, // Assign UserRepo
 	}
 }
 
@@ -91,8 +95,8 @@ func (s *CaseServices) CreateCase(req *case_creation.CreateCaseRequest) (*case_c
 	return s.createCase.CreateCase(req)
 }
 
-func (s *CaseServices) AssignUserToCase(assignerRole string, assigneeID, caseID uuid.UUID, role string) error {
-	return s.assignCase.AssignUserToCase(assignerRole, assigneeID, caseID, role)
+func (s *CaseServices) AssignUserToCase(assignerRole string, assigneeID, caseID uuid.UUID, tenantID uuid.UUID, role string) error {
+	return s.assignCase.AssignUserToCase(assignerRole, assigneeID, caseID, tenantID, role, tenantID)
 }
 
 func (s *CaseServices) GetCaseByID(caseID string) (*ListCases.Case, error) {
@@ -195,6 +199,38 @@ func (h *CaseHandler) CreateCase(c *gin.Context) {
 	}
 
 	fmt.Printf("[CreateCase] Received valid request payload: %+v\n", req)
+
+	userIDVal, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: missing userID in context"})
+		return
+	}
+	userID = userIDVal.(string) // if you need userID later
+
+	tenantIDVal, exists := c.Get("tenantID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: missing tenantID in context"})
+		return
+	}
+	tenantUUID, err := uuid.Parse(tenantIDVal.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID format"})
+		return
+	}
+
+	req.TenantID = tenantUUID
+
+	teamIDVal, exists := c.Get("teamID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: missing teamID in context"})
+		return
+	}
+	teamUUID, err := uuid.Parse(teamIDVal.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid team ID format"})
+		return
+	}
+	req.TeamID = teamUUID
 
 	newCase, err := h.CaseService.CreateCase(&req)
 	if err != nil {

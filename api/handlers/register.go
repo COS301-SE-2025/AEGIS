@@ -111,6 +111,49 @@ func (s *AdminService) RegisterUser(c *gin.Context) {
 		})
 		return
 	}
+	// Extract tenant ID from context
+	tenantIDVal, exists := c.Get("tenantID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "Tenant ID missing from token",
+		})
+		return
+	}
+	tenantIDStr, ok := tenantIDVal.(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "unauthorized",
+			Message: "Tenant ID is not a string",
+		})
+		return
+	}
+	tenantID, err := uuid.Parse(tenantIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+			Error:   "bad_request",
+			Message: "Invalid tenant ID format",
+		})
+		return
+	}
+
+	// Assign it to the request
+	req.TenantID = &tenantID
+	teamIDVal, hasTeam := c.Get("teamID")
+	if hasTeam {
+		if teamIDStr, ok := teamIDVal.(string); ok {
+			if teamID, err := uuid.Parse(teamIDStr); err == nil {
+				req.TeamID = &teamID
+			} else {
+				// Optional: log or return error if team ID is invalid
+				c.JSON(http.StatusBadRequest, structs.ErrorResponse{
+					Error:   "bad_request",
+					Message: "Invalid team ID format",
+				})
+				return
+			}
+		}
+	}
 
 	user, err := s.registrationService.Register(req)
 	if err != nil {

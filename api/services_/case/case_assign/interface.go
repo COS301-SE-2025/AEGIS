@@ -13,3 +13,6 @@ type CaseAssignmentRepoInterface interface {
 	AssignRole(userID, caseID uuid.UUID, role string) error
 	UnassignRole(userID, caseID uuid.UUID) error
 }
+type UserRepo interface {
+	GetUserByID(userID uuid.UUID) (*User, error)
+}

@@ -41,6 +41,8 @@ func (s *Service) CreateCase(req *CreateCaseRequest) (*Case, error) {
 		CreatedBy:          creatorUUID, // Use the resolved user ID as uuid.UUID
 		TeamName:           req.TeamName,
 		CreatedAt:          time.Now(),
+		TenantID:           req.TenantID, // Assuming this is a tenant ID for multi-tenancy
+		TeamID:             req.TeamID,   // Optional team ID
 	}
 
 	// Persist the case in the repository

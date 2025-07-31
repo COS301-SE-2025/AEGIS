@@ -49,11 +49,12 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		}
 
 		// ─── Registration ────────────────────────────────
-		api.POST("/register", h.AdminService.RegisterUser)
+		api.POST("/register", middleware.AuthMiddleware(), middleware.RequireRole("DFIR Admin"), h.AdminService.RegisterUser)
 		api.POST("/register/tenant", h.AdminService.RegisterTenantUser)
 		api.POST("/register/team", middleware.AuthMiddleware(), middleware.RequireRole("Tenant Admin"), h.AdminService.RegisterTeamUser)
 		api.POST("/tenant", h.AdminService.CreateTenant)
 		api.POST("/team", h.AdminService.CreateTeam)
+		api.GET("/teams/:id", h.GetTeamByID)
 		api.GET("/teams", h.GetTeamsByTenant)
 		api.GET("/tenants", h.GetAllTenants)
 

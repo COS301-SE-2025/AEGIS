@@ -76,6 +76,14 @@ func (r *GormUserRepository) FindByTeamIDAndRole(teamID uuid.UUID, role string) 
 func (r *GormTeamRepository) CreateTeam(team *Team) error {
 	return r.db.Create(team).Error
 }
+func (r *GormTeamRepository) FindByID(id uuid.UUID) (*Team, error) {
+	var team Team
+	err := r.db.Where("id = ?", id).First(&team).Error
+	if err != nil {
+		return nil, err
+	}
+	return &team, nil
+}
 
 func (r *GormUserRepository) GetUserByEmail(email string) (*User, error) {
 	var user User
