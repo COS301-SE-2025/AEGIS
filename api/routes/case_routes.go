@@ -72,6 +72,8 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.POST("/cases/assign", h.CaseHandler.AssignUserToCase)
 			protected.GET("/cases/:case_id/collaborators", h.GetCollaboratorsHandler.GetCollaboratorsByCaseID)
 			protected.POST("/cases/unassign", h.CaseHandler.UnassignUserFromCase)
+			protected.GET("/cases/closed", h.CaseHandler.ListClosedCasesHandler)
+			protected.PATCH("/cases/:case_id", h.CaseHandler.UpdateCaseHandler)
 
 			// ─── New List / Filter Cases ──────────────────
 			protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)
@@ -95,6 +97,11 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.GET("/dashboard/totals", h.CaseEvidenceTotalsHandler.GetDashboardTotals)
 			// ─── Recent Activities ───────────────────────────────
 			protected.GET("/auditlogs/recent/:userId", h.RecentActivityHandler.GetRecentActivities)
+
+			// ─── Notification Routes ──────────────────────────────
+			protected.GET("/notifications", h.GetNotifications)
+			protected.POST("/notifications/read", h.MarkNotificationsRead)
+			protected.DELETE("/notifications/delete", h.DeleteNotifications)
 
 			// RegisterMessageRoutes(protected, h.MessageService, auditLogger)
 			// ─── Thread Messaging ────────────────────────
