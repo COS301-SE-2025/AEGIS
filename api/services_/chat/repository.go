@@ -20,17 +20,16 @@ const (
 
 type MongoRepository struct {
 	db *mongo.Database
+	//notifier events.GroupNotifier // Optional notifier
 }
 
 // NewChatRepository creates a new MongoDB chat repository
-func NewChatRepository(db *mongo.Database) ChatRepository {
+func NewChatRepository(db *mongo.Database) *MongoRepository {
 	repo := &MongoRepository{db: db}
-
-	// Create indexes
 	repo.createIndexes()
-
 	return repo
 }
+
 func (r *MongoRepository) UpdateGroupImage(ctx context.Context, groupID primitive.ObjectID, imageURL string) error {
 	collection := r.db.Collection(GroupsCollection)
 	filter := bson.M{"_id": groupID}
@@ -225,20 +224,16 @@ func (r *MongoRepository) DeleteGroup(ctx context.Context, groupID primitive.Obj
 func (r *MongoRepository) AddMemberToGroup(ctx context.Context, groupID primitive.ObjectID, member *Member) error {
 	collection := r.db.Collection(GroupsCollection)
 
-	// Check if member already exists
 	existing := collection.FindOne(ctx, bson.M{
 		"_id":                groupID,
 		"members.user_email": member.UserEmail,
 	})
 	if existing.Err() == nil {
-		// Member already exists
 		return fmt.Errorf("user already a member of this group")
 	} else if existing.Err() != mongo.ErrNoDocuments {
-		// Some other DB error
 		return existing.Err()
 	}
 
-	// Member doesn't exist — proceed to add
 	member.JoinedAt = time.Now()
 	member.IsActive = true
 
@@ -252,6 +247,11 @@ func (r *MongoRepository) AddMemberToGroup(ctx context.Context, groupID primitiv
 	if err != nil {
 		return fmt.Errorf("failed to add member to group: %w", err)
 	}
+
+	// // ✅ Trigger notification without direct websocket dependency
+	// if r.notifier != nil {
+	// 	_ = r.notifier.NotifyMemberAdded(groupID.Hex(), member.UserEmail)
+	// }
 
 	return nil
 }

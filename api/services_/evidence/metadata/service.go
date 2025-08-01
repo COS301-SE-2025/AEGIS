@@ -25,30 +25,35 @@ func NewService(repo Repository, ipfs upload.IPFSClientImp) *Service {
 
 // UploadEvidence uploads a file to IPFS and saves evidence data, including metadata.
 // UploadEvidence streams the file to IPFS and computes checksum on-the-fly.
+// UploadEvidence uploads evidence to IPFS and saves metadata into the database.
+// Supports multi-tenancy (tenant & team).
 func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
-	// Use TeeReader to compute SHA256 while uploading to IPFS
+	// ✅ Compute SHA256 checksum while streaming to IPFS
 	hash := sha256.New()
 	tee := io.TeeReader(data.FileData, hash)
 
-	// Upload to IPFS
+	// ✅ Upload to IPFS
 	cid, err := s.ipfs.UploadFile(tee)
 	if err != nil {
 		return fmt.Errorf("IPFS upload failed: %w", err)
 	}
 
-	// Compute checksum after stream has been read
+	// ✅ Compute checksum
 	checksum := fmt.Sprintf("%x", hash.Sum(nil))
 
+	// ✅ Encode metadata as JSON string
 	metadataJSON, err := json.Marshal(data.Metadata)
 	if err != nil {
 		return fmt.Errorf("metadata JSON marshal failed: %w", err)
 	}
 
-	// Build the evidence record
+	// ✅ Build Evidence record with multi-tenancy
 	e := &Evidence{
 		ID:         uuid.New(),
 		CaseID:     data.CaseID,
 		UploadedBy: data.UploadedBy,
+		TenantID:   data.TenantID, // ✅ new
+		TeamID:     data.TeamID,   // ✅ new
 		Filename:   data.Filename,
 		FileType:   data.FileType,
 		IpfsCID:    cid,

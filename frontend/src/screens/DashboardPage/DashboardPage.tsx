@@ -63,9 +63,20 @@ const [] = useState<File | null>(null);
 const [updatedTitle, setUpdatedTitle] = useState("");
 const [updatedDescription, setUpdatedDescription] = useState("");
 
+interface Notification {
+  id: string;
+  message: string;
+  read: boolean;
+  archived: boolean;
+  // Add other properties as needed
+}
+
 const [openCases, setOpenCases] = useState([]);
 const [closedCases, setClosedCases] = useState([]);
 const [evidenceCount, setEvidenceCount] = useState(0);
+const [notifications, setNotifications] = useState<Notification[]>([]);
+
+const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
 
 
 useEffect(() => {
@@ -439,9 +450,16 @@ const handleSaveCase = async () => {
                 />
               </div>
               <Link to="/notifications">
-              <button className="p-2 text-muted-foreground hover:text-white transition-colors">
-                <Bell className="w-6 h-6" />
-              </button></Link>
+                <button className="relative p-2 text-muted-foreground hover:text-white transition-colors">
+                  <Bell className="w-6 h-6" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+              </Link>
+
               <Link to="/settings">
                 <button className="p-2 text-muted-foreground hover:text-white transition-colors">
                   <Settings className="w-6 h-6" />

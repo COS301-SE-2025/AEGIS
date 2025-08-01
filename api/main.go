@@ -113,16 +113,31 @@ func main() {
 	regService := registration.NewRegistrationService(userRepo, tenantRepo, teamRepo)
 	authService := login.NewAuthService(userRepo)
 	resetService := reset_password.NewPasswordResetService(resetTokenRepo, userRepo, emailSender)
-	caseService := case_creation.NewCaseService(caseRepo)
+	caseService := case_creation.NewCaseService(caseRepo, notificationService, hub)
 	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo, adminChecker, userAdapter)
 
 	listActiveCasesService := ListActiveCases.NewService(listActiveCasesRepo)
 	listClosedCasesService := ListClosedCases.NewService(listClosedCasesRepo)
 	listCasesService := ListCases.NewListCasesService(listCasesRepo)
+
+	// ─── Audit Logging ──────────────────────────────────────────
+	mongoLogger := auditlog.NewMongoLogger(mongoDatabase) // mongoDB is your *mongo.Database
+	zapLogger := auditlog.NewZapLogger()
+	auditLogger := auditlog.NewAuditLogger(mongoLogger, zapLogger)
+
+	// Build the get_collaborators repository & service
+	collabRepo := get_collaborators.NewGormRepository(db.DB)
+	collabService := get_collaborators.NewService(collabRepo)
+	getCollaboratorsHandler := handlers.NewGetCollaboratorsHandler(collabService, auditLogger)
+
 	// ─── Unified Case Services ─────────────────────────────────
 	updateCaseRepo := update_case.NewGormUpdateCaseRepository(db.DB)
-	updateCaseService := update_case.NewService(updateCaseRepo)
-
+	updateCaseService := update_case.NewService(
+		updateCaseRepo,
+		collabService,       // ✅ GetCollaborators service
+		notificationService, // ✅ Notification service
+		hub,                 // ✅ WebSocket Hub
+	)
 	caseServices := handlers.NewCaseServices(
 		caseService,
 		listCasesService,
@@ -135,10 +150,6 @@ func main() {
 	// ─── List Users ─────────────────────────────────────────────
 	listUserRepo := ListUsers.NewUserRepository(db.DB)
 	listUserService := ListUsers.NewListUserService(listUserRepo)
-	// ─── Audit Logging ──────────────────────────────────────────
-	mongoLogger := auditlog.NewMongoLogger(mongoDatabase) // mongoDB is your *mongo.Database
-	zapLogger := auditlog.NewZapLogger()
-	auditLogger := auditlog.NewAuditLogger(mongoLogger, zapLogger)
 
 	// ─── Handlers ───────────────────────────────────────────────
 	adminHandler := handlers.NewAdminService(regService, listUserService, nil, nil, auditLogger)
@@ -195,10 +206,6 @@ func main() {
 	profileService := profile.NewProfileService(profileRepo)
 	profileHandler := handlers.NewProfileHandler(profileService, auditLogger)
 
-	// Build the get_collaborators repository & service
-	collabRepo := get_collaborators.NewGormRepository(db.DB)
-	collabService := get_collaborators.NewService(collabRepo)
-	getCollaboratorsHandler := handlers.NewGetCollaboratorsHandler(collabService, auditLogger)
 	// ─── Evidence Tagging ─────────────────────────────
 	evidenceTagRepo := evidence_tag.NewEvidenceTagRepository(db.DB)
 	evidenceTagService := evidence_tag.NewEvidenceTagService(evidenceTagRepo)

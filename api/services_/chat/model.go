@@ -26,11 +26,15 @@ type ChatGroup struct {
 
 // Member represents a group member
 type Member struct {
+	UserID      string    `bson:"user_id" json:"user_id"` // ✅ Add for notifications
 	UserEmail   string    `bson:"user_email" json:"user_email"`
 	Role        string    `bson:"role" json:"role"` // "admin", "member"
 	JoinedAt    time.Time `bson:"joined_at" json:"joined_at"`
 	IsActive    bool      `bson:"is_active" json:"is_active"`
 	Permissions []string  `bson:"permissions,omitempty" json:"permissions,omitempty"`
+
+	TenantID string `bson:"tenant_id,omitempty" json:"tenant_id,omitempty"` // ✅ Add for multi-tenancy
+	TeamID   string `bson:"team_id,omitempty" json:"team_id,omitempty"`     // ✅ Add for multi-tenancy
 }
 
 // GroupSettings represents group configuration
@@ -128,17 +132,25 @@ type User struct {
 type EventType string
 
 const (
-	EventNewMessage   EventType = "new_message"
-	EventMessageRead  EventType = "message_read"
-	EventUserJoined   EventType = "user_joined"
-	EventUserLeft     EventType = "user_left"
-	EventGroupUpdated EventType = "group_updated"
-	EventGroupDeleted EventType = "group_deleted"
-	EventTypingStart  EventType = "typing_start"
-	EventTypingStop   EventType = "typing_stop"
-	EventUserOnline   EventType = "user_online"
-	EventUserOffline  EventType = "user_offline"
+	EventNewMessage           EventType = "new_message"
+	EventMessageRead          EventType = "message_read"
+	EventUserJoined           EventType = "user_joined"
+	EventUserLeft             EventType = "user_left"
+	EventGroupUpdated         EventType = "group_updated"
+	EventGroupDeleted         EventType = "group_deleted"
+	EventTypingStart          EventType = "typing_start"
+	EventTypingStop           EventType = "typing_stop"
+	EventUserOnline           EventType = "user_online"
+	EventUserOffline          EventType = "user_offline"
+	EventNotification         EventType = "notification"
+	EventMarkNotificationRead EventType = "mark_notification_read"
+	EventArchiveNotification  EventType = "archive_notification"
+	EventDeleteNotification   EventType = "delete_notification"
 )
+
+type MarkReadPayload struct {
+	NotificationIDs []string `json:"notificationIds"`
+}
 
 // WebSocketEvent represents a real-time event
 type WebSocketEvent struct {
