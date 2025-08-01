@@ -84,6 +84,7 @@ type CaseServiceInterface interface {
 	ListActiveCases(userID string, tenantID string, teamID string) ([]ListActiveCases.ActiveCase, error)
 	GetCaseByID(caseID string) (*ListCases.Case, error)
 	UnassignUserFromCase(assignerID *gin.Context, assigneeID, caseID uuid.UUID) error // ← Add this
+	ListClosedCases(userID string, tenantID string, teamID string) ([]ListClosedCases.ClosedCase, error)
 }
 
 func NewCaseHandler(
