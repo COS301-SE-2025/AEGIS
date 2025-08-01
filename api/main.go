@@ -19,17 +19,20 @@ import (
 	"aegis-api/services_/auth/reset_password"
 	"aegis-api/services_/case/ListActiveCases"
 	"aegis-api/services_/case/ListCases"
+	"aegis-api/services_/case/ListClosedCases"
 	"aegis-api/services_/case/ListUsers"
 	"aegis-api/services_/case/case_assign"
 	"aegis-api/services_/case/case_creation"
 	"aegis-api/services_/case/case_evidence_totals"
 	"aegis-api/services_/case/case_tags"
+	update_case "aegis-api/services_/case/case_update"
 	"aegis-api/services_/chat"
 	"aegis-api/services_/evidence/evidence_download"
 	"aegis-api/services_/evidence/evidence_tag"
 	"aegis-api/services_/evidence/evidence_viewer"
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
+	"aegis-api/services_/notification"
 	"aegis-api/services_/user/profile"
 
 	//"github.com/gin-gonic/gin"
@@ -84,7 +87,9 @@ func main() {
 	// r.Use(middleware.AuthMiddleware())
 
 	// Create and start WebSocket hub
-	hub := websocket.NewHub()
+	notificationService := notification.NewNotificationService(db.DB)
+
+	hub := websocket.NewHub(notificationService)
 	go hub.Run()
 
 	// ─── Repositories ───────────────────────────────────────────
@@ -98,6 +103,7 @@ func main() {
 	adminChecker := case_assign.NewContextAdminChecker()
 
 	listActiveCasesRepo := ListActiveCases.NewActiveCaseRepository(db.DB)
+	listClosedCasesRepo := ListClosedCases.NewClosedCaseRepository(db.DB)
 	listCasesRepo := ListCases.NewGormCaseQueryRepository(db.DB)
 
 	// ─── Email Sender (Mock) ────────────────────────────────────
@@ -111,14 +117,19 @@ func main() {
 	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo, adminChecker, userAdapter)
 
 	listActiveCasesService := ListActiveCases.NewService(listActiveCasesRepo)
+	listClosedCasesService := ListClosedCases.NewService(listClosedCasesRepo)
 	listCasesService := ListCases.NewListCasesService(listCasesRepo)
-
 	// ─── Unified Case Services ─────────────────────────────────
+	updateCaseRepo := update_case.NewGormUpdateCaseRepository(db.DB)
+	updateCaseService := update_case.NewService(updateCaseRepo)
+
 	caseServices := handlers.NewCaseServices(
 		caseService,
 		listCasesService,
 		listActiveCasesService,
 		caseAssignService,
+		listClosedCasesService,
+		updateCaseService,
 	)
 
 	// ─── List Users ─────────────────────────────────────────────
@@ -135,11 +146,13 @@ func main() {
 
 	//pass separate services explicitly
 	caseHandler := handlers.NewCaseHandler(
-		caseServices,           // CaseServiceInterface
-		listCasesService,       // ListCasesService
-		listActiveCasesService, // ListActiveCasesService
-		auditLogger,            // AuditLogger
-		userAdapter,            // UserRepo
+		caseServices,
+		listCasesService,
+		listActiveCasesService,
+		listClosedCasesService,
+		auditLogger, // AuditLogger
+		userAdapter, // UserRepo
+		updateCaseService,
 	)
 
 	// ─── Evidence Upload/Download/Metadata ──────────────────────
@@ -156,7 +169,7 @@ func main() {
 
 	// ─── Messages / WebSocket ───────────────────────────────────
 	messageRepo := messages.NewMessageRepository(db.DB)
-	messageHub := websocket.NewHub()
+	messageHub := websocket.NewHub(notificationService)
 	go messageHub.Run()
 
 	messageService := messages.NewMessageService(*messageRepo, messageHub)
@@ -218,6 +231,10 @@ func main() {
 
 	recentActivityHandler := handlers.NewRecentActivityHandler(auditLogService)
 
+	notificationService = &notification.NotificationService{
+		DB: db.DB,
+	}
+
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -244,7 +261,7 @@ func main() {
 		teamRepo,   // Pass the team repository
 		tenantRepo, // Pass the tenant repository
 		userRepo,   // Pass the user repository
-
+		notificationService,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

@@ -3,6 +3,7 @@ package websocket
 import (
 	"aegis-api/pkg/sharedws"
 	"aegis-api/services_/chat"
+	"aegis-api/services_/notification"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -17,12 +18,13 @@ import (
 )
 
 type Hub struct {
-	clients     map[string]map[*Client]bool // caseID -> clients
-	broadcast   chan MessageEnvelope
-	register    chan *Client
-	unregister  chan *Client
-	mu          sync.Mutex
-	connections map[string]map[string]*websocket.Conn
+	clients             map[string]map[*Client]bool // caseID -> clients
+	broadcast           chan MessageEnvelope
+	register            chan *Client
+	unregister          chan *Client
+	mu                  sync.Mutex
+	connections         map[string]map[string]*websocket.Conn
+	NotificationService *notification.NotificationService
 }
 type Claims struct {
 	Email        string `json:"email"`
@@ -36,12 +38,13 @@ type Claims struct {
 // Ensure Hub implements the chat.WebSocketManager interface
 var _ chat.WebSocketManager = (*Hub)(nil)
 
-func NewHub() *Hub {
+func NewHub(notificationService *notification.NotificationService) *Hub {
 	return &Hub{
-		clients:    make(map[string]map[*Client]bool),
-		broadcast:  make(chan MessageEnvelope),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
+		clients:             make(map[string]map[*Client]bool),
+		broadcast:           make(chan MessageEnvelope),
+		register:            make(chan *Client),
+		unregister:          make(chan *Client),
+		NotificationService: notificationService,
 	}
 }
 
@@ -429,6 +432,21 @@ func (c *Client) readPump() {
 			}
 			log.Printf("🛑 Typing STOP received from %s in case %s", payload.UserEmail, c.CaseID)
 			c.Hub.BroadcastTypingStop(c.CaseID, payload.UserEmail)
+
+		case chat.EventMarkNotificationRead:
+			payloadBytes, _ := json.Marshal(msg.Payload)
+			var payload chat.MarkReadPayload
+			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+				log.Printf("❌ Failed to decode MARK_READ payload: %v", err)
+				continue
+			}
+
+			err := c.Hub.NotificationService.MarkAsRead(payload.NotificationIDs)
+
+			if err != nil {
+				log.Printf("❌ Failed to mark notifications as read: %v", err)
+				continue
+			}
 
 		default:
 			log.Printf("⚠️ Unsupported WebSocket message type: %s", msg.Type)

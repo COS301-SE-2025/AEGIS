@@ -17,12 +17,16 @@ func NewClosedCaseRepository(db *gorm.DB) *ClosedCaseRepository {
 	}
 }
 
-func (r *ClosedCaseRepository) GetClosedCasesByUserID(ctx context.Context, userID string) ([]ClosedCase, error) {
+func (r *ClosedCaseRepository) GetClosedCasesByUserID(ctx context.Context, userID string, tenantID string, teamID string) ([]ClosedCase, error) {
 	var cases []ClosedCase
 	err := r.db.Table("cases").
-		Select("cases.*").
-		Joins("JOIN case_user_roles ON case_user_roles.case_id = cases.id").
-		Where("case_user_roles.user_id = ? AND cases.status = ?", userID, "closed").
+		Select("DISTINCT cases.*").
+		Joins("LEFT JOIN case_user_roles ON case_user_roles.case_id = cases.id").
+		Where(`(case_user_roles.user_id = ? OR cases.created_by = ?)
+               AND cases.status = ?
+               AND cases.tenant_id = ?
+               AND cases.team_id = ?`,
+			userID, userID, "closed", tenantID, teamID).
 		Scan(&cases).Error
 
 	if err != nil {

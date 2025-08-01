@@ -5,5 +5,5 @@ import (
 )
 
 type ListClosedCasesRepository interface {
-	GetClosedCasesByUserID(ctx context.Context, userID string) ([]ClosedCase, error)
+	GetClosedCasesByUserID(ctx context.Context, userID, tenantID, teamID string) ([]ClosedCase, error)
 }

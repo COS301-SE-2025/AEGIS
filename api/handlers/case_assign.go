@@ -97,8 +97,25 @@ func (h *CaseHandler) AssignUserToCase(c *gin.Context) {
 		return
 	}
 
+	assignerID, err := uuid.Parse(userID.(string))
+	if err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "ASSIGN_USER_TO_CASE",
+			Actor:  actor,
+			Target: auditlog.Target{
+				Type: "case_assignment",
+				ID:   caseID.String(),
+			},
+			Service:     "case",
+			Status:      "FAILED",
+			Description: "Invalid assigner ID",
+		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid assigner id"})
+		return
+	}
+
 	if err := h.CaseService.AssignUserToCase(
-		assignerRole.(string), assigneeID, caseID, req.Role,
+		assignerRole.(string), assigneeID, caseID, assignerID, req.Role,
 	); err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action: "ASSIGN_USER_TO_CASE",
