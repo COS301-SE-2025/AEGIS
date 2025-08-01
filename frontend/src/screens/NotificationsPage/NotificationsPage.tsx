@@ -4,7 +4,7 @@ import {
   Archive,
   Bell,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 
 import { cn } from "../../lib/utils"; // Utility for conditional styling
@@ -46,10 +46,211 @@ const mockData: Notification[] = [
 ];
 
 export const NotificationsPage = () => {
-  const [notifications, setNotifications] = useState<Notification[]>(mockData);
+ // const [notifications, setNotifications] = useState<Notification[]>(mockData);
   const [selected, setSelected] = useState<string[]>([]);
   const [filter, setFilter] = useState<"all" | "unread" | "archived">("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+const wsRef = useRef<WebSocket | null>(null);
+const [notifications, setNotifications] = useState<Notification[]>([]);
+const token = sessionStorage.getItem("authToken");
+const tenantID = sessionStorage.getItem("tenantId"); // store on login
+const teamID = sessionStorage.getItem("teamId");     // store on login
+
+// Compute unread notifications
+const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
+
+// 1️⃣ Fetch initial notifications from backend REST API
+useEffect(() => {
+  async function fetchNotifications() {
+    if (!token) return;
+    try {
+      const res = await fetch("http://localhost:8080/api/v1/notifications", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch notifications");
+      const data = await res.json();
+
+      // Format timestamps to human-readable form
+      const formatted = data.map((n: Notification) => ({
+        ...n,
+        timestamp: new Date(n.timestamp).toLocaleString(),
+      }));
+      setNotifications(formatted);
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+    }
+  }
+  fetchNotifications();
+}, [token]);
+
+// 2️⃣ WebSocket Connection
+useEffect(() => {
+  if (!token) return;
+
+  // 🔹 Scope the WS to tenant or team instead of global
+  const ws = new WebSocket(
+    `ws://localhost:8080/ws/cases/${tenantID }?token=${token}`
+  );
+  wsRef.current = ws;
+
+  ws.onopen = () => console.log("🔗 Connected to notifications WebSocket");
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+
+      switch (msg.type) {
+        case "notification":
+        case "EventNotification":
+          setNotifications((prev) => [
+            {
+              ...msg.payload,
+              timestamp: new Date(msg.payload.timestamp).toLocaleString(),
+            },
+            ...prev,
+          ]);
+          break;
+
+        case "mark_notification_read":
+          const ids: string[] = msg.payload.notificationIds || [];
+          setNotifications((prev) =>
+            prev.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n))
+          );
+          break;
+
+        default:
+          console.warn("⚠️ Unhandled WS message type:", msg.type);
+      }
+    } catch (err) {
+      console.error("Failed to parse WS message", err);
+    }
+  };
+
+  ws.onclose = () => console.log("❌ Notifications WebSocket closed");
+
+  return () => ws.close();
+}, [token, tenantID]);
+
+// 3️⃣ Mark as Read (local + WebSocket + optional REST call)
+const markAsRead = async () => {
+  if (selected.length === 0) return;
+
+  // Update locally
+  setNotifications((prev) =>
+    prev.map((n) => (selected.includes(n.id) ? { ...n, read: true } : n))
+  );
+
+  // Clear selection
+  const idsToMark = [...selected];
+  setSelected([]);
+
+  // Send WebSocket event
+  const ws = wsRef.current;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(
+      JSON.stringify({
+        type: "MARK_NOTIFICATION_READ",
+        payload: { notificationIds: idsToMark },
+      })
+    );
+  }
+
+  // Optional: Persist via REST
+  try {
+    await fetch("http://localhost:8080/api/v1/notifications/read", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ notificationIds: idsToMark }),
+    });
+  } catch (err) {
+    console.error("Failed to persist mark-as-read:", err);
+  }
+};
+
+
+// Archive selected notifications
+const archiveSelected = async () => {
+  if (selected.length === 0) return;
+
+  // 1. Update local state immediately
+  setNotifications((prev) =>
+    prev.map((n) =>
+      selected.includes(n.id) ? { ...n, archived: true } : n
+    )
+  );
+
+  const idsToArchive = [...selected];
+  setSelected([]);
+
+  // 2. Send WebSocket event
+  const ws = wsRef.current;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(
+      JSON.stringify({
+        type: "ARCHIVE_NOTIFICATION",
+        payload: { notificationIds: idsToArchive },
+      })
+    );
+  }
+
+  // 3. Persist via REST
+  try {
+    await fetch("http://localhost:8080/api/v1/notifications/archive", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ notificationIds: idsToArchive }),
+    });
+  } catch (err) {
+    console.error("Failed to archive notifications:", err);
+  }
+};
+
+// Delete selected notifications
+const deleteSelected = async () => {
+  if (selected.length === 0) return;
+
+  // 1. Update local state immediately
+  const idsToDelete = [...selected];
+  setNotifications((prev) =>
+    prev.filter((n) => !idsToDelete.includes(n.id))
+  );
+
+  setSelected([]);
+
+  // 2. Send WebSocket event
+  const ws = wsRef.current;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(
+      JSON.stringify({
+        type: "DELETE_NOTIFICATION",
+        payload: { notificationIds: idsToDelete },
+      })
+    );
+  }
+
+  // 3. Persist via REST
+  try {
+    await fetch("http://localhost:8080/api/v1/notifications/delete", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ notificationIds: idsToDelete }),
+    });
+  } catch (err) {
+    console.error("Failed to delete notifications:", err);
+  }
+};
+
+
 
   const filteredNotifications = notifications
     .filter((n) => {
@@ -67,30 +268,30 @@ export const NotificationsPage = () => {
     );
   };
 
-  const markAsRead = () => {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        selected.includes(n.id) ? { ...n, read: true } : n
-      )
-    );
-    setSelected([]);
-  };
+  // const markAsRead = () => {
+  //   setNotifications((prev) =>
+  //     prev.map((n) =>
+  //       selected.includes(n.id) ? { ...n, read: true } : n
+  //     )
+  //   );
+  //   setSelected([]);
+  // };
 
-  const archiveSelected = () => {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        selected.includes(n.id) ? { ...n, archived: true } : n
-      )
-    );
-    setSelected([]);
-  };
+  // const archiveSelected = () => {
+  //   setNotifications((prev) =>
+  //     prev.map((n) =>
+  //       selected.includes(n.id) ? { ...n, archived: true } : n
+  //     )
+  //   );
+  //   setSelected([]);
+  // };
 
-  const deleteSelected = () => {
-    setNotifications((prev) =>
-      prev.filter((n) => !selected.includes(n.id))
-    );
-    setSelected([]);
-  };
+  // const deleteSelected = () => {
+  //   setNotifications((prev) =>
+  //     prev.filter((n) => !selected.includes(n.id))
+  //   );
+  //   setSelected([]);
+  // };
 
   // Real-time updates placeholder
   useEffect(() => {
@@ -103,9 +304,19 @@ export const NotificationsPage = () => {
   return (
     <div className="min-h-screen bg-background text-foreground px-8 py-10 transition-colors">
       <div className="flex items-center justify-between pb-6 border-b border-border mb-6">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
+        {/* <h1 className="text-2xl font-semibold flex items-center gap-2">
           <Bell className="w-6 h-6" /> Notifications
+        </h1> */}
+        <h1 className="text-2xl font-semibold flex items-center gap-2 relative">
+          <Bell className="w-6 h-6" />
+          Notifications
+          {unreadCount > 0 && (
+            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">
+              {unreadCount}
+            </span>
+          )}
         </h1>
+
         <div className="flex items-center gap-4">
           <Link to="/dashboard">
             <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">

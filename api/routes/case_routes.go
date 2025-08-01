@@ -102,6 +102,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.GET("/notifications", h.GetNotifications)
 			protected.POST("/notifications/read", h.MarkNotificationsRead)
 			protected.DELETE("/notifications/delete", h.DeleteNotifications)
+			protected.POST("/notifications/archive", h.ArchiveNotifications)
 
 			// RegisterMessageRoutes(protected, h.MessageService, auditLogger)
 			// ─── Thread Messaging ────────────────────────

@@ -91,7 +91,7 @@ func getStringClaim(claims jwt.MapClaims, key string) (string, bool) {
 
 func WebSocketAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Check token from query param
+		// Extract token from query parameter
 		tokenString := c.Query("token")
 		if tokenString == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, structs.ErrorResponse{
@@ -101,6 +101,7 @@ func WebSocketAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// Parse the JWT with custom claims
 		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -108,6 +109,7 @@ func WebSocketAuthMiddleware() gin.HandlerFunc {
 			return GetJWTSecret(), nil
 		})
 
+		// Check token validity
 		if err != nil || !token.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
@@ -116,8 +118,9 @@ func WebSocketAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// Type assert custom claims
 		claims, ok := token.Claims.(*Claims)
-		if !ok || claims.UserID == "" {
+		if !ok || claims.UserID == "" || claims.TenantID == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
 				Message: "Invalid token claims",
@@ -125,11 +128,13 @@ func WebSocketAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// ✅ Inject claims into context
+		// ✅ Inject user data into Gin context
 		c.Set("userID", claims.UserID)
 		c.Set("email", claims.Email)
 		c.Set("userRole", claims.Role)
 		c.Set("fullName", claims.FullName)
+		c.Set("tenantID", claims.TenantID)
+		c.Set("teamID", claims.TeamID)
 
 		c.Next()
 	}
