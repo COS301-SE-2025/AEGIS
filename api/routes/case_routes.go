@@ -69,7 +69,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			// ─── Case Management ──────────────────────────
 			protected.POST("/cases", h.CaseHandler.CreateCase)
 			protected.GET("/cases/active", h.CaseHandler.ListActiveCasesHandler)
-			protected.POST("/cases/assign", h.CaseHandler.AssignUserToCase)
+			protected.POST("/cases/assign", middleware.AuthMiddleware(), h.CaseHandler.AssignUserToCase)
 			protected.GET("/cases/:case_id/collaborators", h.GetCollaboratorsHandler.GetCollaboratorsByCaseID)
 			protected.POST("/cases/unassign", h.CaseHandler.UnassignUserFromCase)
 			protected.GET("/cases/closed", h.CaseHandler.ListClosedCasesHandler)

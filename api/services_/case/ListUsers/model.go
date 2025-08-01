@@ -21,6 +21,7 @@ type User struct {
 	ExternalTokenExpiry *time.Time
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+	TenantID            uuid.UUID `gorm:"type:uuid;index"` // Foreign key to Tenant
 }
 
 type ListUsersResponse struct {

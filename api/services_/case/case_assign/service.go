@@ -19,9 +19,9 @@ func NewCaseAssignmentService(
 // This method now takes the assigner's role directly
 func (s *CaseAssignmentService) AssignUserToCase(
 	assignerRole string,
-	assignerID uuid.UUID,
 	assigneeID uuid.UUID,
 	caseID uuid.UUID,
+	assignerID uuid.UUID,
 	role string,
 	tenantID uuid.UUID,
 ) error {
@@ -29,38 +29,24 @@ func (s *CaseAssignmentService) AssignUserToCase(
 		return errors.New("forbidden: admin privileges required")
 	}
 
-	// Fetch users
-	assigner, err := s.userRepo.GetUserByID(assignerID)
-	if err != nil {
-		return err
-	}
-	assignee, err := s.userRepo.GetUserByID(assigneeID)
-	if err != nil {
-		return err
-	}
 
-	// Ensure same tenant
-	if assigner.TenantID != assignee.TenantID {
-		return errors.New("cannot assign users from a different tenant")
-	}
+	// // Fetch both users
+	// assigner, err := s.userRepo.GetUserByID(assignerID)
+	// if err != nil {
+	// 	return err
+	// }
+	// assignee, err := s.userRepo.GetUserByID(assigneeID)
+	// if err != nil {
+	// 	return err
+	// }
 
-	// Assign the role
-	if err := s.repo.AssignRole(assigneeID, caseID, role); err != nil {
-		return err
-	}
+	// // Ensure both belong to the same tenant
+	// if assigner.TenantID != assignee.TenantID {
+	// 	return errors.New("cannot assign users from a different tenant")
+	// }
 
-	// ✅ Trigger WebSocket + DB notification
-	go websocket.NotifyUser(
-		s.hub,
-		s.notificationService,
-		assigneeID.String(),
-		tenantID.String(),
-		assignee.TeamID.String(),
-		"Assigned to Case",
-		"You have been assigned to a new case.",
-	)
+	return s.repo.AssignRole(assigneeID, caseID, role, tenantID)
 
-	return nil
 }
 
 func (s *CaseAssignmentService) UnassignUserFromCase(ctx *gin.Context, assigneeID, caseID uuid.UUID) error {

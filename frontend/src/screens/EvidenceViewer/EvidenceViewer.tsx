@@ -31,6 +31,16 @@ import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 //import { string } from "prop-types";
 import { useParams } from "react-router-dom";
 import { fetchEvidenceByCaseId } from "./api";
+import { fetchThreadsByFile } from "./api"; 
+import { fetchThreadMessages } from "./api";
+import { sendThreadMessage } from "./api";
+import { createAnnotationThread } from "./api";
+import { addThreadParticipant } from "./api";
+import { fetchThreadParticipants } from "./api";
+import { addReaction } from "./api";
+import { approveMessage } from "./api";
+import { removeReaction } from "./api";
+import{MessageCard} from "../../components/ui/MessageCard";
 
 
 
@@ -84,6 +94,13 @@ interface FileItem {
   priority?: 'high' | 'medium' | 'low' | string; // Parsed from 'metadata'
 }
 
+
+ interface ThreadTag {
+  id: string;        // UUID
+  thread_id: string; // UUID
+  tag_name: string;
+}
+
 interface AnnotationThread {
   id: string;
   title: string;
@@ -95,20 +112,74 @@ interface AnnotationThread {
   isActive?: boolean;
   status: 'open' | 'resolved' | 'pending_approval';
   priority: 'high' | 'medium' | 'low';
-  tags: string[];
+  tags: ThreadTag[];
   fileId: string;
+  createdBy?: string; // UUID of the user who created the thread
 }
+
+
 
 interface ThreadMessage {
   id: string;
-  user: string;
-  avatar: string;
-  time: string;
+  threadID: string;
+  parentMessageID?: string | null;
+  userID: string;
   message: string;
   isApproved?: boolean;
-  reactions: { type: string; count: number; users: string[] }[];
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  mentions: { messageID: string; mentionedUserID: string; createdAt: string }[];
+  reactions: { id: string; messageID: string; userID: string; reaction: string; createdAt: string }[];
+
+  // Optional, if you still want to display replies in nested form:
   replies?: ThreadMessage[];
 }
+
+
+
+// function buildNestedMessages(flatMessages: ThreadMessage[]): ThreadMessage[] {
+//   const map = new Map<string, ThreadMessage>();
+//   const roots: ThreadMessage[] = [];
+
+//   flatMessages.forEach(msg => {
+//     msg.replies = [];
+//     map.set(msg.id, msg);
+//   });
+
+//   flatMessages.forEach(msg => {
+//     if (msg.parentMessageID) {
+//       const parent = map.get(msg.parentMessageID);
+//       if (parent) parent.replies?.push(msg);
+//     } else {
+//       roots.push(msg);
+//     }
+//   });
+
+//   return roots;
+// }
+
+function buildNestedMessages(messages: ThreadMessage[]): ThreadMessage[] {
+  const messageMap: { [id: string]: ThreadMessage & { replies: ThreadMessage[] } } = {};
+  const topLevel: ThreadMessage[] = [];
+
+  messages.forEach((msg) => {
+    messageMap[msg.id] = { ...msg, replies: [] };
+  });
+
+  messages.forEach((msg) => {
+    if (msg.parentMessageID && messageMap[msg.parentMessageID]) {
+      messageMap[msg.parentMessageID].replies.push(messageMap[msg.id]);
+    } else {
+      topLevel.push(messageMap[msg.id]);
+    }
+  });
+
+  return topLevel;
+}
+
+
 
 export const EvidenceViewer  =() =>{
   const storedUser = sessionStorage.getItem("user");
@@ -232,13 +303,12 @@ const { caseId } = useParams();
   const [files, setFiles] = useState<FileItem[]>([]);
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState<string | null>(null);
+const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
 
 useEffect(() => {
   async function loadEvidence() {
-      if (!caseId) {
-      setLoading(false); // Stop loading if caseId is not available
-      setError("Case ID is not available.");
-      return; // Exit the function early if caseId is undefined
+     if (!caseId || caseId === "undefined") {
+      return; // Exit without setting error - this will show "No case, no load"
     }
     try {
       const data = await fetchEvidenceByCaseId(caseId);
@@ -255,57 +325,41 @@ useEffect(() => {
 }, [caseId]);
 
 
+// useEffect(() => {
+//   const handleClickOutside = () => setShowReactionPicker(null);
+//   document.addEventListener('click', handleClickOutside);
+//   return () => document.removeEventListener('click', handleClickOutside);
+// }, []);
 
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (showReactionPicker !== null) {
+      const reactionPicker = document.querySelector('[class*="absolute bottom-full"]');
+      if (reactionPicker && !reactionPicker.contains(event.target)) {
+        setShowReactionPicker(null);
+      }
+    }
+  };
+
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutside);
+  };
+}, [showReactionPicker]);
 
 //   const uniqueTypes = Array.from(
 //   new Set(files.map(file => file.type).filter(Boolean))
 // );
 
 
-  const threadMessages: ThreadMessage[] = [
-    {
-      id: '1',
-      user: 'Forensic.Analyst.1',
-      avatar: 'FA',
-      time: '2 hours ago',
-      message: 'Found suspicious PowerShell commands in memory dump. @Senior.Analyst please review the decoded base64 strings.',
-      isApproved: true,
-      reactions: [
-        { type: '👍', count: 2, users: ['Senior.Analyst', 'Lead.Investigator'] }
-      ],
-      replies: [
-        {
-          id: '1-1',
-          user: 'Senior.Analyst',
-          avatar: 'SA',
-          time: '1 hour ago',
-          message: 'Confirmed. This appears to be a fileless attack. Initiating deeper memory analysis.',
-          isApproved: true,
-          reactions: []
-        }
-      ]
-    },
-    {
-      id: '2',
-      user: 'Junior.Analyst',
-      avatar: 'JA',
-      time: '1 hour ago',
-      message: 'Should we also check for persistence mechanisms?',
-      isApproved: false,
-      reactions: []
-    }
-  ];
-
-  const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>(() => {
-  const saved = localStorage.getItem('annotationThreads');
-  return saved ? JSON.parse(saved) : initialAnnotationThreads;
-});
 
 
+// useEffect(() => {
+//   localStorage.setItem('annotationThreads', JSON.stringify(annotationThreads));
+// }, [annotationThreads]);
 
-useEffect(() => {
-  localStorage.setItem('annotationThreads', JSON.stringify(annotationThreads));
-}, [annotationThreads]);
+const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>([]);
+
 
   const [newThreadTitle, setNewThreadTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(files[0]);
@@ -315,39 +369,207 @@ useEffect(() => {
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'threads' | 'metadata'>('overview');
-  const [allThreadMessages, setAllThreadMessages] = useState<{ [threadId: string]: ThreadMessage[] }>(() => {
-    const saved = localStorage.getItem('allThreadMessages');
-    return saved ? JSON.parse(saved) : { '1': threadMessages };
-  });
+
+  const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([]);
+
 
 useEffect(() => {
-  localStorage.setItem('allThreadMessages', JSON.stringify(allThreadMessages));
-}, [allThreadMessages]);
+  if (!selectedFile) return;
 
+  const loadThreads = async () => {
+    try {
+      const threads = await fetchThreadsByFile(selectedFile.id);
+      const adapted = threads.map((t: any) => ({
+        ...t,
+        fileId: t.file_id, // 🔥 fix the naming for consistency
+        caseId: t.case_id,
+        createdBy: t.created_by,
+        tags: t.Tags || [],
+        participantCount: t.Participants?.length || 0,
+        messageCount: 0,
+        user: profile.name,
+        avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
+        time: new Date(t.created_at).toLocaleString(),
+      }));
 
-
-  const handleSendMessage = () => {
-  if (!newMessage.trim() || !selectedThread) return;
-
-  interface NewMsg extends ThreadMessage {}
-
-  const newMsg: NewMsg = {
-    id: Date.now().toString(),
-    user: profile.name,
-    avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
-    time: 'Just now',
-    message: newMessage,
-    isApproved: false,
-    reactions: [],
-    replies: []
+      console.log("Fetched threads for file:", adapted);
+      setAnnotationThreads(adapted);
+    } catch (err) {
+      console.error("Failed to load threads", err);
+    }
   };
 
-  setAllThreadMessages(prev => ({
-    ...prev,
-    [selectedThread.id]: [...(prev[selectedThread.id] || []), newMsg]
+  loadThreads();
+}, [selectedFile]);
+
+
+function formatMessages(rawMessages: any[]): ThreadMessage[] {
+  return rawMessages.map((m) => ({
+    id: m.ID,
+    threadID: m.ThreadID,
+    parentMessageID: m.ParentMessageID,
+    userID: m.UserID,
+    message: m.Message,
+    isApproved: m.IsApproved,
+    approvedBy: m.ApprovedBy,
+    approvedAt: m.ApprovedAt,
+    createdAt: m.CreatedAt,
+    updatedAt: m.UpdatedAt,
+    mentions: m.Mentions || [],
+    reactions: (m.Reactions || []).map((r: any) => ({
+      id: r.ID,
+      messageID: r.MessageID,
+      userID: r.UserID,
+      reaction: r.Reaction,
+      createdAt: r.CreatedAt,
+    })),
+    replies: [],
   }));
-  setNewMessage('');
+}
+
+
+
+useEffect(() => {
+  if (!selectedThread) return;
+
+  const loadMessages = async () => {
+    try {
+      const rawMessages = await fetchThreadMessages(selectedThread.id); // from `api.ts`
+      console.log("Fetched messages for thread:", rawMessages);
+      const formattedMessages = formatMessages(rawMessages);
+      setThreadMessages(formattedMessages);
+    } catch (err) {
+      console.error("Failed to load thread messages", err);
+    }
+  };
+
+  loadMessages();
+}, [selectedThread]);
+
+
+
+//TO BE DELETED
+//   const [allThreadMessages, setAllThreadMessages] = useState<{ [threadId: string]: ThreadMessage[] }>(() => {
+//     const saved = localStorage.getItem('allThreadMessages');
+//     return saved ? JSON.parse(saved) : { '1': threadMessages };
+//   });
+
+// useEffect(() => {
+//   localStorage.setItem('allThreadMessages', JSON.stringify(allThreadMessages));
+// }, [allThreadMessages]);
+
+
+
+//   const handleSendMessage = () => {
+//   if (!newMessage.trim() || !selectedThread) return;
+
+//   interface NewMsg extends ThreadMessage {}
+
+//   const newMsg: NewMsg = {
+//     id: Date.now().toString(),
+//     user: profile.name,
+//     avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
+//     time: 'Just now',
+//     message: newMessage,
+//     isApproved: false,
+//     reactions: [],
+//     replies: []
+//   };
+
+//   setAllThreadMessages(prev => ({
+//     ...prev,
+//     [selectedThread.id]: [...(prev[selectedThread.id] || []), newMsg]
+//   }));
+//   setNewMessage('');
+// };
+
+//previous
+// const handleSendMessage = async () => {
+//   if (!newMessage.trim() || !selectedThread) return;
+
+//   try {
+//     await sendThreadMessage(selectedThread.id, {
+//       user_id: user.id, // replace with your actual user ID
+//       message: newMessage,
+//       parent_message_id: replyingToMessageId || null,
+//       mentions: [] 
+//     });
+
+//     // Refetch messages for the thread after posting
+//     const updatedMessages = await fetchThreadMessages(selectedThread.id);
+//     setThreadMessages(updatedMessages);
+//     setNewMessage('');
+//     setReplyingToMessageId(null);
+//   } catch (err) {
+//     console.error("Failed to send message:", err);
+//   }
+// };
+
+
+const handleSendMessage = async (overrideText?: string) => {
+  const text = overrideText ?? newMessage;
+  if (!text.trim() || !selectedThread) return;
+
+  try {
+    if (user.id !== selectedThread.createdBy) {
+      try {
+        await addThreadParticipant(selectedThread.id, user.id);
+        const participants = await fetchThreadParticipants(selectedThread.id);
+        setAnnotationThreads(prev =>
+          prev.map(thread =>
+            thread.id === selectedThread.id
+              ? { ...thread, participantCount: participants.length }
+              : thread
+          )
+        );
+      } catch (err) {
+        console.warn("Participant already exists or failed:", err);
+      }
+    }
+
+    await sendThreadMessage(selectedThread.id, {
+      user_id: user.id,
+      message: text,
+      parent_message_id: replyingToMessageId || null,
+      mentions: []
+    });
+
+    const updatedMessages = await fetchThreadMessages(selectedThread.id);
+    const formatted = formatMessages(updatedMessages);
+    setThreadMessages(buildNestedMessages(formatted));
+
+    setNewMessage('');
+    setReplyText('');
+    setReplyingToMessageId(null);
+
+    
+
+    setAnnotationThreads(prev =>
+      prev.map(thread =>
+        thread.id === selectedThread.id
+          ? { ...thread, messageCount: formatted.length }
+          : thread
+      )
+    );
+
+
+    const messageCount = formatted.length;
+    setAnnotationThreads(prev =>
+      prev.map(thread =>
+        thread.id === selectedThread.id
+          ? { ...thread, messageCount }
+          : thread
+      )
+    );
+
+    setSelectedThread(prev => prev ? { ...prev, messageCount } : null);
+  } catch (err) {
+    console.error("Failed to send message:", err);
+  }
 };
+
+
+
 
   const [profile, setProfile] = useState({
     name: user?.name || "User",
@@ -386,9 +608,16 @@ useEffect(() => {
     }
   };
 
-  const filteredThreads = annotationThreads.filter(thread => 
-    selectedFile ? thread.fileId === selectedFile.id : true
-  );
+  // const filteredThreads = annotationThreads.filter(thread => 
+  //   selectedFile ? thread.fileId === selectedFile.id : true
+  // );
+
+const filteredThreads = annotationThreads;
+
+
+
+
+
 
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [timeFilter, setTimeFilter] = useState<'recent' | 'oldest' | null>(null);
@@ -422,47 +651,97 @@ useEffect(() => {
     });
   }
 
-  function updateReplyReaction(replies: ThreadMessage[], replyId: string, user: string): ThreadMessage[] {
-  return replies.map(reply => {
-    if (reply.id === replyId) {
-      const existing = reply.reactions.find(r => r.type === '👍');
-      if (existing) {
-        if (existing.users.includes(user)) return reply;
-        return {
-          ...reply,
-          reactions: reply.reactions.map(r =>
-            r.type === '👍' ? { ...r, count: r.count + 1, users: [...r.users, user] } : r
-          )
-        };
-      } else {
-        return {
-          ...reply,
-          reactions: [...reply.reactions, { type: '👍', count: 1, users: [user] }]
-        };
-      }
-    } else if (reply.replies) {
-      return {
-        ...reply,
-        replies: updateReplyReaction(reply.replies, replyId, user)
-      };
-    }
-    return reply;
-  });
-}
 
-function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadMessage[] {
-  return replies.map(reply => {
-    if (reply.id === replyId) {
-      return { ...reply, isApproved: true };
-    } else if (reply.replies) {
-      return {
-        ...reply,
-        replies: updateReplyApproval(reply.replies, replyId)
-      };
+// Add these helper functions inside the EvidenceViewer component (after existing functions)
+const handleAddReaction = async (messageId: string, emoji: string) => {
+  try {
+    await addReaction(messageId, user.id, emoji);
+    // Refresh messages after adding reaction
+    const updatedMessages = await fetchThreadMessages(selectedThread!.id);
+    const formatted = formatMessages(updatedMessages);
+    setThreadMessages(buildNestedMessages(formatted));
+    setShowReactionPicker(null); // Close reaction picker
+  } catch (err) {
+    console.error("Failed to add reaction:", err);
+  }
+};
+
+
+const handleApproveMessage = async (messageId: string) => {
+  try {
+    await approveMessage(messageId);
+    const updatedMessages = await fetchThreadMessages(selectedThread!.id);
+    const formatted = formatMessages(updatedMessages);
+    setThreadMessages(buildNestedMessages(formatted));
+  } catch (err) {
+    console.error("Failed to approve message:", err);
+  }
+};
+
+const handleSendMessageWithParent = async (text: string, parentId?: string) => {
+  if (!text.trim() || !selectedThread) return;
+
+  try {
+    if (user.id !== selectedThread.createdBy) {
+      try {
+        await addThreadParticipant(selectedThread.id, user.id);
+        const participants = await fetchThreadParticipants(selectedThread.id);
+        setAnnotationThreads(prev =>
+          prev.map(thread =>
+            thread.id === selectedThread.id
+              ? { ...thread, participantCount: participants.length }
+              : thread
+          )
+        );
+      } catch (err) {
+        console.warn("Participant already exists or failed:", err);
+      }
     }
-    return reply;
-  });
-}
+
+    await sendThreadMessage(selectedThread.id, {
+      user_id: user.id,
+      message: text,
+      parent_message_id: parentId || null,
+      mentions: []
+    });
+
+    const updatedMessages = await fetchThreadMessages(selectedThread.id);
+    const formatted = formatMessages(updatedMessages);
+    const nestedMessages = buildNestedMessages(formatted);
+    setThreadMessages(nestedMessages);
+
+    // Update message count in both thread list and selected thread
+    const messageCount = formatted.length;
+    setAnnotationThreads(prev =>
+      prev.map(thread =>
+        thread.id === selectedThread.id
+          ? { ...thread, messageCount }
+          : thread
+      )
+    );
+    
+    setSelectedThread(prev => prev ? { ...prev, messageCount } : null);
+
+  } catch (err) {
+    console.error("Failed to send message:", err);
+  }
+};
+
+
+//TO BE DELETED
+// function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadMessage[] {
+//   return replies.map(reply => {
+//     if (reply.id === replyId) {
+//       return { ...reply, isApproved: true };
+//     } else if (reply.replies) {
+//       return {
+//         ...reply,
+//         replies: updateReplyApproval(reply.replies, replyId)
+//       };
+//     }
+//     return reply;
+//   });
+// }
 
 function timeAgo(dateString: string): string {
   const date = new Date(dateString);
@@ -484,10 +763,162 @@ function timeAgo(dateString: string): string {
   return "just now";
 }
 
-if (loading) return <div className="p-4">Loading evidence files...</div>;
-if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
+// Show loading only when we actually have a caseId and are loading
+if (loading && caseId && caseId !== "undefined") {
+  return <div className="p-4">Loading evidence files...</div>;
+}
 
+// Show error only for actual errors (not missing caseId)  
+if (error) {
+  return <div className="p-4 text-red-500">Error: {error}</div>;
+}
 
+// Handle no case scenario early
+if (!caseId || caseId === "undefined") {
+  return (
+    <div className="min-h-screen bg-background text-foreground flex">
+      {/* Sidebar */}
+      <aside className="fixed left-0 top-0 h-full w-64 bg-background border-r border-border p-4 flex flex-col justify-between z-10">
+        <div>
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-lg overflow-hidden">
+              <img
+                src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
+                alt="AEGIS Logo"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <span className="font-bold text-foreground text-xl">AEGIS</span>
+          </div>
+
+          {/* Navigation */}
+          <nav className="space-y-1">
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <Home className="w-5 h-5" />
+              <Link to="/dashboard"><span className="text-sm">Dashboard</span></Link>
+            </div>
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <Folder className="w-5 h-5" />
+              <Link to="/case-management"><span className="text-sm">Case management</span></Link>
+            </div>
+            <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
+              <File className="w-5 h-5" />
+              <span className="text-sm font-medium">Evidence Viewer</span>
+            </div>
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <MessageSquare className="w-5 h-5" />
+              <Link to="/secure-chat"><span className="text-sm">Secure chat</span></Link>
+            </div>
+          </nav>
+        </div>
+
+        {/* User Profile */}
+        <div className="border-t border-bg-accent pt-4">
+          <div className="flex items-center gap-3">
+            <Link to="/profile">
+              {user?.image_url ? (
+                <img
+                  src={
+                    user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                      ? user.image_url
+                      : `http://localhost:8080${user.image_url}`
+                  }
+                  alt="Profile"
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                  <span className="text-foreground font-medium">{initials}</span>
+                </div>
+              )}
+            </Link>
+            <div>
+              <p className="font-semibold text-foreground">{displayName}</p>
+              <p className="text-muted-foreground text-xs">{user?.email || "user@dfir.com"}</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+      
+      <main className="ml-64 flex-grow bg-background flex">
+        {/* Header */}
+        <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border-border p-4">
+          <div className="flex items-center justify-between">
+            {/* Case Number and Tabs */}
+            <div className="flex items-center gap-4">
+              <div className="bg-gray-600 text-white px-3 py-1 rounded text-sm font-medium">
+                No Case Selected
+              </div>
+              <div className="flex items-center gap-6">
+                <SidebarToggleButton/>
+                <Link to="/dashboard">
+                  <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                    Dashboard
+                  </button>
+                </Link>
+                <Link to="/case-management">
+                  <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                    Case Management
+                  </button>
+                </Link>
+                <Link to="/evidence-viewer">
+                  <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
+                    Evidence Viewer
+                  </button>
+                </Link>
+                <Link to="/secure-chat">
+                  <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                    Secure Chat
+                  </button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Right actions */}
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  className="w-64 h-10 bg-card border border-muted rounded-lg pl-10 pr-4 text-foreground placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500"
+                  placeholder="Search cases, evidence, users"
+                />
+              </div>
+              <Link to="/notifications">
+                <Bell className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
+              </Link>
+              <Link to="/settings">
+                <Settings className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
+              </Link>
+              <Link to="/profile">
+                {user?.image_url ? (
+                  <img
+                    src={
+                      user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                        ? user.image_url
+                        : `http://localhost:8080${user.image_url}`
+                    }
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                    <span className="text-foreground font-medium text-sm">{initials}</span>
+                  </div>
+                )}
+              </Link>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex flex-col items-center justify-center w-full h-[60vh] text-center text-muted-foreground pt-20">
+          <h2 className="text-2xl font-semibold mb-4">No case, no load</h2>
+          <p>Go to case management and pick a case to view details.</p>
+        </div>
+      </main>
+    </div>
+  );
+}
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -565,7 +996,7 @@ if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
             {/* Case Number and Tabs */}
             <div className="flex items-center gap-4">
               <div className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium">
-                #CS-00579
+                 #{`CS-${caseId.slice(0, 7)}...`}
               </div>
             <div className="flex items-center gap-6">
               <SidebarToggleButton/>
@@ -622,12 +1053,7 @@ if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
 
         {/* Content Area */}
         <div className="flex-1 flex pt-20">
-          {!caseId || caseId === "undefined" ? (
-            <div className="flex flex-col items-center justify-center w-full h-[60vh] text-center text-muted-foreground">
-              <h2 className="text-2xl font-semibold mb-4">No case, no load</h2>
-              <p>Select a case from the dashboard to view its details.</p>
-            </div>
-          ) : (
+          
             <>
           {/* Evidence Files Panel */}
           <div className="w-80 border-r border-border p-4">
@@ -909,25 +1335,36 @@ if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
                               />
                               <button
                                 className="w-full px-4 py-2 bg-blue-600 text-foreground rounded hover:bg-blue-700 text-sm"
-                                onClick={() => {
+                                onClick={async () => {
                                   if (!newThreadTitle.trim()) return;
-                                  const newThread: AnnotationThread = {
-                                    id: Date.now().toString(),
-                                    title: newThreadTitle,
+                                  try {
+                                    const createdThread = await createAnnotationThread({
+                                      case_id: caseId,
+                                      file_id: selectedFile?.id || '',
+                                      user_id: user.id,
+                                      title: newThreadTitle,
+                                      tags: [],
+                                      priority: "medium"
+                                    });
+
+                                    const adaptedThread = {
+                                    ...createdThread,
                                     user: profile.name,
                                     avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
-                                    time: 'Just now',
+                                    time: "Just now",
                                     messageCount: 0,
-                                    participantCount: 1,
-                                    status: 'open',
-                                    priority: 'low',
-                                    tags: [] as string[],
-                                    fileId: selectedFile?.id || '1'
+                                    participantCount: createdThread.Participants?.length || 1,
+                                   tags: createdThread.Tags || [],
                                   };
-                                  setAnnotationThreads(prev => [...prev, newThread]);
-                                  setSelectedThread(newThread);
-                                  setAllThreadMessages(prev => ({ ...prev, [newThread.id]: [] }));
-                                  setNewThreadTitle('');
+
+                                    console.log("Created thread:", createdThread);
+                                    setAnnotationThreads(prev => [...prev, adaptedThread]);
+                                    setSelectedThread(adaptedThread);                                    
+                                    setNewThreadTitle('');
+                                  } catch (err) {
+                                    console.error("Failed to create thread:", err);
+                                  }
+
                                 }}
                               >
                                 Create Thread
@@ -935,6 +1372,7 @@ if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
                             </div>
                           </div>
                       </div> 
+                      
                       {filteredThreads.map((thread) => (
                         <div
                           key={thread.id}
@@ -980,11 +1418,11 @@ if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
                             </div>
                           </div>
                           
-                          {thread.tags.length > 0 && (
+                          {Array.isArray(thread.tags) && thread.tags.length > 0 && (
                             <div className="flex items-center gap-2 mt-2">
                               {thread.tags.map((tag, index) => (
                                 <span key={index} className="px-2 py-1 b-muted text-muted-foreground rounded text-xs">
-                                  {tag}
+                                  {tag.tag_name}
                                 </span>
                               ))}
                             </div>
@@ -1074,7 +1512,7 @@ if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
                           
                           <div>
                             <span className="text-muted-foreground">Case Reference:</span>
-                            <p className="text-muted-foreground">#CS-00579</p>
+                            <p className="text-muted-foreground"> #{`CS-${caseId.slice(0, 7)}...`}</p>
                           </div>
                           
                           <div>
@@ -1189,289 +1627,32 @@ if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
                   <div className="flex flex-wrap gap-1 mt-2">
                     {selectedThread.tags.map((tag, index) => (
                       <span key={index} className="px-2 py-1 b-muted text-muted-foreground rounded text-xs">
-                        {tag}
+                        {tag.tag_name}
                       </span>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Messages */}
+             {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {(allThreadMessages[selectedThread?.id || ""] || []).map((message) => (
-                  <div key={message.id} className="space-y-2">
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
-                        {message.avatar}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{message.user}</span>
-                          <span className="text-xs text-muted-foreground">{message.time}</span>
-                          {message.isApproved === false && (
-                            <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded">
-                              Pending Approval
-                            </span>
-                          )}
-                          {message.isApproved === true && (
-                            <CheckCircle className="w-3 h-3 text-green-400" />
-                          )}
-                        </div>
-                        <div className="text-sm text-muted-foreground mb-2">{message.message}</div>
-                        
-                        {/* Reactions */}
-                        {message.reactions.length > 0 && (
-                          <div className="flex items-center gap-2 mb-2">
-                            {message.reactions.map((reaction, index) => (
-                              <button
-                                key={index}
-                                className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs hover:b-muted"
-                              >
-                                <span>{reaction.type}</span>
-                                <span className="text-muted-foreground">{reaction.count}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-3 text-xs">
-                        <button
-                          className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                          onClick={() => setReplyingToMessageId(message.id)} 
-                        >
-                          <Reply className="w-3 h-3" />
-                          Reply
-                        </button>
-                            {replyingToMessageId === message.id && (
-                            <div className="mt-2 ml-1">
-                              <input
-                                type="text"
-                                value={replyText}
-                                onChange={(e) => setReplyText(e.target.value)}
-                                placeholder="Type your reply..."
-                                className="w-full bg-muted text-foreground text-sm px-3 py-2 rounded border border-gray-600 focus:outline-none"
-                              />
-                              <button
-                                className="mt-1 px-3 py-1 bg-blue-600 text-foreground text-xs rounded hover:bg-blue-700"
-                                onClick={() => {
-                                  if (!replyText.trim() || !selectedThread) return;
-
-                                  const reply: ThreadMessage = {
-                                    id: `${replyingToMessageId}-reply-${Date.now()}`,
-                                    user: profile.name,
-                                    avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
-                                    time: 'Just now',
-                                    message: replyText,
-                                    isApproved: true,
-                                    reactions: [],
-                                    replies: []
-                                  };
-
-                                  setAllThreadMessages(prev => ({
-                                    ...prev,
-                                    [selectedThread.id]: addNestedReply(prev[selectedThread.id], replyingToMessageId!, reply)
-                                  }));
-
-                                  setReplyText('');
-                                  setReplyingToMessageId(null);
-                                }}
-                              >
-                                Send Reply
-                              </button>
-                            </div>
-                          )}
-
-                          <button
-                            className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                            onClick={() => {
-                              const currentUser = 'Agent.User';
-                              setAllThreadMessages(prev => ({
-                                ...prev,
-                                [selectedThread.id]: prev[selectedThread.id].map(msg => {
-                                  if (msg.id !== message.id) return msg;
-                                  const existing = msg.reactions.find(r => r.type === '👍');
-                                  if (existing) {
-                                    if (existing.users.includes(currentUser)) return msg; // Already reacted
-                                    return {
-                                      ...msg,
-                                      reactions: msg.reactions.map(r =>
-                                        r.type === '👍'
-                                          ? { ...r, count: r.count + 1, users: [...r.users, currentUser] }
-                                          : r
-                                      )
-                                    };
-                                  } else {
-                                    return {
-                                      ...msg,
-                                      reactions: [...msg.reactions, { type: '👍', count: 1, users: [currentUser] }]
-                                    };
-                                  }
-                                })
-                              }));
-                            }}
-                          >
-                          <ThumbsUp className="w-3 h-3" />
-                            React
-                          </button>
-                          {message.isApproved === false && (
-                          <button
-                            className="text-green-400 hover:text-green-300"
-                            onClick={() => {
-                              setAllThreadMessages(prev => ({
-                                ...prev,
-                                [selectedThread.id]: prev[selectedThread.id].map(msg =>
-                                  msg.id === message.id ? { ...msg, isApproved: true } : msg
-                                )
-                              }));
-                            }}
-                          >
-                            Approve
-                          </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-{/* Replies - Recursive Component */}
-                    {message.replies && message.replies.map((reply) => {
-                      const renderReply = (replyItem: ThreadMessage, depth: number = 0) => {
-                        return (
-                          <div key={replyItem.id} className={`${depth === 0 ? 'ml-8' : 'ml-6'} pl-4 border-l-2 border-muted space-y-2`}>
-                            <div className="flex gap-3">
-                              <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
-                                {replyItem.avatar}
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-sm">{replyItem.user}</span>
-                                  <span className="text-xs text-muted-foreground">{replyItem.time}</span>
-                                  {replyItem.isApproved === false && (
-                                    <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded">
-                                      Pending Approval
-                                    </span>
-                                  )}
-                                  {replyItem.isApproved === true && (
-                                    <CheckCircle className="w-3 h-3 text-green-400" />
-                                  )}
-                                </div>
-                                <div className="text-sm text-muted-foreground mb-2">{replyItem.message}</div>
-
-                                {/* Reactions */}
-                                {replyItem.reactions.length > 0 && (
-                                  <div className="flex items-center gap-2 mb-2">
-                                    {replyItem.reactions.map((reaction, index) => (
-                                      <button
-                                        key={index}
-                                        className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs hover:b-muted"
-                                      >
-                                        <span>{reaction.type}</span>
-                                        <span className="text-muted-foreground">{reaction.count}</span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {/* Action Buttons */}
-                                <div className="flex items-center gap-3 text-xs">
-                                  <button
-                                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                                    onClick={() => setReplyingToMessageId(replyItem.id)}
-                                  >
-                                    <Reply className="w-3 h-3" />
-                                    Reply
-                                  </button>
-                                  <button
-                                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                                    onClick={() => {
-                                      const currentUser = 'Agent.User';
-                                      setAllThreadMessages(prev => ({
-                                        ...prev,
-                                        [selectedThread.id]: prev[selectedThread.id].map(msg => ({
-                                          ...msg,
-                                          replies: updateReplyReaction(msg.replies || [], replyItem.id, currentUser)
-                                        }))
-                                      }));
-                                    }}
-                                  >
-                                    <ThumbsUp className="w-3 h-3" />
-                                    React
-                                  </button>
-                                  {replyItem.isApproved === false && (
-                                    <button
-                                      className="text-green-400 hover:text-green-300"
-                                      onClick={() => {
-                                        setAllThreadMessages(prev => ({
-                                          ...prev,
-                                          [selectedThread.id]: prev[selectedThread.id].map(msg => ({
-                                            ...msg,
-                                            replies: updateReplyApproval(msg.replies || [], replyItem.id)
-                                          }))
-                                        }));
-                                      }}
-                                    >
-                                      Approve
-                                    </button>
-                                  )}
-                                </div>
-
-                                {/* Reply box for replying to this reply */}
-                                {replyingToMessageId === replyItem.id && (
-                                  <div className="mt-2 ml-1">
-                                    <input
-                                      type="text"
-                                      value={replyText}
-                                      onChange={(e) => setReplyText(e.target.value)}
-                                      placeholder="Type your reply..."
-                                      className="w-full bg-muted text-foreground text-sm px-3 py-2 rounded border border-gray-600 focus:outline-none"
-                                    />
-                                    <button
-                                      className="mt-1 px-3 py-1 bg-blue-600 text-foreground text-xs rounded hover:bg-blue-700"
-                                      onClick={() => {
-                                        if (!replyText.trim() || !selectedThread) return;
-
-                                        const nestedReply: ThreadMessage = {
-                                          id: `${replyItem.id}-reply-${Date.now()}`,
-                                          user: profile.name,
-                                          avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
-                                          time: 'Just now',
-                                          message: replyText,
-                                          isApproved: true,
-                                          reactions: [],
-                                          replies: []
-                                        };
-
-                                        setAllThreadMessages(prev => ({
-                                          ...prev,
-                                          [selectedThread.id]: addNestedReply(prev[selectedThread.id], replyItem.id, nestedReply)
-                                        }));
-
-                                        setReplyText('');
-                                        setReplyingToMessageId(null);
-                                      }}
-                                    >
-                                      Send Reply
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* Nested Replies - Recursive Call */}
-                                {replyItem.replies && replyItem.replies.length > 0 && (
-                                  <div className="mt-2">
-                                    {replyItem.replies.map((nestedReply) => 
-                                      renderReply(nestedReply, depth + 1)
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      };
-
-                      return renderReply(reply);
-                    })}
-                  </div>
+                {threadMessages.map(message => (
+                  <MessageCard
+                    key={message.id}
+                    message={message}
+                    user={user}
+                    replyingToMessageId={replyingToMessageId}
+                    setReplyingToMessageId={setReplyingToMessageId}
+                    replyText={replyText}
+                    setReplyText={setReplyText}
+                    showReactionPicker={showReactionPicker}
+                    setShowReactionPicker={setShowReactionPicker}
+                    selectedThread={selectedThread}
+                    onSendMessage={handleSendMessageWithParent}
+                    onAddReaction={handleAddReaction}
+                    onApproveMessage={handleApproveMessage}
+                    profile={profile}
+                  />
                 ))}
               </div>
 
@@ -1498,7 +1679,7 @@ if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
                       <span>Shift+Enter for new line</span>
                     </div>
                     <button
-                      onClick={handleSendMessage}
+                      onClick={() => handleSendMessage()}
                       className="p-1.5 bg-blue-600 text-foreground rounded hover:bg-blue-700"
                     >
                       <Send className="w-4 h-4" />
@@ -1509,7 +1690,7 @@ if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
             </div>
           )}
           </>
-        )}
+        
         </div>
       </main>
     </div>

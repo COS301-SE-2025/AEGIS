@@ -83,17 +83,6 @@ export const LoginPage = (): JSX.Element => {
               </Button>
             </form>
 
-            <div className="pt-6 text-center text-sm">
-              <p className="text-white/80">
-                Don’t have an account?{" "}
-                <Link
-                  to="/register"
-                  className="text-blue-300 hover:underline font-medium"
-                >
-                  Create one
-                </Link>
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>
