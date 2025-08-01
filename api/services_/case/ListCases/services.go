@@ -1,13 +1,17 @@
 package ListCases
 
+import (
+	"github.com/google/uuid"
+)
+
 func NewListCasesService(repo CaseQueryRepository) *Service {
 	return &Service{repo: repo}
 }
 
 // CaseQueryRepository should have the new method signature
 
-func (s *Service) GetAllCases() ([]Case, error) {
-	cases, err := s.repo.GetAllCases()
+func (s *Service) GetAllCases(tenantID string) ([]Case, error) {
+	cases, err := s.repo.GetAllCases(tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -23,14 +27,15 @@ func (s *Service) GetAllCases() ([]Case, error) {
 			CreatedBy:          c.CreatedBy,
 			TeamName:           c.TeamName,
 			CreatedAt:          c.CreatedAt,
+			TenantID:           c.TenantID, // Ensure TenantID is included
 		}
 	}
 
 	return result, nil
 }
 
-func (s *Service) GetCasesByUser(userID string) ([]Case, error) {
-	cases, err := s.repo.GetCasesByUser(userID)
+func (s *Service) GetCasesByUser(userID string, tenantID string) ([]Case, error) {
+	cases, err := s.repo.GetCasesByUser(userID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -46,13 +51,24 @@ func (s *Service) GetCasesByUser(userID string) ([]Case, error) {
 			CreatedBy:          c.CreatedBy,
 			TeamName:           c.TeamName,
 			CreatedAt:          c.CreatedAt,
+			TenantID:           c.TenantID, // Ensure TenantID is included
 		}
 	}
 
 	return result, nil
 }
-func (s *Service) GetFilteredCases(status, priority, createdBy, teamName, titleTerm, sortBy, order string) ([]Case, error) {
+
+func (s *Service) GetFilteredCases(TenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order string) ([]Case, error) {
+	var tenantUUID uuid.UUID
+	var err error
+	if TenantID != "" {
+		tenantUUID, err = uuid.Parse(TenantID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	filter := CaseFilter{
+		TenantID:  tenantUUID,
 		Status:    status,
 		Priority:  priority,
 		CreatedBy: createdBy,
@@ -64,8 +80,8 @@ func (s *Service) GetFilteredCases(status, priority, createdBy, teamName, titleT
 	return s.repo.QueryCases(filter)
 }
 
-func (s *Service) GetCaseByID(caseID string) (*Case, error) {
-	c, err := s.repo.GetCaseByID(caseID)
+func (s *Service) GetCaseByID(caseID string, tenantID string) (*Case, error) {
+	c, err := s.repo.GetCaseByID(caseID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +95,7 @@ func (s *Service) GetCaseByID(caseID string) (*Case, error) {
 		CreatedBy:          c.CreatedBy,
 		TeamName:           c.TeamName,
 		CreatedAt:          c.CreatedAt,
+		TenantID:           c.TenantID, // Ensure TenantID is included
 	}
 	return result, nil
 }

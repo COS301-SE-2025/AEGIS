@@ -13,10 +13,10 @@ import (
 // Assuming your ListCases service looks like this:
 type ListCasesService interface {
 	//ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
-	GetAllCases() ([]ListCases.Case, error)
-	GetCasesByUser(userID string) ([]ListCases.Case, error)
-	GetFilteredCases(status, priority, createdBy, teamName, titleTerm, sortBy, order string) ([]ListCases.Case, error)
-	GetCaseByID(caseID string) (*ListCases.Case, error)
+	GetAllCases(tenantID string) ([]ListCases.Case, error)
+	GetCasesByUser(userID string, tenantID string) ([]ListCases.Case, error)
+	GetFilteredCases(TenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order string) ([]ListCases.Case, error)
+	GetCaseByID(caseID string, tenantID string) (*ListCases.Case, error)
 }
 
 type CaseListHandler struct {

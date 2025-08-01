@@ -9,47 +9,44 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GET /cases/all
-func (h *CaseHandler) GetAllCasesHandler(c *gin.Context) {
+func getActorFromContext(c *gin.Context) auditlog.Actor {
 	userID, _ := c.Get("userID")
 	userRole, _ := c.Get("userRole")
-	email, _ := c.Get("email") // Optional, if you have this set
-	actor := auditlog.Actor{
+	email, _ := c.Get("email")
+
+	return auditlog.Actor{
 		ID:        userID.(string),
 		Role:      userRole.(string),
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
-		Email:     email.(string), // Optional, if you have this set
-
+		Email:     email.(string),
 	}
+}
 
-	cases, err := h.ListCasesService.GetAllCases()
+// GET /cases/all
+func (h *CaseHandler) GetAllCasesHandler(c *gin.Context) {
+	tenantID := c.GetString("tenantID")
+	actor := getActorFromContext(c)
+
+	cases, err := h.ListCasesService.GetAllCases(tenantID)
 	if err != nil {
 		fmt.Printf("[GetAllCasesHandler] failed: %v\n", err)
-
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "LIST_ALL_CASES",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "case_listing",
-				ID:   "",
-			},
+			Action:      "LIST_ALL_CASES",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "case_listing"},
 			Service:     "case",
 			Status:      "FAILED",
 			Description: "Failed to list all cases: " + err.Error(),
 		})
-
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not retrieve cases"})
 		return
 	}
 
 	h.auditLogger.Log(c, auditlog.AuditLog{
-		Action: "LIST_ALL_CASES",
-		Actor:  actor,
-		Target: auditlog.Target{
-			Type: "case_listing",
-			ID:   "",
-		},
+		Action:      "LIST_ALL_CASES",
+		Actor:       actor,
+		Target:      auditlog.Target{Type: "case_listing"},
 		Service:     "case",
 		Status:      "SUCCESS",
 		Description: fmt.Sprintf("Retrieved %d cases", len(cases)),
@@ -60,26 +57,15 @@ func (h *CaseHandler) GetAllCasesHandler(c *gin.Context) {
 
 // GET /cases/user/:user_id
 func (h *CaseHandler) GetCasesByUserHandler(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	userRole, _ := c.Get("userRole")
-	email, _ := c.Get("email") // Optional, if you have this set
-	actor := auditlog.Actor{
-		ID:        userID.(string),
-		Role:      userRole.(string),
-		IPAddress: c.ClientIP(),
-		UserAgent: c.Request.UserAgent(),
-		Email:     email.(string), // Optional, if you have this set
-
-	}
+	tenantID := c.GetString("tenantID")
+	actor := getActorFromContext(c)
 	paramUserID := c.Param("user_id")
+
 	if paramUserID == "" {
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "LIST_USER_CASES",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "case_listing_by_user",
-				ID:   "",
-			},
+			Action:      "LIST_USER_CASES",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "case_listing_by_user"},
 			Service:     "case",
 			Status:      "FAILED",
 			Description: "Missing user_id parameter",
@@ -88,16 +74,13 @@ func (h *CaseHandler) GetCasesByUserHandler(c *gin.Context) {
 		return
 	}
 
-	cases, err := h.ListCasesService.GetCasesByUser(paramUserID)
+	cases, err := h.ListCasesService.GetCasesByUser(tenantID, paramUserID)
 	if err != nil {
 		fmt.Printf("[GetCasesByUserHandler] failed: %v\n", err)
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "LIST_USER_CASES",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "case_listing_by_user",
-				ID:   paramUserID,
-			},
+			Action:      "LIST_USER_CASES",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "case_listing_by_user", ID: paramUserID},
 			Service:     "case",
 			Status:      "FAILED",
 			Description: "Failed to get cases for user: " + err.Error(),
@@ -107,12 +90,9 @@ func (h *CaseHandler) GetCasesByUserHandler(c *gin.Context) {
 	}
 
 	h.auditLogger.Log(c, auditlog.AuditLog{
-		Action: "LIST_USER_CASES",
-		Actor:  actor,
-		Target: auditlog.Target{
-			Type: "case_listing_by_user",
-			ID:   paramUserID,
-		},
+		Action:      "LIST_USER_CASES",
+		Actor:       actor,
+		Target:      auditlog.Target{Type: "case_listing_by_user", ID: paramUserID},
 		Service:     "case",
 		Status:      "SUCCESS",
 		Description: fmt.Sprintf("Retrieved %d cases for user %s", len(cases), paramUserID),
@@ -123,17 +103,8 @@ func (h *CaseHandler) GetCasesByUserHandler(c *gin.Context) {
 
 // GET /cases/filter
 func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	userRole, _ := c.Get("userRole")
-	email, _ := c.Get("email") // Optional, if you have this set
-	actor := auditlog.Actor{
-		ID:        userID.(string),
-		Role:      userRole.(string),
-		IPAddress: c.ClientIP(),
-		UserAgent: c.Request.UserAgent(),
-		Email:     email.(string), // Optional, if you have this set
-
-	}
+	tenantID := c.GetString("tenantID")
+	actor := getActorFromContext(c)
 
 	status := c.Query("status")
 	priority := c.Query("priority")
@@ -144,7 +115,7 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 	order := c.Query("order")
 
 	cases, err := h.ListCasesService.GetFilteredCases(
-		status, priority, createdBy, teamName, titleTerm, sortBy, order,
+		tenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order,
 	)
 	if err != nil {
 		fmt.Printf("[GetFilteredCasesHandler] failed: %v\n", err)
@@ -153,7 +124,6 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 			Actor:  actor,
 			Target: auditlog.Target{
 				Type: "case_filtered_listing",
-				ID:   "",
 				AdditionalInfo: map[string]string{
 					"status":    status,
 					"priority":  priority,
@@ -177,7 +147,6 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 		Actor:  actor,
 		Target: auditlog.Target{
 			Type: "case_filtered_listing",
-			ID:   "",
 			AdditionalInfo: map[string]string{
 				"status":    status,
 				"priority":  priority,
@@ -198,27 +167,15 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 
 // GET /cases/:case_id
 func (h *CaseHandler) GetCaseByIDHandler(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	userRole, _ := c.Get("userRole")
-	email, _ := c.Get("email") // Optional, if you have this set
-	actor := auditlog.Actor{
-		ID:        userID.(string),
-		Role:      userRole.(string),
-		IPAddress: c.ClientIP(),
-		UserAgent: c.Request.UserAgent(),
-		Email:     email.(string), // Optional, if you have this set
-
-	}
-
+	tenantID := c.GetString("tenantID")
+	actor := getActorFromContext(c)
 	caseID := c.Param("case_id")
+
 	if caseID == "" {
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "GET_CASE_BY_ID",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "case_details",
-				ID:   "",
-			},
+			Action:      "GET_CASE_BY_ID",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "case_details"},
 			Service:     "case",
 			Status:      "FAILED",
 			Description: "Missing case_id parameter",
@@ -227,16 +184,13 @@ func (h *CaseHandler) GetCaseByIDHandler(c *gin.Context) {
 		return
 	}
 
-	caseDetails, err := h.ListCasesService.GetCaseByID(caseID)
+	caseDetails, err := h.ListCasesService.GetCaseByID(tenantID, caseID)
 	if err != nil {
 		fmt.Printf("[GetCaseByIDHandler] failed: %v\n", err)
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "GET_CASE_BY_ID",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "case_details",
-				ID:   caseID,
-			},
+			Action:      "GET_CASE_BY_ID",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "case_details", ID: caseID},
 			Service:     "case",
 			Status:      "FAILED",
 			Description: "Failed to retrieve case by ID: " + err.Error(),
@@ -246,12 +200,9 @@ func (h *CaseHandler) GetCaseByIDHandler(c *gin.Context) {
 	}
 
 	h.auditLogger.Log(c, auditlog.AuditLog{
-		Action: "GET_CASE_BY_ID",
-		Actor:  actor,
-		Target: auditlog.Target{
-			Type: "case_details",
-			ID:   caseID,
-		},
+		Action:      "GET_CASE_BY_ID",
+		Actor:       actor,
+		Target:      auditlog.Target{Type: "case_details", ID: caseID},
 		Service:     "case",
 		Status:      "SUCCESS",
 		Description: "Retrieved case details successfully",

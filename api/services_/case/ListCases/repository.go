@@ -18,16 +18,18 @@ func NewGormCaseQueryRepository(db *gorm.DB) *GormCaseQueryRepository {
 }
 
 // Implements GetAllCases
-func (r *GormCaseQueryRepository) GetAllCases() ([]case_creation.Case, error) {
+func (r *GormCaseQueryRepository) GetAllCases(tenantID string) ([]case_creation.Case, error) {
 	var cases []case_creation.Case
-	err := r.db.Table("cases").Select("*").Scan(&cases).Error
+	err := r.db.Table("cases").Where("tenant_id = ?", tenantID).Scan(&cases).Error
 	return cases, err
 }
 
 // Implements GetCasesByUser
-func (r *GormCaseQueryRepository) GetCasesByUser(userID string) ([]case_creation.Case, error) {
+func (r *GormCaseQueryRepository) GetCasesByUser(userID string, tenantID string) ([]case_creation.Case, error) {
 	var cases []case_creation.Case
-	err := r.db.Table("cases").Select("*").Where("created_by = ?", userID).Scan(&cases).Error
+	err := r.db.Table("cases").
+		Where("created_by = ? AND tenant_id = ?", userID, tenantID).
+		Scan(&cases).Error
 	return cases, err
 }
 
@@ -59,9 +61,9 @@ func (r *GormCaseQueryRepository) QueryCases(filter CaseFilter) ([]Case, error) 
 	return cases, err
 }
 
-func (r *GormCaseQueryRepository) GetCaseByID(caseID string) (*case_creation.Case, error) {
+func (r *GormCaseQueryRepository) GetCaseByID(caseID string, tenantID string) (*case_creation.Case, error) {
 	var c case_creation.Case
-	err := r.db.Table("cases").Select("*").Where("id = ?", caseID).First(&c).Error
+	err := r.db.Table("cases").Select("*").Where("id = ? AND tenant_id = ?", caseID, tenantID).First(&c).Error
 	if err != nil {
 		return nil, err
 	}

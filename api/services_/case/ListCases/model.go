@@ -19,6 +19,7 @@ type Case struct {
 	CreatedBy          uuid.UUID `gorm:"column:created_by;type:uuid;not null" json:"created_by"`
 	TeamName           string    `gorm:"column:team_name;type:text;not null" json:"team_name"`
 	CreatedAt          time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	TenantID           uuid.UUID `gorm:"column:tenant_id;type:uuid;not null" json:"tenant_id"`
 }
 
 type CaseFilter struct {
@@ -29,6 +30,7 @@ type CaseFilter struct {
 	TitleTerm string
 	SortBy    string
 	SortOrder string
+	TenantID  uuid.UUID // ← new
 }
 
 // Service provides operations for listing and filtering cases.
