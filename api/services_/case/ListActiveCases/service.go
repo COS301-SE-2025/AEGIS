@@ -8,8 +8,8 @@ func NewService(repo ActiveCaseQueryRepository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) ListActiveCases(userID string) ([]ActiveCase, error) {
-	// You might parse/validate UUID here or just trust the repository.
-	// The repo will handle querying the DB.
-	return s.repo.GetActiveCasesByUserID(nil, userID)
+// Updated to accept tenantID and teamID for multi-tenancy
+func (s *Service) ListActiveCases(userID string, tenantID string, teamID string) ([]ActiveCase, error) {
+	// Repo will filter by user, tenant, and team
+	return s.repo.GetActiveCasesByUserID(nil, userID, tenantID, teamID)
 }

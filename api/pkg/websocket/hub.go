@@ -3,6 +3,7 @@ package websocket
 import (
 	"aegis-api/pkg/sharedws"
 	"aegis-api/services_/chat"
+	"aegis-api/services_/notification"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -17,12 +18,13 @@ import (
 )
 
 type Hub struct {
-	clients     map[string]map[*Client]bool // caseID -> clients
-	broadcast   chan MessageEnvelope
-	register    chan *Client
-	unregister  chan *Client
-	mu          sync.Mutex
-	connections map[string]map[string]*websocket.Conn
+	clients             map[string]map[*Client]bool // caseID -> clients
+	broadcast           chan MessageEnvelope
+	register            chan *Client
+	unregister          chan *Client
+	mu                  sync.Mutex
+	connections         map[string]map[string]*websocket.Conn
+	NotificationService *notification.NotificationService
 }
 type Claims struct {
 	Email        string `json:"email"`
@@ -36,12 +38,13 @@ type Claims struct {
 // Ensure Hub implements the chat.WebSocketManager interface
 var _ chat.WebSocketManager = (*Hub)(nil)
 
-func NewHub() *Hub {
+func NewHub(notificationService *notification.NotificationService) *Hub {
 	return &Hub{
-		clients:    make(map[string]map[*Client]bool),
-		broadcast:  make(chan MessageEnvelope),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
+		clients:             make(map[string]map[*Client]bool),
+		broadcast:           make(chan MessageEnvelope),
+		register:            make(chan *Client),
+		unregister:          make(chan *Client),
+		NotificationService: notificationService,
 	}
 }
 
@@ -284,7 +287,7 @@ func (h *Hub) HandleConnection(w http.ResponseWriter, r *http.Request) error {
 	tokenString := r.URL.Query().Get("token")
 	if tokenString == "" {
 		http.Error(w, "Missing token", http.StatusUnauthorized)
-		return fmt.Errorf("missing token in query params")
+		return fmt.Errorf("missing token")
 	}
 
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
@@ -295,25 +298,26 @@ func (h *Hub) HandleConnection(w http.ResponseWriter, r *http.Request) error {
 	})
 	if err != nil || !token.Valid {
 		http.Error(w, "Invalid token", http.StatusUnauthorized)
-		return fmt.Errorf("invalid or expired token")
+		return fmt.Errorf("invalid token: %w", err)
 	}
 
 	claims, ok := token.Claims.(*Claims)
 	if !ok || claims.UserID == "" {
 		http.Error(w, "Invalid claims", http.StatusUnauthorized)
-		return fmt.Errorf("invalid token claims")
+		return fmt.Errorf("invalid claims")
 	}
 
 	userID := claims.UserID
-	caseID := extractCaseIDFromPath(r.URL.Path) // or use groupID if you prefer
-
+	caseID := extractCaseIDFromPath(r.URL.Path)
 	if userID == "" || caseID == "" {
-		return fmt.Errorf("missing userID or caseID in query params")
+		http.Error(w, "Missing userID or caseID", http.StatusBadRequest)
+		return fmt.Errorf("missing userID or caseID")
 	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		return fmt.Errorf("websocket upgrade failed: %w", err)
+		log.Printf("❌ WebSocket upgrade failed: %v", err)
+		return err
 	}
 
 	client := &Client{
@@ -327,13 +331,38 @@ func (h *Hub) HandleConnection(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	h.register <- client
-	go client.readPump()
-	go client.writePump()
-
+	h.AddUserToGroup(userID, claims.Email, caseID, conn)
 	log.Printf("✅ WebSocket upgraded for user %s in case %s\n", userID, caseID)
-	h.AddUserToGroup(userID, claims.Email, caseID, conn) // or groupID if applicable
 
+	// Start pumps
+	go client.writePump()
+	go client.readPump()
+
+	// ✅ Block until the client disconnects
+	// This prevents Gin from closing the connection
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
+
+	log.Printf("👋 Client %s disconnected from case %s", userID, caseID)
+	h.unregister <- client
+	conn.Close()
 	return nil
+}
+
+// Helper to wait for channel closure
+func clientClosed(c *Client) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		for range c.Send {
+			// consume until closed
+		}
+		close(done)
+	}()
+	return done
 }
 
 func (c *Client) readPump() {
@@ -429,6 +458,54 @@ func (c *Client) readPump() {
 			}
 			log.Printf("🛑 Typing STOP received from %s in case %s", payload.UserEmail, c.CaseID)
 			c.Hub.BroadcastTypingStop(c.CaseID, payload.UserEmail)
+
+		case chat.EventMarkNotificationRead:
+			payloadBytes, _ := json.Marshal(msg.Payload)
+			var payload chat.MarkReadPayload
+			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+				log.Printf("❌ Failed to decode MARK_READ payload: %v", err)
+				continue
+			}
+
+			if err := c.Hub.NotificationService.MarkAsRead(payload.NotificationIDs); err != nil {
+				log.Printf("❌ Failed to mark notifications as read: %v", err)
+				continue
+			}
+
+			// 🔹 Broadcast to the same user across all connections
+			ack := chat.WebSocketEvent{
+				Type:      chat.EventMarkNotificationRead,
+				Payload:   payload,
+				UserEmail: c.UserID,
+				Timestamp: time.Now(),
+			}
+			c.Hub.SendToUser(c.UserID, ack)
+
+		case chat.EventArchiveNotification:
+			payloadBytes, _ := json.Marshal(msg.Payload)
+			var payload chat.MarkReadPayload // reuse struct with NotificationIDs []string
+			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+				log.Printf("❌ Failed to decode ARCHIVE payload: %v", err)
+				continue
+			}
+
+			if err := c.Hub.NotificationService.ArchiveNotifications(payload.NotificationIDs); err != nil {
+				log.Printf("❌ Failed to archive notifications: %v", err)
+				continue
+			}
+
+		case chat.EventDeleteNotification:
+			payloadBytes, _ := json.Marshal(msg.Payload)
+			var payload chat.MarkReadPayload
+			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+				log.Printf("❌ Failed to decode DELETE payload: %v", err)
+				continue
+			}
+
+			if err := c.Hub.NotificationService.DeleteNotifications(payload.NotificationIDs); err != nil {
+				log.Printf("❌ Failed to delete notifications: %v", err)
+				continue
+			}
 
 		default:
 			log.Printf("⚠️ Unsupported WebSocket message type: %s", msg.Type)

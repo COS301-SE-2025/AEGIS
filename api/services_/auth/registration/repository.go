@@ -2,6 +2,7 @@ package registration
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 
@@ -117,19 +118,12 @@ func (r *GormUserRepository) UpdateUserTokenInfo(user *User) error {
 
 func (r *GormUserRepository) GetUserByID(userID string) (*User, error) {
 	var u User
-	if err := r.db.First(&u, "id = ?", userID).Error; err != nil {
+	err := r.db.Raw("SELECT * FROM users WHERE id = ?", userID).Scan(&u).Error
+	if err != nil {
+		fmt.Printf("Raw SQL user lookup failed: %v\n", err)
 		return nil, err
 	}
-
-	return &User{
-		ID:                  u.ID,
-		Email:               u.Email,
-		Role:                u.Role,
-		TokenVersion:        u.TokenVersion,
-		ExternalTokenStatus: u.ExternalTokenStatus,
-		ExternalTokenExpiry: u.ExternalTokenExpiry,
-		IsVerified:          u.IsVerified,
-	}, nil
+	return &u, nil
 }
 
 func (r *GormUserRepository) FindAll() ([]User, error) {

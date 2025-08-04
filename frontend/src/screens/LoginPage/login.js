@@ -62,6 +62,8 @@ const handleSubmit = async (e) => {
 
       // Store token & user info
       sessionStorage.setItem("authToken", token);
+      sessionStorage.setItem("tenantId", userData.tenantId);
+      sessionStorage.setItem("teamId", userData.teamId);
       sessionStorage.setItem("user", JSON.stringify(userData));
 
       // Audit log

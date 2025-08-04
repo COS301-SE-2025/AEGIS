@@ -61,9 +61,18 @@ CREATE TYPE user_role AS ENUM (
     'Threat Hunter'                     -- Proactively searches for hidden or advanced threats
 );
 
-CREATE TYPE case_status AS ENUM ('open', 'under_review', 'closed');
+CREATE TYPE case_status AS ENUM ('open', 'under_review', 'closed','ongoing','archived');
 CREATE TYPE case_priority AS ENUM ('low', 'medium', 'high', 'critical','time-sensitive');
-CREATE TYPE investigation_stage AS ENUM ('analysis', 'research', 'evaluation', 'finalization');
+CREATE TYPE investigation_stage_new AS ENUM (
+    'Triage',
+    'Evidence Collection',
+    'Analysis',
+    'Correlation & Threat Intelligence',
+    'Containment & Eradication',
+    'Recovery',
+    'Reporting & Documentation',
+    'Case Closure & Review'
+);
 
 
 -- STEP 1: Create ENUM for token status (if it doesn't exist yet)
@@ -102,6 +111,19 @@ CREATE TYPE token_type AS ENUM (
     'COLLAB_INVITE'
 );
 
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+    tenant_id TEXT NOT NULL,
+    team_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    read BOOLEAN DEFAULT FALSE,
+    archived BOOLEAN DEFAULT FALSE
+);
+
+
 CREATE TABLE tenants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL UNIQUE,
@@ -114,7 +136,7 @@ CREATE TABLE teams (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-  CONSTRAINT fk_teams_tenant FOREIGN KEY (tenant_id),
+  CONSTRAINT fk_teams_tenant FOREIGN KEY (tenant_id)
     REFERENCES tenants(id) ON DELETE CASCADE
 );
 
@@ -285,7 +307,9 @@ CREATE TABLE IF NOT EXISTS evidence (
     metadata JSONB, -- stores metadata as a key-value JSON object
     uploaded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     -- New Fields
-    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
+    -- 🔹 Multi-tenancy fields
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    team_id   UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE
 );
 
 

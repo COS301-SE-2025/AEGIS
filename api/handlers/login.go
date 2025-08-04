@@ -2,14 +2,14 @@ package handlers
 
 import (
 	"aegis-api/middleware"
+	"aegis-api/pkg/websocket"
 	"aegis-api/services_/auditlog"
 	"aegis-api/services_/auth/login"
 	"aegis-api/services_/auth/registration"
 	"aegis-api/services_/auth/reset_password"
+	"aegis-api/services_/notification"
 	"aegis-api/structs"
 	"net/http"
-
-	"aegis-api/pkg/websocket"
 
 	"github.com/gin-gonic/gin"
 )
@@ -60,6 +60,7 @@ type Handler struct {
 	TeamRepo                  registration.TeamRepository //
 	TenantRepo                registration.TenantRepository
 	UserRepo                  registration.UserRepository // Optional, if you have a user repository
+	NotificationService       *notification.NotificationService
 }
 
 func NewHandler(
@@ -87,6 +88,7 @@ func NewHandler(
 	teamRepo registration.TeamRepository,
 	tenantRepo registration.TenantRepository, // Optional, if you have a tenant repository
 	userRepo registration.UserRepository, // Optional, if you have a user repository
+	notificationService *notification.NotificationService,
 ) *Handler {
 	return &Handler{
 		AdminService:              adminSvc,
@@ -113,6 +115,7 @@ func NewHandler(
 		TeamRepo:                  teamRepo,
 		TenantRepo:                tenantRepo, // Optional, if you have a tenant repository
 		UserRepo:                  userRepo,   // Optional, if you have a user repository
+		NotificationService:       notificationService,
 	}
 }
 

@@ -63,43 +63,78 @@ const [] = useState<File | null>(null);
 const [updatedTitle, setUpdatedTitle] = useState("");
 const [updatedDescription, setUpdatedDescription] = useState("");
 
+interface Notification {
+  id: string;
+  message: string;
+  read: boolean;
+  archived: boolean;
+  // Add other properties as needed
+}
+
 const [openCases, setOpenCases] = useState([]);
 const [closedCases, setClosedCases] = useState([]);
 const [evidenceCount, setEvidenceCount] = useState(0);
+const [notifications, setNotifications] = useState<Notification[]>([]);
+
+const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
 
 
+useEffect(() => {
+  const fetchCases = async () => {
+    try {
+      const token = sessionStorage.getItem("authToken") || "";
 
-  useEffect(() => {
-    const fetchCases = async () => {
-      try {
-        const status = activeTab === "active" ? "open" : "closed";
-        const res = await fetch(`http://localhost:8080/api/v1/cases/filter?status=${status}`, {
-          headers: {
-            "Authorization": `Bearer ${sessionStorage.getItem("authToken") || ""}`
-          }
-        });
-        if (!res.ok) throw new Error("Failed to load cases");
-        const data = await res.json();
-        console.log("Fetched cases:", data);
-        const mappedCases = data.cases.map((c: any) => ({
-          id: c.id,
-          title: c.title,
-          team_name: c.team_name,
-          creator: c.created_by,
-          priority: c.priority,
-          description: c.description,
-          lastActivity: c.created_at, 
-          progress: c.progress || 0,
-          image: c.image || "https://www.cwilson.com/app/uploads/2022/11/iStock-962094400-1024x565.jpg",
-        }));
-        setCaseCards(mappedCases.reverse());
-      } catch (err) {
-        console.error("Error fetching cases:", err);
-        setCaseCards([]);
-      }
-    };
-    fetchCases();
-  }, [activeTab]);
+      let endpoint = "";
+      let responseKey = "";
+
+      if (activeTab === "active") {
+        endpoint = "http://localhost:8080/api/v1/cases/active";
+        responseKey = "cases";
+      } else if (activeTab === "closed") {
+        endpoint = "http://localhost:8080/api/v1/cases/closed";
+        responseKey = "closed_cases";}
+      // } else {
+      //   endpoint = "http://localhost:8080/api/v1/cases/filter?status=all"; // ← replace if your actual route differs
+      //   responseKey = "cases";
+      // }
+
+      const res = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error(`Failed to load ${activeTab} cases`);
+      const data = await res.json();
+
+      console.log(`Fetched ${activeTab} cases:`, data);
+
+      const rawCases = data[responseKey] || [];
+
+      const mappedCases = rawCases.map((c: any) => ({
+        id: c.id,
+        title: c.title,
+        team_name: c.team_name,
+        creator: c.created_by,
+        priority: c.priority,
+        description: c.description,
+        lastActivity: c.created_at,
+        progress: c.progress || 0,
+        image:
+          c.image ||
+          "https://www.cwilson.com/app/uploads/2022/11/iStock-962094400-1024x565.jpg",
+      }));
+
+      setCaseCards(mappedCases.reverse());
+    } catch (err) {
+      console.error(`Error fetching ${activeTab} cases:`, err);
+      setCaseCards([]);
+    }
+  };
+
+  fetchCases();
+}, [activeTab]);
+
 
 useEffect(() => {
   const fetchRecentActivities = async () => {
@@ -195,6 +230,57 @@ const getIcon = (action: string) => {
   if (action.toLowerCase().includes("login")) return Pencil;
   return FileText;
 };
+
+const handleSaveCase = async () => {
+  if (!editingCase) return;
+  
+  const token = sessionStorage.getItem("authToken") || "";
+  
+  try {
+    const res = await fetch(`http://localhost:8080/api/v1/cases/${editingCase.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        title: updatedTitle,
+        description: updatedDescription,
+        status: updatedStatus,
+        investigation_stage: updatedStage,
+      }),
+    });
+
+    if (!res.ok) throw new Error("Failed to update case");
+
+    const data = await res.json();
+    console.log("Case updated:", data);
+
+    // ✅ Close the modal
+    setEditingCase(null);
+
+    // ✅ Update the list locally without refetch
+    setCaseCards(prev =>
+      prev.map(c =>
+        c.id === editingCase.id
+          ? {
+              ...c,
+              title: updatedTitle,
+              description: updatedDescription,
+              status: updatedStatus,
+              investigation_stage: updatedStage,
+            }
+          : c
+      )
+    );
+
+    alert("Case updated successfully!");
+  } catch (err) {
+    console.error("Error updating case:", err);
+    alert("Failed to update case");
+  }
+};
+
 
 
 
@@ -364,9 +450,16 @@ const getIcon = (action: string) => {
                 />
               </div>
               <Link to="/notifications">
-              <button className="p-2 text-muted-foreground hover:text-white transition-colors">
-                <Bell className="w-6 h-6" />
-              </button></Link>
+                <button className="relative p-2 text-muted-foreground hover:text-white transition-colors">
+                  <Bell className="w-6 h-6" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+              </Link>
+
               <Link to="/settings">
                 <button className="p-2 text-muted-foreground hover:text-white transition-colors">
                   <Settings className="w-6 h-6" />
@@ -524,8 +617,8 @@ const getIcon = (action: string) => {
                       <button
                         onClick={() => {
                           setEditingCase(card);
-                          setUpdatedStatus(card.status);
-                          setUpdatedStage(card.investigation_stage);
+                          setUpdatedStatus(card.status || "open");              // ✅ fallback to current or default
+                          setUpdatedStage(card.investigation_stage || "Triage");// ✅ fallback
                           setUpdatedTitle(card.title);
                           setUpdatedDescription(card.description);
                         }}
@@ -736,29 +829,12 @@ const getIcon = (action: string) => {
                       </button>
 
                       <button
-                        onClick={async () => {
-                          const token = sessionStorage.getItem("authToken") || "";
-
-                          await fetch(`http://localhost:8080/api/v1/cases/${editingCase.id}`, {
-                            method: "PATCH",
-                            headers: {
-                              "Content-Type": "application/json",
-                              Authorization: `Bearer ${token}`,
-                            },
-                            body: JSON.stringify({
-                              title: updatedTitle,
-                              description: updatedDescription,
-                              status: updatedStatus,
-                              investigation_stage: updatedStage,
-                            }),
-                          });
-
-                          setEditingCase(null);
-                        }}
+                        onClick={handleSaveCase}
                         className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                       >
                         Save Changes
                       </button>
+
                     </div>
                   </div>
                 </div>

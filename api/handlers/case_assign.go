@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 
 	"aegis-api/services_/auditlog"
@@ -28,15 +30,10 @@ func (h *CaseHandler) AssignUserToCase(c *gin.Context) {
 
 	if !exists {
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "ASSIGN_USER_TO_CASE",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "case_assignment",
-				ID:   "",
-			},
-			Service:     "case",
-			Status:      "FAILED",
-			Description: "Missing role in token",
+			Action:  "ASSIGN_USER_TO_CASE",
+			Actor:   actor,
+			Target:  auditlog.Target{Type: "case_assignment", ID: ""},
+			Service: "case", Status: "FAILED", Description: "Missing role in token",
 		})
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing role in token"})
 		return
@@ -49,15 +46,10 @@ func (h *CaseHandler) AssignUserToCase(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "ASSIGN_USER_TO_CASE",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "case_assignment",
-				ID:   "",
-			},
-			Service:     "case",
-			Status:      "FAILED",
-			Description: "Invalid JSON payload",
+			Action:  "ASSIGN_USER_TO_CASE",
+			Actor:   actor,
+			Target:  auditlog.Target{Type: "case_assignment", ID: ""},
+			Service: "case", Status: "FAILED", Description: "Invalid JSON payload",
 		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
@@ -66,15 +58,10 @@ func (h *CaseHandler) AssignUserToCase(c *gin.Context) {
 	assigneeID, err := uuid.Parse(req.AssigneeID)
 	if err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "ASSIGN_USER_TO_CASE",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "case_assignment",
-				ID:   req.AssigneeID,
-			},
-			Service:     "case",
-			Status:      "FAILED",
-			Description: "Invalid assignee ID",
+			Action:  "ASSIGN_USER_TO_CASE",
+			Actor:   actor,
+			Target:  auditlog.Target{Type: "case_assignment", ID: req.AssigneeID},
+			Service: "case", Status: "FAILED", Description: "Invalid assignee ID",
 		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid assignee id"})
 		return
@@ -83,15 +70,10 @@ func (h *CaseHandler) AssignUserToCase(c *gin.Context) {
 	caseID, err := uuid.Parse(req.CaseID)
 	if err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "ASSIGN_USER_TO_CASE",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "case_assignment",
-				ID:   req.CaseID,
-			},
-			Service:     "case",
-			Status:      "FAILED",
-			Description: "Invalid case ID",
+			Action:  "ASSIGN_USER_TO_CASE",
+			Actor:   actor,
+			Target:  auditlog.Target{Type: "case_assignment", ID: req.CaseID},
+			Service: "case", Status: "FAILED", Description: "Invalid case ID",
 		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid case id"})
 		return
@@ -115,8 +97,69 @@ func (h *CaseHandler) AssignUserToCase(c *gin.Context) {
 		return
 	}
 
+	//  Extract assigner's tenant ID
+	assignerTenantID, ok := c.Get("tenantID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing tenant ID in token"})
+		return
+	}
+
+	//  Check if the assignee belongs to the same tenant
+	assigneeUser, err := h.UserRepo.GetUserByID(assigneeID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch assignee"})
+		return
+	}
+
+	if assigneeUser.Role == "Tenant Admin" || assigneeUser.Role == "DFIR Admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "cannot assign users with elevated roles"})
+		return
+	}
+	fmt.Println("Assignee Tenant:", assigneeUser.TenantID)
+	fmt.Println("Assigner Tenant:", assignerTenantID)
+
+	assignerTenantIDStr, ok := assignerTenantID.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid tenant ID in context"})
+		return
+	}
+
+	assignerTenantUUID, err := uuid.Parse(assignerTenantIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant ID format"})
+		return
+	}
+	log.Printf("AssignerTenantID: %q (%T)", assignerTenantUUID.String(), assignerTenantUUID)
+	log.Printf("AssigneeTenantID: %q (%T)", assigneeUser.TenantID.String(), assigneeUser.TenantID)
+	if assigneeUser.TenantID == uuid.Nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "assignee does not have a tenant"})
+		return
+	}
+
+	// if assigneeUser.TenantID != assignerTenantUUID {
+	// 	c.JSON(http.StatusForbidden, gin.H{"error": "cannot assign users from different tenants"})
+	// 	return
+	// }
+	log.Printf("Comparing Tenant IDs: %s == %s ? %v",
+		assigneeUser.TenantID.String(),
+		assignerTenantUUID.String(),
+		assigneeUser.TenantID == assignerTenantUUID)
+
+	userIDRaw, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user ID missing from context"})
+		return
+	}
+
+	assignerID, err := uuid.Parse(userIDRaw.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	// Proceed with assignment
 	if err := h.CaseService.AssignUserToCase(
-		assignerRole.(string), assigneeID, caseID, assignerUUID, req.Role,
+		assignerRole.(string), assigneeID, caseID, req.Role,
 	); err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action: "ASSIGN_USER_TO_CASE",
@@ -211,7 +254,7 @@ func (h *CaseHandler) UnassignUserFromCase(c *gin.Context) {
 		return
 	}
 
-	// 🚨 Updated: Pass `c` to the service method (instead of assignerID)
+	// 🚨 Updated: Pass c to the service method (instead of assignerID)
 	if err := h.CaseService.UnassignUserFromCase(c, assigneeID, caseID); err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action: "UNASSIGN_USER_FROM_CASE",

@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 // Assuming your ListCases service looks like this:
@@ -28,49 +27,35 @@ func NewCaseListHandler(service ListCasesService) *CaseListHandler {
 }
 
 func (h *CaseHandler) ListActiveCasesHandler(c *gin.Context) {
-	userIDCtx, _ := c.Get("userID")
+	// Extract user info from JWT context
+	userIDCtx, exists := c.Get("userID")
+	tenantIDCtx, tenantExists := c.Get("tenantID")
+	teamIDCtx, teamExists := c.Get("teamID")
 	userRole, _ := c.Get("userRole")
+
+	if !exists || !tenantExists || !teamExists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	userID, ok := userIDCtx.(string)
+	tenantID, tOk := tenantIDCtx.(string)
+	teamID, tmOk := teamIDCtx.(string)
+
+	if !ok || !tOk || !tmOk || userID == "" || tenantID == "" || teamID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user or tenant/team ID in token"})
+		return
+	}
+
 	actor := auditlog.Actor{
-		ID:        userIDCtx.(string),
+		ID:        userID,
 		Role:      userRole.(string),
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
 	}
 
-	userID := c.Query("user_id")
-	if userID == "" {
-		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "LIST_ACTIVE_CASES",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "active_case_listing",
-				ID:   "",
-			},
-			Service:     "case",
-			Status:      "FAILED",
-			Description: "Missing user_id parameter",
-		})
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required"})
-		return
-	}
-
-	if _, err := uuid.Parse(userID); err != nil {
-		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "LIST_ACTIVE_CASES",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "active_case_listing",
-				ID:   userID,
-			},
-			Service:     "case",
-			Status:      "FAILED",
-			Description: "Invalid user_id format: " + err.Error(),
-		})
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id format"})
-		return
-	}
-
-	cases, err := h.CaseService.ListActiveCases(userID)
+	// ✅ Fetch active cases with multi-tenancy filtering
+	cases, err := h.CaseService.ListActiveCases(userID, tenantID, teamID)
 	if err != nil {
 		fmt.Printf("Error listing active cases: %v\n", err)
 		h.auditLogger.Log(c, auditlog.AuditLog{
@@ -79,7 +64,12 @@ func (h *CaseHandler) ListActiveCasesHandler(c *gin.Context) {
 			Target: auditlog.Target{
 				Type: "active_case_listing",
 				ID:   userID,
+				AdditionalInfo: map[string]string{
+					"tenant_id": tenantID,
+					"team_id":   teamID,
+				},
 			},
+
 			Service:     "case",
 			Status:      "FAILED",
 			Description: "Failed to list active cases: " + err.Error(),
@@ -88,13 +78,19 @@ func (h *CaseHandler) ListActiveCasesHandler(c *gin.Context) {
 		return
 	}
 
+	// ✅ Audit successful request
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action: "LIST_ACTIVE_CASES",
 		Actor:  actor,
 		Target: auditlog.Target{
 			Type: "active_case_listing",
 			ID:   userID,
+			AdditionalInfo: map[string]string{
+				"tenant_id": tenantID,
+				"team_id":   teamID,
+			},
 		},
+
 		Service:     "case",
 		Status:      "SUCCESS",
 		Description: fmt.Sprintf("Retrieved %d active cases for user %s", len(cases), userID),

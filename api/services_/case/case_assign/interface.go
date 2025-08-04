@@ -10,7 +10,7 @@ type AdminChecker interface {
 }
 
 type CaseAssignmentRepoInterface interface {
-	AssignRole(userID, caseID uuid.UUID, role string) error
+	AssignRole(userID, caseID uuid.UUID, role string, tenantID uuid.UUID) error
 	UnassignRole(userID, caseID uuid.UUID) error
 }
 type UserRepo interface {

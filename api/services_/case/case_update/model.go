@@ -1,0 +1,35 @@
+package update_case
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type UpdateCaseRequest struct {
+	CaseID             string `json:"case_id"`
+	Title              string `json:"title"`
+	Description        string `json:"description"`
+	Status             string `json:"status"`
+	InvestigationStage string `json:"investigation_stage"`
+	TenantID           string `json:"tenant_id"` // ✅ For multi-tenancy
+	TeamID             string `json:"team_id"`   // ✅ For team scoping
+}
+
+type Case struct {
+	ID                 uuid.UUID `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Title              string    `gorm:"column:title;not null" json:"title"`
+	Description        string    `gorm:"column:description" json:"description"`
+	Status             string    `gorm:"column:status;type:case_status;default:'open'" json:"status"`
+	Priority           string    `gorm:"column:priority;type:case_priority;default:'medium'" json:"priority"`
+	InvestigationStage string    `gorm:"column:investigation_stage;type:investigation_stage;default:'analysis'" json:"investigation_stage"`
+	CreatedBy          uuid.UUID `gorm:"column:created_by;type:uuid;not null" json:"created_by"`
+	TeamName           string    `gorm:"column:team_name;type:text;not null" json:"team_name"`
+	TenantID           uuid.UUID `gorm:"column:tenant_id;type:uuid;not null" json:"tenant_id"` // ✅ New
+	TeamID             uuid.UUID `gorm:"column:team_id;type:uuid;not null" json:"team_id"`     // ✅ New
+	CreatedAt          time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+}
+
+type UpdateCaseResponse struct {
+	Success bool `json:"success"`
+}

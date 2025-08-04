@@ -1,6 +1,8 @@
 package case_creation
 
 import (
+	"aegis-api/pkg/websocket"
+	"aegis-api/services_/notification"
 	"errors"
 	"time"
 
@@ -8,13 +10,20 @@ import (
 )
 
 // Service handles business logic for case creation.
+// Service handles business logic for case creation.
 type Service struct {
-	repo CaseRepository
+	repo                CaseRepository
+	notificationService *notification.NotificationService
+	hub                 *websocket.Hub
 }
 
 // NewCaseService constructs a new CaseService.
-func NewCaseService(repo CaseRepository) *Service {
-	return &Service{repo: repo}
+func NewCaseService(repo CaseRepository, notifService *notification.NotificationService, hub *websocket.Hub) *Service {
+	return &Service{
+		repo:                repo,
+		notificationService: notifService,
+		hub:                 hub,
+	}
 }
 
 // CaseRepository defines persistence operations for cases
@@ -49,6 +58,17 @@ func (s *Service) CreateCase(req *CreateCaseRequest) (*Case, error) {
 	if err := s.repo.CreateCase(newCase); err != nil {
 		return nil, err
 	}
+
+	// ✅ Trigger a notification for the case creator
+	go websocket.NotifyUser(
+		s.hub,
+		s.notificationService,
+		creatorUUID.String(),
+		req.TenantID.String(),
+		req.TeamID.String(),
+		"Case Created",
+		"Your case \""+req.Title+"\" has been created successfully.",
+	)
 
 	return newCase, nil
 }

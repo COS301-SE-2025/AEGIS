@@ -4,7 +4,6 @@ import (
 	"aegis-api/services_/auditlog"
 	"aegis-api/services_/evidence/metadata"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +25,14 @@ func NewMetadataHandler(svc metadata.MetadataService, logger *auditlog.AuditLogg
 func (h *MetadataHandler) UploadEvidence(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	userRole, _ := c.Get("userRole")
+	tenantID, tenantExists := c.Get("tenantID")
+	teamID, teamExists := c.Get("teamID")
+
+	if !tenantExists || !teamExists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Tenant or Team context missing"})
+		return
+	}
+
 	actor := auditlog.Actor{
 		ID:        userID.(string),
 		Role:      userRole.(string),
@@ -33,79 +40,31 @@ func (h *MetadataHandler) UploadEvidence(c *gin.Context) {
 		UserAgent: c.Request.UserAgent(),
 	}
 
+	// Extract form data
 	caseIDStr := c.PostForm("caseId")
 	uploadedByStr := c.PostForm("uploadedBy")
 	fileType := c.PostForm("fileType") // optional
 
 	caseID, err := uuid.Parse(caseIDStr)
 	if err != nil {
-		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "UPLOAD_EVIDENCE_METADATA",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "evidence_metadata_upload",
-				ID:   caseIDStr,
-			},
-			Service:     "evidence",
-			Status:      "FAILED",
-			Description: "Invalid caseId format: " + err.Error(),
-		})
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid caseId format", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid caseId format"})
 		return
 	}
 
 	uploadedBy, err := uuid.Parse(uploadedByStr)
 	if err != nil {
-		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "UPLOAD_EVIDENCE_METADATA",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "evidence_metadata_upload",
-				ID:   uploadedByStr,
-			},
-			Service:     "evidence",
-			Status:      "FAILED",
-			Description: "Invalid uploadedBy format: " + err.Error(),
-		})
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid uploadedBy format", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid uploadedBy format"})
 		return
 	}
-
-	log.Println("[DEBUG] POST form caseId:", caseIDStr)
-	log.Println("[DEBUG] POST form uploadedBy:", uploadedByStr)
 
 	form, err := c.MultipartForm()
 	if err != nil {
-		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "UPLOAD_EVIDENCE_METADATA",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "evidence_metadata_upload",
-				ID:   caseID.String(),
-			},
-			Service:     "evidence",
-			Status:      "FAILED",
-			Description: "Invalid multipart form: " + err.Error(),
-		})
-		log.Printf("[ERROR] MultipartForm parse failed: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid multipart form", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid multipart form"})
 		return
 	}
-	log.Printf("[DEBUG] Form file keys: %v", form.File)
 
 	files := form.File["files"]
 	if len(files) == 0 {
-		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "UPLOAD_EVIDENCE_METADATA",
-			Actor:  actor,
-			Target: auditlog.Target{
-				Type: "evidence_metadata_upload",
-				ID:   caseID.String(),
-			},
-			Service:     "evidence",
-			Status:      "FAILED",
-			Description: "No files uploaded",
-		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No files uploaded"})
 		return
 	}
@@ -113,21 +72,7 @@ func (h *MetadataHandler) UploadEvidence(c *gin.Context) {
 	for _, fileHeader := range files {
 		file, err := fileHeader.Open()
 		if err != nil {
-			h.auditLogger.Log(c, auditlog.AuditLog{
-				Action: "UPLOAD_EVIDENCE_METADATA",
-				Actor:  actor,
-				Target: auditlog.Target{
-					Type: "evidence_metadata_upload",
-					ID:   caseID.String(),
-					AdditionalInfo: map[string]string{
-						"filename": fileHeader.Filename,
-					},
-				},
-				Service:     "evidence",
-				Status:      "FAILED",
-				Description: "Failed to open uploaded file: " + err.Error(),
-			})
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open uploaded file", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open uploaded file"})
 			return
 		}
 
@@ -138,33 +83,17 @@ func (h *MetadataHandler) UploadEvidence(c *gin.Context) {
 			FileType:   fileType,
 			FileSize:   fileHeader.Size,
 			FileData:   file,
+			TenantID:   uuid.MustParse(tenantID.(string)),
+			TeamID:     uuid.MustParse(teamID.(string)),
 		}
 
 		if err := h.service.UploadEvidence(req); err != nil {
-			h.auditLogger.Log(c, auditlog.AuditLog{
-				Action: "UPLOAD_EVIDENCE_METADATA",
-				Actor:  actor,
-				Target: auditlog.Target{
-					Type: "evidence_metadata_upload",
-					ID:   caseID.String(),
-					AdditionalInfo: map[string]string{
-						"filename": fileHeader.Filename,
-					},
-				},
-				Service:     "evidence",
-				Status:      "FAILED",
-				Description: "Failed to upload evidence metadata: " + err.Error(),
-			})
-			log.Printf("❌ UploadEvidence failed: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "Failed to upload evidence",
-				"details": err.Error(),
-			})
 			file.Close()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+
 		file.Close()
-		log.Printf("✅ Successfully uploaded evidence file: %s for case: %s", fileHeader.Filename, caseID)
 	}
 
 	h.auditLogger.Log(c, auditlog.AuditLog{
@@ -175,6 +104,8 @@ func (h *MetadataHandler) UploadEvidence(c *gin.Context) {
 			ID:   caseID.String(),
 			AdditionalInfo: map[string]string{
 				"file_count": fmt.Sprintf("%d", len(files)),
+				"tenant_id":  tenantID.(string),
+				"team_id":    teamID.(string),
 			},
 		},
 		Service:     "evidence",

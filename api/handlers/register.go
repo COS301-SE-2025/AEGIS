@@ -57,6 +57,7 @@ type UserServiceInterface interface {
 	GetUserInfo(c *gin.Context)
 	UpdateUserInfo(c *gin.Context)
 	GetUserCases(c *gin.Context)
+	GetUserByID(userID uuid.UUID) (*registration.User, error)
 }
 type CreateTenantRequest struct {
 	Name string `json:"name" binding:"required"`
