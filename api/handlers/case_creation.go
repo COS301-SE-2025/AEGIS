@@ -83,7 +83,7 @@ type CaseServiceInterface interface {
 
 	AssignUserToCase(assignerRole string, assigneeID uuid.UUID, caseID uuid.UUID, assignerID uuid.UUID, role string, tenantID uuid.UUID) error
 	ListActiveCases(userID string, tenantID string, teamID string) ([]ListActiveCases.ActiveCase, error)
-	GetCaseByID(caseID string) (*ListCases.Case, error)
+	GetCaseByID(caseID string, tenantID string) (*ListCases.Case, error)
 	UnassignUserFromCase(assignerID *gin.Context, assigneeID, caseID uuid.UUID) error // ← Add this
 	ListClosedCases(userID string, tenantID string, teamID string) ([]ListClosedCases.ClosedCase, error)
 }
