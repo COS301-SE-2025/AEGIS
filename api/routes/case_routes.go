@@ -80,6 +80,14 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.GET("/cases/user/:user_id", h.CaseHandler.GetCasesByUserHandler)
 			protected.GET("/cases/filter", h.CaseHandler.GetFilteredCasesHandler)
 			protected.GET("/cases/:case_id", h.CaseHandler.GetCaseByIDHandler)
+
+			// Graphical Mapping - IOC Graph endpoints
+			protected.GET("/tenants/:tenantId/ioc-graph", middleware.AuthMiddleware(), h.IOCHandler.GetTenantIOCGraph)
+			protected.GET("/tenants/:tenantId/cases/:case_id/ioc-graph", middleware.AuthMiddleware(), h.IOCHandler.GetCaseIOCGraph)
+
+			protected.GET("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.GetIOCsByCase)
+			protected.POST("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.AddIOCToCase)
+
 			// ─── Metadata Evidence Upload ────────────────
 			protected.POST("/evidence", h.MetadataHandler.UploadEvidence)
 			// ─── Metadata Evidence Retrieval ─────────────
