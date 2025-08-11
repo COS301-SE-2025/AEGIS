@@ -14,7 +14,7 @@ import {
   Clock
 } from "lucide-react";
 import { useState, useEffect  } from 'react';
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 //thati added
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 import {ShareButton} from "../ShareCasePage/sharecasebutton";
@@ -69,12 +69,9 @@ const getPriorityStyle = (priority: string) => {
   }
 };
 
-
-
 //case ID
 const { caseId } = useParams<{ caseId: string }>();
-
-
+const navigate = useNavigate();
 
 const [caseData, setCaseData] = useState<CaseData | null>(null);
 
@@ -89,11 +86,18 @@ useEffect(() => {
           "Content-Type": "application/json",
         },
       });
+       if (!res.ok) {
+        console.error("Failed to fetch case:", res.status, res.statusText);
+        return;
+      }
 
-    const text = await res.text();
-    console.log("Raw response text:", text);
+    const raw = await res.json();
+      console.log("Raw response json:", raw);
 
-    const raw = JSON.parse(text);
+      if (!raw.case) {
+        console.error("Response missing 'case' field");
+        return;
+      }
     const caseDataRaw = raw.case; // ✅ This is the actual case object
 
   const normalized = {
@@ -490,6 +494,13 @@ useEffect(() => {
               >
                 <Filter className="w-4 h-4" />
                 Filter Timeline
+              </button>
+                    {/* Add IOC button */}
+              <button
+                onClick={() => navigate(`/cases/${caseId}/iocs`)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 border border-transparent rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Add IOC
               </button>
 
           {showFilterInput && (

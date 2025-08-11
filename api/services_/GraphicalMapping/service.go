@@ -30,20 +30,27 @@ func NewIOCService(repo IOCRepository) IOCService {
 	return &iocService{repo: repo}
 }
 
-func (s *iocService) AddIOC(ioc *IOC) error {
-	return s.repo.Create(ioc)
+func (s *iocService) AddIOC(ioc *IOC) (*IOC, error) {
+	err := s.repo.Create(ioc)
+	if err != nil {
+		return nil, err
+	}
+	return ioc, nil
 }
 
-func (s *iocService) GetIOC(id uint) (*IOC, error) {
+func (s *iocService) GetIOC(id string) (*IOC, error) {
 	return s.repo.GetByID(id)
 }
+func (s *iocService) ListIOCsByCase(caseID string) ([]*IOC, error) {
+	return s.repo.ListByCase(caseID)
+}
 
-func (s *iocService) ListIOCsForTenant(tenantID uint) ([]*IOC, error) {
+func (s *iocService) ListIOCsForTenant(tenantID string) ([]*IOC, error) {
 	return s.repo.ListByTenant(tenantID)
 }
 
 // BuildIOCGraph builds nodes and edges based on IOCs similarity for a tenant
-func (s *iocService) BuildIOCGraph(tenantID uint) ([]GraphNode, []GraphEdge, error) {
+func (s *iocService) BuildIOCGraph(tenantID string) ([]GraphNode, []GraphEdge, error) {
 	iocs, err := s.repo.ListByTenant(tenantID)
 	if err != nil {
 		return nil, nil, err
@@ -52,15 +59,15 @@ func (s *iocService) BuildIOCGraph(tenantID uint) ([]GraphNode, []GraphEdge, err
 	nodes := []GraphNode{}
 	edges := []GraphEdge{}
 
-	caseNodeMap := map[uint]bool{}
+	caseNodeMap := map[string]bool{}
 	iocNodeIDs := map[string]bool{}
 
 	// Add case nodes
 	for _, ioc := range iocs {
 		if !caseNodeMap[ioc.CaseID] {
 			nodes = append(nodes, GraphNode{
-				ID:    fmt.Sprintf("case-%d", ioc.CaseID),
-				Label: fmt.Sprintf("Case %d", ioc.CaseID),
+				ID:    fmt.Sprintf("case-%s", ioc.CaseID),
+				Label: fmt.Sprintf("Case %s", ioc.CaseID),
 				Type:  "case",
 			})
 			caseNodeMap[ioc.CaseID] = true
@@ -69,7 +76,7 @@ func (s *iocService) BuildIOCGraph(tenantID uint) ([]GraphNode, []GraphEdge, err
 
 	// Add IOC nodes and edges from case -> IOC
 	for _, ioc := range iocs {
-		iocID := fmt.Sprintf("ioc-%d", ioc.ID)
+		iocID := fmt.Sprintf("ioc-%s", ioc.ID)
 		if !iocNodeIDs[iocID] {
 			nodes = append(nodes, GraphNode{
 				ID:    iocID,
@@ -79,7 +86,7 @@ func (s *iocService) BuildIOCGraph(tenantID uint) ([]GraphNode, []GraphEdge, err
 			iocNodeIDs[iocID] = true
 		}
 		edges = append(edges, GraphEdge{
-			Source: fmt.Sprintf("case-%d", ioc.CaseID),
+			Source: fmt.Sprintf("case-%s", ioc.CaseID),
 			Target: iocID,
 			Label:  "contains",
 		})
@@ -101,8 +108,8 @@ func (s *iocService) BuildIOCGraph(tenantID uint) ([]GraphNode, []GraphEdge, err
 		for i := 0; i < len(group); i++ {
 			for j := i + 1; j < len(group); j++ {
 				edges = append(edges, GraphEdge{
-					Source: fmt.Sprintf("ioc-%d", group[i].ID),
-					Target: fmt.Sprintf("ioc-%d", group[j].ID),
+					Source: fmt.Sprintf("ioc-%s", group[i].ID),
+					Target: fmt.Sprintf("ioc-%s", group[j].ID),
 					Label:  "similar",
 				})
 			}
@@ -140,7 +147,7 @@ func ConvertToCytoscapeElements(nodes []GraphNode, edges []GraphEdge) []Cytoscap
 }
 
 // BuildIOCGraphByCase builds a graph for a specific case, including similar IOCs from other cases(cross-case relationships)
-func (s *iocService) BuildIOCGraphByCase(tenantID, caseID uint) ([]GraphNode, []GraphEdge, error) {
+func (s *iocService) BuildIOCGraphByCase(tenantID, caseID string) ([]GraphNode, []GraphEdge, error) {
 	// First we fetch all IOCs for this tenant and case only
 	iocs, err := s.repo.ListByTenant(tenantID)
 	if err != nil {
@@ -163,8 +170,8 @@ func (s *iocService) BuildIOCGraphByCase(tenantID, caseID uint) ([]GraphNode, []
 
 	// Add node for the selected case
 	nodes = append(nodes, GraphNode{
-		ID:    fmt.Sprintf("case-%d", caseID),
-		Label: fmt.Sprintf("Case %d", caseID),
+		ID:    fmt.Sprintf("case-%s", caseID),
+		Label: fmt.Sprintf("Case %s", caseID),
 		Type:  "case",
 	})
 
@@ -172,7 +179,7 @@ func (s *iocService) BuildIOCGraphByCase(tenantID, caseID uint) ([]GraphNode, []
 
 	// Add IOC nodes + edges from case -> IOC
 	for _, ioc := range caseIOCs {
-		iocID := fmt.Sprintf("ioc-%d", ioc.ID)
+		iocID := fmt.Sprintf("ioc-%s", ioc.ID)
 		if !iocNodeIDs[iocID] {
 			nodes = append(nodes, GraphNode{
 				ID:    iocID,
@@ -182,7 +189,7 @@ func (s *iocService) BuildIOCGraphByCase(tenantID, caseID uint) ([]GraphNode, []
 			iocNodeIDs[iocID] = true
 		}
 		edges = append(edges, GraphEdge{
-			Source: fmt.Sprintf("case-%d", caseID),
+			Source: fmt.Sprintf("case-%s", caseID),
 			Target: iocID,
 			Label:  "contains",
 		})
@@ -201,8 +208,8 @@ func (s *iocService) BuildIOCGraphByCase(tenantID, caseID uint) ([]GraphNode, []
 				continue
 			}
 
-			simIOCId := fmt.Sprintf("ioc-%d", sim.ID)
-			simCaseId := fmt.Sprintf("case-%d", sim.CaseID)
+			simIOCId := fmt.Sprintf("ioc-%s", sim.ID)
+			simCaseId := fmt.Sprintf("case-%s", sim.CaseID)
 
 			// Add similar IOC node if not exists
 			if !iocNodeIDs[simIOCId] {
@@ -225,7 +232,7 @@ func (s *iocService) BuildIOCGraphByCase(tenantID, caseID uint) ([]GraphNode, []
 			if !caseExists {
 				nodes = append(nodes, GraphNode{
 					ID:    simCaseId,
-					Label: fmt.Sprintf("Case %d", sim.CaseID),
+					Label: fmt.Sprintf("Case %s", sim.CaseID),
 					Type:  "case",
 				})
 			}
@@ -239,7 +246,7 @@ func (s *iocService) BuildIOCGraphByCase(tenantID, caseID uint) ([]GraphNode, []
 
 			// Add similarity edge between the IOC in current case and this similar IOC
 			edges = append(edges, GraphEdge{
-				Source: fmt.Sprintf("ioc-%d", ioc.ID),
+				Source: fmt.Sprintf("ioc-%s", ioc.ID),
 				Target: simIOCId,
 				Label:  "similar",
 			})

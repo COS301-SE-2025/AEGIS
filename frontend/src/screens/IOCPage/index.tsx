@@ -1,1 +1,1 @@
-export {IOCPage} from "./IOCPage";
+export {IOCPage} from "./IOCPage"

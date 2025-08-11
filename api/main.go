@@ -10,6 +10,7 @@ import (
 	"aegis-api/middleware"
 	"aegis-api/pkg/websocket"
 	"aegis-api/routes"
+	graphicalmapping "aegis-api/services_/GraphicalMapping"
 	"aegis-api/services_/admin/get_collaborators"
 	"aegis-api/services_/annotation_threads/messages"
 	annotationthreads "aegis-api/services_/annotation_threads/threads"
@@ -105,6 +106,7 @@ func main() {
 	listActiveCasesRepo := ListActiveCases.NewActiveCaseRepository(db.DB)
 	listClosedCasesRepo := ListClosedCases.NewClosedCaseRepository(db.DB)
 	listCasesRepo := ListCases.NewGormCaseQueryRepository(db.DB)
+	iocRepo := graphicalmapping.NewIOCRepository(db.DB)
 
 	// ─── Email Sender (Mock) ────────────────────────────────────
 	emailSender := reset_password.NewMockEmailSender()
@@ -150,6 +152,8 @@ func main() {
 	// ─── List Users ─────────────────────────────────────────────
 	listUserRepo := ListUsers.NewUserRepository(db.DB)
 	listUserService := ListUsers.NewListUserService(listUserRepo)
+	// ioc
+	iocService := graphicalmapping.NewIOCService(iocRepo)
 
 	// ─── Handlers ───────────────────────────────────────────────
 	adminHandler := handlers.NewAdminService(regService, listUserService, nil, nil, auditLogger)
@@ -165,6 +169,8 @@ func main() {
 		userAdapter, // UserRepo
 		updateCaseService,
 	)
+
+	iocHandler := handlers.NewIOCHandler(iocService)
 
 	// ─── Evidence Upload/Download/Metadata ──────────────────────
 	metadataRepo := metadata.NewGormRepository(db.DB)
@@ -269,6 +275,7 @@ func main() {
 		tenantRepo, // Pass the tenant repository
 		userRepo,   // Pass the user repository
 		notificationService,
+		iocHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────
