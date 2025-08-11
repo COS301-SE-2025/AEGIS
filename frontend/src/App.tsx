@@ -25,6 +25,8 @@ import { TeamRegistrationPage } from "./screens/TeamRegistrationPage";
 import { SystemAdminDashboard } from "./screens/SystemAdminDashboard";
 import { TenantAdminDashboard } from "./screens/TenantAdminDashboard";
 import { TeamsPage } from "./screens/TeamsPage";
+import { ReportDashboard } from "./screens/ReportDashboard/ReportDashboard";
+import {ReportEditor} from "./screens/ReportEditor/ReportEditor";
 //FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
 import { UploadEvidenceForm } from "./screens/UploadEvidencePage/UploadEvidencePage";
@@ -61,7 +63,10 @@ export default function App() {
       <Route path="/evidence-viewer" element={<EvidenceViewer />} />
 
       <Route path="/case/:caseId/next-steps" element={<NextStepsPage />} />
-
+      <Route path="/report-dashboard" element={<ReportDashboard />} />
+      <Route path="/report-editor" element={<ReportEditor />} />
+      
+      {/* Additional routes */}
       <Route path="/landing-page" element={<LandingPage />} />
       <Route path="/cases/:caseId/share" element={<ShareCaseForm />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
