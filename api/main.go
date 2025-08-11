@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"aegis-api/db"
 
@@ -26,6 +27,7 @@ import (
 	"aegis-api/services_/case/case_evidence_totals"
 	"aegis-api/services_/case/case_tags"
 	update_case "aegis-api/services_/case/case_update"
+	coc "aegis-api/services_/chain_of_custody"
 	"aegis-api/services_/chat"
 	"aegis-api/services_/evidence/evidence_download"
 	"aegis-api/services_/evidence/evidence_tag"
@@ -242,6 +244,23 @@ func main() {
 		DB: db.DB,
 	}
 
+	// ─── Chain of Custody (CoC) ─────────────────────────────
+	// Create an adapter for the AuditLogger to fit the coc.Auditor interface
+	auditAdapter := &coc.AuditLogAdapter{
+		AuditLogger: auditLogger, // Use the existing AuditLogger
+	}
+
+	// Initialize the CoC service (pass it as a value, not a pointer)
+	cocSvc := coc.Service{
+		Repo:      coc.GormRepo{DB: db.DB}, // Initialize repository (GORM)
+		Authz:     coc.SimpleAuthz{},       // Placeholder for RBAC (role-based access control)
+		Audit:     auditAdapter,            // Use the adapter for AuditLogger
+		DedupeWin: 3 * time.Second,         // Deduplication window (optional)
+	}
+
+	// Initialize the handler, passing a pointer to cocSvc to avoid copying sync.Mutex
+	cocHandler := handlers.NewCoCHandler(cocSvc, auditLogger) // Pass the service pointer
+
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -269,6 +288,7 @@ func main() {
 		tenantRepo, // Pass the tenant repository
 		userRepo,   // Pass the user repository
 		notificationService,
+		cocHandler, // Chain of Custody handler
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

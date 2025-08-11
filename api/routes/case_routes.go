@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	//"aegis-api/pkg/websocket"
 )
 
 func SetUpRouter(h *handlers.Handler) *gin.Engine {
@@ -118,6 +117,9 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.PermissionChecker)
 
 			RegisterCaseTagRoutes(protected, h.CaseTagHandler, h.PermissionChecker)
+
+			// ─── Chain of Custody ───────────────────────────────
+			RegisterCoCRoutes(protected, h.CoCHandler)
 
 		}
 	}
