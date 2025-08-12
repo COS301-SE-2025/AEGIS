@@ -35,6 +35,7 @@ import (
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/notification"
+	"aegis-api/services_/report"
 	"aegis-api/services_/user/profile"
 
 	//"github.com/gin-gonic/gin"
@@ -261,6 +262,25 @@ func main() {
 	// Initialize the handler, passing a pointer to cocSvc to avoid copying sync.Mutex
 	cocHandler := handlers.NewCoCHandler(cocSvc, auditLogger) // Pass the service pointer
 
+	// ─── Report Service Initialization ─────────────────────
+
+	// Initialize the repository and service for report generation and management
+	reportRepo := report.NewCaseReportsRepo(db.DB)
+	coCRepo := report.NewCoCRepo(db.DB)
+
+	// Use dummy implementations for now (or you can replace with actual implementations)
+	reportService := report.NewReportService(
+		reportRepo,
+		nil, // ReportArtifactsRepo
+		nil, // Storage
+		nil, // AuditLogger
+		nil, // Authorizer
+		coCRepo,
+	)
+
+	// Create a handler for reports
+	reportHandler := handlers.NewReportHandler(reportService)
+
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -288,7 +308,8 @@ func main() {
 		tenantRepo, // Pass the tenant repository
 		userRepo,   // Pass the user repository
 		notificationService,
-		cocHandler, // Chain of Custody handler
+		cocHandler,    // Chain of Custody handler
+		reportHandler, // Report generation handler
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

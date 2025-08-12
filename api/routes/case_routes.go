@@ -121,6 +121,9 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			// ─── Chain of Custody ───────────────────────────────
 			RegisterCoCRoutes(protected, h.CoCHandler)
 
+			// ─── Report Generation ──────────────────────────────
+			RegisterReportRoutes(protected, h.ReportHandler)
+
 		}
 	}
 

@@ -62,6 +62,7 @@ type Handler struct {
 	UserRepo                  registration.UserRepository // Optional, if you have a user repository
 	NotificationService       *notification.NotificationService
 	CoCHandler                *CoCHandler
+	ReportHandler             *ReportHandler // Optional: Report generation handler
 }
 
 func NewHandler(
@@ -91,6 +92,7 @@ func NewHandler(
 	userRepo registration.UserRepository, // Optional, if you have a user repository
 	notificationService *notification.NotificationService,
 	coCHandler *CoCHandler, // Chain of Custody handler
+	reportHandler *ReportHandler, // Optional: Report generation handler
 ) *Handler {
 	return &Handler{
 		AdminService:              adminSvc,
@@ -119,6 +121,7 @@ func NewHandler(
 		UserRepo:                  userRepo,   // Optional, if you have a user repository
 		NotificationService:       notificationService,
 		CoCHandler:                coCHandler,
+		ReportHandler:             reportHandler, // Optional: Report generation handler
 	}
 }
 

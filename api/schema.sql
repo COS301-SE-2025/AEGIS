@@ -480,5 +480,104 @@ CREATE INDEX idx_case_user_roles_user_id ON case_user_roles(user_id);
 
 
 
+-- === Chain of Custody (AEGIS) Final Schema — Updated ===
+-- Assumes you already have: cases(id), evidence(id), users(id)
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- 1) Actions we actually support now
+DO $$ BEGIN
+  CREATE TYPE coc_action AS ENUM (
+    'upload',    -- evidence first inserted into the system
+    'download',  -- evidence retrieved from the system
+    'archive',   -- evidence moved to long-term storage
+    'view'       -- evidence opened/viewed in Evidence Viewer
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 2) Main CoC table
+CREATE TABLE IF NOT EXISTS chain_of_custody (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  case_id      UUID NOT NULL REFERENCES cases(id)    ON DELETE CASCADE,
+  evidence_id  UUID NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
+  actor_id     UUID              REFERENCES users(id), -- who performed the action (nullable for system)
+
+  action       coc_action NOT NULL,
+---  reason       TEXT,           -- justification / notes (optional)
+
+  location     TEXT,           -- physical/logical location (optional)
+  hash_md5     TEXT,           -- legacy compatibility (optional)
+  hash_sha1    TEXT,           -- legacy compatibility (optional)
+  hash_sha256  TEXT,           -- canonical integrity hash
+
+  occurred_at  TIMESTAMPTZ NOT NULL,                -- when the action happened
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()   -- when we recorded it
+);
+
+-- 3) Helpful indexes for fast lookups
+CREATE INDEX IF NOT EXISTS idx_coc_case_time
+  ON chain_of_custody (case_id, occurred_at);
+
+CREATE INDEX IF NOT EXISTS idx_coc_evidence_time
+  ON chain_of_custody (evidence_id, occurred_at);
+
+CREATE INDEX IF NOT EXISTS idx_coc_actor
+  ON chain_of_custody (actor_id);
+
+CREATE INDEX IF NOT EXISTS idx_coc_action
+  ON chain_of_custody (action);
+
+-- 4) Append-only enforcement
+CREATE OR REPLACE FUNCTION forbid_coc_update_delete()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'Chain of Custody entries are immutable';
+END $$;
+
+CREATE TRIGGER trg_coc_no_update
+BEFORE UPDATE ON chain_of_custody
+FOR EACH ROW EXECUTE FUNCTION forbid_coc_update_delete();
+
+CREATE TRIGGER trg_coc_no_delete
+BEFORE DELETE ON chain_of_custody
+FOR EACH ROW EXECUTE FUNCTION forbid_coc_update_delete();
+
+-- 5) Convenience view with actor data for UI
+CREATE OR REPLACE VIEW v_chain_of_custody_with_actor AS
+SELECT
+  c.id,
+  c.case_id,
+  c.evidence_id,
+  c.actor_id,
+  u.name  AS actor_name,
+  u.email AS actor_email,
+  c.action,
+  c.reason,
+  c.location,
+  c.hash_md5,
+  c.hash_sha1,
+  c.hash_sha256,
+  c.occurred_at,
+  c.created_at
+FROM chain_of_custody c
+LEFT JOIN users u ON u.id = c.actor_id
+ORDER BY c.occurred_at ASC, c.created_at ASC;
+
+
+
+-- For reference (no change needed if this already exists)
+CREATE TABLE IF NOT EXISTS report_hashes (
+  id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_id UUID NOT NULL REFERENCES report_devices(id) ON DELETE CASCADE,
+  md5       TEXT,
+  sha1      TEXT,
+  sha256    TEXT,
+  context   TEXT,  -- e.g., "acquisition image", "working copy"
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE case_reports
+  ADD COLUMN IF NOT EXISTS acquisition_methods  TEXT,  -- how imaging/collection was done
+  ADD COLUMN IF NOT EXISTS analysis_techniques  TEXT;  -- e.g., keyword search, timeline analysis
 
 
