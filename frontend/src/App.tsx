@@ -77,7 +77,7 @@ export default function App() {
       <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
       <Route path="/tenant-admin-dashboard" element={<TenantAdminDashboard />} />
       <Route path="/teams" element={<TeamsPage />} />
-      <Route path="/ioc-page" element={<IOCPage />} />
+      <Route path="/cases/:case_id/iocs" element={<IOCPage />} />
       
       {/* Fallback route */}
     </Routes>

@@ -479,6 +479,22 @@ CREATE INDEX idx_case_user_roles_case_id ON case_user_roles(case_id);
 CREATE INDEX idx_case_user_roles_user_id ON case_user_roles(user_id);
 
 
+--Timeline Events Table
+CREATE TABLE timeline_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id uuid NOT NULL REFERENCES cases(id),
+  description text NOT NULL,
+  evidence jsonb NOT NULL DEFAULT '[]'::jsonb,
+  tags jsonb NOT NULL DEFAULT '[]'::jsonb,
+  severity varchar(20),
+  analyst_id uuid,
+  analyst_name varchar(255),
+  "order" integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz
+);
+CREATE INDEX idx_timeline_case_order ON timeline_events (case_id, "order");
 
 
 

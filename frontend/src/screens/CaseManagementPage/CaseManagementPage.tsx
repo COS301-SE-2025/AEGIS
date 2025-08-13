@@ -497,7 +497,7 @@ useEffect(() => {
               </button>
                     {/* Add IOC button */}
               <button
-                onClick={() => navigate(`/cases/${caseId}/iocs`)}
+              onClick={() => navigate(`/cases/${caseId}/iocs`)}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 border border-transparent rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 Add IOC
