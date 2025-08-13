@@ -15,5 +15,6 @@ func RegisterReportRoutes(router *gin.RouterGroup, handler *handlers.ReportHandl
 		report.GET("/evidence/:evidenceID", handler.GetReportsByEvidenceID) // Get all reports for evidence
 		report.GET("/:reportID", handler.GetReportByID)                     // Get a specific report
 		report.PUT("/:reportID", handler.UpdateReport)                      // Update a report
+		report.DELETE("/:reportID", handler.DeleteReport)                   // Delete a report
 	}
 }

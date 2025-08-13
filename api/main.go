@@ -271,10 +271,10 @@ func main() {
 	// Use dummy implementations for now (or you can replace with actual implementations)
 	reportService := report.NewReportService(
 		reportRepo,
-		nil, // ReportArtifactsRepo
-		nil, // Storage
-		nil, // AuditLogger
-		nil, // Authorizer
+		nil,         // ReportArtifactsRepo
+		nil,         // Storage
+		auditLogger, // AuditLogger
+		nil,         // Authorizer
 		coCRepo,
 	)
 

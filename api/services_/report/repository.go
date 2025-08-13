@@ -3,6 +3,7 @@ package report
 
 import (
 	"context"
+	"fmt"
 
 	"gorm.io/gorm"
 )
@@ -60,4 +61,13 @@ func (repo *CaseReportsRepoImpl) GetReportsByEvidenceID(ctx context.Context, evi
 		return nil, err
 	}
 	return reports, nil
+}
+
+// DeleteReportByID deletes a report by its ID
+func (repo *CaseReportsRepoImpl) DeleteReportByID(ctx context.Context, reportID string) error {
+	// Perform the delete operation using GORM
+	if err := repo.DB.WithContext(ctx).Where("id = ?", reportID).Delete(&CaseReportRow{}).Error; err != nil {
+		return fmt.Errorf("failed to delete report: %w", err)
+	}
+	return nil
 }

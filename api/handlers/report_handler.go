@@ -150,3 +150,26 @@ func (h *ReportHandler) GetReportsByEvidenceID(c *gin.Context) {
 
 	c.JSON(http.StatusOK, reports)
 }
+
+// DeleteReport handles the request to delete a report.
+func (h *ReportHandler) DeleteReport(c *gin.Context) {
+	// Extract the report ID from the URL parameters
+	reportIDStr := c.Param("reportID")
+	reportID, err := uuid.Parse(reportIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
+		return
+	}
+
+	// Extract user information from context
+
+	// Delete the report from the repository
+	err = h.ReportService.DeleteReportByID(c.Request.Context(), reportID.String())
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
+		return
+	}
+
+	// Return success response
+	c.JSON(http.StatusOK, gin.H{"message": "Report deleted successfully"})
+}

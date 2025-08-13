@@ -3,6 +3,8 @@ package report
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -216,4 +218,23 @@ func (s *ReportService) GetReportsByEvidenceID(ctx context.Context, evidenceID u
 	}
 
 	return reports, nil
+}
+
+// DeleteReportByID deletes a report by its ID and logs the action.
+func (s *ReportService) DeleteReportByID(ctx context.Context, reportID string) error {
+	// Log the delete action
+	// You may not need user information here, or you can pass a default context or other parameters if needed
+	err := s.AuditLogger.LogDeleteReport(ctx, reportID, "", "", "", "", "", time.Now()) // Assuming default or nil values for logging
+	if err != nil {
+		return fmt.Errorf("failed to log delete event: %w", err)
+	}
+
+	// Call the repository method to delete the report from the database
+	err = s.CaseReportsRepo.DeleteReportByID(ctx, reportID)
+	if err != nil {
+		return fmt.Errorf("failed to delete report: %w", err)
+	}
+
+	// Return nil if the report was successfully deleted
+	return nil
 }

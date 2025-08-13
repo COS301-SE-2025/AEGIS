@@ -3,6 +3,7 @@ package report
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -86,4 +87,20 @@ func (s *ReportServiceImpl) GetReportsByEvidenceID(ctx context.Context, evidence
 		return nil, err
 	}
 	return reports, nil
+}
+
+// DeleteReportByID deletes a report by its ID
+func (s *ReportServiceImpl) DeleteReportByID(ctx context.Context, reportID string) error {
+	// Delete the report by its ID
+	var report Report
+	if err := s.DB.WithContext(ctx).Where("id = ?", reportID).First(&report).Error; err != nil {
+		return fmt.Errorf("failed to find report: %w", err)
+	}
+
+	// Perform the delete operation
+	if err := s.DB.WithContext(ctx).Delete(&report).Error; err != nil {
+		return fmt.Errorf("failed to delete report: %w", err)
+	}
+
+	return nil
 }

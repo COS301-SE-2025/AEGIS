@@ -14,6 +14,7 @@ type CaseReportsRepo interface {
 	GetAllReports(ctx context.Context) ([]CaseReportRow, error)
 	GetReportsByCaseID(ctx context.Context, caseID string) ([]CaseReportRow, error)         // New method
 	GetReportsByEvidenceID(ctx context.Context, evidenceID string) ([]CaseReportRow, error) // New method
+	DeleteReportByID(ctx context.Context, reportID string) error
 }
 
 // Add this interface:
@@ -39,6 +40,8 @@ type CaseReportRow struct {
 	ReportNumber           *string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
+	Name                   string // New field for report name
+	FilePath               string // New field for the file path
 }
 
 // ReportArtifactsRepo handles saving report artifacts (PDF, JSON, CSV).
@@ -65,7 +68,8 @@ type Storage interface {
 // AuditLogger interface for logging actions related to reports.
 type AuditLogger interface {
 	LogGenerateReport(ctx context.Context, caseID, reportID, artifactID, actorID, ip, ua string) error
-	LogDownloadReport(ctx context.Context, caseID, reportID, artifactID, actorID, ip, ua string) error
+	LogDownloadReport(ctx context.Context, reportID string, userID string, userRole string, userAgent string, ipAddress string, email string, timestamp time.Time) error
+	LogDeleteReport(ctx context.Context, reportID string, userID string, userRole string, userAgent string, ipAddress string, email string, timestamp time.Time) error
 }
 
 // Authorizer interface for checking if a user is authorized to generate reports.
