@@ -87,6 +87,17 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 			protected.GET("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.GetIOCsByCase)
 			protected.POST("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.AddIOCToCase)
+			// ______timeline routes______________
+			// List all events for a case
+			protected.GET("/cases/:case_id/timeline", middleware.AuthMiddleware(), h.TimelineHandler.ListByCase)
+			// Create new event for a case
+			protected.POST("/cases/:case_id/timeline", middleware.AuthMiddleware(), h.TimelineHandler.Create)
+			// Update a timeline event by ID
+			protected.PATCH("/timeline/:event_id", middleware.AuthMiddleware(), h.TimelineHandler.Update)
+			// Delete a timeline event by ID
+			protected.DELETE("/timeline/:event_id", middleware.AuthMiddleware(), h.TimelineHandler.Delete)
+			// Reorder events for a case
+			protected.POST("/cases/:case_id/timeline/reorder", h.TimelineHandler.Reorder)
 
 			// ─── Metadata Evidence Upload ────────────────
 			protected.POST("/evidence", h.MetadataHandler.UploadEvidence)

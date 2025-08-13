@@ -62,6 +62,7 @@ type Handler struct {
 	UserRepo                  registration.UserRepository // Optional, if you have a user repository
 	NotificationService       *notification.NotificationService
 	IOCHandler                *IOCHandler
+	TimelineHandler           *TimelineHandler
 }
 
 func NewHandler(
@@ -91,6 +92,8 @@ func NewHandler(
 	userRepo registration.UserRepository, // Optional, if you have a user repository
 	notificationService *notification.NotificationService,
 	IOCHandler *IOCHandler,
+	TimelineHandler *TimelineHandler,
+
 ) *Handler {
 	return &Handler{
 		AdminService:              adminSvc,
@@ -119,6 +122,7 @@ func NewHandler(
 		UserRepo:                  userRepo,   // Optional, if you have a user repository
 		NotificationService:       notificationService,
 		IOCHandler:                IOCHandler,
+		TimelineHandler:           TimelineHandler,
 	}
 }
 

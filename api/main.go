@@ -34,6 +34,7 @@ import (
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/notification"
+	"aegis-api/services_/timeline"
 	"aegis-api/services_/user/profile"
 
 	//"github.com/gin-gonic/gin"
@@ -108,6 +109,11 @@ func main() {
 	listCasesRepo := ListCases.NewGormCaseQueryRepository(db.DB)
 	iocRepo := graphicalmapping.NewIOCRepository(db.DB)
 
+	//timeline
+	timelineRepo := timeline.NewRepository(db.DB)
+	if err := timelineRepo.AutoMigrate(); err != nil {
+		log.Fatalf("failed migrating timeline: %v", err)
+	}
 	// ─── Email Sender (Mock) ────────────────────────────────────
 	emailSender := reset_password.NewMockEmailSender()
 
@@ -154,6 +160,8 @@ func main() {
 	listUserService := ListUsers.NewListUserService(listUserRepo)
 	// ioc
 	iocService := graphicalmapping.NewIOCService(iocRepo)
+	//timeline
+	timelineService := timeline.NewService(timelineRepo)
 
 	// ─── Handlers ───────────────────────────────────────────────
 	adminHandler := handlers.NewAdminService(regService, listUserService, nil, nil, auditLogger)
@@ -169,9 +177,10 @@ func main() {
 		userAdapter, // UserRepo
 		updateCaseService,
 	)
-
+	//ioc
 	iocHandler := handlers.NewIOCHandler(iocService)
-
+	//timeline
+	timelineHandler := handlers.NewTimelineHandler(timelineService)
 	// ─── Evidence Upload/Download/Metadata ──────────────────────
 	metadataRepo := metadata.NewGormRepository(db.DB)
 	ipfsClient := upload.NewIPFSClient("")
@@ -276,6 +285,7 @@ func main() {
 		userRepo,   // Pass the user repository
 		notificationService,
 		iocHandler,
+		timelineHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

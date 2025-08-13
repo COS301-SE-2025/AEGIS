@@ -2,6 +2,92 @@ import { useState } from "react";
 import { Plus, Calendar, Clock, Paperclip, Tag, Edit2, Save, X, FileText, Download, Eye, Shield, AlertTriangle, CheckCircle } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
+
+const BASE_URL = "http://localhost:8080/api/v1";
+
+function getUserNameFromToken(): string | null {
+  const token = sessionStorage.getItem('authToken');
+  if (!token) return null;
+  try {
+    const payload = token.split('.')[1];
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    return decoded.fullName || decoded.username || null;
+  } catch {
+    return null;
+  }
+}
+
+async function addTimelineEvent(caseId: string, eventData: {
+  description: string;
+  evidence: string[];
+  tags: string[];
+  severity: string;
+  analystName?: string; // Optional, backend extracts from token
+  createatedAt?: string; // Optional, backend sets default
+}) {
+  const token = sessionStorage.getItem('authToken');
+  if (!token) throw new Error("No auth token found");
+
+  // Only send eventData, no analystName — backend extracts analyst from token
+  const res = await fetch(`${BASE_URL}/cases/${caseId}/timeline`, {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify(eventData),
+  });
+
+  if (!res.ok) throw new Error("Failed to add timeline event");
+  return await res.json();
+}
+
+
+async function deleteTimelineEvent(eventId: string) {
+  const token = sessionStorage.getItem('authToken');
+  const res = await fetch(`${BASE_URL}/timeline/${eventId}`, {
+    method: "DELETE",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    }
+  });
+  if (!res.ok) throw new Error("Failed to delete timeline event");
+}
+
+async function updateTimelineEvent(eventId: string, updateData: {
+  description?: string;
+  evidence?: string[];
+  tags?: string[];
+  severity?: string;
+}) {
+  const token = sessionStorage.getItem('authToken');
+  const res = await fetch(`${BASE_URL}/timeline/${eventId}`, {
+    method: "PATCH",
+    headers: { 
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(updateData),
+  });
+  if (!res.ok) throw new Error("Failed to update timeline event");
+  return await res.json();
+}
+
+async function reorderTimelineEvents(caseId: string, orderedIds: string[]) {
+  const token = sessionStorage.getItem('authToken');
+  const res = await fetch(`${BASE_URL}/cases/${caseId}/timeline/reorder`, {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify({ ordered_ids: orderedIds }),
+  });
+  if (!res.ok) throw new Error("Failed to reorder timeline events");
+}
+
+
 
 export function InvestigationTimeline({
   caseId,
@@ -32,54 +118,80 @@ export function InvestigationTimeline({
     return { date, time };
   };
 
-  const addEvent = () => {
-    if (newEventDescription.trim()) {
-      const { date, time } = getCurrentTimestamp();
-      const newEvent = {
-        id: `event-${Date.now()}`,
-        date,
-        time,
-        description: newEventDescription.trim(),
-        evidence: newEventEvidence,
-        tags: newEventTags,
-        severity: newEventSeverity,
-        analyst: "Current User" // In real app, get from auth context
-      };
-      setTimelineEvents([...timelineEvents, newEvent]);
-      setNewEventDescription("");
-      setNewEventEvidence([]);
-      setNewEventTags([]);
-      setNewEventSeverity('medium');
-      setShowAddForm(false);
-      updateCaseTimestamp(caseId);
-    }
-  };
+const addEvent = async () => {
+  if (!newEventDescription.trim()) return;
+  try {
+    const createdEvent = await addTimelineEvent(caseId, {
+      description: newEventDescription.trim(),
+      evidence: newEventEvidence,
+      tags: newEventTags,
+      severity: newEventSeverity,
+      analystName: getUserNameFromToken() || undefined, // Optional, backend extracts from token
+    });
+    setTimelineEvents([...timelineEvents, createdEvent]); // update local state with backend response
+    setNewEventDescription("");
+    setNewEventEvidence([]);
+    setNewEventTags([]);
+    setNewEventSeverity('medium');
+    setShowAddForm(false);
+    updateCaseTimestamp(caseId);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to add event.");
+  }
+};
 
-  const deleteEvent = (index: number) => {
+
+const deleteEvent = async (index: number) => {
+  const eventId = timelineEvents[index].id;
+  try {
+    await deleteTimelineEvent(eventId);
     setTimelineEvents(timelineEvents.filter((_, i) => i !== index));
-  };
+  } catch (err) {
+    console.error(err);
+    alert("Failed to delete event.");
+  }
+};
+
 
   const startEditing = (index: number, currentDesc: string) => {
     setEditingIndex(index);
     setEditDescription(currentDesc);
   };
 
-  const saveEdit = () => {
-    if (editingIndex !== null) {
-      const updated = [...timelineEvents];
-      updated[editingIndex].description = editDescription;
-      setTimelineEvents(updated);
-      setEditingIndex(null);
-    }
-  };
+const saveEdit = async () => {
+  if (editingIndex === null) return;
+  const event = timelineEvents[editingIndex];
+  try {
+    const updatedEvent = await updateTimelineEvent(event.id, { description: editDescription });
+    const updatedList = [...timelineEvents];
+    updatedList[editingIndex] = updatedEvent;
+    setTimelineEvents(updatedList);
+    setEditingIndex(null);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to update event.");
+  }
+};
 
-  const onDragEnd = (result: any) => {
-    if (!result.destination) return;
-    const reordered = Array.from(timelineEvents);
-    const [moved] = reordered.splice(result.source.index, 1);
-    reordered.splice(result.destination.index, 0, moved);
-    setTimelineEvents(reordered);
-  };
+
+const onDragEnd = async (result: any) => {
+  if (!result.destination) return;
+  const reordered = Array.from(timelineEvents);
+  const [moved] = reordered.splice(result.source.index, 1);
+  reordered.splice(result.destination.index, 0, moved);
+
+  setTimelineEvents(reordered);
+
+  try {
+    const orderedIds = reordered.map(event => event.id);
+    await reorderTimelineEvents(caseId, orderedIds);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to reorder events.");
+  }
+};
+
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -120,9 +232,27 @@ export function InvestigationTimeline({
       [eventId]: !prev[eventId]
     }));
   };
+useEffect(() => {
+  async function fetchTimeline() {
+    try {
+      const token = sessionStorage.getItem('authToken');
+      const res = await fetch(`${BASE_URL}/cases/${caseId}/timeline`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        }
+      });
+      if (!res.ok) throw new Error("Failed to fetch timeline");
+      const events = await res.json();
+      setTimelineEvents(events);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  fetchTimeline();
+}, [caseId]);
 
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 text-gray-100 min-h screen max-w-6xl mx-auto shadow-lg">
+    <div className="bg-card border border-bg-accent rounded-lg p-8 text-gray-100 min-h screen max-w-6xl mx-auto shadow-lg">
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
           <Calendar className="text-blue-400" size={24} />
@@ -406,9 +536,9 @@ export function InvestigationTimeline({
                                 )}
 
                                 {/* Analyst info */}
-                                {event.analyst && (
+                                {event.analystName && (
                                   <div className="mt-3 text-xs text-gray-500 border-t border-gray-700 pt-2">
-                                    Added by: {event.analyst}
+                                    Added by: {event.analystName}
                                   </div>
                                 )}
                               </div>
