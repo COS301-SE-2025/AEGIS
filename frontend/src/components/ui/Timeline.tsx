@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Calendar, Clock, Paperclip, Tag, Edit2, Save, X, FileText, Download, Eye, Shield, AlertTriangle, CheckCircle } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
+import axios from "axios";
 
 export function InvestigationTimeline({
   caseId,
-  evidenceItems,
+  //evidenceItems,
   timelineEvents,
   setTimelineEvents,
   updateCaseTimestamp
@@ -24,6 +25,30 @@ export function InvestigationTimeline({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [expandedEvidence, setExpandedEvidence] = useState<{[key: string]: boolean}>({});
+  const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
+
+  // Auto-fetch evidence files when caseId changes or periodically
+useEffect(() => {
+  const fetchEvidence = async () => {
+    try {
+      const res = await axios.get(`http://localhost:8080/api/v1/evidence/case/${caseId}`, {
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem("authToken") || ""}`
+        }
+      });
+      // backend returns { files: [...] }
+      const data = res.data as { files?: any[] };
+      setEvidenceItems(data.files || []);
+    } catch (err) {
+      console.error("Failed to fetch evidence files:", err);
+    }
+  };
+
+  fetchEvidence(); // run immediately
+  const interval = setInterval(fetchEvidence, 1000000000); // re-fetch every 10s
+  return () => clearInterval(interval); // cleanup
+}, [caseId]);
+
 
   const getCurrentTimestamp = () => {
     const now = new Date();
