@@ -7,41 +7,8 @@ import (
 	"time"
 )
 
-// CaseReportsRepo interface defines methods for interacting with the case reports.
-type CaseReportsRepo interface {
-	SaveReport(ctx context.Context, report *Report) error
-	GetByID(ctx context.Context, reportID string) (*CaseReportRow, error)
-	GetAllReports(ctx context.Context) ([]CaseReportRow, error)
-	GetReportsByCaseID(ctx context.Context, caseID string) ([]CaseReportRow, error)         // New method
-	GetReportsByEvidenceID(ctx context.Context, evidenceID string) ([]CaseReportRow, error) // New method
-	DeleteReportByID(ctx context.Context, reportID string) error
-}
-
-// Add this interface:
 type CoCRepo interface {
 	ListByCase(ctx context.Context, caseID string) ([]coc.Entry, error)
-}
-
-// CaseReportRow represents a row of report data from the database.
-type CaseReportRow struct {
-	ID                     string
-	CaseID                 string
-	ExaminerID             string
-	Scope                  *string
-	Objectives             *string
-	Limitations            *string
-	ToolsMethods           *string
-	FinalConclusion        *string
-	EvidenceSummary        *string
-	CertificationStatement *string
-	DateExamined           *time.Time
-	Status                 string
-	Version                int
-	ReportNumber           *string
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
-	Name                   string // New field for report name
-	FilePath               string // New field for the file path
 }
 
 // ReportArtifactsRepo handles saving report artifacts (PDF, JSON, CSV).
@@ -76,3 +43,5 @@ type AuditLogger interface {
 type Authorizer interface {
 	CanGenerateReport(ctx context.Context, userID, caseID string) bool
 }
+
+//perform joint operations on different tables to get fields for the Authors name and the Count of collaborators that are working on a case

@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"aegis-api/services_/report"
+	"fmt"
+	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -10,11 +13,11 @@ import (
 
 // ReportHandler is the handler for managing reports.
 type ReportHandler struct {
-	ReportService report.ReportInterface // Correct the type to ReportService
+	ReportService report.ReportService // Correct the type to ReportService
 }
 
 // NewReportHandler creates a new instance of ReportHandler.
-func NewReportHandler(reportService report.ReportInterface) *ReportHandler {
+func NewReportHandler(reportService report.ReportService) *ReportHandler {
 	return &ReportHandler{
 		ReportService: reportService,
 	}
@@ -37,9 +40,23 @@ func (h *ReportHandler) GenerateReport(c *gin.Context) {
 		return
 	}
 
-	// Pass the context and other arguments to GenerateReport
-	report, err := h.ReportService.GenerateReport(c.Request.Context(), caseID, examinerID.(uuid.UUID))
+	// Convert the examinerID from string to UUID
+	examinerIDStr, ok := examinerID.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID format"})
+		return
+	}
+
+	examinerUUID, err := uuid.Parse(examinerIDStr)
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID UUID format"})
+		return
+	}
+
+	// Pass the context and other arguments to GenerateReport
+	report, err := h.ReportService.GenerateReport(c, caseID, examinerUUID)
+	if err != nil {
+		log.Printf("Error from ReportService.GenerateReport: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate report"})
 		return
 	}
@@ -164,7 +181,7 @@ func (h *ReportHandler) DeleteReport(c *gin.Context) {
 	// Extract user information from context
 
 	// Delete the report from the repository
-	err = h.ReportService.DeleteReportByID(c.Request.Context(), reportID.String())
+	err = h.ReportService.DeleteReportByID(c.Request.Context(), reportID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
 		return
@@ -172,4 +189,36 @@ func (h *ReportHandler) DeleteReport(c *gin.Context) {
 
 	// Return success response
 	c.JSON(http.StatusOK, gin.H{"message": "Report deleted successfully"})
+}
+
+// DownloadReport handles downloading a specific report file.
+func (h *ReportHandler) DownloadReport(c *gin.Context) {
+	reportIDStr := c.Param("reportID")
+	reportID, err := uuid.Parse(reportIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
+		return
+	}
+
+	// Get the report metadata from the service
+	rep, err := h.ReportService.DownloadReport(c.Request.Context(), reportID)
+	if err != nil {
+		fmt.Printf("Error downloading report: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get report"})
+		return
+	}
+
+	// Assuming the Report struct has a FilePath field
+	fileData, err := os.ReadFile(rep.FilePath)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read report file"})
+		return
+	}
+
+	fileName := fmt.Sprintf("report_%s.pdf", rep.ID)
+
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Disposition", "attachment; filename="+fileName)
+	c.Data(http.StatusOK, "application/pdf", fileData)
 }

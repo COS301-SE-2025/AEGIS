@@ -13,8 +13,8 @@ type GormCoCRepo struct {
 	DB *gorm.DB
 }
 
-func NewCoCRepo(db *gorm.DB) CoCRepo {
-	return &GormCoCRepo{DB: db}
+func NewCoCRepo(db *gorm.DB) GormCoCRepo {
+	return GormCoCRepo{DB: db}
 }
 
 func (r *GormCoCRepo) ListByCase(ctx context.Context, caseID string) ([]coc.Entry, error) {

@@ -1,4 +1,3 @@
-// services/report/report_service.go
 package report
 
 import (
@@ -9,232 +8,124 @@ import (
 	"github.com/google/uuid"
 )
 
-// ReportService struct contains the repositories and services needed for report management.
-type ReportService struct {
-	CaseReportsRepo     CaseReportsRepo
-	ReportArtifactsRepo ReportArtifactsRepo
-	Storage             Storage
-	AuditLogger         AuditLogger
-	Authorizer          Authorizer
-	CoCRepo             CoCRepo
+// ReportService defines the business logic for managing reports.
+type ReportService interface {
+	GenerateReport(ctx context.Context, caseID uuid.UUID, examinerID uuid.UUID) (*Report, error)
+	SaveReport(ctx context.Context, report *Report) error
+	GetReportByID(ctx context.Context, reportID uuid.UUID) (*Report, error)
+	UpdateReport(ctx context.Context, report *Report) error
+	GetAllReports(ctx context.Context) ([]Report, error)
+	GetReportsByCaseID(ctx context.Context, caseID uuid.UUID) ([]ReportWithDetails, error)
+	GetReportsByEvidenceID(ctx context.Context, evidenceID uuid.UUID) ([]Report, error)
+	DeleteReportByID(ctx context.Context, reportID uuid.UUID) error
+	DownloadReport(ctx context.Context, reportID uuid.UUID) (*Report, error)
 }
 
-// NewReportService creates a new instance of ReportService.
+// ReportServiceImpl is the concrete implementation of ReportService.
+type ReportServiceImpl struct {
+	repo ReportRepository
+	// artifactsRepo   ReportArtifactsRepository
+	storage     Storage
+	auditLogger AuditLogger
+	authorizer  Authorizer
+	coCRepo     GormCoCRepo
+}
+
 func NewReportService(
-	caseReportsRepo CaseReportsRepo,
-	reportArtifactsRepo ReportArtifactsRepo,
+	repo ReportRepository,
+	//  artifactsRepo ReportArtifactsRepository,
 	storage Storage,
 	auditLogger AuditLogger,
 	authorizer Authorizer,
-	coCRepo CoCRepo, // Added for CoCRepo
-) *ReportService {
-	return &ReportService{
-		CaseReportsRepo:     caseReportsRepo,
-		ReportArtifactsRepo: reportArtifactsRepo,
-		Storage:             storage,
-		AuditLogger:         auditLogger,
-		Authorizer:          authorizer,
-		CoCRepo:             coCRepo,
+	coCRepo GormCoCRepo,
+) ReportService {
+	return &ReportServiceImpl{
+		repo: repo,
+		//artifactsRepo: artifactsRepo,
+		storage:     storage,
+		auditLogger: auditLogger,
+		authorizer:  authorizer,
+		coCRepo:     coCRepo,
 	}
 }
 
-// GenerateReport creates a new report for a given case ID and examiner ID.
-func (s *ReportService) GenerateReport(ctx context.Context, caseID uuid.UUID, examinerID uuid.UUID) (*Report, error) {
-	// Fetch chain of custody information for the given case
-	cocEntries, err := s.CoCRepo.ListByCase(ctx, caseID.String()) // This uses coCRepo to get CoC data
-	if err != nil {
-		return nil, err
-	}
-
-	// Logic to generate a new report including CoC entries
+// GenerateReport creates a new report for a given case and examiner.
+// Here you could include more logic such as fetching case data, formatting content, etc.
+func (s *ReportServiceImpl) GenerateReport(ctx context.Context, caseID uuid.UUID, examinerID uuid.UUID) (*Report, error) {
 	report := &Report{
+		ID:         uuid.New(),
 		CaseID:     caseID,
 		ExaminerID: examinerID,
-		Scope:      "Scope of investigation",
-		Objectives: "Objectives of investigation",
-		Status:     "draft",
-		Version:    1,
+		// Add default or generated fields here
 	}
 
-	// Example: Concatenate CoC entries into the "EvidenceSummary" field
-	var cocSummary string
-	for _, entry := range cocEntries {
-		cocSummary += *entry.Reason + "\n" // You can format it however you need
+	if err := s.repo.SaveReport(ctx, report); err != nil {
+		return nil, fmt.Errorf("failed to generate report: %w", err)
 	}
-
-	report.EvidenceSummary = cocSummary // Include the CoC information in the report
-
-	// Save the generated report to the database.
-	err = s.CaseReportsRepo.SaveReport(ctx, report)
-	if err != nil {
-		return nil, err
-	}
-
-	// Log the report generation activity using the audit logger.
-	err = s.AuditLogger.LogGenerateReport(ctx, caseID.String(), report.ID.String(), "artifactID", examinerID.String(), "ip", "userAgent")
-	if err != nil {
-		return nil, err
-	}
-
 	return report, nil
 }
 
-// SaveReport saves a report to the database.
-func (s *ReportService) SaveReport(ctx context.Context, report *Report) error {
-	return s.CaseReportsRepo.SaveReport(ctx, report)
+// SaveReport persists a report to the repository.
+func (s *ReportServiceImpl) SaveReport(ctx context.Context, report *Report) error {
+	if report.ID == uuid.Nil {
+		report.ID = uuid.New()
+	}
+	return s.repo.SaveReport(ctx, report)
 }
 
 // GetReportByID retrieves a report by its ID.
-func (s *ReportService) GetReportByID(ctx context.Context, reportID uuid.UUID) (*Report, error) {
-	reportRow, err := s.CaseReportsRepo.GetByID(ctx, reportID.String())
+func (s *ReportServiceImpl) GetReportByID(ctx context.Context, reportID uuid.UUID) (*Report, error) {
+	return s.repo.GetByID(ctx, reportID)
+}
+
+// UpdateReport updates an existing report in the repository.
+func (s *ReportServiceImpl) UpdateReport(ctx context.Context, report *Report) error {
+	// You could add business logic like checking if the report exists first
+	return s.repo.SaveReport(ctx, report) // assuming SaveReport handles both insert/update
+}
+
+// GetAllReports retrieves all reports.
+func (s *ReportServiceImpl) GetAllReports(ctx context.Context) ([]Report, error) {
+	return s.repo.GetAllReports(ctx)
+}
+
+// GetReportsByCaseID retrieves all reports for a specific case.
+// Service layer: convert timestamps to Africa/Johannesburg
+func (s *ReportServiceImpl) GetReportsByCaseID(ctx context.Context, caseID uuid.UUID) ([]ReportWithDetails, error) {
+	reports, err := s.repo.GetReportsByCaseID(ctx, caseID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Map the row from the database to the Report struct.
-	report := &Report{
-		ID:                     uuid.MustParse(reportRow.ID),
-		CaseID:                 uuid.MustParse(reportRow.CaseID),
-		ExaminerID:             uuid.MustParse(reportRow.ExaminerID),
-		Scope:                  *reportRow.Scope,
-		Objectives:             *reportRow.Objectives,
-		Limitations:            *reportRow.Limitations,
-		ToolsMethods:           *reportRow.ToolsMethods,
-		FinalConclusion:        *reportRow.FinalConclusion,
-		EvidenceSummary:        *reportRow.EvidenceSummary,
-		CertificationStatement: *reportRow.CertificationStatement,
-		DateExamined:           *reportRow.DateExamined,
-		Status:                 reportRow.Status,
-		Version:                reportRow.Version,
-		ReportNumber:           *reportRow.ReportNumber,
-		CreatedAt:              reportRow.CreatedAt,
-		UpdatedAt:              reportRow.UpdatedAt,
+	// Load timezone once
+	loc, _ := time.LoadLocation("Africa/Johannesburg")
+
+	for i := range reports {
+		t, err := time.Parse(time.RFC3339, reports[i].LastModified) // or use the actual format your DB returns
+		if err != nil {
+			continue // or handle error
+		}
+		reports[i].LastModified = t.In(loc).Format("2006-01-02 15:04:05")
 	}
 
+	return reports, nil
+}
+
+// GetReportsByEvidenceID retrieves all reports for a specific evidence item.
+func (s *ReportServiceImpl) GetReportsByEvidenceID(ctx context.Context, evidenceID uuid.UUID) ([]Report, error) {
+	return s.repo.GetReportsByEvidenceID(ctx, evidenceID)
+}
+
+// DeleteReportByID deletes a report by ID.
+func (s *ReportServiceImpl) DeleteReportByID(ctx context.Context, reportID uuid.UUID) error {
+	return s.repo.DeleteReportByID(ctx, reportID)
+}
+
+// DownloadReport fetches the report for downloading.
+func (s *ReportServiceImpl) DownloadReport(ctx context.Context, reportID uuid.UUID) (*Report, error) {
+	report, err := s.repo.DownloadReport(ctx, reportID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download report: %w", err)
+	}
 	return report, nil
-}
-
-// UpdateReport updates an existing report.
-func (s *ReportService) UpdateReport(ctx context.Context, report *Report) error {
-	return s.CaseReportsRepo.SaveReport(ctx, report)
-}
-
-// GetAllReports retrieves all reports from the repository.
-func (s *ReportService) GetAllReports(ctx context.Context) ([]Report, error) {
-	reportRows, err := s.CaseReportsRepo.GetAllReports(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var reports []Report
-	// Map each row to a Report struct.
-	for _, row := range reportRows {
-		reports = append(reports, Report{
-			ID:                     uuid.MustParse(row.ID),
-			CaseID:                 uuid.MustParse(row.CaseID),
-			ExaminerID:             uuid.MustParse(row.ExaminerID),
-			Scope:                  *row.Scope,
-			Objectives:             *row.Objectives,
-			Limitations:            *row.Limitations,
-			ToolsMethods:           *row.ToolsMethods,
-			FinalConclusion:        *row.FinalConclusion,
-			EvidenceSummary:        *row.EvidenceSummary,
-			CertificationStatement: *row.CertificationStatement,
-			DateExamined:           *row.DateExamined,
-			Status:                 row.Status,
-			Version:                row.Version,
-			ReportNumber:           *row.ReportNumber,
-			CreatedAt:              row.CreatedAt,
-			UpdatedAt:              row.UpdatedAt,
-		})
-	}
-
-	return reports, nil
-}
-
-// GetReportsByCaseID retrieves all reports for a given case ID.
-func (s *ReportService) GetReportsByCaseID(ctx context.Context, caseID uuid.UUID) ([]Report, error) {
-	// Fetch all reports associated with the given caseID from the repository.
-	reportRows, err := s.CaseReportsRepo.GetReportsByCaseID(ctx, caseID.String()) // Replace with actual repository function
-	if err != nil {
-		return nil, err
-	}
-
-	// Map each row to a Report struct.
-	var reports []Report
-	for _, row := range reportRows {
-		reports = append(reports, Report{
-			ID:                     uuid.MustParse(row.ID),
-			CaseID:                 uuid.MustParse(row.CaseID),
-			ExaminerID:             uuid.MustParse(row.ExaminerID),
-			Scope:                  *row.Scope,
-			Objectives:             *row.Objectives,
-			Limitations:            *row.Limitations,
-			ToolsMethods:           *row.ToolsMethods,
-			FinalConclusion:        *row.FinalConclusion,
-			EvidenceSummary:        *row.EvidenceSummary,
-			CertificationStatement: *row.CertificationStatement,
-			DateExamined:           *row.DateExamined,
-			Status:                 row.Status,
-			Version:                row.Version,
-			ReportNumber:           *row.ReportNumber,
-			CreatedAt:              row.CreatedAt,
-			UpdatedAt:              row.UpdatedAt,
-		})
-	}
-
-	return reports, nil
-}
-
-// GetReportsByEvidenceID retrieves all reports for a given evidence ID.
-func (s *ReportService) GetReportsByEvidenceID(ctx context.Context, evidenceID uuid.UUID) ([]Report, error) {
-	// Fetch all reports associated with the given evidenceID from the repository.
-	reportRows, err := s.CaseReportsRepo.GetReportsByEvidenceID(ctx, evidenceID.String()) // Replace with actual repository function
-	if err != nil {
-		return nil, err
-	}
-
-	// Map each row to a Report struct.
-	var reports []Report
-	for _, row := range reportRows {
-		reports = append(reports, Report{
-			ID:                     uuid.MustParse(row.ID),
-			CaseID:                 uuid.MustParse(row.CaseID),
-			ExaminerID:             uuid.MustParse(row.ExaminerID),
-			Scope:                  *row.Scope,
-			Objectives:             *row.Objectives,
-			Limitations:            *row.Limitations,
-			ToolsMethods:           *row.ToolsMethods,
-			FinalConclusion:        *row.FinalConclusion,
-			EvidenceSummary:        *row.EvidenceSummary,
-			CertificationStatement: *row.CertificationStatement,
-			DateExamined:           *row.DateExamined,
-			Status:                 row.Status,
-			Version:                row.Version,
-			ReportNumber:           *row.ReportNumber,
-			CreatedAt:              row.CreatedAt,
-			UpdatedAt:              row.UpdatedAt,
-		})
-	}
-
-	return reports, nil
-}
-
-// DeleteReportByID deletes a report by its ID and logs the action.
-func (s *ReportService) DeleteReportByID(ctx context.Context, reportID string) error {
-	// Log the delete action
-	// You may not need user information here, or you can pass a default context or other parameters if needed
-	err := s.AuditLogger.LogDeleteReport(ctx, reportID, "", "", "", "", "", time.Now()) // Assuming default or nil values for logging
-	if err != nil {
-		return fmt.Errorf("failed to log delete event: %w", err)
-	}
-
-	// Call the repository method to delete the report from the database
-	err = s.CaseReportsRepo.DeleteReportByID(ctx, reportID)
-	if err != nil {
-		return fmt.Errorf("failed to delete report: %w", err)
-	}
-
-	// Return nil if the report was successfully deleted
-	return nil
 }

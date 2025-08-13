@@ -80,6 +80,16 @@ CREATE TABLE tenants (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE teams (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_name TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_teams_tenant FOREIGN KEY (tenant_id)
+    REFERENCES tenants(id) ON DELETE CASCADE
+);
 -- STEP 1: Create ENUM for token status (if it doesn't exist yet)
 DO $$
 BEGIN
@@ -130,16 +140,7 @@ CREATE TABLE notifications (
 
 
 
-CREATE TABLE teams (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_name TEXT NOT NULL,
-  tenant_id UUID NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-  CONSTRAINT fk_teams_tenant FOREIGN KEY (tenant_id)
-    REFERENCES tenants(id) ON DELETE CASCADE
-);
 
 CREATE TABLE tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -192,6 +193,7 @@ CREATE TABLE IF NOT EXISTS cases (
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     -- New Fields
+    team_id UUID REFERENCES teams(id) ON DELETE SET NULL, -- Link to team
     tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
 );
 
@@ -486,7 +488,22 @@ CREATE TABLE case_user_roles (
 CREATE INDEX idx_case_user_roles_case_id ON case_user_roles(case_id);
 CREATE INDEX idx_case_user_roles_user_id ON case_user_roles(user_id);
 
-
+CREATE TABLE entries (
+    id VARCHAR(255) PRIMARY KEY,
+    case_id VARCHAR(255) NOT NULL,
+    evidence_id VARCHAR(255) NOT NULL,
+    actor_id VARCHAR(255),
+    action VARCHAR(255) NOT NULL,
+    reason TEXT,
+    location TEXT,
+    hash_md5 VARCHAR(32),
+    hash_sha1 VARCHAR(40),
+    hash_sha256 VARCHAR(64),
+    occurred_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    
+ 
+);
 
 -- === Chain of Custody (AEGIS) Final Schema — Updated ===
 -- Assumes you already have: cases(id), evidence(id), users(id)
@@ -646,3 +663,97 @@ FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
 
 
+-- First, create the report_status enum type (PostgreSQL)
+-- Enable UUID generation (PostgreSQL)
+-- Enable UUID generation (PostgreSQL)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create enum type for report status
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'report_status') THEN
+        CREATE TYPE report_status AS ENUM ('draft', 'review', 'published');
+    END IF;
+END
+$$;
+
+-- Create the reports table
+CREATE TABLE reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    case_id UUID NOT NULL,                  -- Links report to a specific case
+    examiner_id UUID NOT NULL,              -- Who created the report
+    name VARCHAR(255) NOT NULL,             -- Report title
+    report_number VARCHAR(255) UNIQUE,      -- Optional, unique identifier
+    version INTEGER NOT NULL DEFAULT 1,     -- Versioning
+    status report_status DEFAULT 'draft',   -- Current report status
+    scope TEXT,                             -- Optional field for report scope
+    objectives TEXT,                        -- Optional objectives
+    limitations TEXT,                       -- Optional limitations
+    tools_methods TEXT,                      -- Optional tools & methods
+    evidence_summary TEXT,                  -- Optional summary of evidence
+    final_conclusion TEXT,                  -- Optional conclusions
+    certification_statement TEXT,           -- Optional certification / sign-off
+    date_examined DATE,                      -- Optional examination date
+    file_path VARCHAR(255) NOT NULL,        -- Path to stored PDF or file
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for better query performance
+CREATE INDEX idx_reports_case_id ON reports(case_id);
+CREATE INDEX idx_reports_examiner_id ON reports(examiner_id);
+CREATE INDEX idx_reports_status ON reports(status);
+CREATE INDEX idx_reports_created_at ON reports(created_at);
+CREATE INDEX idx_reports_report_number ON reports(report_number);
+CREATE INDEX idx_reports_date_examined ON reports(date_examined);
+
+-- Add foreign key constraints (uncomment if you have related tables)
+-- ALTER TABLE reports ADD CONSTRAINT fk_reports_case_id 
+--     FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE;
+-- ALTER TABLE reports ADD CONSTRAINT fk_reports_examiner_id 
+--     FOREIGN KEY (examiner_id) REFERENCES users(id) ON DELETE RESTRICT;
+
+-- Create trigger to automatically update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_reports_updated_at 
+    BEFORE UPDATE ON reports 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Alternative for MySQL (if not using PostgreSQL)
+/*
+CREATE TABLE reports (
+    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    case_id CHAR(36) NOT NULL,
+    examiner_id CHAR(36) NOT NULL,
+    scope TEXT,
+    objectives TEXT,
+    limitations TEXT,
+    tools_methods TEXT,
+    final_conclusion TEXT,
+    evidence_summary TEXT,
+    certification_statement TEXT,
+    date_examined DATE,
+    status ENUM('draft', 'published', 'archived', 'pending', 'reviewed') DEFAULT 'draft',
+    version INTEGER NOT NULL DEFAULT 1,
+    report_number VARCHAR(255) UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    
+    INDEX idx_reports_case_id (case_id),
+    INDEX idx_reports_examiner_id (examiner_id),
+    INDEX idx_reports_status (status),
+    INDEX idx_reports_created_at (created_at),
+    INDEX idx_reports_report_number (report_number),
+    INDEX idx_reports_date_examined (date_examined)
+);
+*/

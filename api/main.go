@@ -265,22 +265,20 @@ func main() {
 	// ─── Report Service Initialization ─────────────────────
 
 	// Initialize the repository and service for report generation and management
-	reportRepo := report.NewCaseReportsRepo(db.DB)
+	// ─── Report Service Initialization ─────────────────────────────
+
+	reportRepo := report.NewReportRepository(db.DB)
 	coCRepo := report.NewCoCRepo(db.DB)
 
-	// Use dummy implementations for now (or you can replace with actual implementations)
 	reportService := report.NewReportService(
 		reportRepo,
-		nil,         // ReportArtifactsRepo
+		//nil,         // ReportArtifactsRepo
 		nil,         // Storage
 		auditLogger, // AuditLogger
 		nil,         // Authorizer
 		coCRepo,
 	)
-
-	// Create a handler for reports
 	reportHandler := handlers.NewReportHandler(reportService)
-
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,

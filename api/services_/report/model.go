@@ -30,9 +30,6 @@ type Report struct {
 }
 
 // ReportInterface defines the methods for managing reports.
-// report/ports.go
-
-// ReportInterface defines the methods for managing reports.
 type ReportInterface interface {
 	GenerateReport(ctx context.Context, caseID uuid.UUID, examinerID uuid.UUID) (*Report, error)
 	SaveReport(ctx context.Context, report *Report) error
@@ -42,4 +39,17 @@ type ReportInterface interface {
 	GetReportsByCaseID(ctx context.Context, caseID uuid.UUID) ([]Report, error)         // Updated to use uuid.UUID
 	GetReportsByEvidenceID(ctx context.Context, evidenceID uuid.UUID) ([]Report, error) // Updated to use uuid.UUID
 	DeleteReportByID(ctx context.Context, reportID string) error
+	DownloadReport(ctx context.Context, reportID uuid.UUID) (*Report, error)
+}
+type ReportWithDetails struct {
+	ID            uuid.UUID `json:"id"`
+	CaseID        uuid.UUID `json:"case_id"`
+	Name          string    `json:"name"`
+	Type          string    `json:"type"`
+	Status        string    `json:"status"`
+	Version       int       `json:"version"`
+	LastModified  string    `json:"last_modified"`
+	FilePath      string    `json:"file_path"`
+	Author        string    `json:"author"`        // full name of examiner
+	Collaborators int       `json:"collaborators"` // count from case_user_roles
 }

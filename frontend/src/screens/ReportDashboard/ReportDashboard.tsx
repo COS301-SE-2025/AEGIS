@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import { 
   Search, 
   //ChevronDown, 
@@ -17,18 +17,22 @@ import {
   Bug
 } from 'lucide-react';
 import { Link } from "react-router-dom";
+import axios from 'axios';
 
 // Types
-interface Report {
+interface ReportWithDetails {
   id: string;
-  title: string;
-  type: 'incident' | 'forensic' | 'malware';
-  author: string;
-  collaborators: number;
-  lastModified: string;
+  case_id: string;
+  name: string;             // corresponds to report name
+  type: string;
   status: 'draft' | 'review' | 'published';
-  caseId?: string;
+  version: number;
+  last_modified: string;
+  file_path: string;
+  author: string;           // examiner full name
+  collaborators: number;    // count from case_user_roles
 }
+
 
 interface ReportTemplate {
   id: string;
@@ -44,6 +48,155 @@ export const ReportDashboard = () => {
   const [selectedAuthor, setSelectedAuthor] = useState('All Authors');
   const [selectedType, setSelectedType] = useState('All Types');
   const [selectedTimeframe, setSelectedTimeframe] = useState('Last 30 days');
+  
+const [reports, setReports] = useState<ReportWithDetails[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState<string>('923f5f04-0641-4e10-b9f8-ef6fcfbecbc2');
+  const [error, setError] = useState<string | null>(null);
+  const token = sessionStorage.getItem('authToken');
+
+  // Change from Axios.AxiosResponse to axios.AxiosResponse (lowercase)
+
+  // API URL - make sure to update with the correct URL
+  const API_URL = 'http://localhost:8080/api/v1';
+
+
+   // Fetch reports by case - move the axios call here
+// Fetch reports by case
+useEffect(() => {
+  const fetchReports = async () => {
+    try {
+      const token = sessionStorage.getItem('authToken'); // get your stored token
+      if (!token) {
+        console.error('No auth token found');
+        return;
+      }
+
+      const response = await axios.get<ReportWithDetails[]>(
+        `${API_URL}/reports/cases/${selectedCaseId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setReports(response.data);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+    }
+  };
+
+  fetchReports();
+}, [selectedCaseId]);
+
+  // Generate a new report for the selected case
+// Generate a new report for the selected case
+const handleGenerateReport = async () => {
+  try {
+    const token = sessionStorage.getItem('authToken'); // make sure token exists
+    if (!token) {
+      console.error('No auth token found');
+      return;
+    }
+
+    const reportData: Partial<ReportWithDetails> = {
+      name: 'New Incident Report',
+      type: 'incident',
+      author: 'User',
+      collaborators: 3,
+      case_id: selectedCaseId,
+    };
+
+    // Call backend to create the report
+    const response = await axios.post<ReportWithDetails>(
+      `${API_URL}/reports/cases/${selectedCaseId}`,
+      reportData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const newReport = response.data;
+
+    // Ensure unique key and all required fields for frontend
+    const normalizedReport: ReportWithDetails = {
+      ...newReport,
+      last_modified: newReport.last_modified || new Date().toISOString(), // fallback if backend doesn’t return
+      id: newReport.id || `temp-${Date.now()}`, // temporary ID if backend hasn’t returned one
+    };
+
+    // Update reports state immediately
+    setReports((prevReports) => [...prevReports, normalizedReport]);
+
+    console.log('Report generated and added to state:', normalizedReport);
+
+  } catch (error) {
+    console.error('Error generating report:', error);
+  }
+};
+
+const formatTimestamp = (timestamp: string) => {
+  if (!timestamp) return "";
+
+  // Parse the timestamp string (assume "2025-08-13 15:58:46")
+  const date = new Date(timestamp.replace(" ", "T")); // make it ISO compatible
+
+  // Format options
+  const options: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  };
+
+  return date.toLocaleString("en-US", options); // e.g., "Dec 12, 2025 at 9:15 AM"
+};
+
+
+  // Update an existing report by ID
+// Update an existing report by ID
+const handleUpdateReport = async (reportId: string, updatedData: Partial<Report>) => {
+  try {
+    // Add generic type to specify that response.data will be a Report
+    const response = await axios.put<ReportWithDetails>(`${API_URL}/reports/${reportId}`, updatedData);
+    setReports((prevReports) => prevReports.map((report) =>
+      report.id === reportId ? response.data : report
+    ));
+  } catch (error) {
+    console.error('Error updating report:', error);
+  }
+};
+
+
+async function downloadReport(id: string) {
+  try {
+    const token = sessionStorage.getItem('authToken');
+    if (!token) throw new Error('No auth token found');
+
+    // Tell Axios we expect a Blob
+ const res = await axios.get(`${API_URL}/reports/${id}/download`, {
+  headers: { Authorization: `Bearer ${token}` },
+  responseType: "blob",
+});
+const blob = new Blob([res.data as BlobPart], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `report-${id}.pdf`;
+    link.click();
+
+    window.URL.revokeObjectURL(url);
+
+  } catch (err) {
+    console.error('Failed to download report', err);
+    setError("Failed to download report");
+  }
+}
 
   const reportTemplates: ReportTemplate[] = [
     {
@@ -69,48 +222,48 @@ export const ReportDashboard = () => {
     }
   ];
 
-  const existingReports: Report[] = [
-    {
-      id: 'report-1',
-      title: 'Phishing Campaign Analysis - Q4 2024',
-      type: 'incident',
-      author: 'J. Doe',
-      collaborators: 3,
-      lastModified: 'Dec 15, 2024 at 4:30 PM',
-      status: 'draft',
-      caseId: '2024-001'
-    },
-    {
-      id: 'report-2',
-      title: 'Network Intrusion Investigation',
-      type: 'forensic',
-      author: 'M. Smith',
-      collaborators: 1,
-      lastModified: 'Dec 12, 2024 at 9:15 AM',
-      status: 'review',
-      caseId: '2024-002'
-    },
-    {
-      id: 'report-3',
-      title: 'Ransomware Incident Response',
-      type: 'incident',
-      author: 'A. Johnson',
-      collaborators: 2,
-      lastModified: 'Dec 10, 2024 at 6:45 PM',
-      status: 'published',
-      caseId: '2024-003'
-    },
-    {
-      id: 'report-4',
-      title: 'Data Breach Assessment',
-      type: 'forensic',
-      author: 'S. Williams',
-      collaborators: 4,
-      lastModified: 'Dec 8, 2024 at 11:20 AM',
-      status: 'published',
-      caseId: '2024-004'
-    }
-  ];
+  // const existingReports: ReportWithDetails[] = [
+  //   {
+  //     id: 'report-1',
+  //     name: 'Phishing Campaign Analysis - Q4 2024',
+  //     type: 'incident',
+  //     author: 'J. Doe',
+  //     collaborators: 3,
+  //     last_modified: 'Dec 15, 2024 at 4:30 PM',
+  //     status: 'draft',
+  //     caseId: '2024-001'
+  //   },
+  //   {
+  //     id: 'report-2',
+  //     name: 'Network Intrusion Investigation',
+  //     type: 'forensic',
+  //     author: 'M. Smith',
+  //     collaborators: 1,
+  //     last_modified: 'Dec 12, 2024 at 9:15 AM',
+  //     status: 'review',
+  //     caseId: '2024-002'
+  //   },
+  //   {
+  //     id: 'report-3',
+  //     name: 'Ransomware Incident Response',
+  //     type: 'incident',
+  //     author: 'A. Johnson',
+  //     collaborators: 2,
+  //     last_modified: 'Dec 10, 2024 at 6:45 PM',
+  //     status: 'published',
+  //     caseId: '2024-003'
+  //   },
+  //   {
+  //     id: 'report-4',
+  //     name: 'Data Breach Assessment',
+  //     type: 'forensic',
+  //     author: 'S. Williams',
+  //     collaborators: 4,
+  //     last_modified: 'Dec 8, 2024 at 11:20 AM',
+  //     status: 'published',
+  //     caseId: '2024-004'
+  //   }
+  // ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -145,12 +298,12 @@ export const ReportDashboard = () => {
     </div>
   );
 
-  const ReportCard = ({ report }: { report: Report }) => (
+  const ReportCard = ({ report }: { report: ReportWithDetails }) => (
     <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="text-white font-semibold mb-1">{report.title}</h3>
-          <p className="text-gray-400 text-sm">Last modified: {report.lastModified}</p>
+          <h3 className="text-white font-semibold mb-1">{report.name}</h3>
+          <p className="text-gray-400 text-sm">Last Modified: {formatTimestamp(report.last_modified)}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 text-gray-400">
@@ -162,23 +315,26 @@ export const ReportDashboard = () => {
       </div>
       
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-            Open
-          </button>
-          <button className="p-2 text-gray-400 hover:text-white transition-colors">
-            <Users className="w-4 h-4" />
-          </button>
-          <button className="p-2 text-gray-400 hover:text-white transition-colors">
-            <Download className="w-4 h-4" />
-          </button>
-        </div>
-        {getTypeIcon(report.type)}
-      </div>
+  <div className="flex items-center gap-3">
+    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+      Open
+    </button>
+    <button className="p-2 text-gray-400 hover:text-white transition-colors">
+      <Users className="w-4 h-4" />
+    </button>
+    <button
+      onClick={() => downloadReport(report.id)}
+      className="p-2 text-gray-400 hover:text-white transition-colors"
+    >
+      <Download className="w-4 h-4" />
+    </button>
+  </div>
+  {getTypeIcon(report.type)}
+</div>
     </div>
   );
 
-  const ReportListItem = ({ report }: { report: Report }) => (
+  const ReportListItem = ({ report }: { report: ReportWithDetails }) => (
     <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4 flex-1">
@@ -188,8 +344,8 @@ export const ReportDashboard = () => {
           </div>
           
           <div className="flex-1 min-w-0">
-            <h3 className="text-white font-medium truncate">{report.title}</h3>
-            <p className="text-gray-400 text-sm">{report.author} • {report.lastModified}</p>
+            <h3 className="text-white font-medium truncate">{report.name}</h3>
+            <p className="text-gray-400 text-sm">{report.author} • {formatTimestamp(report.last_modified)}</p>
           </div>
           
           <div className="flex items-center gap-1 text-gray-400">
@@ -210,12 +366,14 @@ export const ReportDashboard = () => {
     </div>
   );
 
-  const filteredReports = existingReports.filter(report => {
-    const matchesSearch = report.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesAuthor = selectedAuthor === 'All Authors' || report.author === selectedAuthor;
-    const matchesType = selectedType === 'All Types' || report.type === selectedType;
-    return matchesSearch && matchesAuthor && matchesType;
-  });
+  const filteredReports = reports.filter(report => {
+  const matchesSearch = (report.name ?? '').toLowerCase().includes(searchTerm.toLowerCase());
+  const matchesAuthor = selectedAuthor === 'All Authors' || (report.author ?? '') === selectedAuthor;
+  const matchesType = selectedType === 'All Types' || (report.type ?? '') === selectedType;
+  return matchesSearch && matchesAuthor && matchesType;
+});
+
+
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -236,8 +394,10 @@ export const ReportDashboard = () => {
                         <FileText className="w-6 h-6" />
                         <Link to="/case-management"><span className="text-lg">Case Management</span></Link>
                       </div>
-            
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+             <button 
+              onClick={handleGenerateReport}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
               <Plus className="w-4 h-4" />
               New Report
             </button>
@@ -336,9 +496,13 @@ export const ReportDashboard = () => {
 
           {viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredReports.map(report => (
-                <ReportCard key={report.id} report={report} />
-              ))}
+             {filteredReports.map((report, index) => (
+              <ReportCard
+                key={report.id ?? `report-${index}`} // fallback to index if id is missing
+                report={report}
+              />
+            ))}
+
             </div>
           ) : (
             <div className="space-y-3">

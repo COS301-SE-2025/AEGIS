@@ -26,6 +26,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		fmt.Println("Parsed Token String:", tokenString)
+
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -52,15 +53,16 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Extract claims from MapClaims
+		// Extract string claims
 		userID, ok1 := getStringClaim(claims, "user_id")
 		email, ok2 := getStringClaim(claims, "email")
 		role, ok3 := getStringClaim(claims, "role")
 		fullName, _ := getStringClaim(claims, "full_name")
 		tenantID, ok4 := getStringClaim(claims, "tenant_id")
-		teamID, ok5 := getStringClaim(claims, "team_id")
+		teamID, _ := getStringClaim(claims, "team_id") // teamID can be empty for some roles
 
-		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || userID == "" || email == "" || role == "" || tenantID == "" || teamID == "" {
+		// Basic claim checks (teamID optional here)
+		if !ok1 || !ok2 || !ok3 || !ok4 || userID == "" || email == "" || role == "" || tenantID == "" {
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
 				Message: "Missing required token claims",
@@ -69,13 +71,23 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Attach claims to context
+		// Only enforce teamID for roles that must belong to a team
+		if teamID == "" && (role == "DFIR Admin" || role == "DFIR User") {
+			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+				Error:   "unauthorized",
+				Message: "Team ID required for this role",
+			})
+			c.Abort()
+			return
+		}
+
+		// ✅ Attach claims to context
 		c.Set("userID", userID)
 		c.Set("email", email)
 		c.Set("userRole", role)
 		c.Set("fullName", fullName)
 		c.Set("tenantID", tenantID)
-		c.Set("teamID", teamID)
+		c.Set("teamID", teamID) // may be empty for Tenant Admin
 
 		c.Next()
 	}

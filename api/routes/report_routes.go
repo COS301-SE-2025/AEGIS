@@ -16,5 +16,11 @@ func RegisterReportRoutes(router *gin.RouterGroup, handler *handlers.ReportHandl
 		report.GET("/:reportID", handler.GetReportByID)                     // Get a specific report
 		report.PUT("/:reportID", handler.UpdateReport)                      // Update a report
 		report.DELETE("/:reportID", handler.DeleteReport)                   // Delete a report
+
+		// NEW: download report
+		report.GET("/:reportID/download", handler.DownloadReport) // Download a specific report
+
+		// Optional: get all reports
+		//report.GET("/", handler.GetAllReports) // Get all reports in system
 	}
 }

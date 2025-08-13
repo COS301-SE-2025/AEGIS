@@ -6,6 +6,7 @@ import (
 	"aegis-api/services_/report"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -52,9 +53,10 @@ func (m *MockAuditLogger) LogGenerateReport(ctx context.Context, caseID, reportI
 	return args.Error(0)
 }
 
-func (m *MockAuditLogger) LogDownloadReport(ctx context.Context, caseID, reportID, artifactID, actorID, ip, ua string) error {
-	args := m.Called(ctx, caseID, reportID, artifactID, actorID, ip, ua)
-	return args.Error(0)
+func (m *MockAuditLogger) LogDownloadReport(ctx context.Context, reportID, userID, userRole, userAgent, ipAddress, email string, timestamp time.Time) error {
+	// Use the mock framework's Called method to simulate method calls
+	args := m.Called(ctx, reportID, userID, userRole, userAgent, ipAddress, email, timestamp)
+	return args.Error(0) // return the error (or nil if no error)
 }
 
 // Mocking CoCRepo
