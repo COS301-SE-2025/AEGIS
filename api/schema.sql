@@ -680,21 +680,15 @@ $$;
 -- Create the reports table
 CREATE TABLE reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    case_id UUID NOT NULL,                  -- Links report to a specific case
-    examiner_id UUID NOT NULL,              -- Who created the report
-    name VARCHAR(255) NOT NULL,             -- Report title
-    report_number VARCHAR(255) UNIQUE,      -- Optional, unique identifier
-    version INTEGER NOT NULL DEFAULT 1,     -- Versioning
-    status report_status DEFAULT 'draft',   -- Current report status
-    scope TEXT,                             -- Optional field for report scope
-    objectives TEXT,                        -- Optional objectives
-    limitations TEXT,                       -- Optional limitations
-    tools_methods TEXT,                      -- Optional tools & methods
-    evidence_summary TEXT,                  -- Optional summary of evidence
-    final_conclusion TEXT,                  -- Optional conclusions
-    certification_statement TEXT,           -- Optional certification / sign-off
-    date_examined DATE,                      -- Optional examination date
-    file_path VARCHAR(255) NOT NULL,        -- Path to stored PDF or file
+    case_id UUID NOT NULL,                     -- Links report to a specific case
+    examiner_id UUID NOT NULL,                 -- Who created the report
+    name VARCHAR(255) NOT NULL,                 -- Report title
+    mongo_id CHAR(24),                          -- MongoDB ObjectID in 24-char hex format
+    report_number VARCHAR(255) UNIQUE,          -- Optional unique report number
+    status report_status DEFAULT 'draft',       -- Current report status
+    version INTEGER NOT NULL DEFAULT 1,         -- Versioning
+    date_examined DATE,                         -- Optional examination date
+    file_path VARCHAR(255) NOT NULL,            -- Path to PDF or stored file
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

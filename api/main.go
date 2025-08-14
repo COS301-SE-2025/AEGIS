@@ -269,10 +269,14 @@ func main() {
 
 	reportRepo := report.NewReportRepository(db.DB)
 	coCRepo := report.NewCoCRepo(db.DB)
+	reportContentCollection := mongoDatabase.Collection("report_contents")
+
+	reportMongoRepo := report.NewReportMongoRepo(reportContentCollection)
 
 	reportService := report.NewReportService(
 		reportRepo,
 		//nil,         // ReportArtifactsRepo
+		reportMongoRepo,
 		nil,         // Storage
 		auditLogger, // AuditLogger
 		nil,         // Authorizer
