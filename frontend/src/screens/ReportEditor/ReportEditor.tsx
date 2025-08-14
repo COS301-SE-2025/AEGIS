@@ -1,29 +1,17 @@
 import React, { useState } from 'react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import {
-  Bold,
-  Italic,
-  Underline,
-  List,
-  ListOrdered,
-  Link,
-  Image,
-  Table,
-  Code,
   FileText,
   Download,
-  //Share2,
   Save,
   Plus,
   Clock,
   Users,
   Calendar,
- // AlertTriangle,
   Shield,
   Eye,
-  //Edit3,
-  //Settings
 } from 'lucide-react';
-
 
 interface ReportSection {
   id: string;
@@ -51,25 +39,19 @@ export const ReportEditor = () => {
     {
       id: 'executive-summary',
       title: 'Executive Summary',
-      content: `On January 14, 2024, the Security Operations Center (SOC) detected suspicious network activity indicating a potential security breach. This report documents the comprehensive digital forensics investigation conducted to determine the scope, attack vector, and root cause of the incident.
-
-Initial analysis revealed unauthorized access to the corporate network through a compromised employee workstation. The investigation timeline, findings, and recommended remediation actions are detailed in this report.`,
+      content: `<p>On January 14, 2024, the Security Operations Center (SOC) detected suspicious network activity indicating a potential security breach. This report documents the comprehensive digital forensics investigation conducted to determine the scope, attack vector, and root cause of the incident.</p><p>Initial analysis revealed unauthorized access to the corporate network through a compromised employee workstation. The investigation timeline, findings, and recommended remediation actions are detailed in this report.</p>`,
       completed: true
     },
     {
       id: 'incident-scope',
       title: 'Incident Scope & Objectives',
-      content: `Investigation Objectives:
-• Identify the attack vector and timeline
-• Determine the extent of system compromise  
-• Assess data exfiltration risks
-• Document evidence for potential legal proceedings`,
+      content: `<p><strong>Investigation Objectives:</strong></p><ul><li>Identify the attack vector and timeline</li><li>Determine the extent of system compromise</li><li>Assess data exfiltration risks</li><li>Document evidence for potential legal proceedings</li></ul>`,
       completed: true
     },
     {
       id: 'evidence-findings',
       title: 'Evidence & Findings',
-      content: 'Content for Evidence & Findings section...',
+      content: '<p>Content for Evidence &amp; Findings section...</p>',
       completed: false
     },
     {
@@ -113,6 +95,26 @@ Initial analysis revealed unauthorized access to the corporate network through a
     }
   ];
 
+  // Custom Quill modules with dark theme styling
+  const modules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'color': [] }, { 'background': [] }],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      [{ 'indent': '-1'}, { 'indent': '+1' }],
+      ['link', 'image', 'code-block'],
+      [{ 'align': [] }],
+      ['clean']
+    ],
+  };
+
+  const formats = [
+    'header', 'bold', 'italic', 'underline', 'strike', 
+    'color', 'background', 'list', 'bullet', 'indent',
+    'link', 'image', 'code-block', 'align'
+  ];
+
   const updateSectionContent = (content: string) => {
     const updatedSections = sections.map((section, index) =>
       index === activeSection ? { ...section, content } : section
@@ -136,35 +138,90 @@ Initial analysis revealed unauthorized access to the corporate network through a
     }
   };
 
-  const ToolbarButton = ({ icon, active = false, onClick }: { 
-    icon: React.ReactNode; 
-    active?: boolean; 
-    onClick?: () => void 
-  }) => (
-    <button 
-      onClick={onClick}
-      className={`p-2 rounded hover:bg-gray-700 transition-colors ${
-        active ? 'bg-gray-600 text-white' : 'text-gray-300'
-      }`}
-    >
-      {icon}
-    </button>
-  );
-
   return (
     <div className="min-h-screen bg-gray-900 flex">
+      {/* Custom styles for Quill in dark mode */}
+      <style jsx global>{`
+        .ql-snow {
+          border: 1px solid #374151 !important;
+          background-color: #1f2937 !important;
+        }
+        
+        .ql-snow .ql-toolbar {
+          border-bottom: 1px solid #374151 !important;
+          background-color: #1f2937 !important;
+        }
+        
+        .ql-snow .ql-container {
+          border-top: none !important;
+          background-color: #1f2937 !important;
+        }
+        
+        .ql-editor {
+          color: #e5e7eb !important;
+          background-color: #1f2937 !important;
+          min-height: 300px !important;
+          font-size: 16px !important;
+          line-height: 1.6 !important;
+        }
+        
+        .ql-editor.ql-blank::before {
+          color: #6b7280 !important;
+          font-style: italic;
+        }
+        
+        .ql-snow .ql-tooltip {
+          background-color: #374151 !important;
+          border: 1px solid #4b5563 !important;
+          color: #e5e7eb !important;
+        }
+        
+        .ql-snow .ql-tooltip input {
+          background-color: #1f2937 !important;
+          color: #e5e7eb !important;
+          border: 1px solid #4b5563 !important;
+        }
+        
+        .ql-snow .ql-picker-options {
+          background-color: #374151 !important;
+          border: 1px solid #4b5563 !important;
+        }
+        
+        .ql-snow .ql-picker-item:hover {
+          background-color: #4b5563 !important;
+          color: #e5e7eb !important;
+        }
+        
+        .ql-snow .ql-stroke {
+          stroke: #9ca3af !important;
+        }
+        
+        .ql-snow .ql-fill {
+          fill: #9ca3af !important;
+        }
+        
+        .ql-snow .ql-picker-label:hover .ql-stroke,
+        .ql-snow .ql-picker-label.ql-active .ql-stroke {
+          stroke: #e5e7eb !important;
+        }
+        
+        .ql-snow .ql-picker-label:hover .ql-fill,
+        .ql-snow .ql-picker-label.ql-active .ql-fill {
+          fill: #e5e7eb !important;
+        }
+      `}</style>
+
       {/* Left Sidebar */}
       <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
         {/* Logo & Header */}
         <div className="p-4 border-b border-gray-700">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded flex items-center justify-center">
-              {/* <Shield className="w-5 h-5 text-white" /> */}
               <img
-              src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
-              alt="AEGIS Logo"
-              className="w-full h-full object-cover"
-            />
+                src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
+                alt="AEGIS Logo"
+                className="w-full h-full object-cover"
+              />
             </div>
             <span className="text-white font-bold text-xl">AEGIS</span>
           </div>
@@ -277,34 +334,11 @@ Initial analysis revealed unauthorized access to the corporate network through a
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {/* <Link to="/report-dashboard">
-                 <button className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors">
-                  Report dashboard
-                </button>
-                </Link> */}
-               
                 <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                   <Download className="w-4 h-4" />
                   Export
                 </button>
               </div>
-            </div>
-          </div>
-
-          {/* Toolbar */}
-          <div className="bg-gray-800 border-b border-gray-700 p-2">
-            <div className="flex items-center gap-1">
-              <ToolbarButton icon={<Bold className="w-4 h-4" />} />
-              <ToolbarButton icon={<Italic className="w-4 h-4" />} />
-              <ToolbarButton icon={<Underline className="w-4 h-4" />} />
-              <div className="w-px h-6 bg-gray-600 mx-2"></div>
-              <ToolbarButton icon={<List className="w-4 h-4" />} />
-              <ToolbarButton icon={<ListOrdered className="w-4 h-4" />} />
-              <div className="w-px h-6 bg-gray-600 mx-2"></div>
-              <ToolbarButton icon={<Link className="w-4 h-4" />} />
-              <ToolbarButton icon={<Image className="w-4 h-4" />} />
-              <ToolbarButton icon={<Table className="w-4 h-4" />} />
-              <ToolbarButton icon={<Code className="w-4 h-4" />} />
             </div>
           </div>
 
@@ -343,12 +377,14 @@ Initial analysis revealed unauthorized access to the corporate network through a
                 </h2>
               </div>
 
-              {/* Content Editor */}
-              <div className="bg-gray-800 rounded-lg border border-gray-700">
-                <textarea
+              {/* React Quill Editor */}
+              <div className="mb-8">
+                <ReactQuill
+                  theme="snow"
                   value={sections[activeSection]?.content || ''}
-                  onChange={(e) => updateSectionContent(e.target.value)}
-                  className="w-full h-96 p-6 bg-transparent text-gray-200 resize-none border-none outline-none text-base leading-relaxed"
+                  onChange={updateSectionContent}
+                  modules={modules}
+                  formats={formats}
                   placeholder="Start writing your report content here..."
                 />
               </div>
