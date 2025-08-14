@@ -22,6 +22,7 @@ import axios from 'axios';
 // Types
 interface ReportWithDetails {
   id: string;
+   reportID: string;
   case_id: string;
   name: string;             // corresponds to report name
   type: string;
@@ -122,10 +123,11 @@ const handleGenerateReport = async () => {
 
     // Ensure unique key and all required fields for frontend
     const normalizedReport: ReportWithDetails = {
-      ...newReport,
-      last_modified: newReport.last_modified || new Date().toISOString(), // fallback if backend doesn’t return
-      id: newReport.id || `temp-${Date.now()}`, // temporary ID if backend hasn’t returned one
-    };
+  ...newReport,
+  last_modified: newReport.last_modified || new Date().toISOString(),
+  id: newReport.reportID, // use the backend-generated UUID
+};
+
 
     // Update reports state immediately
     setReports((prevReports) => [...prevReports, normalizedReport]);
@@ -178,7 +180,7 @@ async function downloadReport(id: string) {
     if (!token) throw new Error('No auth token found');
 
     // Tell Axios we expect a Blob
- const res = await axios.get(`${API_URL}/reports/${id}/download`, {
+ const res = await axios.get(`${API_URL}/reports/${id}/download/pdf`, {
   headers: { Authorization: `Bearer ${token}` },
   responseType: "blob",
 });
