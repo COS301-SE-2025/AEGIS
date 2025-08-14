@@ -312,6 +312,28 @@ CREATE TABLE IF NOT EXISTS evidence (
     team_id   UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE
 );
 
+--IOCS
+CREATE TABLE iocs (
+    id SERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    case_id UUID NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    value VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Foreign key constraints
+    CONSTRAINT fk_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    CONSTRAINT fk_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+
+    -- Prevent duplicate IOC entries per case
+    CONSTRAINT unique_case_ioc UNIQUE (case_id, type, value)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_iocs_tenant_id ON iocs(tenant_id);
+CREATE INDEX idx_iocs_case_id ON iocs(case_id);
+CREATE INDEX idx_iocs_type_value ON iocs(type, value);
+CREATE INDEX idx_iocs_tenant_type_value ON iocs(tenant_id, type, value);
 
 
 -- Optional indexes for performance

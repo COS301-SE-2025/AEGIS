@@ -3,6 +3,8 @@ import { Plus, Calendar, Clock, Paperclip, Tag, Edit2, Save, X, FileText, Downlo
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
+import axios from "axios";
+
 
 const BASE_URL = "http://localhost:8080/api/v1";
 
@@ -91,7 +93,7 @@ async function reorderTimelineEvents(caseId: string, orderedIds: string[]) {
 
 export function InvestigationTimeline({
   caseId,
-  evidenceItems,
+  //evidenceItems,
   timelineEvents,
   setTimelineEvents,
   updateCaseTimestamp
@@ -110,7 +112,9 @@ export function InvestigationTimeline({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [expandedEvidence, setExpandedEvidence] = useState<{[key: string]: boolean}>({});
-
+  const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [evidenceError, setEvidenceError] = useState<string | null>(null);
   const getCurrentTimestamp = () => {
     const now = new Date();
     const date = now.toISOString().split("T")[0];
@@ -141,6 +145,63 @@ const addEvent = async () => {
   }
 };
 
+const fetchEvidence = async () => {
+  setEvidenceLoading(true);
+  setEvidenceError(null);
+  try {
+    const token = sessionStorage.getItem('authToken');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    const res = await axios.get(
+      `${BASE_URL}/cases/${caseId}/iocs`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+    
+    console.log('Evidence API response:', res.data);
+    
+    // The backend returns IOCs directly as an array
+    const data = res.data;
+    let files: any[] = [];
+    
+    if (Array.isArray(data)) {
+      // IOCs are returned directly as an array
+      files = data;
+    } else if (typeof data === 'object' && data !== null) {
+      // Fallback for nested structures
+      if ('files' in data && Array.isArray((data as any).files)) {
+        files = (data as any).files;
+      } else if ('evidence' in data && Array.isArray((data as any).evidence)) {
+        files = (data as any).evidence;
+      } else if ('data' in data && Array.isArray((data as any).data)) {
+        files = (data as any).data;
+      } else if ('iocs' in data && Array.isArray((data as any).iocs)) {
+        files = (data as any).iocs;
+      }
+    }
+    
+    console.log('Processed files:', files);
+    setEvidenceItems(files);
+  } catch (err: any) {
+    console.error("Failed to fetch evidence files:", err);
+    console.error("Error response:", err.response?.data);
+    setEvidenceError(err.response?.data?.message || err.message || 'Failed to fetch evidence');
+    setEvidenceItems([]);
+  } finally {
+    setEvidenceLoading(false);
+  }
+};
+
+useEffect(() => {
+  fetchEvidence(); // run immediately
+  const interval = setInterval(fetchEvidence, 10 * 60 * 1000); // every 10 minutes
+  return () => clearInterval(interval); // cleanup
+}, [caseId]);
 
 const deleteEvent = async (index: number) => {
   const eventId = timelineEvents[index].id;
@@ -387,7 +448,7 @@ useEffect(() => {
               <div className="absolute left-36 top-0 bottom-0 w-px bg-gradient-to-b from-blue-500 via-cyan-400 to-blue-500 opacity-30"></div>
               
               <AnimatePresence>
-                {(timelineEvents ?? []).map((event, index) => (
+                {timelineEvents.map((event, index) => (
                 <Draggable key={event.id || index} draggableId={`event-${event.id || index}`} index={index}>
                   {(provided: any, snapshot: any) => (
                     <motion.div
