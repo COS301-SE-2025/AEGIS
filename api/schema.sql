@@ -500,6 +500,29 @@ CREATE TABLE case_user_roles (
 CREATE INDEX idx_case_user_roles_case_id ON case_user_roles(case_id);
 CREATE INDEX idx_case_user_roles_user_id ON case_user_roles(user_id);
 
+-- iocs related tables
+CREATE TABLE iocs (
+    id SERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    case_id UUID NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    value VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Foreign key constraints
+    CONSTRAINT fk_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    CONSTRAINT fk_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
+
+    -- Prevent duplicate IOC entries per case
+    CONSTRAINT unique_case_ioc UNIQUE (case_id, type, value)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_iocs_tenant_id ON iocs(tenant_id);
+CREATE INDEX idx_iocs_case_id ON iocs(case_id);
+CREATE INDEX idx_iocs_type_value ON iocs(type, value);
+CREATE INDEX idx_iocs_tenant_type_value ON iocs(tenant_id, type, value);
+
 
 --Timeline Events Table
 CREATE TABLE timeline_events (

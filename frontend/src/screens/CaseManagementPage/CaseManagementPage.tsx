@@ -99,7 +99,6 @@ useEffect(() => {
         return;
       }
     const caseDataRaw = raw.case; // ✅ This is the actual case object
-
   const normalized = {
     id: caseDataRaw.id,
     creator: caseDataRaw.created_by,
@@ -108,8 +107,8 @@ useEffect(() => {
     attackType: caseDataRaw.title,
     description: caseDataRaw.description,
     createdAt: caseDataRaw.created_at,
-    updatedAt: caseDataRaw.created_at, // assuming no update time
-    lastActivity: caseDataRaw.created_at,
+    updatedAt: caseDataRaw.updated_at,
+    lastActivity: caseDataRaw.updated_at,
     progress: caseDataRaw.status === "closed" ? 100 : 50,
     image: "",
   };
@@ -126,6 +125,7 @@ useEffect(() => {
 
 
 const [assignedMembers, setAssignedMembers] = useState<{ name: string; role: string }[]>([]);
+const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
 
 useEffect(() => {
   const fetchCollaborators = async () => {
@@ -163,26 +163,44 @@ useEffect(() => {
   fetchCollaborators();
 }, [caseId]);
 
-
-const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
-
 useEffect(() => {
-  const stored = localStorage.getItem("evidenceFiles");
-  if (stored && caseId) {
-    const parsed = JSON.parse(stored);
-    const matching = parsed.filter((e: any) => String(e.caseId) === caseId);
-    setEvidenceItems(matching);
-  }
+  const fetchEvidence = async () => {
+    if (!caseId) return;
+    try {
+      const token = sessionStorage.getItem("authToken");
+      const res = await fetch(`http://localhost:8080/api/v1/evidence-metadata/case/${caseId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!res.ok) throw new Error("Failed to fetch evidence");
+      const data = await res.json();
+      setEvidenceItems(data || []);
+    } catch (err) {
+      console.error("Error fetching evidence:", err);
+      setEvidenceItems([]);
+    }
+  };
+  fetchEvidence();
 }, [caseId]);
 
-console.log("Current caseId from URL:", caseId);
 
+// useEffect(() => {
+//   const stored = localStorage.getItem("evidenceFiles");
+//   if (stored && caseId) {
+//     const parsed = JSON.parse(stored);
+//     const matching = parsed.filter((e: any) => String(e.caseId) === caseId);
+//     setEvidenceItems(matching);
+//   }
+// }, [caseId]);
+
+console.log("Current caseId from URL:", caseId);
 
 const caseName = caseData?.attackType || "Unknown Case";
 console.log("Loaded case data:", caseData);
 console.log("Assigned members:", assignedMembers);
 console.log("Evidence items:", evidenceItems);
-
 
 const updateCaseTimestamp = (caseId: string) => {
   const stored = localStorage.getItem("cases");
@@ -650,10 +668,10 @@ useEffect(() => {
                 <div className="space-y-3">
                   {Array.isArray(evidenceItems) && evidenceItems.length > 0 ? (
                   evidenceItems.map((item: any, index: number) => (
-                      <div key={index} className="flex items-center gap-3">
-                        <Paperclip className="w-5 h-5 text-blue-500" />
+                      <div key={item.id} className="flex items-center gap-3">
+                       <Link to={`/evidence-viewer/${caseId}`}><Paperclip className="w-5 h-5 text-blue-500" /></Link>
                         <span className="text-blue-500 hover:text-blue-400 cursor-pointer">
-                          {item.name || `Evidence #${index + 1}`}
+                          {item.filename || `Evidence #${index + 1}`}
                         </span>
                       </div>
                     ))
