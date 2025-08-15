@@ -24,9 +24,11 @@
     "jwt-decode": "^4.0.0",
     "libsodium-wrappers": "^0.7.15",
     "lucide-react": "^0.511.0",
+    "quill": "^2.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.5.2",
+    "react-quill": "^2.0.0",
     "react-router-dom": "^7.6.0",
     "tailwind-merge": "^1.14.0",
     "zustand": "^5.0.5"
