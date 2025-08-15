@@ -29,75 +29,123 @@ const ThreatLandscape = ({ userCases }: { userCases: any[] }) => {
     }
   }, []);
 
-  // Fetch graph data when mode, selectedCase, or tenantId changes
-  useEffect(() => {
-    if (!tenantId) return; // Wait until tenantId is set
+// Update the state to store cytoscape elements directly
+const [elements, setElements] = useState<cytoscape.ElementDefinition[]>([]);
 
-    const fetchGraph = async () => {
-      const token = sessionStorage.getItem("authToken") || "";
+// Update the fetch handler
+useEffect(() => {
+  if (!tenantId) return;
 
-      let endpoint = "";
-      if (mode === "case") {
-        if (!selectedCase) return; // no case selected
-        endpoint = `http://localhost:8080/api/v1/tenants/${tenantId}/cases/${selectedCase}/ioc-graph`;
-      } else {
-        endpoint = `http://localhost:8080/api/v1/tenants/${tenantId}/ioc-graph`;
+  const fetchGraph = async () => {
+    const token = sessionStorage.getItem("authToken") || "";
+    let endpoint = "";
+
+    if (mode === "case") {
+      if (!selectedCase) return;
+      endpoint = `http://localhost:8080/api/v1/tenants/${tenantId}/cases/${selectedCase}/ioc-graph`;
+    } else {
+      endpoint = `http://localhost:8080/api/v1/tenants/${tenantId}/ioc-graph`;
+    }
+
+    try {
+      const res = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(res.statusText);
+
+      const data = await res.json();
+      
+      // Ensure we're getting properly formatted elements
+      if (Array.isArray(data)) {
+        // If backend returns Cytoscape elements directly
+        setElements(data);
+      } else if (data.nodes && data.edges) {
+        // If backend returns { nodes, edges }, convert them
+        const cyElements = [
+          ...data.nodes.map((n: any) => ({
+            data: {
+              id: n.id,
+              label: n.label,
+              type: n.type,
+            },
+            group: 'nodes',
+          })),
+          ...data.edges.map((e: any) => ({
+            data: {
+              id: `${e.source}-${e.target}-${e.label}`,
+              source: e.source,
+              target: e.target,
+              label: e.label,
+            },
+            group: 'edges',
+          })),
+        ];
+        setElements(cyElements);
       }
+    } catch (err) {
+      console.error("Error fetching graph data", err);
+    }
+  };
 
-      try {
-        const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          console.error("Failed to fetch graph data", res.statusText);
-          return;
-        }
+  fetchGraph();
+}, [mode, selectedCase, tenantId]);
 
-        const data = await res.json();
-        setGraphData(data);
-      } catch (err) {
-        console.error("Error fetching graph data", err);
-      }
-    };
+// Update Cytoscape initialization
+useEffect(() => {
+  if (!cyRef.current || elements.length === 0) return;
 
-    fetchGraph();
-  }, [mode, selectedCase, tenantId]);
-
-  // Initialize Cytoscape
-  useEffect(() => {
-    if (!cyRef.current) return;
-
-    const cy = cytoscape({
-      container: cyRef.current,
-      elements: graphData,
-      style: [
-        {
-          selector: "node",
-          style: {
-            "background-color": "#3b82f6",
-            label: "data(label)",
-            color: "#fff",
-            "text-valign": "center",
-            "text-halign": "center",
-            "font-size": "10px",
-          },
+  const cy = cytoscape({
+    container: cyRef.current,
+    elements: elements,
+    style: [
+      {
+        selector: 'node[type="case"]',
+        style: {
+          'background-color': '#3b82f6',
+          shape: 'rectangle',
         },
-        {
-          selector: "edge",
-          style: {
-            "line-color": "#6b7280",
-            width: 1.5,
-            "curve-style": "straight",
-          },
+      },
+      {
+        selector: 'node[type="ioc"]',
+        style: {
+          'background-color': '#ef4444',
+          shape: 'ellipse',
         },
-      ],
-      layout: { name: "cose" },
-    });
+      },
+      {
+        selector: 'node',
+        style: {
+          label: 'data(label)',
+          color: '#fff',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '10px',
+          width: 30,
+          height: 30,
+        },
+      },
+      {
+        selector: 'edge',
+        style: {
+          'line-color': '#6b7280',
+          width: 1.5,
+          'curve-style': 'straight',
+          'target-arrow-shape': 'triangle',
+          'arrow-scale': 0.5,
+        },
+      },
+    ],
+    layout: {
+      name: 'cose',
+      animate: true,
+      randomize: true,
+    },
+  });
 
-    return () => {
-      cy.destroy();
-    };
-  }, [graphData]);
+  return () => {
+    cy.destroy();
+  };
+}, [elements]);
 
   return (
     <div className="overflow-hidden w-[550px] h-[366px] rounded-lg border bg-card p-6">

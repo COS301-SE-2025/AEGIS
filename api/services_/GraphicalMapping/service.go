@@ -50,6 +50,7 @@ func (s *iocService) ListIOCsForTenant(tenantID string) ([]*IOC, error) {
 }
 
 // BuildIOCGraph builds nodes and edges based on IOCs similarity for a tenant
+// IOCs that appear in multiple cases will be shared nodes
 func (s *iocService) BuildIOCGraph(tenantID string) ([]GraphNode, []GraphEdge, error) {
 	iocs, err := s.repo.ListByTenant(tenantID)
 	if err != nil {
@@ -60,7 +61,7 @@ func (s *iocService) BuildIOCGraph(tenantID string) ([]GraphNode, []GraphEdge, e
 	edges := []GraphEdge{}
 
 	caseNodeMap := map[string]bool{}
-	iocNodeIDs := map[string]bool{}
+	iocNodeMap := map[string]bool{} // Key: Type:Value, not individual IOC ID
 
 	// Add case nodes
 	for _, ioc := range iocs {
@@ -74,44 +75,37 @@ func (s *iocService) BuildIOCGraph(tenantID string) ([]GraphNode, []GraphEdge, e
 		}
 	}
 
-	// Add IOC nodes and edges from case -> IOC
-	for _, ioc := range iocs {
-		iocID := fmt.Sprintf("ioc-%s", ioc.ID)
-		if !iocNodeIDs[iocID] {
-			nodes = append(nodes, GraphNode{
-				ID:    iocID,
-				Label: fmt.Sprintf("%s: %s", ioc.Type, ioc.Value),
-				Type:  "ioc",
-			})
-			iocNodeIDs[iocID] = true
-		}
-		edges = append(edges, GraphEdge{
-			Source: fmt.Sprintf("case-%s", ioc.CaseID),
-			Target: iocID,
-			Label:  "contains",
-		})
-	}
-
-	// Group IOCs by Type+Value to find similarities
+	// Group IOCs by Type+Value to create shared nodes
 	iocGroups := map[string][]*IOC{}
 	for i := range iocs {
 		key := iocs[i].Type + ":" + iocs[i].Value
 		iocGroups[key] = append(iocGroups[key], iocs[i])
 	}
 
-	// Add similarity edges between IOCs of different cases with same Type+Value
-	for _, group := range iocGroups {
-		if len(group) < 2 {
-			continue
+	// Add IOC nodes (one per unique Type:Value combination) and edges from cases to IOCs
+	for typeValue, group := range iocGroups {
+		// Create single node for this IOC type:value combination
+		if !iocNodeMap[typeValue] {
+			// Use the first IOC's data for the node (they all have same Type and Value)
+			firstIOC := group[0]
+			nodes = append(nodes, GraphNode{
+				ID:    fmt.Sprintf("ioc-%s", typeValue), // Use Type:Value as unique identifier
+				Label: fmt.Sprintf("%s: %s", firstIOC.Type, firstIOC.Value),
+				Type:  "ioc",
+			})
+			iocNodeMap[typeValue] = true
 		}
-		// Connect all pairs
-		for i := 0; i < len(group); i++ {
-			for j := i + 1; j < len(group); j++ {
+
+		// Add edges from all cases that contain this IOC to the shared IOC node
+		casesSeen := map[string]bool{}
+		for _, ioc := range group {
+			if !casesSeen[ioc.CaseID] {
 				edges = append(edges, GraphEdge{
-					Source: fmt.Sprintf("ioc-%s", group[i].ID),
-					Target: fmt.Sprintf("ioc-%s", group[j].ID),
-					Label:  "similar",
+					Source: fmt.Sprintf("case-%s", ioc.CaseID),
+					Target: fmt.Sprintf("ioc-%s", typeValue),
+					Label:  "contains",
 				})
+				casesSeen[ioc.CaseID] = true
 			}
 		}
 	}
@@ -146,23 +140,24 @@ func ConvertToCytoscapeElements(nodes []GraphNode, edges []GraphEdge) []Cytoscap
 	return elements
 }
 
-// BuildIOCGraphByCase builds a graph for a specific case, including similar IOCs from other cases(cross-case relationships)
+// BuildIOCGraphByCase builds a graph for a specific case, including similar IOCs from other cases
+// IOCs that appear in multiple cases will be shared nodes
 func (s *iocService) BuildIOCGraphByCase(tenantID, caseID string) ([]GraphNode, []GraphEdge, error) {
-	// First we fetch all IOCs for this tenant and case only
-	iocs, err := s.repo.ListByTenant(tenantID)
+	// Fetch all IOCs for this tenant
+	allIOCs, err := s.repo.ListByTenant(tenantID)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Filter to only those for the requested case, same IOCs
+	// Filter to only those for the requested case
 	caseIOCs := []*IOC{}
-	for _, i := range iocs {
+	for _, i := range allIOCs {
 		if i.CaseID == caseID {
 			caseIOCs = append(caseIOCs, i)
 		}
 	}
 	if len(caseIOCs) == 0 {
-		return nil, nil, nil // IOCS not found for this case, not added yet
+		return nil, nil, nil // No IOCs found for this case
 	}
 
 	nodes := []GraphNode{}
@@ -175,81 +170,80 @@ func (s *iocService) BuildIOCGraphByCase(tenantID, caseID string) ([]GraphNode, 
 		Type:  "case",
 	})
 
-	iocNodeIDs := map[string]bool{}
+	iocNodeMap := map[string]bool{} // Key: Type:Value
+	caseNodeMap := map[string]bool{caseID: true}
 
-	// Add IOC nodes + edges from case -> IOC
+	// Process each IOC in the case
 	for _, ioc := range caseIOCs {
-		iocID := fmt.Sprintf("ioc-%s", ioc.ID)
-		if !iocNodeIDs[iocID] {
+		typeValue := ioc.Type + ":" + ioc.Value
+		iocNodeID := fmt.Sprintf("ioc-%s", typeValue)
+
+		// Add IOC node if not exists (shared node for this Type:Value combination)
+		if !iocNodeMap[typeValue] {
 			nodes = append(nodes, GraphNode{
-				ID:    iocID,
+				ID:    iocNodeID,
 				Label: fmt.Sprintf("%s: %s", ioc.Type, ioc.Value),
 				Type:  "ioc",
 			})
-			iocNodeIDs[iocID] = true
+			iocNodeMap[typeValue] = true
 		}
-		edges = append(edges, GraphEdge{
-			Source: fmt.Sprintf("case-%s", caseID),
-			Target: iocID,
-			Label:  "contains",
-		})
-	}
 
-	// Step 2: For each IOC in the case, find similar IOCs in other cases
-	for _, ioc := range caseIOCs {
+		// Add edge from case to IOC (if not already added)
+		caseToIOCExists := false
+		for _, e := range edges {
+			if e.Source == fmt.Sprintf("case-%s", caseID) && e.Target == iocNodeID && e.Label == "contains" {
+				caseToIOCExists = true
+				break
+			}
+		}
+		if !caseToIOCExists {
+			edges = append(edges, GraphEdge{
+				Source: fmt.Sprintf("case-%s", caseID),
+				Target: iocNodeID,
+				Label:  "contains",
+			})
+		}
+
+		// Find similar IOCs in other cases
 		similarIOCs, err := s.repo.FindSimilar(tenantID, ioc.Type, ioc.Value)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		for _, sim := range similarIOCs {
-			// Skip the IOC itself and those in the same case (already added)
-			if sim.ID == ioc.ID || sim.CaseID == caseID {
+			// Skip IOCs in the same case (already handled)
+			if sim.CaseID == caseID {
 				continue
 			}
 
-			simIOCId := fmt.Sprintf("ioc-%s", sim.ID)
-			simCaseId := fmt.Sprintf("case-%s", sim.CaseID)
-
-			// Add similar IOC node if not exists
-			if !iocNodeIDs[simIOCId] {
-				nodes = append(nodes, GraphNode{
-					ID:    simIOCId,
-					Label: fmt.Sprintf("%s: %s", sim.Type, sim.Value),
-					Type:  "ioc",
-				})
-				iocNodeIDs[simIOCId] = true
-			}
+			simCaseID := fmt.Sprintf("case-%s", sim.CaseID)
 
 			// Add similar case node if not exists
-			caseExists := false
-			for _, n := range nodes {
-				if n.ID == simCaseId {
-					caseExists = true
-					break
-				}
-			}
-			if !caseExists {
+			if !caseNodeMap[sim.CaseID] {
 				nodes = append(nodes, GraphNode{
-					ID:    simCaseId,
+					ID:    simCaseID,
 					Label: fmt.Sprintf("Case %s", sim.CaseID),
 					Type:  "case",
 				})
+				caseNodeMap[sim.CaseID] = true
 			}
 
-			// Add edges: similar IOC belongs to its case
-			edges = append(edges, GraphEdge{
-				Source: simCaseId,
-				Target: simIOCId,
-				Label:  "contains",
-			})
-
-			// Add similarity edge between the IOC in current case and this similar IOC
-			edges = append(edges, GraphEdge{
-				Source: fmt.Sprintf("ioc-%s", ioc.ID),
-				Target: simIOCId,
-				Label:  "similar",
-			})
+			// Add edge from similar case to the SAME IOC node (shared node)
+			// Check if edge already exists
+			caseToIOCExists := false
+			for _, e := range edges {
+				if e.Source == simCaseID && e.Target == iocNodeID && e.Label == "contains" {
+					caseToIOCExists = true
+					break
+				}
+			}
+			if !caseToIOCExists {
+				edges = append(edges, GraphEdge{
+					Source: simCaseID,
+					Target: iocNodeID,
+					Label:  "contains",
+				})
+			}
 		}
 	}
 
