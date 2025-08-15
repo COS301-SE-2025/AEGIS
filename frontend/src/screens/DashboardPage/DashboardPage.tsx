@@ -107,7 +107,7 @@ const [availableTiles, setAvailableTiles] = useState([
     icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
     isVisible: true,
   },
-  // Add more tiles as needed
+
   {
     id: 'total-alerts',
     value: "12", // Replace with actual data
@@ -177,6 +177,42 @@ useEffect(() => {
 
   fetchCases();
 }, [activeTab]);
+
+useEffect(() => {
+  const storedUser = sessionStorage.getItem("user");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+
+  if (!user?.tenantId) return;
+
+  const fetchEvidenceCount = async () => {
+    try {
+      const token = sessionStorage.getItem("authToken");
+      const res = await fetch(`http://localhost:8080/api/v1/evidence/count?tenantId=${user.tenantId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error("Failed to fetch evidence count");
+
+      const data = await res.json();
+      setEvidenceCount(data.count);
+
+      // also update the availableTiles evidence tile
+      setAvailableTiles((prev) =>
+        prev.map((tile) =>
+          tile.id === "evidence-count"
+            ? { ...tile, value: data.count.toString() }
+            : tile
+        )
+      );
+    } catch (error) {
+      console.error("Error fetching evidence count:", error);
+    }
+  };
+
+  fetchEvidenceCount();
+}, []);
+
 
 const handleDragEnd = (result: DropResult) => {
   if (!result.destination) return;
