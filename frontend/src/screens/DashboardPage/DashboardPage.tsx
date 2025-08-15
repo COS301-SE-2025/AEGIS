@@ -613,7 +613,6 @@ const handleSaveCase = async () => {
           <div className="mt-[100px] flex gap-6">
           <ThreatLandscape userCases={caseCards} />
           {/* Recent Activities */}
-
             <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border border-border bg-[#0d1117] p-6 overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-bold text-[#58a6ff] text-lg flex items-center gap-2">
