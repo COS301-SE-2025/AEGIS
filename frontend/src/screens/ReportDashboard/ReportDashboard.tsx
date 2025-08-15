@@ -18,7 +18,8 @@ import {
 } from 'lucide-react';
 import { Link } from "react-router-dom";
 import axios from 'axios';
-
+import { useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';  // React Router v6
 // Types
 interface ReportWithDetails {
   id: string;
@@ -42,6 +43,11 @@ interface ReportTemplate {
   icon: React.ReactNode;
   color: string;
 }
+interface Report {
+  name: string;
+  content: { title: string; content: string }[];
+}
+
 
 export const ReportDashboard = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -53,7 +59,8 @@ export const ReportDashboard = () => {
 const [reports, setReports] = useState<ReportWithDetails[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string>('923f5f04-0641-4e10-b9f8-ef6fcfbecbc2');
   const [error, setError] = useState<string | null>(null);
-  const token = sessionStorage.getItem('authToken');
+ const { reportId } = useParams<Record<string, string | undefined>>(); 
+
 
   // Change from Axios.AxiosResponse to axios.AxiosResponse (lowercase)
 
@@ -159,19 +166,6 @@ const formatTimestamp = (timestamp: string) => {
 };
 
 
-  // Update an existing report by ID
-// Update an existing report by ID
-const handleUpdateReport = async (reportId: string, updatedData: Partial<Report>) => {
-  try {
-    // Add generic type to specify that response.data will be a Report
-    const response = await axios.put<ReportWithDetails>(`${API_URL}/reports/${reportId}`, updatedData);
-    setReports((prevReports) => prevReports.map((report) =>
-      report.id === reportId ? response.data : report
-    ));
-  } catch (error) {
-    console.error('Error updating report:', error);
-  }
-};
 
 
 async function downloadReport(id: string) {
@@ -200,6 +194,48 @@ const blob = new Blob([res.data as BlobPart], { type: "application/pdf" });
   }
 }
 
+const navigate = useNavigate();
+const handleOpenReport = (reportId: string) => {
+  navigate(`/report-editor/${reportId}`);
+};
+
+  const [report, setReport] = useState<Report | null>(null);
+
+
+// useEffect(() => {
+//     const fetchReportDetails = async () => {
+//       if (!reportId) {
+//         setError('Report ID is missing.');
+//         return;
+//       }
+
+//       try {
+//         const token = sessionStorage.getItem('authToken');
+//         if (!token) {
+//           console.error('No auth token found');
+//           return;
+//         }
+
+//         // Use generics to specify the expected response type as Report
+//         const response = await axios.get<Report>(`http://localhost:8080/api/v1/reports/${reportId}`, {
+//           headers: {
+//             Authorization: `Bearer ${token}`,
+//           },
+//         });
+//         console.log('Fetched report details:', response.data);
+//         // Successfully fetched data, set the report state
+//         setReport(response.data);  // Now TypeScript knows response.data is a Report
+//       } catch (err) {
+//         console.error('Error fetching report details:', err);
+//         setError('Failed to fetch report details');
+//       }
+//     };
+
+//     fetchReportDetails();
+//   }, [reportId]);  // Re-run this effect whenever reportId changes
+
+
+  
   const reportTemplates: ReportTemplate[] = [
     {
       id: 'incident-standard',
@@ -318,7 +354,9 @@ const blob = new Blob([res.data as BlobPart], { type: "application/pdf" });
       
       <div className="flex items-center justify-between">
   <div className="flex items-center gap-3">
-    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+    <button 
+     onClick={() => handleOpenReport(report.id)}  
+    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
       Open
     </button>
     <button className="p-2 text-gray-400 hover:text-white transition-colors">
