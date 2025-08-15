@@ -13,13 +13,15 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import cytoscape from "cytoscape";
+
 import { Link } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
 import { SidebarToggleButton } from "../../context/SidebarToggleContext";
 import { ThreatLandscape } from "../../components/ui/ThreatLandscape";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import React from "react";
 
 
 interface CaseCard {
@@ -65,6 +67,8 @@ const [] = useState<File | null>(null);
 const [updatedTitle, setUpdatedTitle] = useState("");
 const [updatedDescription, setUpdatedDescription] = useState("");
 
+
+
 interface Notification {
   id: string;
   message: string;
@@ -77,7 +81,44 @@ const [openCases, setOpenCases] = useState([]);
 const [closedCases, setClosedCases] = useState([]);
 const [evidenceCount, setEvidenceCount] = useState(0);
 const [notifications, setNotifications] = useState<Notification[]>([]);
+// Add these new state variables after your existing useState declarations
+const [availableTiles, setAvailableTiles] = useState([
+  {
+    id: 'ongoing-cases',
+    value: openCases.length.toString(),
+    label: "Cases ongoing",
+    color: "text-[#636ae8]",
+    icon: <Briefcase className="w-[75px] h-[52px] text-[#636ae8] flex-shrink-0" />,
+    isVisible: true,
+  },
+  {
+    id: 'closed-cases',
+    value: closedCases.length.toString(),
+    label: "Cases Closed",
+    color: "text-green-500",
+    icon: <CheckCircle className="w-[75px] h-[52px] text-green-500 flex-shrink-0" />,
+    isVisible: true,
+  },
+  {
+    id: 'evidence-count',
+    value: evidenceCount.toString(),
+    label: "Evidence Collected",
+    color: "text-sky-500",
+    icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
+    isVisible: true,
+  },
+  // Add more tiles as needed
+  {
+    id: 'total-alerts',
+    value: "12", // Replace with actual data
+    label: "Active Alerts",
+    color: "text-red-500",
+    icon: <AlertTriangle className="w-[75px] h-[52px] text-red-500 flex-shrink-0" />,
+    isVisible: false,
+  },
+]);
 
+const [showTileCustomizer, setShowTileCustomizer] = useState(false);
 const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
 
 
@@ -137,7 +178,23 @@ useEffect(() => {
   fetchCases();
 }, [activeTab]);
 
+const handleDragEnd = (result: DropResult) => {
+  if (!result.destination) return;
 
+  const items = Array.from(availableTiles);
+  const [reorderedItem] = items.splice(result.source.index, 1);
+  items.splice(result.destination.index, 0, reorderedItem);
+
+  setAvailableTiles(items);
+};
+
+const toggleTileVisibility = (tileId: string) => {
+  setAvailableTiles(prev =>
+    prev.map(tile =>
+      tile.id === tileId ? { ...tile, isVisible: !tile.isVisible } : tile
+    )
+  );
+};
 useEffect(() => {
   const fetchRecentActivities = async () => {
     try {
@@ -187,11 +244,24 @@ useEffect(() => {
       setOpenCases(openData.cases || []);
       setClosedCases(closedData.cases || []);
 
-      
       const totalEvidence = [...(openData.cases || []), ...(closedData.cases || [])]
         .reduce((acc, curr) => acc + (curr.evidence?.length || 0), 0);
 
       setEvidenceCount(totalEvidence);
+
+      // Update tile values
+      setAvailableTiles(prev => prev.map(tile => {
+        switch(tile.id) {
+          case 'ongoing-cases':
+            return { ...tile, value: (openData.cases || []).length.toString() };
+          case 'closed-cases':
+            return { ...tile, value: (closedData.cases || []).length.toString() };
+          case 'evidence-count':
+            return { ...tile, value: totalEvidence.toString() };
+          default:
+            return tile;
+        }
+      }));
 
     } catch (error) {
       console.error("Failed to fetch cases:", error);
@@ -494,49 +564,132 @@ const handleSaveCase = async () => {
           <h1 className="text-3xl font-semibold mb-6">Dashboard Overview</h1>
 
           {/* Metric Cards */}
-          <div className="flex gap-6 flex-wrap">
-            {metricCards.map((card, index) => (
-              <div
-                key={index}
-                className="w-[266px] h-[123px] flex-shrink-0 bg-card border-[5px] border rounded-[8px] p-4 flex items-center justify-between"
-              >
-                <div>
-                  <p className={`text-3xl font-bold ${card.color}`}>{card.value}</p>
-                  <p className="text-foreground text-sm">{card.label}</p>
-                </div>
-                {card.icon}
-              </div>
-            ))}
+          {/* Customizable Dashboard Tiles */}
+          <div className="flex justify-between items-center mb-4">
+            <button
+              onClick={() => setShowTileCustomizer(true)}
+              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700"
+            >
+              Customize Dashboard
+            </button>
           </div>
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="dashboard-tiles" direction="horizontal">
+              {(provided) => (
+                <div
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                  className="flex gap-6 flex-wrap mb-8"
+                >
+                  {availableTiles
+                    .filter(tile => tile.isVisible)
+                    .map((tile, index) => (
+                      <Draggable key={tile.id} draggableId={tile.id} index={index}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className={`w-[266px] h-[123px] flex-shrink-0 bg-card border-[5px] border rounded-[8px] p-4 flex items-center justify-between ${
+                              snapshot.isDragging ? 'opacity-50' : ''
+                            }`}
+                          >
+                            <div>
+                              <p className={`text-3xl font-bold ${tile.color}`}>{tile.value}</p>
+                              <p className="text-foreground text-sm">{tile.label}</p>
+                            </div>
+                            {tile.icon}
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
 
           {/* Threat landscape and recent activities */}
           <div className="mt-[100px] flex gap-6">
           <ThreatLandscape userCases={caseCards} />
           {/* Recent Activities */}
-            <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border border bg-card p-6 overflow-auto">
-              <h2 className="font-bold text-foreground text-lg mb-4">Recent Activities</h2>
-              <ul className="space-y-4">
-                {recentActivities.map((activity, index) => {
-                  const Icon = getIcon(activity.Action); // use capitalized field
-                  const timeAgo = activity.Timestamp
-                    ? new Date(activity.Timestamp).toLocaleString()
-                    : "unknown time";
-                  return (
-                    <li key={index}>
-                      <div className="flex items-start gap-3 mb-2">
-                        <Icon className="w-5 h-5 mt-1 text-foreground" />
-                        <div>
-                          <p className="text-foreground text-sm">
-                            <strong>{activity.Actor?.email}</strong> {activity.Description}
-                          </p>
-                          <p className="text-muted-foreground text-xs">{timeAgo}</p>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
 
-              </ul>
+            <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border border-border bg-[#0d1117] p-6 overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-[#58a6ff] text-lg flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+                  </svg>
+                  SECURITY ACTIVITY LOG
+                </h2>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                  <span className="text-xs text-muted-foreground">LIVE</span>
+                </div>
+              </div>
+
+              <div className="h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                <ul className="space-y-3">
+                  {recentActivities.map((activity, index) => {
+                    const Icon = getIcon(activity.Action);
+                    const timeAgo = activity.Timestamp 
+                      ? new Date(activity.Timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      : "--:--";
+                    const date = activity.Timestamp
+                      ? new Date(activity.Timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })
+                      : "---";
+
+                    // Color coding based on action type
+                    let activityColor = "text-[#58a6ff]"; // Default blue
+                    if (activity.Action.toLowerCase().includes("alert") || activity.Action.toLowerCase().includes("threat")) {
+                      activityColor = "text-[#f85149]"; // Red for alerts
+                    } else if (activity.Action.toLowerCase().includes("login")) {
+                      activityColor = "text-[#3fb950]"; // Green for logins
+                    }
+
+                    return (
+                      <li key={index} className="group">
+                        <div className="flex gap-3 p-2 rounded-md hover:bg-[#161b22] transition-colors">
+                          <div className={`flex-shrink-0 mt-1 ${activityColor}`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-baseline gap-2">
+                              <p className={`text-sm font-mono truncate ${activityColor}`}>
+                                {activity.Actor?.email || "system"}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">{date}</span>
+                                <span className="text-xs text-[#484f58]">{timeAgo}</span>
+                              </div>
+                            </div>
+                            
+                            <p className="text-[#c9d1d9] text-sm mt-1 font-mono">
+                              {activity.Description}
+                            </p>
+                            
+                            <div className="mt-1 flex gap-2">
+                              <span className="text-[10px] px-2 py-0.5 bg-[#21262d] text-[#8b949e] rounded-full">
+                                {activity.Action}
+                              </span>
+                              {activity.Timestamp && (
+                                <span className="text-[10px] px-2 py-0.5 bg-[#1e60e5] bg-opacity-20 text-[#58a6ff] rounded-full">
+                                  {new Date(activity.Timestamp).toLocaleTimeString([], { hour12: false }) + " UTC"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {index < recentActivities.length - 1 && (
+                          <div className="h-px bg-[#21262d] mx-2 my-1 group-last:hidden"></div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             </div>
           </div>
 
@@ -823,12 +976,49 @@ const handleSaveCase = async () => {
                   </div>
                 </div>
               )}
-
-
               </div>
             )}
-            
           </div>
+          {/* Tile Customizer Modal */}
+            {showTileCustomizer && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-card p-6 rounded-2xl shadow-lg border border-border w-full max-w-md">
+                  <h2 className="text-xl font-semibold text-foreground mb-4">Customize Dashboard</h2>
+                  
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {availableTiles.map(tile => (
+                      <div key={tile.id} className="flex items-center justify-between p-3 bg-muted rounded">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 flex items-center justify-center">
+                            {React.cloneElement(tile.icon, { className: "w-5 h-5" })}
+                          </div>
+                          <span className="text-foreground">{tile.label}</span>
+                        </div>
+                        <button
+                          onClick={() => toggleTileVisibility(tile.id)}
+                          className={`px-3 py-1 rounded text-sm ${
+                            tile.isVisible
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-600 text-gray-300'
+                          }`}
+                        >
+                          {tile.isVisible ? 'Visible' : 'Hidden'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-end gap-3 mt-6">
+                    <button
+                      onClick={() => setShowTileCustomizer(false)}
+                      className="px-4 py-2 text-sm text-muted-foreground hover:text-white"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
         </main>
       </div>
     </div>

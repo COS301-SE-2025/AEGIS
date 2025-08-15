@@ -106,7 +106,7 @@ export function InvestigationTimeline({
 }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newEventDescription, setNewEventDescription] = useState("");
-  const [newEventEvidence, setNewEventEvidence] = useState<string[]>([]);
+  const [newEventEvidence, setNewEventEvidence] = useState<string>("");
   const [newEventTags, setNewEventTags] = useState<string[]>([]);
   const [newEventSeverity, setNewEventSeverity] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -127,14 +127,14 @@ const addEvent = async () => {
   try {
     const createdEvent = await addTimelineEvent(caseId, {
       description: newEventDescription.trim(),
-      evidence: newEventEvidence,
+      evidence: newEventEvidence ? [newEventEvidence] : [],
       tags: newEventTags,
       severity: newEventSeverity,
       analystName: getUserNameFromToken() || undefined, // Optional, backend extracts from token
     });
     setTimelineEvents([...timelineEvents, createdEvent]); // update local state with backend response
     setNewEventDescription("");
-    setNewEventEvidence([]);
+    setNewEventEvidence("");
     setNewEventTags([]);
     setNewEventSeverity('medium');
     setShowAddForm(false);
@@ -278,10 +278,10 @@ const onDragEnd = async (result: any) => {
     const evidence = evidenceItems.find(item => item.name === evidenceName);
     if (evidence) {
       if (action === 'view') {
-        // In real app, open evidence viewer modal
+        
         console.log('Viewing evidence:', evidence);
       } else if (action === 'download') {
-        // In real app, trigger download
+        
         console.log('Downloading evidence:', evidence);
       }
     }
@@ -381,26 +381,24 @@ useEffect(() => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {evidenceItems.map((item) => (
                     <button
-                      key={item.name}
-                      onClick={() =>
-                        setNewEventEvidence((prev) =>
-                          prev.includes(item.name)
-                            ? prev.filter((e) => e !== item.name)
-                            : [...prev, item.name]
-                        )
-                      }
+                      key={item.id}
+                      onClick={() => setNewEventEvidence(item.value)}
                       className={`p-2 border rounded-lg text-xs transition-all text-left ${
-                        newEventEvidence.includes(item.name)
+                        newEventEvidence === item.value
                           ? "bg-blue-600 border-blue-500 text-white shadow-lg"
                           : "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-600"
                       }`}
                     >
                       <div className="flex items-center gap-2">
                         <FileText size={14} />
-                        <span className="truncate">{item.name}</span>
+                        <span className="truncate">
+                          {item.type ? `${item.type}: ${item.value}` : item.value}
+                        </span>
                       </div>
-                      {item.size && (
-                        <div className="text-xs opacity-75 mt-1">{item.size}</div>
+                      {item.created_at && (
+                        <div className="text-xs opacity-75 mt-1">
+                          {new Date(item.created_at).toLocaleString()}
+                        </div>
                       )}
                     </button>
                   ))}
@@ -561,7 +559,7 @@ useEffect(() => {
                                         const evidenceItem = evidenceItems.find(item => item.name === evidenceName);
                                         return (
                                           <div key={i} className="bg-gray-700/50 border border-gray-600 rounded-lg p-2">
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between">  
                                               <div className="flex items-center gap-2 min-w-0">
                                                 <FileText size={14} className="text-gray-400 flex-shrink-0" />
                                                 <span className="text-sm text-gray-200 truncate">{evidenceName}</span>
