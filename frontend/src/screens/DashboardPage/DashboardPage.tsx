@@ -937,7 +937,7 @@ const handleSaveCase = async () => {
                       <label className="block text-sm font-medium text-muted-foreground mb-1">
                         Upload Evidence
                       </label>
-                      <Link to={`/upload-evidence?caseId=${editingCase.id}`} className="inline-block w-full">
+                      <Link to={`/upload-evidence/${editingCase.id}`} className="inline-block w-full">
                         <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
                           Go to Upload Evidence Page
                         </button>
@@ -949,7 +949,7 @@ const handleSaveCase = async () => {
                       <label className="block text-sm font-medium text-muted-foreground mb-1">
                         Assign Members
                       </label>
-                      <Link to={`/assign-case-members?caseId=${editingCase.id}`} className="inline-block w-full">
+                      <Link to={`/assign-case-members/${editingCase.id}`} className="inline-block w-full">
                         <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
                           Go to Assign Members Page
                         </button>
