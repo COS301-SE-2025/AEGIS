@@ -65,6 +65,7 @@ export default function App() {
       <Route path="/case/:caseId/next-steps" element={<NextStepsPage />} />
       <Route path="/report-dashboard" element={<ReportDashboard />} />
       <Route path="/report-editor/:reportId" element={<ReportEditor />} />
+      <Route path="*" element={<div style={{padding:16,color:'#fff'}}>Not Found</div>} />
       
       {/* Additional routes */}
       <Route path="/landing-page" element={<LandingPage />} />

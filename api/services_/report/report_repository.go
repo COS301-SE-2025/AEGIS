@@ -24,6 +24,8 @@ type ReportMongoRepository interface {
 	UpdateSectionTitle(ctx context.Context, reportID, sectionID primitive.ObjectID, newTitle string) error
 	ReorderSection(ctx context.Context, reportID, sectionID primitive.ObjectID, newOrder int) error
 	BulkUpdateSections(ctx context.Context, reportID primitive.ObjectID, sections []ReportSection) error
+	// NEW: for a batch of reports, return max(sections.updated_at) per report_id (string UUID)
+	LatestUpdateByReportIDs(ctx context.Context, reportIDs []string) (map[string]time.Time, error)
 }
 type ReportMongoRepoImpl struct {
 	collection *mongo.Collection
@@ -298,4 +300,55 @@ func (r *ReportMongoRepoImpl) BulkUpdateSections(ctx context.Context, reportID p
 		return fmt.Errorf("report not found")
 	}
 	return nil
+}
+
+// Ensure this type implements the interface at compile time
+var _ ReportMongoRepository = (*ReportMongoRepoImpl)(nil)
+
+// LatestUpdateByReportIDs returns max(updated_at, max(sections.updated_at)) per ReportID (string UUID).
+func (r *ReportMongoRepoImpl) LatestUpdateByReportIDs(ctx context.Context, reportIDs []string) (map[string]time.Time, error) {
+	out := make(map[string]time.Time, len(reportIDs))
+	if len(reportIDs) == 0 {
+		return out, nil
+	}
+
+	pipeline := mongo.Pipeline{
+		// Only consider the requested report_ids
+		bson.D{{Key: "$match", Value: bson.D{{Key: "report_id", Value: bson.D{{Key: "$in", Value: reportIDs}}}}}},
+		// Keep the top-level updated_at so we can compare later
+		bson.D{{Key: "$addFields", Value: bson.D{{Key: "docUpdated", Value: "$updated_at"}}}},
+		// Unwind sections (but keep docs even if there are none)
+		bson.D{{Key: "$unwind", Value: bson.D{{Key: "path", Value: "$sections"}, {Key: "preserveNullAndEmptyArrays", Value: true}}}},
+		// Compute per-doc max of sections.updated_at and carry along docUpdated
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$report_id"},
+			{Key: "lastSectionsUpdate", Value: bson.D{{Key: "$max", Value: "$sections.updated_at"}}},
+			{Key: "docUpdated", Value: bson.D{{Key: "$max", Value: "$docUpdated"}}},
+		}}},
+		// Final "lastUpdate" = max(lastSectionsUpdate, docUpdated)
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "lastUpdate", Value: bson.D{{Key: "$max", Value: bson.A{"$lastSectionsUpdate", "$docUpdated"}}}},
+		}}},
+	}
+
+	cur, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	for cur.Next(ctx) {
+		var row struct {
+			ID         string    `bson:"_id"`
+			LastUpdate time.Time `bson:"lastUpdate"`
+		}
+		if err := cur.Decode(&row); err != nil {
+			return nil, err
+		}
+		out[row.ID] = row.LastUpdate
+	}
+	if err := cur.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

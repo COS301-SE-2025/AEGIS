@@ -3,6 +3,7 @@ package report
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -16,6 +17,8 @@ type ReportRepository interface {
 	GetReportsByEvidenceID(ctx context.Context, evidenceID uuid.UUID) ([]Report, error)
 	DeleteReportByID(ctx context.Context, reportID uuid.UUID) error
 	DownloadReport(ctx context.Context, reportID uuid.UUID) (*Report, error)
+
+	ListRecentCandidates(ctx context.Context, opts RecentReportsOptions, candidateLimit int) ([]Report, error)
 }
 
 type ReportsRepoImpl struct {
@@ -24,6 +27,44 @@ type ReportsRepoImpl struct {
 
 func NewReportRepository(db *gorm.DB) ReportRepository {
 	return &ReportsRepoImpl{DB: db}
+
+}
+
+// compile-time check
+var _ ReportRepository = (*ReportsRepoImpl)(nil)
+
+func (repo *ReportsRepoImpl) ListRecentCandidates(
+	ctx context.Context,
+	opts RecentReportsOptions,
+	candidateLimit int,
+) ([]Report, error) {
+	if candidateLimit <= 0 || candidateLimit > 200 {
+		candidateLimit = 60
+	}
+
+	q := repo.DB.WithContext(ctx).Model(&Report{})
+
+	// Filters
+	if opts.MineOnly && opts.ExaminerID != uuid.Nil {
+		q = q.Where("examiner_id = ?", opts.ExaminerID)
+	}
+	if opts.CaseID != nil {
+		q = q.Where("case_id = ?", *opts.CaseID)
+	}
+	if opts.Status != nil && strings.TrimSpace(*opts.Status) != "" {
+		q = q.Where("status = ?", *opts.Status)
+	}
+
+	// Select only what we need for “recent”
+	var rows []Report
+	if err := q.
+		Select("id, case_id, examiner_id, name, status, updated_at").
+		Order("updated_at DESC").
+		Limit(candidateLimit).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
 
 func (repo *ReportsRepoImpl) SaveReport(ctx context.Context, report *Report) error {

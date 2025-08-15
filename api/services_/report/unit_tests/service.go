@@ -6,14 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"image/jpeg"
-	"image/png"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jung-kurt/gofpdf"
+	"github.com/google/uuid" // or your gofpdf import path
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -38,8 +35,7 @@ type ReportService interface {
 	DeleteCustomSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID) error
 	UpdateSectionContent(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newContent string) error
 	UpdateSectionTitle(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newTitle string) error
-	ReorderCustomSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newOrder int) error // ... your existing methods ...
-	ListRecentReports(ctx context.Context, opts RecentReportsOptions) ([]RecentReport, error)                         // NEW
+	ReorderCustomSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newOrder int) error
 }
 
 // ReportServiceImpl is the concrete implementation of ReportService.
@@ -291,84 +287,29 @@ func extractDataURLImages(html string) (cleanHTML string, imgs []embeddedImage) 
 }
 
 func (s *ReportServiceImpl) DownloadReportAsPDF(ctx context.Context, reportID uuid.UUID) ([]byte, error) {
-	rpt, err := s.DownloadReport(ctx, reportID)
+	rptWithContent, err := s.DownloadReport(ctx, reportID) // returns *ReportWithContent (meta + sections)
 	if err != nil {
 		return nil, err
 	}
 
-	pdf := gofpdf.New("P", "mm", "A4", "")
-	pdf.SetMargins(15, 15, 15)
-	pdf.SetAutoPageBreak(true, 15)
-	pdf.AddPage()
+	opts := PDFRenderOptions{
+		PageSize:        "A4",
+		MarginMm:        15,
+		MaxImageWidthMm: 180,
+		FontRegular:     "assets/fonts/NotoSans-Regular.ttf",
+		FontBold:        "assets/fonts/NotoSans-Bold.ttf",
+		FontItalic:      "assets/fonts/NotoSans-Italic.ttf",
+		FontBoldItalic:  "assets/fonts/NotoSans-BoldItalic.ttf",
+		BaseFontFamily:  "NotoSans",
+		HeadingColorRGB: [3]int{20, 20, 20},
+		TextColorRGB:    [3]int{20, 20, 20},
+		TableHeaderRGB:  [3]int{245, 245, 245},
+		BorderGrayRGB:   [3]int{200, 200, 200},
+	}
 
-	pdf.SetFont("Arial", "B", 16)
-	pdf.Cell(0, 10, fmt.Sprintf("Report: %s", rpt.Metadata.Name))
-	pdf.Ln(12)
-
-	// If you’re using gofpdf’s HTML renderer:
-	html := pdf.HTMLBasicNew()
-
-	for _, sec := range rpt.Content {
-		// title...
-		pdf.SetFont("Arial", "B", 12)
-		pdf.Cell(0, 8, sec.Title)
-		pdf.Ln(8)
-
-		// (optional) sanitize first; otherwise use sec.Content directly
-		// sanitized := policy.Sanitize(sec.Content)
-		sanitized := sec.Content
-
-		// ⬇️ call the extractor so the function & regex are USED
-		cleaned, images := extractDataURLImages(sanitized)
-
-		// text rendering
-		pdf.SetFont("Arial", "", 11)
-		trimmed := strings.TrimSpace(strings.ToLower(strings.ReplaceAll(cleaned, " ", "")))
-		if trimmed == "" || trimmed == "<p><br></p>" || trimmed == "<p></p>" {
-			pdf.MultiCell(0, 6, "(No content provided)", "", "", false)
-		} else {
-			html.Write(5, cleaned)
-		}
-		pdf.Ln(4)
-
-		// image rendering (the block you already have)
-		for _, im := range images {
-			imgType := strings.ToUpper(strings.TrimPrefix(im.Mimetype, "image/"))
-			if imgType == "JPEG" {
-				imgType = "JPG"
-			}
-
-			r := bytes.NewReader(im.Data)
-			if imgType == "PNG" && len(im.Data) > 1_000_000 {
-				if pngImg, err := png.Decode(bytes.NewReader(im.Data)); err == nil {
-					var buf bytes.Buffer
-					_ = jpeg.Encode(&buf, pngImg, &jpeg.Options{Quality: 85})
-					r = bytes.NewReader(buf.Bytes())
-					imgType = "JPG"
-				}
-			}
-
-			name := fmt.Sprintf("sec-%v-%d", sec.ID, time.Now().UnixNano()) // use sec.ID or sec.ID.Hex()
-			opts := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: true}
-			info := pdf.RegisterImageOptionsReader(name, opts, r)
-
-			w, h := info.Width(), info.Height()
-			maxW := 180.0
-			if w > maxW {
-				scale := maxW / w
-				w = maxW
-				h *= scale
-			}
-
-			x := (210.0 - w) / 2.0
-			y := pdf.GetY()
-			pdf.ImageOptions(name, x, y, w, 0, false, opts, 0, "")
-			pdf.Ln(h + 4)
-		}
-
-		if pdf.GetY() > 260 {
-			pdf.AddPage()
-		}
+	pdf := NewPDF(opts)
+	if err := RenderReportWithContentGofpdf(pdf, opts, rptWithContent); err != nil {
+		return nil, fmt.Errorf("render (gofpdf): %w", err)
 	}
 
 	var buf bytes.Buffer

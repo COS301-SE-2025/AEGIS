@@ -27,6 +27,9 @@ func RegisterReportRoutes(router *gin.RouterGroup, handler *handlers.ReportHandl
 		report.PUT("/:reportID/sections/:sectionID/content", handler.UpdateSectionContent) // Update section content
 		report.PUT("/:reportID/sections/:sectionID/title", handler.UpdateSectionTitle)     // Update section title
 		report.PUT("/:reportID/sections/:sectionID/reorder", handler.ReorderSection)       // Reorder section
-		report.DELETE("/:reportID/sections/:sectionID", handler.DeleteSection)             // Delete section
+		report.DELETE("/:reportID/sections/:sectionID", handler.DeleteSection)
+
+		// Recent reports endpoint
+		report.GET("/recent", handler.GetRecentReports) // List recent reports
 	}
 }

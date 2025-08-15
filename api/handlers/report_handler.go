@@ -4,7 +4,9 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"aegis-api/services_/report"
 
@@ -273,40 +275,6 @@ func (h *ReportHandler) GetReportsByCaseID(c *gin.Context) {
 	c.JSON(http.StatusOK, reports)
 }
 
-// UpdateSectionContent updates the content of a specific section
-// func (h *ReportHandler) UpdateSectionContent(c *gin.Context) {
-// 	reportIDStr := c.Param("reportID")
-// 	reportUUID, err := uuid.Parse(reportIDStr)
-// 	if err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
-// 		return
-// 	}
-
-// 	sectionIDStr := c.Param("sectionID")
-// 	sectionID, err := primitive.ObjectIDFromHex(sectionIDStr)
-// 	if err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid section ID"})
-// 		return
-// 	}
-
-// 	var req struct {
-// 		Content string `json:"content"`
-// 	}
-
-// 	if err := c.ShouldBindJSON(&req); err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-// 		return
-// 	}
-
-// 	err = h.ReportService.UpdateReportSection(c.Request.Context(), reportUUID, sectionID, req.Content)
-// 	if err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update section content"})
-// 		return
-// 	}
-
-// 	c.JSON(http.StatusOK, gin.H{"status": "section content updated successfully"})
-// }
-
 // UpdateSectionTitle updates the title of a specific section
 func (h *ReportHandler) UpdateSectionTitle(c *gin.Context) {
 	// Parse report UUID
@@ -376,4 +344,81 @@ func (h *ReportHandler) ReorderSection(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "section reordered successfully"})
+}
+
+// GET /api/v1/reports/recent?limit=6&mine=true&caseId=<uuid>&status=<string>
+func (h *ReportHandler) GetRecentReports(c *gin.Context) {
+	// auth: same style as GenerateReport
+	userIDVal, ok := c.Get("userID")
+	if !ok {
+		writeError(c, http.StatusUnauthorized, "unauthorized", "user not authorized")
+		return
+	}
+	examinerID, err := uuid.Parse(userIDVal.(string))
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "invalid_user_id", "invalid user id format")
+		return
+	}
+
+	// query params
+	limitStr := c.DefaultQuery("limit", "6")
+	mineStr := c.DefaultQuery("mine", "true")
+	caseIDStr := c.Query("caseId")
+	statusStr := strings.TrimSpace(c.Query("status"))
+
+	limit := 6
+	if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+		limit = v
+	}
+	mine := strings.EqualFold(mineStr, "true")
+
+	var caseID *uuid.UUID
+	if caseIDStr != "" {
+		if cid, err := uuid.Parse(caseIDStr); err == nil {
+			caseID = &cid
+		} else {
+			writeError(c, http.StatusBadRequest, "invalid_case_id", "invalid caseId")
+			return
+		}
+	}
+
+	var status *string
+	if statusStr != "" {
+		status = &statusStr
+	}
+
+	opts := report.RecentReportsOptions{
+		Limit:      limit,
+		MineOnly:   mine,
+		ExaminerID: examinerID,
+		CaseID:     caseID,
+		Status:     status,
+	}
+
+	items, err := h.ReportService.ListRecentReports(c.Request.Context(), opts)
+	if err != nil {
+		logWithCtx("error", "list recent reports failed", c, map[string]any{"err": err.Error()})
+		writeError(c, http.StatusInternalServerError, "recent_reports_failed", "failed to load recent reports")
+		return
+	}
+
+	// shape the response to what your React expects
+	type row struct {
+		ID           uuid.UUID `json:"id"`
+		Title        string    `json:"title"`
+		Status       string    `json:"status"`
+		LastModified string    `json:"lastModified"` // ISO time
+	}
+
+	resp := make([]row, len(items))
+	for i, it := range items {
+		resp[i] = row{
+			ID:           it.ID,
+			Title:        it.Title,
+			Status:       it.Status,
+			LastModified: it.LastModified.Format(time.RFC3339),
+		}
+	}
+
+	c.JSON(http.StatusOK, resp)
 }

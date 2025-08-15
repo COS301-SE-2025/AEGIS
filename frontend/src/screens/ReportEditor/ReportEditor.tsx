@@ -14,6 +14,8 @@ import {
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom"; 
+import { Pencil, Check, X } from "lucide-react"; // NEW
 
 interface ReportSection {
   id: string;
@@ -86,8 +88,18 @@ export const ReportEditor = () => {
 const [lastSavedAt, setLastSavedAt] = useState<number|null>(null);
 const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // debounce timer for autosave
-  //const saveTimer = useRef<number | null>(null);
+// --- title edit state ---
+const [editingTitleSectionId, setEditingTitleSectionId] = useState<string|null>(null);
+const [tempSectionTitle, setTempSectionTitle] = useState("");
+const [titleDirty, setTitleDirty] = useState(false);
+const [titleSaving, setTitleSaving] = useState<"idle"|"saving"|"saved"|"error">("idle");
+
+
+const navigate = useNavigate(); // NEW
+
+const [recentReports, setRecentReports] = useState<RecentReport[]>([]); // NEW
+const [recentLoading, setRecentLoading] = useState(true);               // NEW
+const [recentError, setRecentError] = useState<string | null>(null);    // NEW
 
   // fetch report
   useEffect(() => {
@@ -229,6 +241,10 @@ const flushSaveNow = useCallback(
       return;
     }
 
+    if (payload === "" && lastSavedRef.current === "") {
+  setSaveState("saved");
+  return;
+}
     try {
       setSaveState("saving");
       await putSectionContent(reportId, sectionId, payload);
@@ -294,6 +310,76 @@ const flushAndDownload = async () => {
   await downloadReport(id);
 };
 
+useEffect(() => { // NEW
+  let cancelled = false;
+  (async () => {
+    try {
+      setRecentLoading(true);
+      setRecentError(null);
+      const token = sessionStorage.getItem("authToken");
+      if (!token) {
+        setRecentReports([]);
+        setRecentLoading(false);
+        return;
+      }
+      const res = await axios.get(`${API_URL}/reports/recent?limit=6&mine=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const items = (res.data as any[]).map(x => ({
+        id: x.id,
+        title: x.title,
+        status: x.status as RecentReport["status"],
+        lastModified: x.lastModified as string,
+      })) as RecentReport[];
+
+      if (!cancelled) setRecentReports(items);
+    } catch (e: any) {
+      if (!cancelled) setRecentError("Failed to load recent reports");
+      console.error("Recent reports error:", e?.response?.data ?? e);
+    } finally {
+      if (!cancelled) setRecentLoading(false);
+    }
+  })();
+  return () => { cancelled = true; };
+}, []);
+
+const refreshRecent = async () => { // NEW (optional)
+  try {
+    setRecentLoading(true);
+    setRecentError(null);
+    const token = sessionStorage.getItem("authToken");
+    if (!token) return;
+    const res = await axios.get(`${API_URL}/reports/recent?limit=6&mine=true`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const items = (res.data as any[]).map(x => ({
+      id: x.id, title: x.title, status: x.status as RecentReport["status"], lastModified: x.lastModified
+    })) as RecentReport[];
+    setRecentReports(items);
+  } catch {
+    setRecentError("Failed to refresh");
+  } finally {
+    setRecentLoading(false);
+  }
+};
+
+const openReport = async (id: string) => {
+  try {
+    // only flush if there are pending edits
+    if (dirty || saveState === "saving") {
+      await flushSaveNow(sections[activeSection]?.content ?? ""); // no { force: true }
+    }
+    navigate(`/report-editor/${id}`);
+  } catch (e) {
+    console.error("Failed to save before navigation", e);
+    setError("Couldn't save changes before opening another report.");
+  }
+};
+
+
+
+
 async function updateSectionTitle(reportId: string, sectionId: string, title: string) {
   const token = sessionStorage.getItem("authToken");
   const res = await axios.put(
@@ -305,65 +391,32 @@ async function updateSectionTitle(reportId: string, sectionId: string, title: st
 }
 
 
-  // const [sections, setSections] = useState<ReportSection[]>([
+  // const recentReports: RecentReport[] = [
   //   {
-  //     id: 'executive-summary',
-  //     title: 'Executive Summary',
-  //     content: `<p>On January 14, 2024, the Security Operations Center (SOC) detected suspicious network activity indicating a potential security breach. This report documents the comprehensive digital forensics investigation conducted to determine the scope, attack vector, and root cause of the incident.</p><p>Initial analysis revealed unauthorized access to the corporate network through a compromised employee workstation. The investigation timeline, findings, and recommended remediation actions are detailed in this report.</p>`,
-  //     completed: true
+  //     id: 'security-incident-2024-001',
+  //     title: 'Security Incident 2024-001',
+  //     status: 'draft',
+  //     lastModified: '2 hours ago'
   //   },
   //   {
-  //     id: 'incident-scope',
-  //     title: 'Incident Scope & Objectives',
-  //     content: `<p><strong>Investigation Objectives:</strong></p><ul><li>Identify the attack vector and timeline</li><li>Determine the extent of system compromise</li><li>Assess data exfiltration risks</li><li>Document evidence for potential legal proceedings</li></ul>`,
-  //     completed: true
+  //     id: 'malware-analysis-report',
+  //     title: 'Malware Analysis Report',
+  //     status: 'review',
+  //     lastModified: '1 day ago'
   //   },
   //   {
-  //     id: 'evidence-findings',
-  //     title: 'Evidence & Findings',
-  //     content: '<p>Content for Evidence &amp; Findings section...</p>',
-  //     completed: false
+  //     id: 'network-forensics',
+  //     title: 'Network Forensics',
+  //     status: 'review',
+  //     lastModified: '1 day ago'
   //   },
   //   {
-  //     id: 'compromised-assets',
-  //     title: 'Compromised Assets',
-  //     content: '',
-  //     completed: false
-  //   },
-  //   {
-  //     id: 'malware-identified',
-  //     title: 'Malware Identified',
-  //     content: '',
-  //     completed: false
+  //     id: 'endpoint-investigation',
+  //     title: 'Endpoint Investigation',
+  //     status: 'published',
+  //     lastModified: '3 days ago'
   //   }
-  // ]);
-
-  const recentReports: RecentReport[] = [
-    {
-      id: 'security-incident-2024-001',
-      title: 'Security Incident 2024-001',
-      status: 'draft',
-      lastModified: '2 hours ago'
-    },
-    {
-      id: 'malware-analysis-report',
-      title: 'Malware Analysis Report',
-      status: 'review',
-      lastModified: '1 day ago'
-    },
-    {
-      id: 'network-forensics',
-      title: 'Network Forensics',
-      status: 'review',
-      lastModified: '1 day ago'
-    },
-    {
-      id: 'endpoint-investigation',
-      title: 'Endpoint Investigation',
-      status: 'published',
-      lastModified: '3 days ago'
-    }
-  ];
+  // ];
 
   // Custom Quill modules with dark theme styling
   const modules = {
@@ -397,6 +450,57 @@ async function updateSectionTitle(reportId: string, sectionId: string, title: st
       default: return 'bg-gray-400';
     }
   };
+
+  function timeAgo(iso: string) { // NEW
+  const d = new Date(iso);
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min${m > 1 ? "s" : ""} ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hour${h > 1 ? "s" : ""} ago`;
+  const days = Math.floor(h / 24);
+  if (days < 7) return `${days} day${days > 1 ? "s" : ""} ago`;
+  return d.toLocaleString(); // fallback for older items
+}
+const startEditingTitle = useCallback((section: ReportSection) => {
+  setEditingTitleSectionId(section.id);
+  setTempSectionTitle(section.title || "");
+  setTitleDirty(false);
+  setTitleSaving("idle");
+}, []);
+
+const cancelEditingTitle = useCallback(() => {
+  setEditingTitleSectionId(null);
+  setTempSectionTitle("");
+  setTitleDirty(false);
+  setTitleSaving("idle");
+}, []);
+
+const commitEditingTitle = useCallback(async () => {
+  if (!editingTitleSectionId) return;
+  const newTitle = tempSectionTitle.trim();
+  if (!newTitle) return; // (optional) show a toast/error
+
+  // Frontend-only optimistic update
+  setSections(prev => prev.map(s => (s.id === editingTitleSectionId ? { ...s, title: newTitle } : s)));
+  setTitleSaving("saved");
+  setEditingTitleSectionId(null);
+  setTitleDirty(false);
+
+  // LATER: wire to backend
+  // try {
+  //   setTitleSaving("saving");
+  //   if (reportId) await putSectionTitle(reportId, editingTitleSectionId, newTitle);
+  //   setTitleSaving("saved");
+  // } catch (e) {
+  //   console.error("Title save failed", e);
+  //   setTitleSaving("error");
+  // }
+}, [editingTitleSectionId, tempSectionTitle, setSections, reportId]);
+
+
+
 
   return (
     <div className="min-h-screen bg-gray-900 flex">
@@ -489,25 +593,58 @@ async function updateSectionTitle(reportId: string, sectionId: string, title: st
 
         {/* Recent Reports */}
         <div className="p-4 border-b border-gray-700">
-          <h3 className="text-gray-300 font-medium mb-3">Recent Reports</h3>
-          <div className="space-y-2">
-            {recentReports.map((report) => (
-              <div 
-                key={report.id}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors"
-              >
-                <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${getStatusDot(report.status)}`}></span>
-                    <span className="text-white text-sm truncate">{report.title}</span>
-                  </div>
-                  <p className="text-gray-400 text-xs">{report.lastModified}</p>
-                </div>
-              </div>
-            ))}
+          <h3 className="text-gray-300 font-medium mb-3 flex items-center justify-between">
+  <span>Recent Reports</span>
+  <button
+    onClick={refreshRecent}
+    className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded"
+  >
+    Refresh
+  </button>
+</h3>
+
+
+  {recentLoading && (
+    <div className="space-y-2">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="animate-pulse h-10 bg-gray-700/60 rounded-lg" />
+      ))}
+    </div>
+  )}
+
+  {!recentLoading && recentError && (
+    <div className="text-sm text-red-400">{recentError}</div>
+  )}
+
+  {!recentLoading && !recentError && (
+    <div className="space-y-2">
+      {recentReports.length === 0 && (
+        <div className="text-sm text-gray-400">No recent reports yet.</div>
+      )}
+
+      {recentReports.map((r) => (
+        <button
+          key={r.id}
+          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700 transition-colors text-left"
+          onClick={() => openReport(r.id)}
+          disabled={saveState === "saving"} // avoid switching mid-save
+        >
+          <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-2 h-2 rounded-full ${getStatusDot(r.status)}`}
+              />
+              <span className="text-white text-sm truncate">{r.title}</span>
+            </div>
+            <p className="text-gray-400 text-xs">{timeAgo(r.lastModified)}</p>
           </div>
-        </div>
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+
 
         {/* New Report Button */}
         <div className="p-4">
@@ -550,7 +687,8 @@ async function updateSectionTitle(reportId: string, sectionId: string, title: st
       key={section.id}
       onClick={async () => {
         if (index === activeSection) return;
-        await flushSaveNow(sections[activeSection]?.content ?? "", { force: true });
+        if (dirty || saveState === "saving") {
+        await flushSaveNow(sections[activeSection]?.content ?? "", { force: true });}
         setActiveSection(index);
       }}
       disabled={saveState === "saving"} // optional: prevent switching during save
@@ -640,12 +778,62 @@ async function updateSectionTitle(reportId: string, sectionId: string, title: st
 
               {/* Current Section */}
             {sections && sections[activeSection] && (
-          <div className="mb-6">
-            <h2 className="text-2xl font-semibold text-white mb-4">
-              {sections[activeSection].title}
-            </h2>
-          </div>
+  <div className="mb-6">
+    {editingTitleSectionId === sections[activeSection].id ? (
+      <div className="flex items-center gap-2">
+        <input
+          autoFocus
+          value={tempSectionTitle}
+          onChange={(e) => { setTempSectionTitle(e.target.value); setTitleDirty(true); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); commitEditingTitle(); }
+            if (e.key === "Escape") { e.preventDefault(); cancelEditingTitle(); }
+          }}
+          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white w-full max-w-xl"
+          placeholder="Section title"
+        />
+        <button
+          type="button"
+          onClick={commitEditingTitle}
+          disabled={!tempSectionTitle.trim()}
+          className="p-2 rounded-lg bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+          title="Save"
+        >
+          <Check className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={cancelEditingTitle}
+          className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
+          title="Cancel"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    ) : (
+      <div className="flex items-center gap-3">
+        <h2 className="text-2xl font-semibold text-white">
+          {sections[activeSection].title}
+        </h2>
+        <button
+          type="button"
+          onClick={() => startEditingTitle(sections[activeSection])}
+          className="p-2 rounded-lg hover:bg-gray-700 text-gray-300"
+          title="Rename section"
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+        {titleSaving === "error" && (
+          <span className="text-sm text-red-400">Save failed</span>
         )}
+        {titleSaving === "saved" && (
+          <span className="text-sm text-emerald-400">Saved</span>
+        )}
+      </div>
+    )}
+  </div>
+)}
+
 
 
               {/* React Quill Editor */}
