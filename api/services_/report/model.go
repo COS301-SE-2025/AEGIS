@@ -4,7 +4,16 @@ import (
 	"context"
 	"time"
 
+	"errors"
+
 	"github.com/google/uuid"
+)
+
+var (
+	ErrReportNotFound      = errors.New("report not found")
+	ErrMongoReportNotFound = errors.New("mongo report not found")
+	ErrSectionNotFound     = errors.New("section not found")
+	ErrInvalidInput        = errors.New("invalid input")
 )
 
 // Report represents the case report structure.

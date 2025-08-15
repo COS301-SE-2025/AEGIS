@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"errors"
+	"log"
 	"net/http"
+	"strings"
 
 	"aegis-api/services_/report"
 
@@ -70,39 +73,78 @@ func (h *ReportHandler) GetReportByID(c *gin.Context) {
 	c.JSON(http.StatusOK, report)
 }
 
-// UpdateReportSection updates the content of a section.
-// UpdateSectionContent updates the content of a specific section
+// Error writer with a stable shape
+func writeError(c *gin.Context, status int, code, msg string) {
+	c.AbortWithStatusJSON(status, gin.H{
+		"error": gin.H{
+			"code":    code,
+			"message": msg,
+		},
+	})
+}
+
+func logWithCtx(level, msg string, c *gin.Context, kv map[string]any) {
+	log.Printf("%s %s path=%s method=%s ip=%s ctx=%v",
+		strings.ToUpper(level), msg, c.FullPath(), c.Request.Method, c.ClientIP(), kv)
+}
+
 func (h *ReportHandler) UpdateSectionContent(c *gin.Context) {
 	reportIDStr := c.Param("reportID")
 	reportUUID, err := uuid.Parse(reportIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
+		logWithCtx("warn", "invalid report ID", c, map[string]any{"reportID": reportIDStr, "err": err.Error()})
+		writeError(c, http.StatusBadRequest, "invalid_report_id", "invalid report ID")
 		return
 	}
 
 	sectionIDStr := c.Param("sectionID")
 	sectionID, err := primitive.ObjectIDFromHex(sectionIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid section ID"})
+		logWithCtx("warn", "invalid section ID", c, map[string]any{"reportID": reportUUID.String(), "sectionID": sectionIDStr, "err": err.Error()})
+		writeError(c, http.StatusBadRequest, "invalid_section_id", "invalid section ID")
 		return
 	}
 
 	var req struct {
 		Content string `json:"content"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Content) == "" {
+		logWithCtx("warn", "invalid body", c, map[string]any{
+			"reportID":  reportUUID.String(),
+			"sectionID": sectionID.Hex(),
+			"err":       err,
+		})
+		writeError(c, http.StatusBadRequest, "invalid_body", "content is required")
 		return
 	}
 
-	// Use service wrapper for Mongo update
-	err = h.ReportService.UpdateCustomSectionContent(c.Request.Context(), reportUUID, sectionID, req.Content)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update section content"})
-		return
+	if err := h.ReportService.UpdateCustomSectionContent(c.Request.Context(), reportUUID, sectionID, req.Content); err != nil {
+		// Prefer sentinel errors from your service/repo (see note below).
+		switch {
+		case errors.Is(err, report.ErrReportNotFound), errors.Is(err, report.ErrMongoReportNotFound):
+			logWithCtx("info", "report not found", c, map[string]any{"reportID": reportUUID.String(), "sectionID": sectionID.Hex(), "err": err.Error()})
+			writeError(c, http.StatusNotFound, "report_not_found", "report not found")
+			return
+		case errors.Is(err, report.ErrSectionNotFound):
+			logWithCtx("info", "section not found", c, map[string]any{"reportID": reportUUID.String(), "sectionID": sectionID.Hex(), "err": err.Error()})
+			writeError(c, http.StatusNotFound, "section_not_found", "section not found")
+			return
+		default:
+			// Fallback if you haven't added sentinel errors yet:
+			low := strings.ToLower(err.Error())
+			if strings.Contains(low, "not found") {
+				logWithCtx("info", "resource not found", c, map[string]any{"reportID": reportUUID.String(), "sectionID": sectionID.Hex(), "err": err.Error()})
+				writeError(c, http.StatusNotFound, "not_found", "resource not found")
+				return
+			}
+			logWithCtx("error", "update section failed", c, map[string]any{"reportID": reportUUID.String(), "sectionID": sectionID.Hex(), "err": err.Error()})
+			writeError(c, http.StatusInternalServerError, "update_failed", "failed to update section content")
+			return
+		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "section content updated successfully"})
+	logWithCtx("info", "section content updated", c, map[string]any{"reportID": reportUUID.String(), "sectionID": sectionID.Hex()})
+	c.Status(http.StatusNoContent)
 }
 
 // DownloadReportPDF returns the report as PDF.

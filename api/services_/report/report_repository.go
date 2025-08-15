@@ -56,7 +56,7 @@ func (r *ReportMongoRepoImpl) GetReportContent(ctx context.Context, mongoID prim
 	err := r.collection.FindOne(ctx, bson.M{"_id": mongoID}).Decode(&reportContent)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, nil // No document found, return nil
+			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to retrieve report content from MongoDB: %w", err)
 	}
@@ -65,7 +65,7 @@ func (r *ReportMongoRepoImpl) GetReportContent(ctx context.Context, mongoID prim
 
 // UpdateSection updates the content of a subsection
 func (r *ReportMongoRepoImpl) UpdateSection(ctx context.Context, reportID, sectionID primitive.ObjectID, newContent string) error {
-	filter := bson.M{"report_id": reportID, "sections._id": sectionID}
+	filter := bson.M{"_id": reportID, "sections._id": sectionID} // <-- _id, not report_id
 	update := bson.M{
 		"$set": bson.M{
 			"sections.$.content":    newContent,
@@ -93,13 +93,16 @@ func (r *ReportMongoRepoImpl) AddSection(ctx context.Context, reportID primitive
 	}
 	section.UpdatedAt = time.Now()
 
-	filter := bson.M{"report_id": reportID}
-	update := bson.M{"$push": bson.M{"sections": section}, "$set": bson.M{"updated_at": time.Now()}}
-	result, err := r.collection.UpdateOne(ctx, filter, update)
+	filter := bson.M{"_id": reportID} // <-- _id
+	update := bson.M{
+		"$push": bson.M{"sections": section},
+		"$set":  bson.M{"updated_at": time.Now()},
+	}
+	res, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
-	if result.MatchedCount == 0 {
+	if res.MatchedCount == 0 {
 		return errors.New("report not found")
 	}
 	return nil
@@ -107,7 +110,7 @@ func (r *ReportMongoRepoImpl) AddSection(ctx context.Context, reportID primitive
 
 // DeleteSection removes a subsection
 func (r *ReportMongoRepoImpl) DeleteSection(ctx context.Context, reportID, sectionID primitive.ObjectID) error {
-	filter := bson.M{"report_id": reportID}
+	filter := bson.M{"_id": reportID}
 	update := bson.M{
 		"$pull": bson.M{"sections": bson.M{"_id": sectionID}},
 		"$set":  bson.M{"updated_at": time.Now()},
@@ -211,7 +214,6 @@ func (r *ReportMongoRepoImpl) FindByReportUUID(ctx context.Context, reportUUID u
 }
 
 func (r *ReportMongoRepoImpl) UpdateSections(ctx context.Context, reportID primitive.ObjectID, sections []ReportSection) error {
-	// Update the entire sections array in Mongo for a report
 	filter := bson.M{"_id": reportID}
 	update := bson.M{
 		"$set": bson.M{
@@ -219,20 +221,17 @@ func (r *ReportMongoRepoImpl) UpdateSections(ctx context.Context, reportID primi
 			"updated_at": time.Now(),
 		},
 	}
-
 	result, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
-
 	if result.MatchedCount == 0 {
 		return fmt.Errorf("report not found")
 	}
-
 	return nil
 }
 func (r *ReportMongoRepoImpl) UpdateSectionTitle(ctx context.Context, reportID, sectionID primitive.ObjectID, newTitle string) error {
-	filter := bson.M{"report_id": reportID, "sections._id": sectionID}
+	filter := bson.M{"_id": reportID, "sections._id": sectionID}
 	update := bson.M{
 		"$set": bson.M{
 			"sections.$.title":      newTitle,
@@ -251,11 +250,10 @@ func (r *ReportMongoRepoImpl) UpdateSectionTitle(ctx context.Context, reportID, 
 }
 
 func (r *ReportMongoRepoImpl) ReorderSection(ctx context.Context, reportID, sectionID primitive.ObjectID, newOrder int) error {
-	reportContent, err := r.GetReportContent(ctx, reportID)
+	reportContent, err := r.GetReportContent(ctx, reportID) // uses _id
 	if err != nil {
 		return err
 	}
-
 	var target *ReportSection
 	for i := range reportContent.Sections {
 		if reportContent.Sections[i].ID == sectionID {
@@ -270,27 +268,29 @@ func (r *ReportMongoRepoImpl) ReorderSection(ctx context.Context, reportID, sect
 	oldOrder := target.Order
 	target.Order = newOrder
 
-	// Shift other sections
 	for i := range reportContent.Sections {
-		if reportContent.Sections[i].ID != sectionID {
-			if oldOrder < newOrder {
-				if reportContent.Sections[i].Order > oldOrder && reportContent.Sections[i].Order <= newOrder {
-					reportContent.Sections[i].Order--
-				}
-			} else if oldOrder > newOrder {
-				if reportContent.Sections[i].Order >= newOrder && reportContent.Sections[i].Order < oldOrder {
-					reportContent.Sections[i].Order++
-				}
+		if reportContent.Sections[i].ID == sectionID {
+			continue
+		}
+		if oldOrder < newOrder {
+			if reportContent.Sections[i].Order > oldOrder && reportContent.Sections[i].Order <= newOrder {
+				reportContent.Sections[i].Order--
+			}
+		} else if oldOrder > newOrder {
+			if reportContent.Sections[i].Order >= newOrder && reportContent.Sections[i].Order < oldOrder {
+				reportContent.Sections[i].Order++
 			}
 		}
 	}
 
-	return r.BulkUpdateSections(ctx, reportID, reportContent.Sections)
+	return r.UpdateSections(ctx, reportID, reportContent.Sections) // uses _id
 }
 
 func (r *ReportMongoRepoImpl) BulkUpdateSections(ctx context.Context, reportID primitive.ObjectID, sections []ReportSection) error {
-	update := bson.M{"$set": bson.M{"sections": sections, "updated_at": time.Now()}}
-	result, err := r.collection.UpdateOne(ctx, bson.M{"report_id": reportID}, update)
+	// If you keep this method, make it consistent with _id as well:
+	result, err := r.collection.UpdateOne(ctx, bson.M{"_id": reportID}, bson.M{
+		"$set": bson.M{"sections": sections, "updated_at": time.Now()},
+	})
 	if err != nil {
 		return err
 	}

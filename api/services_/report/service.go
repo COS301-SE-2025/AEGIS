@@ -3,8 +3,13 @@ package report
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image/jpeg"
+	"image/png"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -258,42 +263,117 @@ func (s *ReportServiceImpl) DownloadReportAsJSON(ctx context.Context, reportID u
 	return json.Marshal(report)
 }
 
+// at file scope (or inside the same file above DownloadReportAsPDF)
+type embeddedImage struct {
+	Mimetype string
+	Data     []byte
+}
+
+func extractDataURLImages(html string) (cleanHTML string, imgs []embeddedImage) {
+	// local regex so it’s not a global unused symbol
+	imgTagRe := regexp.MustCompile(`(?i)<img[^>]+src=["']data:(image/(?:png|jpeg|jpg));base64,([^"']+)["'][^>]*>`)
+	out := imgTagRe.ReplaceAllStringFunc(html, func(tag string) string {
+		m := imgTagRe.FindStringSubmatch(tag)
+		if len(m) != 3 {
+			return ""
+		}
+		mime := m[1]
+		b64 := strings.NewReplacer(" ", "", "\n", "").Replace(m[2])
+		data, err := base64.StdEncoding.DecodeString(b64)
+		if err != nil {
+			return ""
+		}
+		imgs = append(imgs, embeddedImage{Mimetype: mime, Data: data})
+		return "" // strip <img> from HTML; we’ll render images separately
+	})
+	return out, imgs
+}
+
 func (s *ReportServiceImpl) DownloadReportAsPDF(ctx context.Context, reportID uuid.UUID) ([]byte, error) {
-	// Always go through the unified fetch method
-	report, err := s.DownloadReport(ctx, reportID)
+	rpt, err := s.DownloadReport(ctx, reportID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch report for PDF: %w", err)
+		return nil, err
 	}
 
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(15, 15, 15)
+	pdf.SetAutoPageBreak(true, 15)
 	pdf.AddPage()
 
-	// Title
 	pdf.SetFont("Arial", "B", 16)
-	pdf.Cell(0, 10, fmt.Sprintf("Report: %s", report.Metadata.Name))
+	pdf.Cell(0, 10, fmt.Sprintf("Report: %s", rpt.Metadata.Name))
 	pdf.Ln(12)
 
-	// Sections from Mongo
-	for _, sec := range report.Content {
+	// If you’re using gofpdf’s HTML renderer:
+	html := pdf.HTMLBasicNew()
+
+	for _, sec := range rpt.Content {
+		// title...
 		pdf.SetFont("Arial", "B", 12)
 		pdf.Cell(0, 8, sec.Title)
 		pdf.Ln(8)
 
+		// (optional) sanitize first; otherwise use sec.Content directly
+		// sanitized := policy.Sanitize(sec.Content)
+		sanitized := sec.Content
+
+		// ⬇️ call the extractor so the function & regex are USED
+		cleaned, images := extractDataURLImages(sanitized)
+
+		// text rendering
 		pdf.SetFont("Arial", "", 11)
-		if sec.Content == "" {
+		trimmed := strings.TrimSpace(strings.ToLower(strings.ReplaceAll(cleaned, " ", "")))
+		if trimmed == "" || trimmed == "<p><br></p>" || trimmed == "<p></p>" {
 			pdf.MultiCell(0, 6, "(No content provided)", "", "", false)
 		} else {
-			pdf.MultiCell(0, 6, sec.Content, "", "", false)
+			html.Write(5, cleaned)
 		}
 		pdf.Ln(4)
+
+		// image rendering (the block you already have)
+		for _, im := range images {
+			imgType := strings.ToUpper(strings.TrimPrefix(im.Mimetype, "image/"))
+			if imgType == "JPEG" {
+				imgType = "JPG"
+			}
+
+			r := bytes.NewReader(im.Data)
+			if imgType == "PNG" && len(im.Data) > 1_000_000 {
+				if pngImg, err := png.Decode(bytes.NewReader(im.Data)); err == nil {
+					var buf bytes.Buffer
+					_ = jpeg.Encode(&buf, pngImg, &jpeg.Options{Quality: 85})
+					r = bytes.NewReader(buf.Bytes())
+					imgType = "JPG"
+				}
+			}
+
+			name := fmt.Sprintf("sec-%v-%d", sec.ID, time.Now().UnixNano()) // use sec.ID or sec.ID.Hex()
+			opts := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: true}
+			info := pdf.RegisterImageOptionsReader(name, opts, r)
+
+			w, h := info.Width(), info.Height()
+			maxW := 180.0
+			if w > maxW {
+				scale := maxW / w
+				w = maxW
+				h *= scale
+			}
+
+			x := (210.0 - w) / 2.0
+			y := pdf.GetY()
+			pdf.ImageOptions(name, x, y, w, 0, false, opts, 0, "")
+			pdf.Ln(h + 4)
+		}
+
+		if pdf.GetY() > 260 {
+			pdf.AddPage()
+		}
 	}
 
 	var buf bytes.Buffer
 	if err := pdf.Output(&buf); err != nil {
-		return nil, fmt.Errorf("failed to generate PDF: %w", err)
+		return nil, fmt.Errorf("pdf output: %w", err)
 	}
-
 	return buf.Bytes(), nil
 }
 
