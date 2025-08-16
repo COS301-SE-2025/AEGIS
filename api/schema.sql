@@ -61,7 +61,7 @@ CREATE TYPE user_role AS ENUM (
     'Threat Hunter'                     -- Proactively searches for hidden or advanced threats
 );
 
-CREATE TYPE case_status AS ENUM ('open', 'under_review', 'closed','ongoing','archived');
+CREATE TYPE case_status AS ENUM ('open','Open', 'under_review','Under Review', 'closed','Ongoing','Archived');
 CREATE TYPE case_priority AS ENUM ('low', 'medium', 'high', 'critical','time-sensitive');
 CREATE TYPE investigation_stage_new AS ENUM (
     'Triage',
@@ -275,11 +275,17 @@ CREATE TABLE message_reactions (
 );
 
 CREATE TABLE threads (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    title TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title varchar(255) NOT NULL,
+    file_id uuid NOT NULL,
     case_id uuid NOT NULL,
+    created_by uuid NOT NULL,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    status varchar(50) DEFAULT 'open',
+    priority varchar(50) DEFAULT 'medium',
+    is_active boolean DEFAULT true,
+    resolved_at timestamp DEFAULT NULL
 );
 
 ALTER TABLE thread_messages

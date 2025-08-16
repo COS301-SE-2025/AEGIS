@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
 import { SidebarToggleButton } from "../../context/SidebarToggleContext";
@@ -39,18 +39,11 @@ interface CaseCard {
   investigation_stage: string;
 }
 
-
-
-
-
-
 export const DashBoardPage = () => {
   const [caseCards, setCaseCards] = useState<CaseCard[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("active");
   const [, setProfile] = useState<{ name: string; email: string; role: string; image: string } | null>(null);
-
-
   const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
@@ -66,9 +59,6 @@ const [updatedStage, setUpdatedStage] = useState("");
 const [] = useState<File | null>(null);
 const [updatedTitle, setUpdatedTitle] = useState("");
 const [updatedDescription, setUpdatedDescription] = useState("");
-
-
-
 interface Notification {
   id: string;
   message: string;
@@ -79,7 +69,9 @@ interface Notification {
 
 const [openCases, setOpenCases] = useState([]);
 const [closedCases, setClosedCases] = useState([]);
+const [archivedCases, setArchivedCases] = useState([]); // <-- Add this line
 const [evidenceCount, setEvidenceCount] = useState(0);
+const [evidenceError, setEvidenceError] = useState<string | null>(null);
 const [notifications, setNotifications] = useState<Notification[]>([]);
 // Add these new state variables after your existing useState declarations
 const [availableTiles, setAvailableTiles] = useState([
@@ -121,7 +113,6 @@ const [availableTiles, setAvailableTiles] = useState([
 const [showTileCustomizer, setShowTileCustomizer] = useState(false);
 const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
 
-
 useEffect(() => {
   const fetchCases = async () => {
     try {
@@ -135,11 +126,8 @@ useEffect(() => {
         responseKey = "cases";
       } else if (activeTab === "closed") {
         endpoint = "http://localhost:8080/api/v1/cases/closed";
-        responseKey = "closed_cases";}
-      // } else {
-      //   endpoint = "http://localhost:8080/api/v1/cases/filter?status=all"; // ← replace if your actual route differs
-      //   responseKey = "cases";
-      // }
+        responseKey = "closed_cases";
+      }
 
       const res = await fetch(endpoint, {
         headers: {
@@ -179,25 +167,46 @@ useEffect(() => {
 }, [activeTab]);
 
 useEffect(() => {
-  const storedUser = sessionStorage.getItem("user");
-  const user = storedUser ? JSON.parse(storedUser) : null;
+  const token = sessionStorage.getItem("authToken");
+  if (!token) return;
 
-  if (!user?.tenantId) return;
+  // Decode JWT to get tenantId
+  function getTenantIdFromJWT(jwt: string): string | null {
+    try {
+      const payload = jwt.split('.')[1];
+      const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+      return decoded.tenant_id || decoded.tenantId || null;
+    } catch {
+      return null;
+    }
+  }
+
+  const tenantId = getTenantIdFromJWT(token);
+  if (!tenantId) return;
 
   const fetchEvidenceCount = async () => {
     try {
-      const token = sessionStorage.getItem("authToken");
-      const res = await fetch(`http://localhost:8080/api/v1/evidence/count?tenantId=${user.tenantId}`, {
+      const res = await fetch(`http://localhost:8080/api/v1/evidence/count/${tenantId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      if (!res.ok) throw new Error("Failed to fetch evidence count");
-
       const data = await res.json();
+      console.log("Evidence count API response:", data, "Status:", res.status);
+      if (!res.ok || typeof data.count !== "number") {
+        setEvidenceError(`Failed to fetch evidence count. Status: ${res.status}`);
+        setEvidenceCount(0);
+        setAvailableTiles((prev) =>
+          prev.map((tile) =>
+            tile.id === "evidence-count"
+              ? { ...tile, value: "0" }
+              : tile
+          )
+        );
+        return;
+      }
       setEvidenceCount(data.count);
-
-      // also update the availableTiles evidence tile
+      setEvidenceError(null);
       setAvailableTiles((prev) =>
         prev.map((tile) =>
           tile.id === "evidence-count"
@@ -207,6 +216,15 @@ useEffect(() => {
       );
     } catch (error) {
       console.error("Error fetching evidence count:", error);
+      setEvidenceError("Error fetching evidence count. See console for details.");
+      setEvidenceCount(0);
+      setAvailableTiles((prev) =>
+        prev.map((tile) =>
+          tile.id === "evidence-count"
+            ? { ...tile, value: "0" }
+            : tile
+        )
+      );
     }
   };
 
@@ -280,11 +298,6 @@ useEffect(() => {
       setOpenCases(openData.cases || []);
       setClosedCases(closedData.cases || []);
 
-      const totalEvidence = [...(openData.cases || []), ...(closedData.cases || [])]
-        .reduce((acc, curr) => acc + (curr.evidence?.length || 0), 0);
-
-      setEvidenceCount(totalEvidence);
-
       // Update tile values
       setAvailableTiles(prev => prev.map(tile => {
         switch(tile.id) {
@@ -293,7 +306,10 @@ useEffect(() => {
           case 'closed-cases':
             return { ...tile, value: (closedData.cases || []).length.toString() };
           case 'evidence-count':
-            return { ...tile, value: totalEvidence.toString() };
+            // Only update if evidenceCount is still zero (not set by backend)
+            return tile.value === "0"
+              ? { ...tile, value: evidenceCount.toString() }
+              : tile;
           default:
             return tile;
         }
@@ -327,8 +343,6 @@ const metricCards = [
     icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
   },
 ];
-
-
 
 // Define getIcon ABOVE the .map
 const getIcon = (action: string) => {
@@ -388,9 +402,6 @@ const handleSaveCase = async () => {
     alert("Failed to update case");
   }
 };
-
-
-
 
 <ul className="space-y-4">
   {recentActivities.map((activity, index) => {
@@ -597,6 +608,9 @@ const handleSaveCase = async () => {
 
         {/* Page Content */}
         <main className="p-8">
+        {evidenceError && (
+          <div className="mb-4 p-3 bg-red-900 text-red-300 rounded">{evidenceError}</div>
+        )}
           <h1 className="text-3xl font-semibold mb-6">Dashboard Overview</h1>
 
           {/* Metric Cards */}
@@ -742,7 +756,7 @@ const handleSaveCase = async () => {
                       : "bg-card text-muted-foreground border border-muted"
                   )}
                 >
-                  Active Cases ({caseCards.length})
+                  Active Cases ({openCases.length})
                 </button>
                 <button
                   onClick={() => setActiveTab("archived")}
@@ -753,7 +767,7 @@ const handleSaveCase = async () => {
                       : "bg-card text-muted-foreground border border-muted"
                   )}
                 >
-                  Archived Cases (0)
+                  Archived Cases ({archivedCases.length})
                 </button>
                 <button
                   onClick={() => setActiveTab("closed")}
@@ -764,7 +778,7 @@ const handleSaveCase = async () => {
                       : "bg-card text-muted-foreground border border-muted"
                   )}
                 >
-                  Closed Cases (0)
+                  Closed Cases ({closedCases.length})
                 </button>
               </div>
               <Link to="/create-case">

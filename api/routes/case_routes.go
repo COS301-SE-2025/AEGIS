@@ -104,7 +104,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			// ─── Metadata Evidence Retrieval ─────────────
 			protected.GET("/evidence-metadata/:id", h.MetadataHandler.GetEvidenceByID)
 			protected.GET("/evidence-metadata/case/:case_id", h.MetadataHandler.GetEvidenceByCaseID)
-
+			protected.GET("/evidence/count/:tenantId", h.EvidenceHandler.GetEvidenceCount)
 			// ─── Admin: Users ────────────────────────────
 			protected.GET("/users", h.AdminService.ListUsers)
 

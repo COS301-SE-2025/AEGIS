@@ -28,6 +28,7 @@ import (
 	"aegis-api/services_/case/case_tags"
 	update_case "aegis-api/services_/case/case_update"
 	"aegis-api/services_/chat"
+	evidencecount "aegis-api/services_/evidence/evidence_count"
 	"aegis-api/services_/evidence/evidence_download"
 	"aegis-api/services_/evidence/evidence_tag"
 	"aegis-api/services_/evidence/evidence_viewer"
@@ -114,6 +115,7 @@ func main() {
 	if err := timelineRepo.AutoMigrate(); err != nil {
 		log.Fatalf("failed migrating timeline: %v", err)
 	}
+	evidenceCountRepo := evidencecount.NewEvidenceRepository(db.DB)
 	// ─── Email Sender (Mock) ────────────────────────────────────
 	emailSender := reset_password.NewMockEmailSender()
 
@@ -163,6 +165,8 @@ func main() {
 	//timeline
 	timelineService := timeline.NewService(timelineRepo)
 
+	evidenceCountService := evidencecount.NewEvidenceService(evidenceCountRepo)
+
 	// ─── Handlers ───────────────────────────────────────────────
 	adminHandler := handlers.NewAdminService(regService, listUserService, nil, nil, auditLogger)
 	authHandler := handlers.NewAuthHandler(authService, resetService, userRepo, auditLogger)
@@ -182,6 +186,7 @@ func main() {
 	//timeline
 	timelineHandler := handlers.NewTimelineHandler(timelineService)
 	// ─── Evidence Upload/Download/Metadata ──────────────────────
+	evidenceHandler := handlers.NewEvidenceHandler(evidenceCountService)
 	metadataRepo := metadata.NewGormRepository(db.DB)
 	ipfsClient := upload.NewIPFSClient("")
 
@@ -287,6 +292,7 @@ func main() {
 		notificationService,
 		iocHandler,
 		timelineHandler,
+		evidenceHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

@@ -63,6 +63,7 @@ type Handler struct {
 	NotificationService       *notification.NotificationService
 	IOCHandler                *IOCHandler
 	TimelineHandler           *TimelineHandler
+	EvidenceHandler           *EvidenceHandler
 }
 
 func NewHandler(
@@ -93,6 +94,7 @@ func NewHandler(
 	notificationService *notification.NotificationService,
 	IOCHandler *IOCHandler,
 	TimelineHandler *TimelineHandler,
+	EvidenceHandler *EvidenceHandler,
 
 ) *Handler {
 	return &Handler{
@@ -123,6 +125,7 @@ func NewHandler(
 		NotificationService:       notificationService,
 		IOCHandler:                IOCHandler,
 		TimelineHandler:           TimelineHandler,
+		EvidenceHandler:           EvidenceHandler,
 	}
 }
 

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	evidencecount "aegis-api/services_/evidence/evidence_count"
@@ -17,13 +18,20 @@ func NewEvidenceHandler(service evidencecount.EvidenceService) *EvidenceHandler 
 }
 
 func (h *EvidenceHandler) GetEvidenceCount(c *gin.Context) {
-	tenantID := c.Query("tenantId")
-	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenantId is required"})
+	tenantIDFromToken, exists := c.Get("tenantID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing tenantID in token context"})
 		return
 	}
-
+	tenantIDStr := tenantIDFromToken.(string)
+	tenantID := c.Param("tenantId")
+	fmt.Printf("[DEBUG] Received tenantID: %s\n", tenantID)
+	if tenantID != tenantIDStr {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant ID mismatch"})
+		return
+	}
 	count, err := h.service.GetEvidenceCount(tenantID)
+	fmt.Printf("[DEBUG] Evidence count for tenantID %s: %d\n", tenantID, count)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get evidence count"})
 		return
