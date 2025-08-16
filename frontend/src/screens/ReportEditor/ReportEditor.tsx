@@ -16,6 +16,23 @@ import axios from "axios";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom"; 
 import { Pencil, Check, X,Trash2 } from "lucide-react"; // NEW
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { GripVertical } from "lucide-react";
 
 interface ReportSection {
   id: string;
@@ -65,6 +82,92 @@ async function putSectionTitle(reportId: string, sectionId: string, title: strin
     `${API_URL}/reports/${reportId}/sections/${sectionId}/title`,
     { title },
     { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+  );
+}
+type SortableSectionItemProps = {
+  section: ReportSection;
+  index: number;
+  activeIndex: number;
+  onSelect: (idx: number) => Promise<void> | void;
+  onDelete: (id: string) => void;
+  deletingId: string | null;
+  saveState: "idle" | "saving" | "saved" | "error";
+};
+
+function SortableSectionItem({
+  section,
+  index,
+  activeIndex,
+  onSelect,
+  onDelete,
+  deletingId,
+  saveState,
+}: SortableSectionItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: section.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between p-3 rounded-lg text-left transition-colors ${
+        activeIndex === index
+          ? "bg-blue-600 text-white"
+          : "hover:bg-gray-700 text-gray-300"
+      } ${isDragging ? "ring-2 ring-blue-500/70" : ""}`}
+      onClick={() => onSelect(index)}
+      role="button"
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Drag handle */}
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="p-1 -ml-1 mr-1 rounded cursor-grab active:cursor-grabbing hover:bg-gray-700"
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Drag to reorder"
+          title="Drag to reorder"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+
+        <span className="font-medium truncate">{section.title}</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {/* completion dot */}
+        <div
+          className={`w-3 h-3 rounded-full border-2 ${
+            section.completed ? "bg-green-500 border-green-500" : "border-gray-400"
+          }`}
+          onClick={(e) => e.stopPropagation()}
+          title={section.completed ? "Completed" : "Mark completed"}
+        />
+
+        {/* delete */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(section.id);
+          }}
+          disabled={deletingId === section.id || saveState === "saving"}
+          className={`p-1 rounded hover:bg-gray-700 ${
+            activeIndex === index ? "text-white" : "text-gray-400"
+          } disabled:opacity-50`}
+          title="Delete section"
+          aria-label="Delete section"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -495,8 +598,91 @@ async function deleteSection(reportId: string, sectionId: string) {
   return res.data; // {status: "..."}
 }
 
+async function putSectionsOrderBulk(
+  reportId: string,
+  order: { id: string; order: number }[]
+) {
+  const token = sessionStorage.getItem("authToken");
+  await axios.put(
+    `${API_URL}/reports/${reportId}/sections/reorder`,
+    { order },
+    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+  );
+}
 
 
+// API helper
+async function putSectionOrder(
+  reportId: string,
+  sectionId: string,
+  order: number
+) {
+  const token = sessionStorage.getItem("authToken");
+  await axios.put(
+    `${API_URL}/reports/${reportId}/sections/${sectionId}/reorder`,
+    { order }, // 1-based
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+}
+
+
+// sensors (tiny drag threshold avoids accidental drags)
+const sensors = useSensors(
+  useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+);
+
+// drag end => reorder UI + persist
+const handleDragEnd = useCallback(
+  async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = sections.findIndex((s) => s.id === String(active.id));
+    const newIndex = sections.findIndex((s) => s.id === String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newList = arrayMove(sections, oldIndex, newIndex);
+    setSections(newList);
+
+    // keep the active selection sensible
+    setActiveSection((prev) => {
+      if (prev === oldIndex) return newIndex;
+      if (prev > oldIndex && prev <= newIndex) return prev - 1;
+      if (prev < oldIndex && prev >= newIndex) return prev + 1;
+      return prev;
+    });
+
+    // persist to server (choose bulk OR per-item)
+   try {
+  const rid = reportId ?? report?.id;
+  if (!rid) return;
+
+  // Optional: flush pending edits before persisting order
+  if (dirty || saveState === "saving") {
+    await flushSaveNow(sections[activeSection]?.content ?? "");
+  }
+
+  // Persist each item’s order (sequential to avoid racey reads)
+  for (let i = 0; i < newList.length; i++) {
+    await putSectionOrder(String(rid), newList[i].id, i + 1); // 1-based
+  }
+
+  // Optional but nice: confirm with server's canonical state
+  // await loadReport(String(rid));
+} catch (e) {
+  console.error("Reorder persist failed", e);
+  const rid = reportId ?? report?.id;
+  if (rid) await loadReport(String(rid)); // revert to server order on error
+}
+
+  },
+  [sections, reportId, report?.id, dirty, saveState, flushSaveNow, activeSection, loadReport]
+);
 
 
   //   {
@@ -846,55 +1032,36 @@ const commitEditingTitle = useCallback(async () => {
   )}
 </div>
 
-  <div className="space-y-1">
-  {sections.map((section, index) => (
-    <button
-      key={section.id}
-      onClick={async () => {
-        if (index === activeSection) return;
-        if (dirty || saveState === "saving") {
-        await flushSaveNow(sections[activeSection]?.content ?? "", { force: true });}
-        setActiveSection(index);
-      }}
-      disabled={saveState === "saving"} // optional: prevent switching during save
-      className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors ${
-        activeSection === index
-          ? "bg-blue-600 text-white"
-          : "hover:bg-gray-700 text-gray-300"
-      }`}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-  <span className="font-medium truncate">{section.title}</span>
-
-
-  {/* delete */}
-<button
-  type="button"
-  onClick={(e) => { e.stopPropagation(); handleDeleteSection(section.id); }}
-  disabled={deletingId === section.id}
-  className={`p-1 rounded hover:bg-gray-700 ${activeSection === index ? "text-white" : "text-gray-400"} disabled:opacity-50`}
-  title="Delete section"
-  aria-label="Delete section"
+ <DndContext
+  sensors={sensors}
+  collisionDetection={closestCenter}
+  modifiers={[restrictToVerticalAxis]}
+  onDragEnd={handleDragEnd}
 >
-  <Trash2 className="w-3.5 h-3.5" />
-</button>
+  <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+    <div className="space-y-1">
+      {sections.map((section, index) => (
+        <SortableSectionItem
+          key={section.id}
+          section={section}
+          index={index}
+          activeIndex={activeSection}
+          deletingId={deletingId}
+          saveState={saveState}
+          onSelect={async (idx) => {
+            if (idx === activeSection) return;
+            if (dirty || saveState === "saving") {
+              await flushSaveNow(sections[activeSection]?.content ?? "", { force: true });
+            }
+            setActiveSection(idx);
+          }}
+          onDelete={(id) => handleDeleteSection(id)}
+        />
+      ))}
+    </div>
+  </SortableContext>
+</DndContext>
 
-</div>
-
-
-      {/* keep your completion toggle */}
-      <div
-        className={`w-3 h-3 rounded-full border-2 ${
-          section.completed ? "bg-green-500 border-green-500" : "border-gray-400"
-        }`}
-        onClick={(e) => {
-          e.stopPropagation(); // don’t trigger section switch
-          toggleSectionCompletion(index);
-        }}
-      />
-    </button>
-  ))}
-</div>
 
 </div>
 
