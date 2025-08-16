@@ -1,4 +1,4 @@
-import {useEffect, useState } from "react";
+import {useEffect, useState, ReactNode } from "react";
 import {
   Bell,
   File,
@@ -53,27 +53,17 @@ import {
   SelectItem
 } from "../../components/ui/select";
 
-// Define file structure
-// interface FileItem {
-//   caseId: any;
-//   id: string;
-//   name: string;
-//   type: 'executable' | 'log' | 'image' | 'document' | 'memory_dump' | 'network_capture';
-//   size?: string;
-//   hash?: string;
-//   created?: string;
-//   description?: string;
-//   status: 'verified' | 'pending' | 'failed';
-//   chainOfCustody: string[];
-//   acquisitionDate: string;
-//   acquisitionTool: string;
-//   integrityCheck: 'passed' | 'failed' | 'pending';
-//   threadCount: number;
-//   priority: 'high' | 'medium' | 'low';
-// }
 
-
+// Helper to get user name from session storage if userId matches current user
+function getUserNameById(userId: string): string {
+  const storedUser = sessionStorage.getItem("user");
+  if (!storedUser) return "Unknown";
+  const user = JSON.parse(storedUser);
+  if (user.id === userId) return user.name || user.email || "Unknown";
+  return userId; // fallback to userId if not found
+}
 interface FileItem {
+  hash: ReactNode;
   id: string; // Corresponds to Go's `ID` (uuid.UUID)
   caseId: string; // Corresponds to Go's `CaseID` (uuid.UUID)
   uploaded_by: string; // Corresponds to Go's `UploadedBy` (uuid.UUID)
@@ -138,28 +128,6 @@ interface ThreadMessage {
 }
 
 
-
-// function buildNestedMessages(flatMessages: ThreadMessage[]): ThreadMessage[] {
-//   const map = new Map<string, ThreadMessage>();
-//   const roots: ThreadMessage[] = [];
-
-//   flatMessages.forEach(msg => {
-//     msg.replies = [];
-//     map.set(msg.id, msg);
-//   });
-
-//   flatMessages.forEach(msg => {
-//     if (msg.parentMessageID) {
-//       const parent = map.get(msg.parentMessageID);
-//       if (parent) parent.replies?.push(msg);
-//     } else {
-//       roots.push(msg);
-//     }
-//   });
-
-//   return roots;
-// }
-
 function buildNestedMessages(messages: ThreadMessage[]): ThreadMessage[] {
   const messageMap: { [id: string]: ThreadMessage & { replies: ThreadMessage[] } } = {};
   const topLevel: ThreadMessage[] = [];
@@ -191,131 +159,38 @@ export const EvidenceViewer  =() =>{
     .join("")
     .toUpperCase();
 
-  // Enhanced sample data
-  // const files: FileItem[] = [
-  //   {
-  //     id: '1',
-  //     name: 'system_memory.dmp',
-  //     type: 'memory_dump',
-  //     size: '8.2 GB',
-  //     hash: 'SHA256: a1b2c3d4e5f6789abc...',
-  //     created: '2024-03-15T14:30:00Z',
-  //     description: 'Memory dump of workstation WS-0234 captured using FTK Imager following detection of unauthorized PowerShell activity',
-  //     status: 'verified',
-  //     chainOfCustody: ['Agent.Smith', 'Forensic.Analyst.1', 'Lead.Investigator'],
-  //     acquisitionDate: '2024-03-15T14:30:00Z',
-  //     acquisitionTool: 'FTK Imager v4.7.1',
-  //     integrityCheck: 'passed',
-  //     threadCount: 3,
-  //     priority: 'high'
-  //   },
-  //   {
-  //     id: '2',
-  //     name: 'malware_sample.exe',
-  //     type: 'executable',
-  //     size: '1.8 MB',
-  //     hash: 'MD5: x1y2z3a4b5c6def...',
-  //     created: '2024-03-14T09:15:00Z',
-  //     description: 'Suspected malware executable recovered from infected system',
-  //     status: 'pending',
-  //     chainOfCustody: ['Field.Agent.2'],
-  //     acquisitionDate: '2024-03-14T09:15:00Z',
-  //     acquisitionTool: 'Manual Collection',
-  //     integrityCheck: 'pending',
-  //     threadCount: 1,
-  //     priority: 'high'
-  //   },
-  //   {
-  //     id: '3',
-  //     name: 'network_capture.pcap',
-  //     type: 'network_capture',
-  //     size: '245 MB',
-  //     hash: 'SHA1: abc123def456...',
-  //     created: '2024-03-13T16:45:00Z',
-  //     description: 'Network traffic capture during incident timeframe',
-  //     status: 'verified',
-  //     chainOfCustody: ['Network.Analyst', 'Forensic.Analyst.1'],
-  //     acquisitionDate: '2024-03-13T16:45:00Z',
-  //     acquisitionTool: 'Wireshark v4.0.3',
-  //     integrityCheck: 'passed',
-  //     threadCount: 2,
-  //     priority: 'medium'
-  //   }
-  // ];
 
-  
-
-  const initialAnnotationThreads: AnnotationThread[] = [
-    
-    {
-      id: '1',
-      title: 'Suspicious PowerShell activity detected',
-      user: 'Forensic.Analyst.1',
-      avatar: 'FA',
-      time: '2 hours ago',
-      messageCount: 5,
-      participantCount: 3,
-      isActive: true,
-      status: 'open',
-      priority: 'high',
-      tags: ['PowerShell', 'Malware', 'Initial Analysis'],
-      fileId: '1'
-    },
-    {
-      id: '2',
-      title: 'Memory strings analysis findings',
-      user: 'Senior.Analyst',
-      avatar: 'SA',
-      time: '4 hours ago',
-      messageCount: 8,
-      participantCount: 2,
-      status: 'pending_approval',
-      priority: 'medium',
-      tags: ['Memory Analysis', 'Strings', 'IOCs'],
-      fileId: '1'
-    },
-    {
-      id: '3',
-      title: 'Malware classification needed',
-      user: 'Malware.Specialist',
-      avatar: 'MS',
-      time: '6 hours ago',
-      messageCount: 3,
-      participantCount: 4,
-      status: 'open',
-      priority: 'high',
-      tags: ['Classification', 'Signature Analysis'],
-      fileId: '2'
-    }
-  ];
-
-    
 const { caseId } = useParams();
 
-  // const [allFiles] = useState<FileItem[]>(() => {
-  //   const stored = localStorage.getItem("evidenceFiles");
-  //   return stored ? JSON.parse(stored) : [];
-  // });
-
-  // const files = allFiles.filter(file => String(file.caseId) === String(caseId));
-
-
-  const [files, setFiles] = useState<FileItem[]>([]);
+const [files, setFiles] = useState<FileItem[]>([]);
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState<string | null>(null);
 const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
 
 useEffect(() => {
   async function loadEvidence() {
-     if (!caseId || caseId === "undefined") {
-      return; // Exit without setting error - this will show "No case, no load"
+    if (!caseId || caseId === "undefined") {
+      setFiles([]);
+      setLoading(false);
+      return;
     }
+    setLoading(true);
     try {
-      const data = await fetchEvidenceByCaseId(caseId);
-      console.log("fetched evidence:",data)
-      setFiles(data);
+      const evidenceFiles = await fetchEvidenceByCaseId(caseId);
+      // For each file, fetch its threads and set threadCount
+      const filesWithThreadCount = await Promise.all(
+        evidenceFiles.map(async (file: any) => {
+          const threads = await fetchThreadsByFile(file.id);
+          return {
+            ...file,
+            threadCount: Array.isArray(threads) ? threads.length : 0,
+          };
+        })
+      );
+      setFiles(filesWithThreadCount);
+      setError(null);
     } catch (err: any) {
-      setError(err.message || "Failed to load evidence");
+      setError(err.message || "Failed to load evidence files");
     } finally {
       setLoading(false);
     }
@@ -325,17 +200,11 @@ useEffect(() => {
 }, [caseId]);
 
 
-// useEffect(() => {
-//   const handleClickOutside = () => setShowReactionPicker(null);
-//   document.addEventListener('click', handleClickOutside);
-//   return () => document.removeEventListener('click', handleClickOutside);
-// }, []);
-
 useEffect(() => {
-  const handleClickOutside = (event) => {
+  const handleClickOutside = (event: MouseEvent) => {
     if (showReactionPicker !== null) {
       const reactionPicker = document.querySelector('[class*="absolute bottom-full"]');
-      if (reactionPicker && !reactionPicker.contains(event.target)) {
+      if (reactionPicker && !reactionPicker.contains(event.target as Node)) {
         setShowReactionPicker(null);
       }
     }
@@ -347,20 +216,8 @@ useEffect(() => {
   };
 }, [showReactionPicker]);
 
-//   const uniqueTypes = Array.from(
-//   new Set(files.map(file => file.type).filter(Boolean))
-// );
 
-
-
-
-// useEffect(() => {
-//   localStorage.setItem('annotationThreads', JSON.stringify(annotationThreads));
-// }, [annotationThreads]);
-
-const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>([]);
-
-
+  const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>([]);   
   const [newThreadTitle, setNewThreadTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(files[0]);
   const [selectedThread, setSelectedThread] = useState<AnnotationThread | null>(null);
@@ -379,21 +236,26 @@ useEffect(() => {
   const loadThreads = async () => {
     try {
       const threads = await fetchThreadsByFile(selectedFile.id);
-      const adapted = threads.map((t: any) => ({
-        ...t,
-        fileId: t.file_id, // 🔥 fix the naming for consistency
-        caseId: t.case_id,
-        createdBy: t.created_by,
-        tags: t.Tags || [],
-        participantCount: t.Participants?.length || 0,
-        messageCount: 0,
-        user: profile.name,
-        avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
-        time: new Date(t.created_at).toLocaleString(),
-      }));
-
-      console.log("Fetched threads for file:", adapted);
-      setAnnotationThreads(adapted);
+      // For each thread, fetch its messages and set messageCount
+      const threadsWithCounts = await Promise.all(
+        threads.map(async (t: any) => {
+          const rawMessages = await fetchThreadMessages(t.id);
+          const userName = getUserNameById(t.created_by);
+          return {
+            ...t,
+            fileId: t.file_id,
+            caseId: t.case_id,
+            createdBy: t.created_by,
+            tags: t.Tags || [],
+            participantCount: t.Participants?.length || 0,
+            messageCount: rawMessages.length, // <-- set actual count
+            user: userName,
+            avatar: userName.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
+            time: new Date(t.created_at).toLocaleString(),
+          };
+        })
+      );
+      setAnnotationThreads(threadsWithCounts);
     } catch (err) {
       console.error("Failed to load threads", err);
     }
@@ -407,21 +269,21 @@ function formatMessages(rawMessages: any[]): ThreadMessage[] {
   return rawMessages.map((m) => ({
     id: m.ID,
     threadID: m.ThreadID,
-    parentMessageID: m.ParentMessageID,
+    parentMessageID: m.ParentMessageID ?? m.parentMessageID ?? null, // ensure field is always present
     userID: m.UserID,
     message: m.Message,
     isApproved: m.IsApproved,
     approvedBy: m.ApprovedBy,
     approvedAt: m.ApprovedAt,
-    createdAt: m.CreatedAt,
-    updatedAt: m.UpdatedAt,
+    createdAt: m.CreatedAt ? new Date(m.CreatedAt).toLocaleString() : "",
+    updatedAt: m.UpdatedAt ? new Date(m.UpdatedAt).toLocaleString() : "",
     mentions: m.Mentions || [],
     reactions: (m.Reactions || []).map((r: any) => ({
       id: r.ID,
       messageID: r.MessageID,
       userID: r.UserID,
       reaction: r.Reaction,
-      createdAt: r.CreatedAt,
+      createdAt: r.CreatedAt ? new Date(r.CreatedAt).toLocaleString() : "",
     })),
     replies: [],
   }));
@@ -434,10 +296,11 @@ useEffect(() => {
 
   const loadMessages = async () => {
     try {
-      const rawMessages = await fetchThreadMessages(selectedThread.id); // from `api.ts`
-      console.log("Fetched messages for thread:", rawMessages);
-      const formattedMessages = formatMessages(rawMessages);
-      setThreadMessages(formattedMessages);
+    const rawMessages = await fetchThreadMessages(selectedThread.id); // from `api.ts`
+    console.log("Fetched messages for thread:", rawMessages);
+    const formattedMessages = formatMessages(rawMessages);
+    console.log("Formatted messages before nesting:", formattedMessages);
+    setThreadMessages(buildNestedMessages(formattedMessages));
     } catch (err) {
       console.error("Failed to load thread messages", err);
     }
@@ -446,66 +309,10 @@ useEffect(() => {
   loadMessages();
 }, [selectedThread]);
 
-
-
-//TO BE DELETED
-//   const [allThreadMessages, setAllThreadMessages] = useState<{ [threadId: string]: ThreadMessage[] }>(() => {
-//     const saved = localStorage.getItem('allThreadMessages');
-//     return saved ? JSON.parse(saved) : { '1': threadMessages };
-//   });
-
-// useEffect(() => {
-//   localStorage.setItem('allThreadMessages', JSON.stringify(allThreadMessages));
-// }, [allThreadMessages]);
-
-
-
-//   const handleSendMessage = () => {
-//   if (!newMessage.trim() || !selectedThread) return;
-
-//   interface NewMsg extends ThreadMessage {}
-
-//   const newMsg: NewMsg = {
-//     id: Date.now().toString(),
-//     user: profile.name,
-//     avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
-//     time: 'Just now',
-//     message: newMessage,
-//     isApproved: false,
-//     reactions: [],
-//     replies: []
-//   };
-
-//   setAllThreadMessages(prev => ({
-//     ...prev,
-//     [selectedThread.id]: [...(prev[selectedThread.id] || []), newMsg]
-//   }));
-//   setNewMessage('');
-// };
-
-//previous
-// const handleSendMessage = async () => {
-//   if (!newMessage.trim() || !selectedThread) return;
-
-//   try {
-//     await sendThreadMessage(selectedThread.id, {
-//       user_id: user.id, // replace with your actual user ID
-//       message: newMessage,
-//       parent_message_id: replyingToMessageId || null,
-//       mentions: [] 
-//     });
-
-//     // Refetch messages for the thread after posting
-//     const updatedMessages = await fetchThreadMessages(selectedThread.id);
-//     setThreadMessages(updatedMessages);
-//     setNewMessage('');
-//     setReplyingToMessageId(null);
-//   } catch (err) {
-//     console.error("Failed to send message:", err);
-//   }
-// };
-
-
+function formatFileSize(bytes: number): string {
+  if (bytes === undefined || bytes === null) return "0 MB";
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
 const handleSendMessage = async (overrideText?: string) => {
   const text = overrideText ?? newMessage;
   if (!text.trim() || !selectedThread) return;
@@ -537,6 +344,15 @@ const handleSendMessage = async (overrideText?: string) => {
     const updatedMessages = await fetchThreadMessages(selectedThread.id);
     const formatted = formatMessages(updatedMessages);
     setThreadMessages(buildNestedMessages(formatted));
+
+    // Update messageCount in annotationThreads
+    setAnnotationThreads(prev =>
+      prev.map(thread =>
+        thread.id === selectedThread.id
+          ? { ...thread, messageCount: formatted.length }
+          : thread
+      )
+    );
 
     setNewMessage('');
     setReplyText('');
@@ -612,22 +428,27 @@ const handleSendMessage = async (overrideText?: string) => {
   //   selectedFile ? thread.fileId === selectedFile.id : true
   // );
 
-const filteredThreads = annotationThreads;
-
-
-
-
-
-
+  const filteredThreads = annotationThreads;
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [timeFilter, setTimeFilter] = useState<'recent' | 'oldest' | null>(null);
 
   let filteredFiles = [...files];
 
-  if (typeFilter) {
+  // Filter by type
+  if (typeFilter && typeFilter !== "all") {
     filteredFiles = filteredFiles.filter(file => file.file_type === typeFilter);
   }
 
+  // Filter by search term
+  if (searchTerm && searchTerm.trim() !== "") {
+    const term = searchTerm.trim().toLowerCase();
+    filteredFiles = filteredFiles.filter(file =>
+      file.filename.toLowerCase().includes(term) ||
+      (file.description && file.description.toLowerCase().includes(term))
+    );
+  }
+
+  // Sort by time
   if (timeFilter === 'recent') {
     filteredFiles.sort((a, b) => new Date(b.uploaded_at || '').getTime() - new Date(a.uploaded_at || '').getTime());
   } else if (timeFilter === 'oldest') {
@@ -655,11 +476,15 @@ const filteredThreads = annotationThreads;
 // Add these helper functions inside the EvidenceViewer component (after existing functions)
 const handleAddReaction = async (messageId: string, emoji: string) => {
   try {
-    await addReaction(messageId, user.id, emoji);
-    // Refresh messages after adding reaction
-    const updatedMessages = await fetchThreadMessages(selectedThread!.id);
-    const formatted = formatMessages(updatedMessages);
-    setThreadMessages(buildNestedMessages(formatted));
+    // Call the backend and get the updated message with reactions
+    const updatedMessage = await addReaction(messageId, user.id, emoji);
+
+    // Update the threadMessages state: replace the old message with updatedMessage
+    if (!selectedThread) return;
+    const updatedMessages = await fetchThreadMessages(selectedThread.id);
+    const formattedMessages = formatMessages(updatedMessages);
+    setThreadMessages(buildNestedMessages(formattedMessages));
+
     setShowReactionPicker(null); // Close reaction picker
   } catch (err) {
     console.error("Failed to add reaction:", err);
@@ -840,7 +665,7 @@ if (!caseId || caseId === "undefined") {
           </div>
         </div>
       </aside>
-      
+
       <main className="ml-64 flex-grow bg-background flex">
         {/* Header */}
         <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border-border p-4">
@@ -1081,6 +906,7 @@ if (!caseId || caseId === "undefined") {
                   <SelectValue placeholder="Filter by type" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 text-popover-foreground text-sm">
+                  <SelectItem value="all">All files</SelectItem>
                   <SelectItem value="memory_dump">Memory Dump</SelectItem>
                   <SelectItem value="executable">Executable</SelectItem>
                   <SelectItem value="network_capture">Network Capture</SelectItem>
@@ -1106,7 +932,7 @@ if (!caseId || caseId === "undefined") {
 
             {/* File List */}
             <div className="space-y-2">
-              {files.map((file) => (
+              {filteredFiles.map((file) => (
                 <button
                   key={file.id}
                   onClick={() => setSelectedFile(file)}
@@ -1130,7 +956,7 @@ if (!caseId || caseId === "undefined") {
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{file.file_size}</span>
+                        <span>{formatFileSize(file.file_size)}</span>
                         <div className="flex items-center gap-1">
                           <MessageCircle className="w-3 h-3" />
                           <span>{file.threadCount}</span>
@@ -1250,14 +1076,14 @@ if (!caseId || caseId === "undefined") {
                           Chain of Custody
                         </h3>
                         <div className="space-y-3">
-                          {selectedFile.chainOfCustody.map((person, index) => (
+                          {Array.isArray(selectedFile.chainOfCustody) && selectedFile.chainOfCustody.map((person, index) => (
                             <div key={index} className="flex items-center gap-3">
                               <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                               <div className="flex-1">
                                 <div className="text-sm font-medium">{person}</div>
                                 <div className="text-xs text-muted-foreground">
                                   {index === 0 ? 'Original Collector' : 
-                                   index === selectedFile.chainOfCustody.length - 1 ? 'Current Custodian' : 'Transferred'}
+                                   (selectedFile.chainOfCustody && index === selectedFile.chainOfCustody.length - 1) ? 'Current Custodian' : 'Transferred'}
                                 </div>
                               </div>
                               <CheckCircle className="w-4 h-4 text-green-400" />
@@ -1477,7 +1303,7 @@ if (!caseId || caseId === "undefined") {
                             </div>
                             <div>
                               <span className="text-muted-foreground">Modified:</span>
-                              <p className="text-muted-foreground">{new Date(selectedFile.acquisitionDate).toLocaleString()}</p>
+                              <p className="text-muted-foreground">{selectedFile.acquisitionDate ? new Date(selectedFile.acquisitionDate).toLocaleString() : "N/A"}</p>
                             </div>
                           </div>
                         </div>
@@ -1507,7 +1333,7 @@ if (!caseId || caseId === "undefined") {
                           
                           <div>
                             <span className="text-muted-foreground">Examiner:</span>
-                            <p className="text-muted-foreground">{selectedFile.chainOfCustody[0]}</p>
+                            <p className="text-muted-foreground">{Array.isArray(selectedFile.chainOfCustody) && selectedFile.chainOfCustody.length > 0 ? selectedFile.chainOfCustody[0] : "N/A"}</p>
                           </div>
                           
                           <div>

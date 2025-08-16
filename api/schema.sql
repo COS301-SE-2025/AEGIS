@@ -279,6 +279,7 @@ CREATE TABLE threads (
     title TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
+    case_id uuid NOT NULL,
 );
 
 ALTER TABLE thread_messages

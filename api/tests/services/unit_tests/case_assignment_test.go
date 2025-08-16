@@ -17,9 +17,18 @@ import (
 type MockCaseAssignmentRepo struct {
 	mock.Mock
 }
+type MockUserRepository struct {
+	mock.Mock
+}
 
-func (m *MockCaseAssignmentRepo) AssignRole(userID, caseID uuid.UUID, role string) error {
-	args := m.Called(userID, caseID, role)
+// Implement GetUserByID to satisfy case_assign.UserRepo interface
+func (m *MockUserRepository) GetUserByID(userID uuid.UUID) (interface{}, error) {
+	args := m.Called(userID)
+	return args.Get(0), args.Error(1)
+}
+
+func (m *MockCaseAssignmentRepo) AssignRole(userID, caseID uuid.UUID, role string, assignedBy uuid.UUID) error {
+	args := m.Called(userID, caseID, role, assignedBy)
 	return args.Error(0)
 }
 
@@ -47,7 +56,8 @@ func TestUnassignUserFromCase_Authorized(t *testing.T) {
 
 	repo := new(MockCaseAssignmentRepo)
 	admin := new(MockAdminChecker)
-	svc := case_assign.NewCaseAssignmentService(repo, admin)
+	userRepo := new(MockUserRepository)
+	svc := case_assign.NewCaseAssignmentService(repo, admin, userRepo)
 
 	assigneeID := uuid.New()
 	caseID := uuid.New()
@@ -70,7 +80,8 @@ func TestUnassignUserFromCase_Forbidden(t *testing.T) {
 
 	repo := new(MockCaseAssignmentRepo)
 	admin := new(MockAdminChecker)
-	svc := case_assign.NewCaseAssignmentService(repo, admin)
+	userRepo := new(MockUserRepository)
+	svc := case_assign.NewCaseAssignmentService(repo, admin, userRepo)
 
 	assigneeID := uuid.New()
 	caseID := uuid.New()

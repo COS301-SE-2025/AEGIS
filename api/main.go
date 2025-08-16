@@ -219,7 +219,8 @@ func main() {
 	// User Profile Service
 	profileRepo := profile.NewGormProfileRepository(db.DB)
 	profileService := profile.NewProfileService(profileRepo)
-	profileHandler := handlers.NewProfileHandler(profileService, auditLogger)
+	profileIPFSClient := upload.NewIPFSClient("")
+	profileHandler := handlers.NewProfileHandler(profileService, auditLogger, profileIPFSClient)
 
 	// ─── Evidence Tagging ─────────────────────────────
 	evidenceTagRepo := evidence_tag.NewEvidenceTagRepository(db.DB)
