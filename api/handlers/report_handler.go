@@ -25,36 +25,51 @@ func NewReportHandler(s report.ReportService) *ReportHandler {
 }
 
 // GenerateReport creates a new report for a case.
+// handlers/report.go
 func (h *ReportHandler) GenerateReport(c *gin.Context) {
-	caseIDStr := c.Param("caseID")
-	caseID, err := uuid.Parse(caseIDStr)
+	caseID, err := uuid.Parse(c.Param("caseID"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid case ID"})
+		writeError(c, http.StatusBadRequest, "invalid_case_id", "invalid case ID")
 		return
 	}
 
-	userID, exists := c.Get("userID")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authorized"})
+	userID, ok := c.Get("userID")
+	if !ok {
+		writeError(c, http.StatusUnauthorized, "unauthorized", "user not authorized")
 		return
 	}
-
-	examinerUUID, err := uuid.Parse(userID.(string))
+	examinerID, err := uuid.Parse(userID.(string))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID format"})
+		writeError(c, http.StatusInternalServerError, "invalid_user_id", "invalid user ID format")
 		return
 	}
 
-	report, err := h.ReportService.GenerateReport(c.Request.Context(), caseID, examinerUUID)
+	tenantIDStr := c.GetString("tenantID")
+	if tenantIDStr == "" {
+		writeError(c, http.StatusUnauthorized, "tenant_missing", "tenant not found")
+		return
+	}
+	tenantID, err := uuid.Parse(tenantIDStr)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate report"})
+		writeError(c, http.StatusBadRequest, "invalid_tenant_id", "invalid tenant id")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"reportID": report.ID,
-		"status":   "Report generated successfully",
-	})
+	var teamID uuid.UUID
+	if s := c.GetString("teamID"); s != "" {
+		if teamID, err = uuid.Parse(s); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid_team_id", "invalid team id")
+			return
+		}
+	}
+
+	rep, err := h.ReportService.GenerateReport(c.Request.Context(), caseID, examinerID, tenantID, teamID)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "generate_failed", "failed to generate report")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"reportID": rep.ID, "status": "Report generated successfully"})
 }
 
 // GetReportByID retrieves a report with metadata and content.
@@ -62,17 +77,18 @@ func (h *ReportHandler) GetReportByID(c *gin.Context) {
 	reportIDStr := c.Param("reportID")
 	reportID, err := uuid.Parse(reportIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
+		writeError(c, http.StatusBadRequest, "invalid_report_id", "invalid report ID")
 		return
 	}
 
-	report, err := h.ReportService.DownloadReport(c.Request.Context(), reportID)
+	rep, err := h.ReportService.DownloadReport(c.Request.Context(), reportID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
+		logWithCtx("info", "report not found", c, map[string]any{"reportID": reportIDStr, "err": err.Error()})
+		writeError(c, http.StatusNotFound, "report_not_found", "report not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, report)
+	c.JSON(http.StatusOK, rep)
 }
 
 // Error writer with a stable shape
@@ -110,18 +126,18 @@ func (h *ReportHandler) UpdateSectionContent(c *gin.Context) {
 	var req struct {
 		Content string `json:"content"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Content) == "" {
+	// ✅ allow empty content (users may clear a section)
+	if err := c.ShouldBindJSON(&req); err != nil {
 		logWithCtx("warn", "invalid body", c, map[string]any{
 			"reportID":  reportUUID.String(),
 			"sectionID": sectionID.Hex(),
 			"err":       err,
 		})
-		writeError(c, http.StatusBadRequest, "invalid_body", "content is required")
+		writeError(c, http.StatusBadRequest, "invalid_body", "invalid request body")
 		return
 	}
 
 	if err := h.ReportService.UpdateCustomSectionContent(c.Request.Context(), reportUUID, sectionID, req.Content); err != nil {
-		// Prefer sentinel errors from your service/repo (see note below).
 		switch {
 		case errors.Is(err, report.ErrReportNotFound), errors.Is(err, report.ErrMongoReportNotFound):
 			logWithCtx("info", "report not found", c, map[string]any{"reportID": reportUUID.String(), "sectionID": sectionID.Hex(), "err": err.Error()})
@@ -132,7 +148,6 @@ func (h *ReportHandler) UpdateSectionContent(c *gin.Context) {
 			writeError(c, http.StatusNotFound, "section_not_found", "section not found")
 			return
 		default:
-			// Fallback if you haven't added sentinel errors yet:
 			low := strings.ToLower(err.Error())
 			if strings.Contains(low, "not found") {
 				logWithCtx("info", "resource not found", c, map[string]any{"reportID": reportUUID.String(), "sectionID": sectionID.Hex(), "err": err.Error()})
@@ -149,6 +164,7 @@ func (h *ReportHandler) UpdateSectionContent(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// -----------------
 // DownloadReportPDF returns the report as PDF.
 func (h *ReportHandler) DownloadReportPDF(c *gin.Context) {
 	reportIDStr := c.Param("reportID")
@@ -169,21 +185,25 @@ func (h *ReportHandler) DownloadReportPDF(c *gin.Context) {
 }
 
 // DownloadReportJSON returns the report as JSON.
+// DownloadReportJSON returns the report as JSON.
 func (h *ReportHandler) DownloadReportJSON(c *gin.Context) {
 	reportIDStr := c.Param("reportID")
 	reportID, err := uuid.Parse(reportIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
+		writeError(c, http.StatusBadRequest, "invalid_report_id", "invalid report ID")
 		return
 	}
 
 	jsonBytes, err := h.ReportService.DownloadReportAsJSON(c.Request.Context(), reportID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate JSON"})
+		logWithCtx("error", "download json failed", c, map[string]any{"reportID": reportIDStr, "err": err.Error()})
+		writeError(c, http.StatusInternalServerError, "generate_json_failed", "failed to generate JSON")
 		return
 	}
 
+	c.Header("Content-Type", "application/json")
 	c.Header("Content-Disposition", "attachment; filename=report_"+reportIDStr+".json")
+	c.Header("Cache-Control", "no-store")
 	c.Data(http.StatusOK, "application/json", jsonBytes)
 }
 
@@ -192,41 +212,68 @@ func (h *ReportHandler) DeleteReport(c *gin.Context) {
 	reportIDStr := c.Param("reportID")
 	reportID, err := uuid.Parse(reportIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
+		writeError(c, http.StatusBadRequest, "invalid_report_id", "invalid report ID")
 		return
 	}
 
 	if err := h.ReportService.DeleteReportByID(c.Request.Context(), reportID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete report"})
+		// map known errors if you expose them from the repo/service
+		if errors.Is(err, report.ErrReportNotFound) {
+			writeError(c, http.StatusNotFound, "report_not_found", "report not found")
+			return
+		}
+		logWithCtx("error", "delete report failed", c, map[string]any{"reportID": reportIDStr, "err": err.Error()})
+		writeError(c, http.StatusInternalServerError, "delete_failed", "failed to delete report")
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "report deleted"})
 }
 
-// AddSection handles adding a new custom section to a report
+// AddSection handles adding a new custom section to a report.
 func (h *ReportHandler) AddSection(c *gin.Context) {
 	reportIDStr := c.Param("reportID")
 	reportUUID, err := uuid.Parse(reportIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
+		writeError(c, http.StatusBadRequest, "invalid_report_id", "invalid report ID")
 		return
 	}
 
 	var req struct {
 		Title   string `json:"title"`
 		Content string `json:"content"`
-		Order   int    `json:"order"`
+		Order   int    `json:"order"` // 1-based; service can clamp/append if <=0
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		writeError(c, http.StatusBadRequest, "invalid_body", "invalid request body")
+		return
+	}
+	req.Title = strings.TrimSpace(req.Title)
+	if req.Title == "" {
+		writeError(c, http.StatusBadRequest, "invalid_title", "title is required")
+		return
+	}
+	// Optional title length guardrail
+	if len(req.Title) > 200 {
+		writeError(c, http.StatusBadRequest, "invalid_title", "title is too long")
 		return
 	}
 
-	err = h.ReportService.AddCustomSection(c.Request.Context(), reportUUID, req.Title, req.Content, req.Order)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add section"})
+	if err := h.ReportService.AddCustomSection(c.Request.Context(), reportUUID, req.Title, req.Content, req.Order); err != nil {
+		switch {
+		case errors.Is(err, report.ErrReportNotFound), errors.Is(err, report.ErrMongoReportNotFound):
+			writeError(c, http.StatusNotFound, "report_not_found", "report not found")
+		case errors.Is(err, report.ErrInvalidInput):
+			writeError(c, http.StatusBadRequest, "invalid_input", "invalid input")
+		default:
+			logWithCtx("error", "add section failed", c, map[string]any{
+				"reportID": reportUUID.String(),
+				"title":    req.Title,
+				"order":    req.Order,
+				"err":      err.Error(),
+			})
+			writeError(c, http.StatusInternalServerError, "add_section_failed", "failed to add section")
+		}
 		return
 	}
 
@@ -275,71 +322,104 @@ func (h *ReportHandler) GetReportsByCaseID(c *gin.Context) {
 	c.JSON(http.StatusOK, reports)
 }
 
-// UpdateSectionTitle updates the title of a specific section
 func (h *ReportHandler) UpdateSectionTitle(c *gin.Context) {
-	// Parse report UUID
+	// IDs
 	reportIDStr := c.Param("reportID")
 	reportUUID, err := uuid.Parse(reportIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
+		writeError(c, http.StatusBadRequest, "invalid_report_id", "invalid report ID")
 		return
 	}
-
-	// Parse section ID (Mongo ObjectID)
 	sectionIDStr := c.Param("sectionID")
 	sectionID, err := primitive.ObjectIDFromHex(sectionIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid section ID"})
+		writeError(c, http.StatusBadRequest, "invalid_section_id", "invalid section ID")
 		return
 	}
 
-	// Bind request body
+	// Body
 	var req struct {
 		Title string `json:"title"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		writeError(c, http.StatusBadRequest, "invalid_body", "invalid request body")
+		return
+	}
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		writeError(c, http.StatusBadRequest, "invalid_title", "title is required")
+		return
+	}
+	if len(title) > 200 { // guardrails; adjust if you want
+		writeError(c, http.StatusBadRequest, "invalid_title", "title is too long")
 		return
 	}
 
-	// Call service method
-	err = h.ReportService.UpdateSectionTitle(c.Request.Context(), reportUUID, sectionID, req.Title)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update section title"})
+	// Service
+	if err := h.ReportService.UpdateSectionTitle(c.Request.Context(), reportUUID, sectionID, title); err != nil {
+		switch {
+		case errors.Is(err, report.ErrReportNotFound), errors.Is(err, report.ErrMongoReportNotFound):
+			writeError(c, http.StatusNotFound, "report_not_found", "report not found")
+		case errors.Is(err, report.ErrSectionNotFound):
+			writeError(c, http.StatusNotFound, "section_not_found", "section not found")
+		case errors.Is(err, report.ErrInvalidInput):
+			writeError(c, http.StatusBadRequest, "invalid_input", "invalid input")
+		default:
+			writeError(c, http.StatusInternalServerError, "update_failed", "failed to update section title")
+		}
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "section title updated successfully"})
 }
 
-// ReorderSection updates the order of a section
 func (h *ReportHandler) ReorderSection(c *gin.Context) {
+	// IDs
 	reportIDStr := c.Param("reportID")
 	reportUUID, err := uuid.Parse(reportIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
+		writeError(c, http.StatusBadRequest, "invalid_report_id", "invalid report ID")
 		return
 	}
-
 	sectionIDStr := c.Param("sectionID")
 	sectionID, err := primitive.ObjectIDFromHex(sectionIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid section ID"})
+		writeError(c, http.StatusBadRequest, "invalid_section_id", "invalid section ID")
 		return
 	}
 
+	// Body
 	var req struct {
 		NewOrder int `json:"order"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		writeError(c, http.StatusBadRequest, "invalid_body", "invalid request body")
+		return
+	}
+	if req.NewOrder < 1 {
+		writeError(c, http.StatusBadRequest, "invalid_order", "order must be >= 1")
 		return
 	}
 
-	err = h.ReportService.ReorderSection(c.Request.Context(), reportUUID, sectionID, req.NewOrder)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reorder section"})
+	// Service (rename here if your service method is ReorderCustomSection)
+	if err := h.ReportService.ReorderSection(c.Request.Context(), reportUUID, sectionID, req.NewOrder); err != nil {
+		switch {
+		case errors.Is(err, report.ErrReportNotFound), errors.Is(err, report.ErrMongoReportNotFound):
+			writeError(c, http.StatusNotFound, "report_not_found", "report not found")
+		case errors.Is(err, report.ErrSectionNotFound):
+			writeError(c, http.StatusNotFound, "section_not_found", "section not found")
+		case errors.Is(err, report.ErrInvalidInput):
+			writeError(c, http.StatusBadRequest, "invalid_input", "invalid input")
+		default:
+			// Optional: if you implement optimistic concurrency and return a "conflict" error,
+			// map it to 409 here.
+			low := strings.ToLower(err.Error())
+			if strings.Contains(low, "conflict") {
+				writeError(c, http.StatusConflict, "conflict", "the section was modified by someone else")
+				return
+			}
+			writeError(c, http.StatusInternalServerError, "reorder_failed", "failed to reorder section")
+		}
 		return
 	}
 
@@ -387,12 +467,36 @@ func (h *ReportHandler) GetRecentReports(c *gin.Context) {
 		status = &statusStr
 	}
 
+	// NEW: tenant & team from auth middleware (strings)
+	tidStr := c.GetString("tenantID")
+	if tidStr == "" {
+		writeError(c, http.StatusUnauthorized, "tenant_missing", "tenant not found")
+		return
+	}
+	tenantID, err := uuid.Parse(tidStr)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, "invalid_tenant_id", "invalid tenant id")
+		return
+	}
+
+	var teamIDPtr *uuid.UUID
+	if teamStr := c.GetString("teamID"); teamStr != "" {
+		if t, err := uuid.Parse(teamStr); err == nil {
+			teamIDPtr = &t
+		} else {
+			writeError(c, http.StatusBadRequest, "invalid_team_id", "invalid team id")
+			return
+		}
+	}
+
 	opts := report.RecentReportsOptions{
 		Limit:      limit,
 		MineOnly:   mine,
 		ExaminerID: examinerID,
 		CaseID:     caseID,
 		Status:     status,
+		TenantID:   tenantID, // ← NEW
+		TeamID:     teamIDPtr,
 	}
 
 	items, err := h.ReportService.ListRecentReports(c.Request.Context(), opts)

@@ -15,17 +15,18 @@ import (
 
 type ReportMongoRepository interface {
 	SaveReportContent(ctx context.Context, content *ReportContentMongo) error
-	GetReportContent(ctx context.Context, reportID primitive.ObjectID) (*ReportContentMongo, error)
-	UpdateSection(ctx context.Context, reportID, sectionID primitive.ObjectID, newContent string) error
-	AddSection(ctx context.Context, reportID primitive.ObjectID, section ReportSection) error
-	DeleteSection(ctx context.Context, reportID, sectionID primitive.ObjectID) error
-	UpdateSections(ctx context.Context, reportID primitive.ObjectID, sections []ReportSection) error // for reorder
-	FindByReportUUID(ctx context.Context, reportUUID uuid.UUID) (*ReportContentMongo, error)         // for mapping
-	UpdateSectionTitle(ctx context.Context, reportID, sectionID primitive.ObjectID, newTitle string) error
-	ReorderSection(ctx context.Context, reportID, sectionID primitive.ObjectID, newOrder int) error
+	GetReportContent(ctx context.Context, reportID primitive.ObjectID, tenantID, teamID string) (*ReportContentMongo, error)
+	UpdateSection(ctx context.Context, reportID, sectionID primitive.ObjectID, newContent, tenantID, teamID string) error
+	AddSection(ctx context.Context, reportID primitive.ObjectID, section ReportSection, tenantID, teamID string) error
+
+	DeleteSection(ctx context.Context, reportID, sectionID primitive.ObjectID, tenantID, teamID string) error
+	UpdateSections(ctx context.Context, reportID primitive.ObjectID, sections []ReportSection, tenantID, teamID string) error // for reorder
+	FindByReportUUID(ctx context.Context, reportUUID uuid.UUID) (*ReportContentMongo, error)                                  // for mapping
+	UpdateSectionTitle(ctx context.Context, reportID, sectionID primitive.ObjectID, newTitle string, tenantID, teamID string) error
+	ReorderSection(ctx context.Context, reportID, sectionID primitive.ObjectID, newOrder int, tenantID, teamID string) error
 	BulkUpdateSections(ctx context.Context, reportID primitive.ObjectID, sections []ReportSection) error
 	// NEW: for a batch of reports, return max(sections.updated_at) per report_id (string UUID)
-	LatestUpdateByReportIDs(ctx context.Context, reportIDs []string) (map[string]time.Time, error)
+	LatestUpdateByReportIDs(ctx context.Context, reportIDs []string, tenantID, teamID string) (map[string]time.Time, error)
 }
 type ReportMongoRepoImpl struct {
 	collection *mongo.Collection
@@ -36,6 +37,71 @@ func NewReportMongoRepo(coll *mongo.Collection) ReportMongoRepository {
 	return &ReportMongoRepoImpl{
 		collection: coll,
 	}
+}
+func (r *ReportMongoRepoImpl) ReorderSection(
+	ctx context.Context,
+	reportID, sectionID primitive.ObjectID,
+	newOrder int,
+	tenantID, teamID string,
+) error {
+	// Load scoped doc
+	filter := bson.M{"_id": reportID}
+	if tenantID != "" {
+		filter["tenant_id"] = tenantID
+	}
+	if teamID != "" {
+		filter["team_id"] = teamID
+	}
+
+	var doc ReportContentMongo
+	if err := r.collection.FindOne(ctx, filter).Decode(&doc); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return ErrMongoReportNotFound
+		}
+		return err
+	}
+	if len(doc.Sections) == 0 {
+		return ErrSectionNotFound
+	}
+
+	// Find source index
+	from := -1
+	for i, s := range doc.Sections {
+		if s.ID == sectionID {
+			from = i
+			break
+		}
+	}
+	if from == -1 {
+		return ErrSectionNotFound
+	}
+
+	// Clamp target (1-based -> 0-based)
+	n := len(doc.Sections)
+	if newOrder < 1 {
+		newOrder = 1
+	}
+	if newOrder > n {
+		newOrder = n
+	}
+	to := newOrder - 1
+	if from == to {
+		return nil
+	}
+
+	// Move item and renumber 1..N
+	moved := doc.Sections[from]
+	secs := append(append([]ReportSection{}, doc.Sections[:from]...), doc.Sections[from+1:]...)
+	if to > len(secs) {
+		to = len(secs)
+	}
+	secs = append(secs[:to], append([]ReportSection{moved}, secs[to:]...)...)
+	for i := range secs {
+		secs[i].Order = i + 1
+	}
+
+	// Persist — NOTE: POSitional args (Go has no named args)
+	return r.UpdateSections(ctx, reportID, secs, tenantID, teamID)
 }
 
 // SaveReportContent saves a new report content document in Mongo
@@ -52,10 +118,27 @@ func (r *ReportMongoRepoImpl) SaveReportContent(ctx context.Context, content *Re
 	return err
 }
 
+func ttFilter(tenantID, teamID string) bson.M {
+	f := bson.M{}
+	if tenantID != "" {
+		f["tenant_id"] = tenantID
+	}
+	if teamID != "" {
+		f["team_id"] = teamID
+	}
+	return f
+}
+
 // GetReportContent fetches the content by Mongo report ID
-func (r *ReportMongoRepoImpl) GetReportContent(ctx context.Context, mongoID primitive.ObjectID) (*ReportContentMongo, error) {
+// GetReportContent
+func (r *ReportMongoRepoImpl) GetReportContent(ctx context.Context, mongoID primitive.ObjectID, tenantID, teamID string) (*ReportContentMongo, error) {
+	filter := bson.M{"_id": mongoID}
+	for k, v := range ttFilter(tenantID, teamID) {
+		filter[k] = v
+	}
+
 	var reportContent ReportContentMongo
-	err := r.collection.FindOne(ctx, bson.M{"_id": mongoID}).Decode(&reportContent)
+	err := r.collection.FindOne(ctx, filter).Decode(&reportContent)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
@@ -65,28 +148,30 @@ func (r *ReportMongoRepoImpl) GetReportContent(ctx context.Context, mongoID prim
 	return &reportContent, nil
 }
 
-// UpdateSection updates the content of a subsection
-func (r *ReportMongoRepoImpl) UpdateSection(ctx context.Context, reportID, sectionID primitive.ObjectID, newContent string) error {
-	filter := bson.M{"_id": reportID, "sections._id": sectionID} // <-- _id, not report_id
-	update := bson.M{
-		"$set": bson.M{
-			"sections.$.content":    newContent,
-			"sections.$.updated_at": time.Now(),
-			"updated_at":            time.Now(),
-		},
+// UpdateSection
+func (r *ReportMongoRepoImpl) UpdateSection(ctx context.Context, reportID, sectionID primitive.ObjectID, newContent string, tenantID, teamID string) error {
+	filter := bson.M{"_id": reportID, "sections._id": sectionID}
+	for k, v := range ttFilter(tenantID, teamID) {
+		filter[k] = v
 	}
-	result, err := r.collection.UpdateOne(ctx, filter, update)
+
+	update := bson.M{"$set": bson.M{
+		"sections.$.content":    newContent,
+		"sections.$.updated_at": time.Now(),
+		"updated_at":            time.Now(),
+	}}
+	res, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
-	if result.MatchedCount == 0 {
+	if res.MatchedCount == 0 {
 		return errors.New("section not found")
 	}
 	return nil
 }
 
-// AddSection appends a new subsection
-func (r *ReportMongoRepoImpl) AddSection(ctx context.Context, reportID primitive.ObjectID, section ReportSection) error {
+// AddSection
+func (r *ReportMongoRepoImpl) AddSection(ctx context.Context, reportID primitive.ObjectID, section ReportSection, tenantID, teamID string) error {
 	if section.ID.IsZero() {
 		section.ID = primitive.NewObjectID()
 	}
@@ -95,11 +180,12 @@ func (r *ReportMongoRepoImpl) AddSection(ctx context.Context, reportID primitive
 	}
 	section.UpdatedAt = time.Now()
 
-	filter := bson.M{"_id": reportID} // <-- _id
-	update := bson.M{
-		"$push": bson.M{"sections": section},
-		"$set":  bson.M{"updated_at": time.Now()},
+	filter := bson.M{"_id": reportID}
+	for k, v := range ttFilter(tenantID, teamID) {
+		filter[k] = v
 	}
+
+	update := bson.M{"$push": bson.M{"sections": section}, "$set": bson.M{"updated_at": time.Now()}}
 	res, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
@@ -111,30 +197,47 @@ func (r *ReportMongoRepoImpl) AddSection(ctx context.Context, reportID primitive
 }
 
 // DeleteSection removes a subsection
-func (r *ReportMongoRepoImpl) DeleteSection(ctx context.Context, reportID, sectionID primitive.ObjectID) error {
-	filter := bson.M{"_id": reportID}
+func (r *ReportMongoRepoImpl) DeleteSection(
+	ctx context.Context,
+	reportID, sectionID primitive.ObjectID,
+	tenantID, teamID string, // NEW
+) error {
+	filter := bson.M{
+		"_id":          reportID,
+		"sections._id": sectionID,
+	}
+	if tenantID != "" {
+		filter["tenant_id"] = tenantID
+	}
+	if teamID != "" {
+		filter["team_id"] = teamID
+	}
+
 	update := bson.M{
 		"$pull": bson.M{"sections": bson.M{"_id": sectionID}},
 		"$set":  bson.M{"updated_at": time.Now()},
 	}
-	result, err := r.collection.UpdateOne(ctx, filter, update)
+	res, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
-	if result.MatchedCount == 0 {
-		return errors.New("report not found")
+	if res.MatchedCount == 0 {
+		return ErrSectionNotFound // use your sentinel error
 	}
 	return nil
 }
 
-func (s *ReportServiceImpl) AddCustomSection(ctx context.Context, reportUUID uuid.UUID, title, content string, order int) error {
-	// 1. Map reportUUID → Mongo ObjectID
-	mongoID, err := s.getMongoID(ctx, reportUUID)
+func (s *ReportServiceImpl) AddCustomSection(
+	ctx context.Context,
+	reportUUID uuid.UUID,
+	title, content string,
+	order int,
+) error {
+	mongoID, tenantID, teamID, err := s.getMongoID(ctx, reportUUID)
 	if err != nil {
 		return err
 	}
 
-	// 2. Create section
 	section := ReportSection{
 		ID:        primitive.NewObjectID(),
 		Title:     title,
@@ -143,36 +246,37 @@ func (s *ReportServiceImpl) AddCustomSection(ctx context.Context, reportUUID uui
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-
-	// 3. Call Mongo repo
-	return s.mongoRepo.AddSection(ctx, mongoID, section)
+	return s.mongoRepo.AddSection(ctx, mongoID, section, tenantID, teamID)
 }
 
-func (s *ReportServiceImpl) DeleteCustomSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID) error {
-	mongoID, err := s.getMongoID(ctx, reportUUID)
+func (s *ReportServiceImpl) DeleteCustomSection(
+	ctx context.Context,
+	reportUUID uuid.UUID,
+	sectionID primitive.ObjectID,
+) error {
+	mongoID, tenantID, teamID, err := s.getMongoID(ctx, reportUUID)
 	if err != nil {
 		return err
 	}
-	return s.mongoRepo.DeleteSection(ctx, mongoID, sectionID)
+	return s.mongoRepo.DeleteSection(ctx, mongoID, sectionID, tenantID, teamID)
 }
 
-func (s *ReportServiceImpl) getMongoID(ctx context.Context, reportUUID uuid.UUID) (primitive.ObjectID, error) {
-	// Fetch the Postgres report metadata first
-	_, err := s.repo.GetByID(ctx, reportUUID)
+func (s *ReportServiceImpl) getMongoID(
+	ctx context.Context,
+	reportUUID uuid.UUID,
+) (oid primitive.ObjectID, tenant string, team string, err error) {
+	meta, err := s.repo.GetByID(ctx, reportUUID)
 	if err != nil {
-		return primitive.NilObjectID, fmt.Errorf("report not found: %w", err)
+		return primitive.NilObjectID, "", "", fmt.Errorf("%w", ErrReportNotFound)
 	}
-
-	// Find the Mongo document linked to this report UUID
-	mongoReport, err := s.mongoRepo.FindByReportUUID(ctx, reportUUID)
+	if meta.MongoID == "" {
+		return primitive.NilObjectID, "", "", fmt.Errorf("%w", ErrMongoReportNotFound)
+	}
+	oid, err = primitive.ObjectIDFromHex(meta.MongoID)
 	if err != nil {
-		return primitive.NilObjectID, fmt.Errorf("mongo report not found: %w", err)
+		return primitive.NilObjectID, "", "", fmt.Errorf("invalid mongo id: %w", err)
 	}
-	if mongoReport == nil {
-		return primitive.NilObjectID, fmt.Errorf("mongo report not found")
-	}
-
-	return mongoReport.ID, nil
+	return oid, meta.TenantID.String(), meta.TeamID.String(), nil
 }
 
 func (s *ReportServiceImpl) ReorderSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newOrder int) error {
@@ -197,7 +301,8 @@ func (s *ReportServiceImpl) ReorderSection(ctx context.Context, reportUUID uuid.
 	sections := mongoDoc.Sections
 	sort.SliceStable(sections, func(i, j int) bool { return sections[i].Order < sections[j].Order })
 
-	return s.mongoRepo.UpdateSections(ctx, mongoDoc.ID, sections)
+	return s.mongoRepo.UpdateSections(ctx, mongoDoc.ID, sections, mongoDoc.TenantID, mongoDoc.TeamID)
+
 }
 
 func (r *ReportMongoRepoImpl) FindByReportUUID(ctx context.Context, reportUUID uuid.UUID) (*ReportContentMongo, error) {
@@ -215,78 +320,93 @@ func (r *ReportMongoRepoImpl) FindByReportUUID(ctx context.Context, reportUUID u
 	return &result, nil
 }
 
-func (r *ReportMongoRepoImpl) UpdateSections(ctx context.Context, reportID primitive.ObjectID, sections []ReportSection) error {
+// In your repo file
+
+// UpdateSections replaces the entire sections array for a given report document.
+// It enforces tenant/team scoping and normalizes timestamps/ids on each section.
+
+func (r *ReportMongoRepoImpl) UpdateSections(
+	ctx context.Context,
+	reportID primitive.ObjectID,
+	sections []ReportSection,
+	tenantID, teamID string, // multitenancy guards
+) error {
+	now := time.Now()
+
+	// Normalize: ensure IDs & timestamps; keep caller-provided Order
+	for i := range sections {
+		if sections[i].ID.IsZero() {
+			sections[i].ID = primitive.NewObjectID()
+		}
+		if sections[i].CreatedAt.IsZero() {
+			sections[i].CreatedAt = now
+		}
+		sections[i].UpdatedAt = now
+	}
+
+	// Keep a deterministic order
+	sort.SliceStable(sections, func(i, j int) bool { return sections[i].Order < sections[j].Order })
+
+	// Filter with defense-in-depth
 	filter := bson.M{"_id": reportID}
+	if tenantID != "" {
+		filter["tenant_id"] = tenantID
+	}
+	if teamID != "" {
+		filter["team_id"] = teamID
+	}
+
 	update := bson.M{
 		"$set": bson.M{
 			"sections":   sections,
-			"updated_at": time.Now(),
+			"updated_at": now,
 		},
 	}
-	result, err := r.collection.UpdateOne(ctx, filter, update)
+
+	res, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
-	if result.MatchedCount == 0 {
-		return fmt.Errorf("report not found")
-	}
-	return nil
-}
-func (r *ReportMongoRepoImpl) UpdateSectionTitle(ctx context.Context, reportID, sectionID primitive.ObjectID, newTitle string) error {
-	filter := bson.M{"_id": reportID, "sections._id": sectionID}
-	update := bson.M{
-		"$set": bson.M{
-			"sections.$.title":      newTitle,
-			"sections.$.updated_at": time.Now(),
-			"updated_at":            time.Now(),
-		},
-	}
-	result, err := r.collection.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return err
-	}
-	if result.MatchedCount == 0 {
-		return fmt.Errorf("section not found")
+	if res.MatchedCount == 0 {
+		return ErrMongoReportNotFound
 	}
 	return nil
 }
 
-func (r *ReportMongoRepoImpl) ReorderSection(ctx context.Context, reportID, sectionID primitive.ObjectID, newOrder int) error {
-	reportContent, err := r.GetReportContent(ctx, reportID) // uses _id
+func (r *ReportMongoRepoImpl) UpdateSectionTitle(
+	ctx context.Context,
+	reportID, sectionID primitive.ObjectID,
+	newTitle string,
+	tenantID, teamID string,
+) error {
+	filter := bson.M{
+		"_id":          reportID,
+		"sections._id": sectionID,
+	}
+	if tenantID != "" {
+		filter["tenant_id"] = tenantID
+	}
+	if teamID != "" {
+		filter["team_id"] = teamID
+	}
+
+	update := bson.M{"$set": bson.M{
+		"sections.$.title":      newTitle,
+		"sections.$.updated_at": time.Now(),
+		"updated_at":            time.Now(),
+	}}
+
+	res, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
-	var target *ReportSection
-	for i := range reportContent.Sections {
-		if reportContent.Sections[i].ID == sectionID {
-			target = &reportContent.Sections[i]
-			break
-		}
+	if res.MatchedCount == 0 {
+		return ErrSectionNotFound
 	}
-	if target == nil {
-		return fmt.Errorf("section not found")
-	}
-
-	oldOrder := target.Order
-	target.Order = newOrder
-
-	for i := range reportContent.Sections {
-		if reportContent.Sections[i].ID == sectionID {
-			continue
-		}
-		if oldOrder < newOrder {
-			if reportContent.Sections[i].Order > oldOrder && reportContent.Sections[i].Order <= newOrder {
-				reportContent.Sections[i].Order--
-			}
-		} else if oldOrder > newOrder {
-			if reportContent.Sections[i].Order >= newOrder && reportContent.Sections[i].Order < oldOrder {
-				reportContent.Sections[i].Order++
-			}
-		}
-	}
-
-	return r.UpdateSections(ctx, reportID, reportContent.Sections) // uses _id
+	return nil
 }
+
+// var _ ReportMongoRepository = (*ReportMongoRepoImpl)(nil)
 
 func (r *ReportMongoRepoImpl) BulkUpdateSections(ctx context.Context, reportID primitive.ObjectID, sections []ReportSection) error {
 	// If you keep this method, make it consistent with _id as well:
@@ -303,29 +423,45 @@ func (r *ReportMongoRepoImpl) BulkUpdateSections(ctx context.Context, reportID p
 }
 
 // Ensure this type implements the interface at compile time
-var _ ReportMongoRepository = (*ReportMongoRepoImpl)(nil)
+// var _ ReportMongoRepository = (*ReportMongoRepoImpl)(nil)
 
-// LatestUpdateByReportIDs returns max(updated_at, max(sections.updated_at)) per ReportID (string UUID).
-func (r *ReportMongoRepoImpl) LatestUpdateByReportIDs(ctx context.Context, reportIDs []string) (map[string]time.Time, error) {
+// LatestUpdateByReportIDs returns, per report_id, the max of:
+//   - top-level updated_at
+//   - max(sections.updated_at)
+//
+// It scopes by tenant/team and tolerates docs with no sections.
+func (r *ReportMongoRepoImpl) LatestUpdateByReportIDs(
+	ctx context.Context,
+	reportIDs []string,
+	tenantID string,
+	teamID string,
+) (map[string]time.Time, error) {
 	out := make(map[string]time.Time, len(reportIDs))
 	if len(reportIDs) == 0 {
 		return out, nil
 	}
 
+	// Precise multitenant match
+	match := bson.D{{Key: "report_id", Value: bson.D{{Key: "$in", Value: reportIDs}}}}
+	if tenantID != "" {
+		match = append(match, bson.E{Key: "tenant_id", Value: tenantID})
+	}
+	if teamID != "" {
+		match = append(match, bson.E{Key: "team_id", Value: teamID})
+	}
+
 	pipeline := mongo.Pipeline{
-		// Only consider the requested report_ids
-		bson.D{{Key: "$match", Value: bson.D{{Key: "report_id", Value: bson.D{{Key: "$in", Value: reportIDs}}}}}},
-		// Keep the top-level updated_at so we can compare later
+		bson.D{{Key: "$match", Value: match}},
 		bson.D{{Key: "$addFields", Value: bson.D{{Key: "docUpdated", Value: "$updated_at"}}}},
-		// Unwind sections (but keep docs even if there are none)
-		bson.D{{Key: "$unwind", Value: bson.D{{Key: "path", Value: "$sections"}, {Key: "preserveNullAndEmptyArrays", Value: true}}}},
-		// Compute per-doc max of sections.updated_at and carry along docUpdated
+		bson.D{{Key: "$unwind", Value: bson.D{
+			{Key: "path", Value: "$sections"},
+			{Key: "preserveNullAndEmptyArrays", Value: true},
+		}}},
 		bson.D{{Key: "$group", Value: bson.D{
 			{Key: "_id", Value: "$report_id"},
 			{Key: "lastSectionsUpdate", Value: bson.D{{Key: "$max", Value: "$sections.updated_at"}}},
 			{Key: "docUpdated", Value: bson.D{{Key: "$max", Value: "$docUpdated"}}},
 		}}},
-		// Final "lastUpdate" = max(lastSectionsUpdate, docUpdated)
 		bson.D{{Key: "$project", Value: bson.D{
 			{Key: "lastUpdate", Value: bson.D{{Key: "$max", Value: bson.A{"$lastSectionsUpdate", "$docUpdated"}}}},
 		}}},

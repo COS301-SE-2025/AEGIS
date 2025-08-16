@@ -11,13 +11,30 @@ import (
 
 type GormReportRepository struct{ db *gorm.DB }
 
-func (r *GormReportRepository) ListRecentCandidates(ctx context.Context, opts RecentReportsOptions, candidateLimit int) ([]Report, error) {
+// compile-time check
+//var _ ReportRepository = (*GormReportRepository)(nil)
+
+func (r *GormReportRepository) ListRecentCandidates(
+	ctx context.Context,
+	opts RecentReportsOptions,
+	candidateLimit int,
+) ([]Report, error) {
 	if candidateLimit <= 0 || candidateLimit > 200 {
-		candidateLimit = 60 // grab a bit more than final limit to avoid missing items promoted by Mongo timestamps
+		candidateLimit = 60 // grab more than final limit; Mongo timestamps might promote some
 	}
 
-	q := r.db.WithContext(ctx).Table("reports").Where("deleted_at IS NULL")
+	q := r.db.WithContext(ctx).Model(&Report{})
 
+	// 🔒 Multi-tenancy scope
+	if opts.TenantID != uuid.Nil {
+		q = q.Where("tenant_id = ?", opts.TenantID)
+	}
+	// If you want “all teams in tenant”, leave TeamID nil; otherwise filter by team
+	if opts.TeamID != nil && *opts.TeamID != uuid.Nil {
+		q = q.Where("team_id = ?", *opts.TeamID)
+	}
+
+	// Additional filters
 	if opts.MineOnly && opts.ExaminerID != uuid.Nil {
 		q = q.Where("examiner_id = ?", opts.ExaminerID)
 	}
@@ -28,9 +45,10 @@ func (r *GormReportRepository) ListRecentCandidates(ctx context.Context, opts Re
 		q = q.Where("status = ?", *opts.Status)
 	}
 
+	// Select only what we need for recent
 	var rows []Report
 	if err := q.
-		Select("id, case_id, examiner_id, name, status, updated_at").
+		Select("id, case_id, examiner_id, tenant_id, team_id, name, status, updated_at").
 		Order("updated_at DESC").
 		Limit(candidateLimit).
 		Find(&rows).Error; err != nil {

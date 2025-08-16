@@ -17,8 +17,9 @@ type RecentReport struct {
 type RecentReportsOptions struct {
 	Limit      int
 	MineOnly   bool
-	ExaminerID uuid.UUID  // who is asking; used when MineOnly=true
-	CaseID     *uuid.UUID // optional filter
-	Status     *string    // optional filter
-	// If you carry multi-tenancy via Case → Tenant, filter in repo query with a JOIN.
+	ExaminerID uuid.UUID
+	CaseID     *uuid.UUID
+	Status     *string
+	TenantID   uuid.UUID  // ← add
+	TeamID     *uuid.UUID // ← add (nil means “all teams in tenant”)
 }

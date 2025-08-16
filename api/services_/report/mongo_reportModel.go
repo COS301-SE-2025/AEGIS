@@ -25,9 +25,11 @@ type ReportSection struct {
 
 // Full report content document
 type ReportContentMongo struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty"` // MongoDB ID for the report content
-	ReportID  string             `bson:"report_id"`     // Link to Postgres report metadata
-	Sections  []ReportSection    `bson:"sections"`      // Array of subsections
+	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	ReportID  string             `bson:"report_id"` // Postgres UUID as string
+	TenantID  string             `bson:"tenant_id"` // NEW: store UUID string
+	TeamID    string             `bson:"team_id"`   // NEW: store UUID string
+	Sections  []ReportSection    `bson:"sections"`
 	CreatedAt time.Time          `bson:"created_at"`
 	UpdatedAt time.Time          `bson:"updated_at"`
 }

@@ -680,6 +680,8 @@ $$;
 -- Create the reports table
 CREATE TABLE reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tenant_id UUID NOT NULL,                    -- 🔒 tenant scope
+    team_id   UUID NOT NULL,     
     case_id UUID NOT NULL,                     -- Links report to a specific case
     examiner_id UUID NOT NULL,                 -- Who created the report
     name VARCHAR(255) NOT NULL,                 -- Report title

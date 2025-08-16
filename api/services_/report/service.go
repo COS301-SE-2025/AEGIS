@@ -19,7 +19,7 @@ import (
 
 // ReportService defines the business logic for managing reports.
 type ReportService interface {
-	GenerateReport(ctx context.Context, caseID uuid.UUID, examinerID uuid.UUID) (*Report, error)
+	GenerateReport(ctx context.Context, caseID, examinerID, tenantID, teamID uuid.UUID) (*Report, error)
 	SaveReport(ctx context.Context, report *Report) error
 	GetReportByID(ctx context.Context, reportID uuid.UUID) (*Report, error)
 	UpdateReport(ctx context.Context, report *Report) error
@@ -73,49 +73,59 @@ func NewReportService(
 
 // GenerateReport creates a new report for a given case and examiner.
 // Here you could include more logic such as fetching case data, formatting content, etc.
-func (s *ReportServiceImpl) GenerateReport(ctx context.Context, caseID, examinerID uuid.UUID) (*Report, error) {
-	// 1. Create Postgres report metadata
+// services_/report/service_impl.go
+func (s *ReportServiceImpl) GenerateReport(
+	ctx context.Context,
+	caseID, examinerID, tenantID, teamID uuid.UUID,
+) (*Report, error) {
+	now := time.Now()
+
+	// 1) Create Postgres report metadata (includes tenant/team)
 	report := &Report{
 		ID:         uuid.New(),
+		TenantID:   tenantID, // NEW
+		TeamID:     teamID,   // NEW
 		CaseID:     caseID,
 		ExaminerID: examinerID,
 		Status:     "draft",
 		Version:    1,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
-	// 2. Generate MongoID for content
+	// 2) Generate MongoID for content
 	mongoID := primitive.NewObjectID()
-	report.MongoID = mongoID.Hex() // store mapping in Postgres
+	report.MongoID = mongoID.Hex()
 
-	// 3. Save metadata in Postgres
+	// 3) Save metadata in Postgres
 	if err := s.repo.SaveReport(ctx, report); err != nil {
 		return nil, fmt.Errorf("failed to generate report metadata: %w", err)
 	}
 
-	// 4. Save default sections in Mongo
+	// 4) Default sections (ensure timestamps)
 	defaultSections := []ReportSection{
-		{ID: primitive.NewObjectID(), Title: "Case Identification", Content: "", Order: 1},
-		{ID: primitive.NewObjectID(), Title: "Scope and Objectives", Content: "", Order: 2},
-		{ID: primitive.NewObjectID(), Title: "Evidence Summary", Content: "", Order: 3},
-		{ID: primitive.NewObjectID(), Title: "Tools and Methodologies", Content: "", Order: 4},
-		{ID: primitive.NewObjectID(), Title: "Findings", Content: "", Order: 5},
-		{ID: primitive.NewObjectID(), Title: "Interpretation and Analysis", Content: "", Order: 6},
-		{ID: primitive.NewObjectID(), Title: "Limitations", Content: "", Order: 7},
-		{ID: primitive.NewObjectID(), Title: "Conclusion", Content: "", Order: 8},
-		{ID: primitive.NewObjectID(), Title: "Appendices", Content: "", Order: 9},
-		{ID: primitive.NewObjectID(), Title: "Certification", Content: "", Order: 10},
+		{ID: primitive.NewObjectID(), Title: "Case Identification", Content: "", Order: 1, CreatedAt: now, UpdatedAt: now},
+		{ID: primitive.NewObjectID(), Title: "Scope and Objectives", Content: "", Order: 2, CreatedAt: now, UpdatedAt: now},
+		{ID: primitive.NewObjectID(), Title: "Evidence Summary", Content: "", Order: 3, CreatedAt: now, UpdatedAt: now},
+		{ID: primitive.NewObjectID(), Title: "Tools and Methodologies", Content: "", Order: 4, CreatedAt: now, UpdatedAt: now},
+		{ID: primitive.NewObjectID(), Title: "Findings", Content: "", Order: 5, CreatedAt: now, UpdatedAt: now},
+		{ID: primitive.NewObjectID(), Title: "Interpretation and Analysis", Content: "", Order: 6, CreatedAt: now, UpdatedAt: now},
+		{ID: primitive.NewObjectID(), Title: "Limitations", Content: "", Order: 7, CreatedAt: now, UpdatedAt: now},
+		{ID: primitive.NewObjectID(), Title: "Conclusion", Content: "", Order: 8, CreatedAt: now, UpdatedAt: now},
+		{ID: primitive.ObjectID{}, Title: "Appendices", Content: "", Order: 9, CreatedAt: now, UpdatedAt: now},
+		{ID: primitive.NewObjectID(), Title: "Certification", Content: "", Order: 10, CreatedAt: now, UpdatedAt: now},
 	}
 
+	// 5) Save content in Mongo WITH tenant/team
 	reportContent := &ReportContentMongo{
-		ID:        mongoID,            // Use same Mongo ObjectID
-		ReportID:  report.ID.String(), // store Postgres UUID as string
+		ID:        mongoID,
+		ReportID:  report.ID.String(),
+		TenantID:  tenantID.String(), // NEW
+		TeamID:    teamID.String(),   // NEW
 		Sections:  defaultSections,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
-
 	if err := s.mongoRepo.SaveReportContent(ctx, reportContent); err != nil {
 		return nil, fmt.Errorf("failed to save report content in Mongo: %w", err)
 	}
@@ -179,82 +189,49 @@ func (s *ReportServiceImpl) DeleteReportByID(ctx context.Context, reportID uuid.
 	return s.repo.DeleteReportByID(ctx, reportID)
 }
 
-// DownloadReport fetches the report for downloading.
-// func (s *ReportServiceImpl) DownloadReport(ctx context.Context, reportID uuid.UUID) (*Report, error) {
-// 	report, err := s.repo.DownloadReport(ctx, reportID)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to download report: %w", err)
-// 	}
-// 	return report, nil
-// }
-
 func (s *ReportServiceImpl) DownloadReport(ctx context.Context, reportID uuid.UUID) (*ReportWithContent, error) {
-	// 1. Fetch report metadata from Postgres (this part seems fine).
+	// 1) Fetch Postgres metadata (also gives us TenantID/TeamID)
 	meta, err := s.repo.GetByID(ctx, reportID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch report metadata: %w", err)
 	}
 
-	// 2. If MongoID is not empty, try to fetch content from MongoDB.
+	// 2) Optionally fetch Mongo content (scoped by tenant/team)
 	var contentSections []ReportSection
 	if meta.MongoID != "" {
-		// Convert MongoID string to ObjectID.
-		mongoID, err := primitive.ObjectIDFromHex(meta.MongoID) // Convert string to ObjectID
+		mongoID, err := primitive.ObjectIDFromHex(meta.MongoID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert MongoID to ObjectID: %w", err)
 		}
 
-		// Fetch the content from MongoDB using the valid ObjectID.
-		content, err := s.mongoRepo.GetReportContent(ctx, mongoID)
+		content, err := s.mongoRepo.GetReportContent(ctx, mongoID, meta.TenantID.String(), meta.TeamID.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch content from MongoDB: %w", err)
 		}
-
-		// If content is found, assign it to sections.
 		if content != nil {
 			contentSections = content.Sections
 		}
 	}
 
-	// Fallback to an empty slice if no content is found.
+	// 3) Fallback: ensure non-nil slice
 	if contentSections == nil {
 		contentSections = []ReportSection{}
 	}
 
-	// Return both metadata and content sections.
 	return &ReportWithContent{
 		Metadata: meta,
 		Content:  contentSections,
 	}, nil
 }
 
-func (s *ReportServiceImpl) UpdateReportSection(ctx context.Context, reportID uuid.UUID, sectionID primitive.ObjectID, newContent string) error {
-	// Convert reportID to Mongo ObjectID if you store a mapping
-	mongoID := primitive.NewObjectID() // Replace with actual mapping
-	return s.mongoRepo.UpdateSection(ctx, mongoID, sectionID, newContent)
+func (s *ReportServiceImpl) UpdateReportSection(
+	ctx context.Context,
+	reportUUID uuid.UUID,
+	sectionID primitive.ObjectID,
+	newContent string,
+) error {
+	return s.UpdateCustomSectionContent(ctx, reportUUID, sectionID, newContent)
 }
-
-// func (s *ReportServiceImpl) DownloadReport(ctx context.Context, reportID uuid.UUID) (*Report, error) {
-// 	return s.repo.DownloadReport(ctx, reportID)
-// }
-
-// func (s *ReportServiceImpl) DownloadReportWithContent(ctx context.Context, reportID uuid.UUID) (*ReportWithContent, error) {
-// 	meta, err := s.repo.GetByID(ctx, reportID)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	mongoID := primitive.NewObjectID() // Map Postgres UUID -> Mongo ObjectID
-// 	content, err := s.mongoRepo.GetReportContent(ctx, mongoID)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &ReportWithContent{
-// 		Metadata: meta,
-// 		Content:  content.Sections,
-// 	}, nil
-// }
 
 func (s *ReportServiceImpl) DownloadReportAsJSON(ctx context.Context, reportID uuid.UUID) ([]byte, error) {
 	report, err := s.DownloadReport(ctx, reportID)
@@ -378,48 +355,50 @@ func (s *ReportServiceImpl) DownloadReportAsPDF(ctx context.Context, reportID uu
 	return buf.Bytes(), nil
 }
 
-func (s *ReportServiceImpl) UpdateCustomSectionContent(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newContent string) error {
-	mongoID, err := s.getMongoID(ctx, reportUUID)
+func (s *ReportServiceImpl) UpdateCustomSectionContent(
+	ctx context.Context,
+	reportUUID uuid.UUID,
+	sectionID primitive.ObjectID,
+	newContent string,
+) error {
+	mongoID, tenantID, teamID, err := s.getMongoID(ctx, reportUUID)
 	if err != nil {
 		return err
 	}
-	return s.mongoRepo.UpdateSection(ctx, mongoID, sectionID, newContent)
+	return s.mongoRepo.UpdateSection(ctx, mongoID, sectionID, newContent, tenantID, teamID)
 }
 
-// Add a custom section
-
-// // Delete a custom section
-// func (s *ReportServiceImpl) DeleteCustomSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID) error {
-// 	mongoID, err := s.getMongoID(ctx, reportUUID)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return s.mongoRepo.DeleteSection(ctx, mongoID, sectionID)
-// }
-
-// Update content of a section
-func (s *ReportServiceImpl) UpdateSectionContent(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newContent string) error {
-	mongoID, err := s.getMongoID(ctx, reportUUID)
+func (s *ReportServiceImpl) UpdateSectionContent(
+	ctx context.Context,
+	reportUUID uuid.UUID,
+	sectionID primitive.ObjectID,
+	newContent string,
+) error {
+	// delegate to the same impl
+	return s.UpdateCustomSectionContent(ctx, reportUUID, sectionID, newContent)
+}
+func (s *ReportServiceImpl) UpdateSectionTitle(
+	ctx context.Context,
+	reportUUID uuid.UUID,
+	sectionID primitive.ObjectID,
+	newTitle string,
+) error {
+	mongoID, tenantID, teamID, err := s.getMongoID(ctx, reportUUID)
 	if err != nil {
 		return err
 	}
-	return s.mongoRepo.UpdateSection(ctx, mongoID, sectionID, newContent)
+	return s.mongoRepo.UpdateSectionTitle(ctx, mongoID, sectionID, newTitle, tenantID, teamID)
 }
 
-// Update the title of a section
-func (s *ReportServiceImpl) UpdateSectionTitle(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newTitle string) error {
-	mongoID, err := s.getMongoID(ctx, reportUUID)
+func (s *ReportServiceImpl) ReorderCustomSection(
+	ctx context.Context,
+	reportUUID uuid.UUID,
+	sectionID primitive.ObjectID,
+	newOrder int,
+) error {
+	mongoID, tenantID, teamID, err := s.getMongoID(ctx, reportUUID)
 	if err != nil {
 		return err
 	}
-	return s.mongoRepo.UpdateSectionTitle(ctx, mongoID, sectionID, newTitle)
-}
-
-// Reorder a section
-func (s *ReportServiceImpl) ReorderCustomSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newOrder int) error {
-	mongoID, err := s.getMongoID(ctx, reportUUID)
-	if err != nil {
-		return err
-	}
-	return s.mongoRepo.ReorderSection(ctx, mongoID, sectionID, newOrder)
+	return s.mongoRepo.ReorderSection(ctx, mongoID, sectionID, newOrder, tenantID, teamID)
 }

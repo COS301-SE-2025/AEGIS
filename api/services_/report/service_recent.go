@@ -13,7 +13,6 @@ func (s *ReportServiceImpl) ListRecentReports(ctx context.Context, opts RecentRe
 	if candidateLimit <= 0 {
 		candidateLimit = 10
 	}
-	// fetch a slightly larger window to account for Mongo-promoted items
 	window := candidateLimit * 3
 	if window < 30 {
 		window = 30
@@ -27,12 +26,16 @@ func (s *ReportServiceImpl) ListRecentReports(ctx context.Context, opts RecentRe
 		return []RecentReport{}, nil
 	}
 
-	// 2) Ask Mongo for max(section.updated_at) for all report IDs in one go
+	// 2) Ask Mongo for max(section.updated_at) per report, scoped by tenant/team
 	ids := make([]string, 0, len(candidates))
 	for _, r := range candidates {
 		ids = append(ids, r.ID.String())
 	}
-	mx, err := s.mongoRepo.LatestUpdateByReportIDs(ctx, ids)
+	team := ""
+	if opts.TeamID != nil {
+		team = opts.TeamID.String()
+	}
+	mx, err := s.mongoRepo.LatestUpdateByReportIDs(ctx, ids, opts.TenantID.String(), team)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +61,7 @@ func (s *ReportServiceImpl) ListRecentReports(ctx context.Context, opts RecentRe
 		out = out[:candidateLimit]
 	}
 
-	// 5) (Optional) present times in Africa/Johannesburg (to match your other method)
+	// 5) Present times in Africa/Johannesburg
 	if loc, _ := time.LoadLocation("Africa/Johannesburg"); loc != nil {
 		for i := range out {
 			out[i].LastModified = out[i].LastModified.In(loc)

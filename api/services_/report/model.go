@@ -16,41 +16,24 @@ var (
 	ErrInvalidInput        = errors.New("invalid input")
 )
 
-// Report represents the case report structure.
-//
-//	type Report struct {
-//		ID                     uuid.UUID `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"` // Unique ID for the report
-//		CaseID                 uuid.UUID `gorm:"type:uuid;not null"`                              // ID of the associated case
-//		ExaminerID             uuid.UUID `gorm:"type:uuid;not null"`                              // ID of the examiner
-//		Scope                  string    `gorm:"type:text"`                                       // Scope of the report
-//		Objectives             string    `gorm:"type:text"`                                       // Objectives of the report
-//		Limitations            string    `gorm:"type:text"`                                       // Limitations of the report
-//		ToolsMethods           string    `gorm:"type:text"`                                       // Tools and methods used in the report
-//		FinalConclusion        string    `gorm:"type:text"`                                       // Final conclusion of the report
-//		EvidenceSummary        string    `gorm:"type:text"`                                       // Summary of the evidence in the report
-//		CertificationStatement string    `gorm:"type:text"`                                       // Certification statement of the report
-//		DateExamined           time.Time `gorm:"type:date"`                                       // Date the report was examined
-//		Status                 string    `gorm:"type:report_status;default:'draft'"`              // Status of the report (e.g., draft, published)
-//		Version                int       `gorm:"not null;default:1"`                              // Version of the report
-//		ReportNumber           string    `gorm:"unique"`                                          // Unique report number
-//		CreatedAt              time.Time `gorm:"type:timestamp;default:current_timestamp"`        // Timestamp when the report was created
-//		UpdatedAt              time.Time `gorm:"type:timestamp;default:current_timestamp"`        // Timestamp when the report was last updated
-//		Name                   string    `gorm:"type:varchar(255);not null"`                      // Name of the report (for download purposes)
-//		FilePath               string    `gorm:"type:varchar(255);not null"`                      // File path where the report is stored
-//	}
 type Report struct {
-	ID           uuid.UUID `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()" json:"id"`
-	CaseID       uuid.UUID `gorm:"type:uuid;not null" json:"case_id"`
-	ExaminerID   uuid.UUID `gorm:"type:uuid;not null" json:"examiner_id"`
+	ID         uuid.UUID `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()" json:"id"`
+	CaseID     uuid.UUID `gorm:"type:uuid;not null" json:"case_id"`
+	ExaminerID uuid.UUID `gorm:"type:uuid;not null" json:"examiner_id"`
+	// NEW ↓↓↓
+	TenantID uuid.UUID `gorm:"type:uuid;not null;index:idx_reports_tenant_team_updated,priority:1" json:"tenant_id"`
+	TeamID   uuid.UUID `gorm:"type:uuid;not null;index:idx_reports_tenant_team_updated,priority:2" json:"team_id"`
+	// NEW ↑↑↑
+
 	Name         string    `gorm:"type:varchar(255);not null" json:"name"`
-	MongoID      string    `gorm:"type:char(24)" json:"mongo_id"` // MongoDB ObjectID as 24-char hex
+	MongoID      string    `gorm:"type:char(24)" json:"mongo_id"`
 	ReportNumber string    `gorm:"type:varchar(255);unique" json:"report_number"`
 	Status       string    `gorm:"type:report_status;default:'draft'" json:"status"`
 	Version      int       `gorm:"not null;default:1" json:"version"`
 	DateExamined time.Time `gorm:"type:date" json:"date_examined"`
 	FilePath     string    `gorm:"type:varchar(255);not null" json:"file_path"`
 	CreatedAt    time.Time `gorm:"type:timestamp;default:current_timestamp" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"type:timestamp;default:current_timestamp" json:"updated_at"`
+	UpdatedAt    time.Time `gorm:"type:timestamp;default:current_timestamp;index:idx_reports_tenant_team_updated,priority:3" json:"updated_at"`
 }
 
 // ReportInterface defines the methods for managing reports.
