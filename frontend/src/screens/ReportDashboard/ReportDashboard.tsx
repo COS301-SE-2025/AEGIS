@@ -202,38 +202,6 @@ const handleOpenReport = (reportId: string) => {
   const [report, setReport] = useState<Report | null>(null);
 
 
-// useEffect(() => {
-//     const fetchReportDetails = async () => {
-//       if (!reportId) {
-//         setError('Report ID is missing.');
-//         return;
-//       }
-
-//       try {
-//         const token = sessionStorage.getItem('authToken');
-//         if (!token) {
-//           console.error('No auth token found');
-//           return;
-//         }
-
-//         // Use generics to specify the expected response type as Report
-//         const response = await axios.get<Report>(`http://localhost:8080/api/v1/reports/${reportId}`, {
-//           headers: {
-//             Authorization: `Bearer ${token}`,
-//           },
-//         });
-//         console.log('Fetched report details:', response.data);
-//         // Successfully fetched data, set the report state
-//         setReport(response.data);  // Now TypeScript knows response.data is a Report
-//       } catch (err) {
-//         console.error('Error fetching report details:', err);
-//         setError('Failed to fetch report details');
-//       }
-//     };
-
-//     fetchReportDetails();
-//   }, [reportId]);  // Re-run this effect whenever reportId changes
-
 
   
   const reportTemplates: ReportTemplate[] = [

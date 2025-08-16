@@ -15,14 +15,15 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom"; 
-import { Pencil, Check, X } from "lucide-react"; // NEW
+import { Pencil, Check, X,Trash2 } from "lucide-react"; // NEW
 
 interface ReportSection {
   id: string;
   title: string;
   content: string;
-  completed: boolean;
+  completed?: boolean; // <- optional
 }
+
 
 interface RecentReport {
   id: string;
@@ -93,6 +94,17 @@ const [editingTitleSectionId, setEditingTitleSectionId] = useState<string|null>(
 const [tempSectionTitle, setTempSectionTitle] = useState("");
 const [titleDirty, setTitleDirty] = useState(false);
 const [titleSaving, setTitleSaving] = useState<"idle"|"saving"|"saved"|"error">("idle");
+const [addingBusy, setAddingBusy] = useState(false);
+const [deletingId, setDeletingId] = useState<string | null>(null);
+
+// local-only section helpers (so we can skip API calls until backend is wired)
+const makeLocalId = () =>
+  `local-${(crypto as any)?.randomUUID?.() ?? Date.now().toString(36)}`;
+const isLocalSection = (id: string) => id.startsWith("local-");
+
+// add/delete UI state
+const [adding, setAdding] = useState(false);
+const [newSectionTitle, setNewSectionTitle] = useState("");
 
 
 const navigate = useNavigate(); // NEW
@@ -102,26 +114,48 @@ const [recentLoading, setRecentLoading] = useState(true);               // NEW
 const [recentError, setRecentError] = useState<string | null>(null);    // NEW
 
   // fetch report
-  useEffect(() => {
-    (async () => {
-      if (!reportId) return;
-      const token = sessionStorage.getItem("authToken");
-      if (!token) return;
+  // useEffect(() => {
+  //   (async () => {
+  //     if (!reportId) return;
+  //     const token = sessionStorage.getItem("authToken");
+  //     if (!token) return;
 
-      // If your backend returns { metadata, content }, map accordingly.
-      const { data } = await axios.get<Report>(`${API_URL}/reports/${reportId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+  //     // If your backend returns { metadata, content }, map accordingly.
+  //     const { data } = await axios.get<Report>(`${API_URL}/reports/${reportId}`, {
+  //       headers: { Authorization: `Bearer ${token}` },
+  //     });
 
-      setReport(data);
-      setSections(Array.isArray(data.content) ? data.content : []);
-      setReportTitle(data.name || "");
-      setIncidentId(data.incidentId || "");
-      setDateCreated(data.dateCreated || "");
-      setAnalyst(data.analyst || "");
-      setReportType(data.type || "");
-    })().catch(err => console.error("Error fetching report:", err));
-  }, [reportId]);
+  //     setReport(data);
+  //     setSections(Array.isArray(data.content) ? data.content : []);
+  //     setReportTitle(data.name || "");
+  //     setIncidentId(data.incidentId || "");
+  //     setDateCreated(data.dateCreated || "");
+  //     setAnalyst(data.analyst || "");
+  //     setReportType(data.type || "");
+  //   })().catch(err => console.error("Error fetching report:", err));
+  // }, [reportId]);
+const loadReport = useCallback(async (id: string) => {
+  const token = sessionStorage.getItem("authToken");
+  if (!token) return;
+
+  const { data } = await axios.get<Report>(`${API_URL}/reports/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  setReport(data);
+  const received = Array.isArray(data.content) ? data.content : [];
+  setSections(received.map(s => ({ ...s, completed: !!s.completed })));
+  setReportTitle(data.name || "");
+  setIncidentId(data.incidentId || "");
+  setDateCreated(data.dateCreated || "");
+  setAnalyst(data.analyst || "");
+  setReportType(data.type || "");
+}, []);
+
+useEffect(() => {
+  if (!reportId) return;
+  loadReport(reportId).catch(err => console.error("Error fetching report:", err));
+}, [reportId, loadReport]);
 
   // keep activeSection in range if sections change
   useEffect(() => {
@@ -146,15 +180,6 @@ const normalizeHtml = (html: string) => {
 };
 
 
-  
-// const toggleSectionCompletion = (index: number) => {
-//   if (!sections) return; // Guard: do nothing if sections is null
-
-//   const updatedSections = sections.map((section, i) =>
-//     i === index ? { ...section, completed: !section.completed } : section
-//   );
-//   setSections(updatedSections);
-// };
 
 
   // ReactQuill change handler: optimistic update + debounce save
@@ -183,6 +208,14 @@ const scheduleSave = useCallback((contentNorm: string) => {
 
     try {
       setSaveState("saving");
+      if (isLocalSection(secId)) {
+  // pretend-save locally (no network)
+  lastSavedRef.current = payload;
+  setDirty(false);
+  setSaveState("saved");
+  setLastSavedAt(Date.now());
+  return;
+}
       await putSectionContent(reportId, secId, payload);
       lastSavedRef.current = payload;
       setDirty(false);
@@ -247,6 +280,15 @@ const flushSaveNow = useCallback(
 }
     try {
       setSaveState("saving");
+      if (isLocalSection(sectionId)) {
+  lastSavedRef.current = payload;
+  lastQueuedRef.current = "";
+  setDirty(false);
+  setSaveState("saved");
+  setLastSavedAt(Date.now());
+  return;
+}
+
       await putSectionContent(reportId, sectionId, payload);
       lastSavedRef.current = payload;
       lastQueuedRef.current = "";
@@ -377,21 +419,86 @@ const openReport = async (id: string) => {
   }
 };
 
+const handleAddSection = useCallback(async () => {
+  const rid = reportId ?? report?.id;
+  if (!rid) return;
+
+  const title = newSectionTitle.trim() || "New Section";
+  // Insert AFTER the active section; backend uses 1-based order.
+  const order = activeSection + 2;
+
+  try {
+    setAddingBusy(true);
+    await postAddSection(String(rid), title, "", order);
+    await loadReport(String(rid));        // refresh with server IDs/order
+    setActiveSection(order - 1);          // focus new section
+    setAdding(false);
+    setNewSectionTitle("");
+  } catch (e) {
+    console.error("Add section failed", e);
+    setError("Failed to add section");
+  } finally {
+    setAddingBusy(false);
+  }
+}, [reportId, report?.id, newSectionTitle, activeSection, loadReport]);
+
+// Remove a section locally and keep the UI stable
+const handleDeleteSection = useCallback(async (sectionId: string) => {
+  const rid = reportId ?? report?.id;
+  if (!rid) return;
+
+  const idx = sections.findIndex(s => s.id === sectionId);
+  if (idx === -1) return;
+  if (!window.confirm("Delete this section?")) return;
+
+  const prevSections = sections;
+  const next = sections.filter(s => s.id !== sectionId);
+
+  const newActive =
+    idx < activeSection ? activeSection - 1 :
+    idx === activeSection ? Math.max(0, activeSection - (idx === sections.length - 1 ? 1 : 0)) :
+    activeSection;
+
+  setSections(next);
+  setActiveSection(newActive);
+
+  try {
+    // If the section was never persisted, just stop here
+    if (sectionId.startsWith("local-")) return;
+
+    await deleteSection(String(rid), sectionId);
+    await loadReport(String(rid));
+  } catch (e) {
+    console.error("Delete section failed", e);
+    setSections(prevSections); // rollback
+    setActiveSection(activeSection);
+  }
+}, [reportId, report?.id, sections, activeSection, loadReport]);
 
 
-
-async function updateSectionTitle(reportId: string, sectionId: string, title: string) {
+async function postAddSection(reportId: string, title: string, content = "", order?: number) {
   const token = sessionStorage.getItem("authToken");
-  const res = await axios.put(
-    `${API_URL}/reports/${reportId}/sections/${sectionId}/title`,
-    { title },
+  const res = await axios.post(
+    `${API_URL}/reports/${reportId}/sections`,
+    { title, content, order },
     { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
   );
-  return res.status;
+  return res.data; // handler returns {status: "..."} (no id), we’ll refetch below
+}
+
+async function deleteSection(reportId: string, sectionId: string) {
+  const token = sessionStorage.getItem("authToken");
+  const res = await axios.delete(
+    `${API_URL}/reports/${reportId}/sections/${sectionId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return res.data; // {status: "..."}
 }
 
 
-  // const recentReports: RecentReport[] = [
+
+
+
   //   {
   //     id: 'security-incident-2024-001',
   //     title: 'Security Incident 2024-001',
@@ -479,25 +586,40 @@ const cancelEditingTitle = useCallback(() => {
 
 const commitEditingTitle = useCallback(async () => {
   if (!editingTitleSectionId) return;
+  const rid = reportId ?? report?.id;
   const newTitle = tempSectionTitle.trim();
-  if (!newTitle) return; // (optional) show a toast/error
+  const currentTitle = sections.find(s => s.id === editingTitleSectionId)?.title ?? "";
 
-  // Frontend-only optimistic update
-  setSections(prev => prev.map(s => (s.id === editingTitleSectionId ? { ...s, title: newTitle } : s)));
-  setTitleSaving("saved");
-  setEditingTitleSectionId(null);
-  setTitleDirty(false);
+  // no-op / empty
+  if (newTitle === "" || newTitle === currentTitle) {
+    setEditingTitleSectionId(null);
+    setTempSectionTitle("");
+    setTitleDirty(false);
+    return;
+  }
 
-  // LATER: wire to backend
-  // try {
-  //   setTitleSaving("saving");
-  //   if (reportId) await putSectionTitle(reportId, editingTitleSectionId, newTitle);
-  //   setTitleSaving("saved");
-  // } catch (e) {
-  //   console.error("Title save failed", e);
-  //   setTitleSaving("error");
-  // }
-}, [editingTitleSectionId, tempSectionTitle, setSections, reportId]);
+  // optimistic
+  setSections(prev => prev.map(s => s.id === editingTitleSectionId ? { ...s, title: newTitle } : s));
+  setTitleSaving("saving");
+
+  try {
+    // skip API while it's a local section
+    if (!isLocalSection(editingTitleSectionId) && rid) {
+      await putSectionTitle(String(rid), editingTitleSectionId, newTitle);
+    }
+    setTitleSaving("saved");
+  } catch (e) {
+    console.error("Title save failed", e);
+    // rollback
+    setSections(prev => prev.map(s => s.id === editingTitleSectionId ? { ...s, title: currentTitle } : s));
+    setTitleSaving("error");
+  } finally {
+    setEditingTitleSectionId(null);
+    setTempSectionTitle("");
+    setTitleDirty(false);
+    setTimeout(() => setTitleSaving("idle"), 1000);
+  }
+}, [editingTitleSectionId, tempSectionTitle, reportId, report, sections]);
 
 
 
@@ -681,6 +803,49 @@ const commitEditingTitle = useCallback(async () => {
   </div>
 
   {/* Section List */}
+  <div className="mb-3">
+  {adding ? (
+    <div className="flex items-center gap-2">
+      <input
+        autoFocus
+        value={newSectionTitle}
+        onChange={e => setNewSectionTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); handleAddSection(); }
+          if (e.key === "Escape") { e.preventDefault(); setAdding(false); setNewSectionTitle(""); }
+        }}
+        className="w-full bg-gray-800 text-white border border-gray-700 rounded px-3 py-2"
+        placeholder="New section title"
+      />
+    <button
+      type="button"
+      onClick={handleAddSection}
+      disabled={addingBusy}
+      className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+    >
+      Add
+    </button>
+
+      <button
+        type="button"
+        onClick={() => { setAdding(false); setNewSectionTitle(""); }}
+        className="px-3 py-2 bg-gray-700 text-gray-200 rounded hover:bg-gray-600"
+      >
+        Cancel
+      </button>
+    </div>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setAdding(true)}
+      className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-700 text-gray-200 rounded hover:bg-gray-600"
+    >
+      <Plus className="w-4 h-4" />
+      Add Section
+    </button>
+  )}
+</div>
+
   <div className="space-y-1">
   {sections.map((section, index) => (
     <button
@@ -698,7 +863,24 @@ const commitEditingTitle = useCallback(async () => {
           : "hover:bg-gray-700 text-gray-300"
       }`}
     >
-      <span className="font-medium">{section.title}</span>
+      <div className="flex items-center gap-2 min-w-0">
+  <span className="font-medium truncate">{section.title}</span>
+
+
+  {/* delete */}
+<button
+  type="button"
+  onClick={(e) => { e.stopPropagation(); handleDeleteSection(section.id); }}
+  disabled={deletingId === section.id}
+  className={`p-1 rounded hover:bg-gray-700 ${activeSection === index ? "text-white" : "text-gray-400"} disabled:opacity-50`}
+  title="Delete section"
+  aria-label="Delete section"
+>
+  <Trash2 className="w-3.5 h-3.5" />
+</button>
+
+</div>
+
 
       {/* keep your completion toggle */}
       <div
@@ -812,24 +994,37 @@ const commitEditingTitle = useCallback(async () => {
       </div>
     ) : (
       <div className="flex items-center gap-3">
-        <h2 className="text-2xl font-semibold text-white">
-          {sections[activeSection].title}
-        </h2>
-        <button
-          type="button"
-          onClick={() => startEditingTitle(sections[activeSection])}
-          className="p-2 rounded-lg hover:bg-gray-700 text-gray-300"
-          title="Rename section"
-        >
-          <Pencil className="w-4 h-4" />
-        </button>
-        {titleSaving === "error" && (
-          <span className="text-sm text-red-400">Save failed</span>
-        )}
-        {titleSaving === "saved" && (
-          <span className="text-sm text-emerald-400">Saved</span>
-        )}
-      </div>
+  <h2
+    className="text-2xl font-semibold text-white"
+    onDoubleClick={() => startEditingTitle(sections[activeSection])} // optional: dbl-click to rename
+    title="Double-click to rename"
+  >
+    {sections[activeSection].title}
+  </h2>
+
+  {/* rename pencil opens the header editor */}
+  <button
+    type="button"
+    disabled={saveState === "saving" || editingTitleSectionId !== null}
+    onClick={() => startEditingTitle(sections[activeSection])}
+    className="p-2 rounded-lg hover:bg-gray-700 text-gray-300 disabled:opacity-50"
+    aria-label="Rename section"
+    title={saveState === "saving" ? "Saving… please wait" : "Rename section"}
+  >
+    <Pencil className="w-4 h-4" />
+  </button>
+
+  {titleSaving === "saving" && (
+    <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />
+  )}
+  {titleSaving === "error" && (
+    <span className="text-sm text-red-400">Save failed</span>
+  )}
+  {titleSaving === "saved" && (
+    <span className="text-sm text-emerald-400">Saved</span>
+  )}
+</div>
+
     )}
   </div>
 )}
@@ -935,16 +1130,16 @@ const commitEditingTitle = useCallback(async () => {
 
 
 
-                  <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">
+                  {/* <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">
                     <Eye className="w-4 h-4 inline mr-2" />
                     Preview
-                  </button>
+                  </button> */}
                 </div>
                 
-                <div className="flex items-center gap-2 text-sm text-gray-400">
+                {/* <div className="flex items-center gap-2 text-sm text-gray-400">
                   <Clock className="w-4 h-4" />
                   <span>Auto-saved 30 seconds ago</span>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>
