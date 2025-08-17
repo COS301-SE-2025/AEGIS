@@ -2,6 +2,7 @@ package report
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -17,7 +18,7 @@ type ReportRepository interface {
 	GetReportsByEvidenceID(ctx context.Context, evidenceID uuid.UUID) ([]Report, error)
 	DeleteReportByID(ctx context.Context, reportID uuid.UUID) error
 	DownloadReport(ctx context.Context, reportID uuid.UUID) (*Report, error)
-
+	UpdateReportName(ctx context.Context, reportID uuid.UUID, name string) (*Report, error)
 	ListRecentCandidates(ctx context.Context, opts RecentReportsOptions, candidateLimit int) ([]Report, error)
 }
 
@@ -128,4 +129,26 @@ func (repo *ReportsRepoImpl) DownloadReport(ctx context.Context, reportID uuid.U
 		return nil, err
 	}
 	return &report, nil
+}
+
+func (r *ReportsRepoImpl) UpdateReportName(ctx context.Context, reportID uuid.UUID, name string) (*Report, error) {
+	// Bump version + touch updated_at. NOW() is Postgres/MySQL; switch to CURRENT_TIMESTAMP if you prefer.
+	res := r.DB.WithContext(ctx).Exec(`
+        UPDATE reports
+           SET name = ?, version = COALESCE(version, 0) + 1, updated_at = NOW()
+         WHERE id = ?
+    `, name, reportID)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return nil, errors.New("not found")
+	}
+
+	// Read back the full row into your Report struct
+	out := Report{}
+	if err := r.DB.WithContext(ctx).First(&out, "id = ?", reportID).Error; err != nil {
+		return nil, err
+	}
+	return &out, nil
 }

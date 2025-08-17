@@ -526,3 +526,34 @@ func (h *ReportHandler) GetRecentReports(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
+
+func (h *ReportHandler) UpdateReportName(c *gin.Context) {
+	rid, err := uuid.Parse(c.Param("reportID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid reportID"})
+		return
+	}
+
+	var req struct {
+		Name string `json:"name" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		return
+	}
+
+	updated, err := h.ReportService.UpdateReportName(c.Request.Context(), rid, req.Name)
+	if err != nil {
+		switch {
+		case errors.Is(err, report.ErrInvalidReportName):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case errors.Is(err, report.ErrReportNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update name"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, updated) // full Report JSON
+}

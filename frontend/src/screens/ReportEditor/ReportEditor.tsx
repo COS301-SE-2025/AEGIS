@@ -57,6 +57,7 @@ interface Report {
   incidentId?: string;
   dateCreated?: string;
   analyst?: string;
+  case_id?: string;
 }
 
 
@@ -199,6 +200,11 @@ const [titleDirty, setTitleDirty] = useState(false);
 const [titleSaving, setTitleSaving] = useState<"idle"|"saving"|"saved"|"error">("idle");
 const [addingBusy, setAddingBusy] = useState(false);
 const [deletingId, setDeletingId] = useState<string | null>(null);
+const [reportNameState, setReportNameState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+const [reportTitleDirty, setReportTitleDirty] = useState(false);
+const reportNameTimerRef = useRef<number | null>(null);
+const lastReportNameSavedRef = useRef<string>("");
+const [caseId, setCaseId] = useState("");
 
 // local-only section helpers (so we can skip API calls until backend is wired)
 const makeLocalId = () =>
@@ -241,19 +247,78 @@ const loadReport = useCallback(async (id: string) => {
   const token = sessionStorage.getItem("authToken");
   if (!token) return;
 
-  const { data } = await axios.get<Report>(`${API_URL}/reports/${id}`, {
+  // Don’t force a wrong type here — read the raw payload and map it
+  const { data } = await axios.get<any>(`${API_URL}/reports/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  setReport(data);
-  const received = Array.isArray(data.content) ? data.content : [];
-  setSections(received.map(s => ({ ...s, completed: !!s.completed })));
-  setReportTitle(data.name || "");
-  setIncidentId(data.incidentId || "");
-  setDateCreated(data.dateCreated || "");
-  setAnalyst(data.analyst || "");
-  setReportType(data.type || "");
+  // Support both shapes:
+  //  - new: { metadata, content }
+  //  - old: { id, name, content, ... }
+  const meta = (data && data.metadata) ? data.metadata : data;
+
+  // Sections (array) — prefer data.content, fallback to data.sections
+  const rawSections: any[] =
+    Array.isArray(data?.content) ? data.content :
+    Array.isArray(data?.sections) ? data.sections :
+    [];
+
+  const mappedSections: ReportSection[] = rawSections.map((s) => ({
+    id: String(s.id),
+    title: String(s.title ?? ""),
+    content: String(s.content ?? ""),
+    completed: !!s.completed, // local flag (defaults false)
+  }));
+
+  // Build the UI model that matches your existing Report interface
+  const uiReport: Report = {
+    id: String(meta?.id ?? ""),
+    name: String(meta?.name ?? ""),                  // <-- THIS is the report name you edit/show
+    type: String(meta?.status ?? meta?.type ?? ""),  // you’ve been using type as status in UI
+    content: mappedSections,
+    incidentId: String(meta?.report_number ?? ""),   // if that’s what you show as “Incident ID”
+    dateCreated: String(meta?.created_at ?? meta?.updated_at ?? ""),
+    analyst: String(meta?.analyst ?? ""),            // not present in payload; stays ""
+    case_id: String(meta?.case_id ?? ""),
+  };
+
+  // Store the whole report (if you need it elsewhere)
+  setReport(uiReport);
+
+  // Bind UI state in one place
+  setSections(uiReport.content);
+
+  // IMPORTANT: set the title from metadata.name and sync the debounce guard
+  setReportTitle(uiReport.name);
+  lastReportNameSavedRef.current = uiReport.name;
+  setReportNameState("idle");
+  setReportTitleDirty(false);
+
+  setIncidentId(uiReport.incidentId ?? "");
+  setDateCreated(uiReport.dateCreated ?? "");
+  setAnalyst(uiReport.analyst ?? "");
+  setReportType(uiReport.type ?? "");
+  setCaseId(uiReport.case_id ?? "");
 }, []);
+
+// put this near the top of your component file (or in a utils file)
+const formatIsoDate = (
+  iso?: string,
+  opts: { locale?: string; utc?: boolean } = {}
+) => {
+  if (!iso) return "";
+  // handle your sentinel "no date" value
+  if (iso.startsWith("0001-01-01")) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso; // fallback if server sends odd value
+  const { locale = "en-GB", utc = false } = opts;
+  return new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    ...(utc ? { timeZone: "UTC" } : {}),
+  }).format(d);
+};
 
 useEffect(() => {
   if (!reportId) return;
@@ -684,6 +749,78 @@ const handleDragEnd = useCallback(
   [sections, reportId, report?.id, dirty, saveState, flushSaveNow, activeSection, loadReport]
 );
 
+async function putReportName(reportId: string, name: string) {
+  const token = sessionStorage.getItem("authToken");
+  await axios.put(
+    `${API_URL}/reports/${reportId}/name`,
+    { name },
+    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+  );
+}
+
+
+// Debounce like your content saver
+const scheduleReportNameSave = useCallback((nextName: string) => {
+  if (nextName === lastReportNameSavedRef.current) {
+    setReportTitleDirty(false);
+    setReportNameState("saved");
+    return;
+  }
+
+  setReportTitleDirty(true);
+  if (reportNameTimerRef.current) window.clearTimeout(reportNameTimerRef.current);
+
+  reportNameTimerRef.current = window.setTimeout(async () => {
+    const rid = reportId ?? report?.id;
+    if (!rid) return;
+    try {
+      setReportNameState("saving");
+      await putReportName(String(rid), nextName.trim());
+      lastReportNameSavedRef.current = nextName.trim();
+      setReportTitleDirty(false);
+      setReportNameState("saved");
+    } catch (e) {
+      console.error("Report name save failed", e);
+      setReportNameState("error");
+    }
+  }, 600);
+}, [reportId, report?.id]);
+
+const flushReportNameNow = useCallback(
+  async (opts?: { force?: boolean }) => {
+    const rid = reportId ?? report?.id;
+    if (!rid) return;
+    if (reportNameTimerRef.current) {
+      window.clearTimeout(reportNameTimerRef.current);
+      reportNameTimerRef.current = null;
+    }
+    const current = (reportTitle ?? "").trim();
+    if (!opts?.force && current === lastReportNameSavedRef.current) {
+      setReportNameState("saved");
+      setReportTitleDirty(false);
+      return;
+    }
+    if (current === "") {
+      // optional: prevent empty names
+      return;
+    }
+    try {
+      setReportNameState("saving");
+      await putReportName(String(rid), current);
+      lastReportNameSavedRef.current = current;
+      setReportTitleDirty(false);
+      setReportNameState("saved");
+    } catch (e) {
+      console.error("Report name save failed", e);
+      setReportNameState("error");
+    }
+  },
+  [reportId, report?.id, reportTitle]
+);
+
+useEffect(() => () => {
+  if (reportNameTimerRef.current) window.clearTimeout(reportNameTimerRef.current);
+}, []);
 
   //   {
   //     id: 'security-incident-2024-001',
@@ -967,26 +1104,39 @@ const commitEditingTitle = useCallback(async () => {
       <div className="flex-1 flex">
         {/* Report Sections Navigation */}
         <div className="w-80 bg-gray-850 border-r border-gray-700 p-4">
-  <div className="mb-6">
+<div className="mb-6">
+  <div className="flex items-center gap-2">
     <input
       type="text"
       value={reportTitle}
-      onChange={(e) => setReportTitle(e.target.value)}
+      onChange={(e) => {
+        setReportTitle(e.target.value);
+        scheduleReportNameSave(e.target.value);
+      }}
+      onBlur={() => flushReportNameNow()}
       className="w-full bg-transparent text-white font-semibold text-lg border-none outline-none"
+      placeholder="Untitled report"
     />
-    <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
-      <Calendar className="w-4 h-4" />
-      <span>{incidentId}</span> {/* Dynamically show incident ID */}
-    </div>
-    <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
-      <Clock className="w-4 h-4" />
-      <span>Date Created: {dateCreated}</span>
-    </div>
-    <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
-      <Users className="w-4 h-4" />
-      <span>Analyst: {analyst}</span>
-    </div>
+    {/* status dot */}
+    {reportNameState === "saving" && <Loader2 className="w-4 h-4 animate-spin text-gray-300" />}
+    {reportNameState === "saved" && !reportTitleDirty && <CheckCircle className="w-4 h-4 text-emerald-500" />}
+    {reportNameState === "error" && <XCircle className="w-4 h-4 text-red-500" />}
   </div>
+
+  <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
+    <Calendar className="w-4 h-4" />
+    <span>{incidentId}</span>
+  </div>
+  <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
+    <Clock className="w-4 h-4" />
+    <span>Date Created: {formatIsoDate(dateCreated)} </span>
+  </div>
+  <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
+    <Users className="w-4 h-4" />
+    <span>Analyst: {analyst}</span>
+  </div>
+</div>
+
 
   {/* Section List */}
   <div className="mb-3">
@@ -1072,9 +1222,11 @@ const commitEditingTitle = useCallback(async () => {
           <div className="bg-gray-800 border-b border-gray-700 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-white font-semibold text-lg">
-                  Security Incident 2024-001
-                </h2>
+              <h2 className="text-white font-semibold text-lg">
+                {`Case: ${caseId?.trim() ? caseId : "ID"}`}
+              </h2>
+
+
                 <div className="flex items-center gap-4 text-sm text-gray-400 mt-1">
                   <span className="flex items-center gap-1">
                     <Eye className="w-4 h-4" />
@@ -1108,11 +1260,11 @@ const commitEditingTitle = useCallback(async () => {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-400">Incident ID:</span>
-                    <span className="text-white ml-2">{incidentId}</span>
+                    <span className="text-white ml-2">{caseId}</span>
                   </div>
                   <div>
                     <span className="text-gray-400">Date Created:</span>
-                    <span className="text-white ml-2">{dateCreated}</span>
+                    <span className="text-white ml-2">{formatIsoDate(dateCreated)} </span>
                   </div>
                   <div>
                     <span className="text-gray-400">Analyst:</span>
@@ -1297,10 +1449,10 @@ const commitEditingTitle = useCallback(async () => {
 
 
 
-                  {/* <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">
+                  <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">
                     <Eye className="w-4 h-4 inline mr-2" />
                     Preview
-                  </button> */}
+                  </button>
                 </div>
                 
                 {/* <div className="flex items-center gap-2 text-sm text-gray-400">

@@ -57,6 +57,6 @@ type ReportWithDetails struct {
 	Version       int       `json:"version"`
 	LastModified  string    `json:"last_modified"`
 	FilePath      string    `json:"file_path"`
-	Author        string    `json:"author"`        // full name of examiner
-	Collaborators int       `json:"collaborators"` // count from case_user_roles
+	Author        string    `json:"author"`
+	Collaborators int       `json:"collaborators"`
 }

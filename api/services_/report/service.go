@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image/jpeg"
 	"image/png"
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jung-kurt/gofpdf"
@@ -39,7 +41,8 @@ type ReportService interface {
 	UpdateSectionContent(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newContent string) error
 	UpdateSectionTitle(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newTitle string) error
 	ReorderCustomSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newOrder int) error // ... your existing methods ...
-	ListRecentReports(ctx context.Context, opts RecentReportsOptions) ([]RecentReport, error)                         // NEW
+	ListRecentReports(ctx context.Context, opts RecentReportsOptions) ([]RecentReport, error)
+	UpdateReportName(ctx context.Context, reportID uuid.UUID, name string) (*Report, error) // NEW
 }
 
 // ReportServiceImpl is the concrete implementation of ReportService.
@@ -401,4 +404,42 @@ func (s *ReportServiceImpl) ReorderCustomSection(
 		return err
 	}
 	return s.mongoRepo.ReorderSection(ctx, mongoID, sectionID, newOrder, tenantID, teamID)
+}
+
+var (
+	ErrInvalidReportName      = errors.New("name must be 1..255 characters")
+	ErrReportNotFoundWithName = errors.New("report not found")
+)
+
+func (s *ReportServiceImpl) UpdateReportName(ctx context.Context, reportID uuid.UUID, name string) (*Report, error) {
+	// 1) Normalize + validate
+	trimmed := strings.TrimSpace(name)
+	if l := utf8.RuneCountInString(trimmed); l == 0 || l > 255 {
+		return nil, ErrInvalidReportName
+	}
+
+	// 2) (Optional) Authorization & tenancy checks.
+	//    If you store tenant/team on Report, you can fetch first and check.
+	//    Example:
+	//    rep, err := s.repo.GetReportByID(ctx, reportID)
+	//    if err != nil { return nil, err }
+	//    if rep == nil { return nil, ErrReportNotFoundWithName }
+	//    // TODO: authorize current principal against rep.TenantID/TeamID
+
+	// 3) Persist via repository
+	updated, err := s.repo.UpdateReportName(ctx, reportID, trimmed)
+	if err != nil {
+		// Map repo "not found" to a stable service error if your repo returns it
+		if errors.Is(err, ErrReportNotFoundWithName) {
+			return nil, ErrReportNotFoundWithName
+		}
+		return nil, err
+	}
+
+	// 4) (Optional) Audit event
+	// if s.aud != nil {
+	//     _ = s.aud.ReportRenamed(ctx, updated.ID, oldName, updated.Name, actorID)
+	// }
+
+	return updated, nil
 }

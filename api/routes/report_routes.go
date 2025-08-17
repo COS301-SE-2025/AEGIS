@@ -31,5 +31,8 @@ func RegisterReportRoutes(router *gin.RouterGroup, handler *handlers.ReportHandl
 
 		// Recent reports endpoint
 		report.GET("/recent", handler.GetRecentReports) // List recent reports
+
+		// Report name update endpoint
+		report.PUT("/:reportID/name", handler.UpdateReportName) // Update report name
 	}
 }
