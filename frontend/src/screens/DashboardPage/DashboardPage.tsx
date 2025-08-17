@@ -18,6 +18,7 @@ import { useState, useEffect } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
 import { SidebarToggleButton } from "../../context/SidebarToggleContext";
+import { ClipboardList } from "lucide-react";
 
 
 interface CaseCard {
@@ -77,6 +78,9 @@ const [evidenceCount, setEvidenceCount] = useState(0);
 const [notifications, setNotifications] = useState<Notification[]>([]);
 
 const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
+// NEW: keep a role state (fallback to what's in sessionStorage, if present)
+const [role, setRole] = useState<string>(user?.role || "");
+const isDFIRAdmin = role === "DFIR Admin";
 
 
 useEffect(() => {
@@ -323,7 +327,8 @@ const handleSaveCase = async () => {
         if (!res.ok) throw new Error("Failed to load profile");
 
         const result = await res.json();
-
+// keep a simple local Profile state if you want, but importantly set role:
+      setRole(result.data.role || "");
         // Update both the state and sessionStorage
         setProfile({
           name: result.data.name,
@@ -333,15 +338,16 @@ const handleSaveCase = async () => {
         });
 
         // Update sessionStorage
-        sessionStorage.setItem(
-          "user",
-          JSON.stringify({
-            ...user,
-            name: result.data.name,
-            email: result.data.email,
-            image_url: result.data.image_url,
-          })
-        );
+      sessionStorage.setItem(
+        "user",
+        JSON.stringify({
+          ...user,
+          name: result.data.name,
+          email: result.data.email,
+          image_url: result.data.image_url,
+          role: result.data.role,               // <= IMPORTANT
+        })
+      );
       } catch (err) {
         console.error("Error fetching profile:", err);
       }
@@ -349,6 +355,31 @@ const handleSaveCase = async () => {
 
     if (user?.id) fetchProfile();
   }, [user?.id]);
+
+
+
+
+// (optional) quick fallback: if your JWT has a "role" claim, you can seed it here
+useEffect(() => {
+  if (!role) {
+    const token = sessionStorage.getItem("authToken");
+    if (token) {
+      try {
+        const [, payloadB64] = token.split(".");
+        const json = JSON.parse(
+          decodeURIComponent(
+            atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+              .split("")
+              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          )
+        );
+        if (json?.role) setRole(json.role);
+      } catch { /* ignore */ }
+    }
+  }
+}, [role]);
+
 
 
   return (
@@ -387,6 +418,16 @@ const handleSaveCase = async () => {
               <Link to="/secure-chat">Secure Chat</Link>
             </span>
           </div>
+            {isDFIRAdmin && (
+              <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+                <ClipboardList className="w-6 h-6" />
+                <Link to="/report-dashboard">
+                  <span className="text-lg">Report Dashboard</span>
+                </Link>
+              </div>
+            )}
+
+
         </nav>
 
         {/* User Profile */}
@@ -440,6 +481,7 @@ const handleSaveCase = async () => {
                 <Link to="/secure-chat">Secure Chat</Link>
               </button>
             </div>
+            
 
             <div className="flex items-center gap-4">
               <div className="relative">
