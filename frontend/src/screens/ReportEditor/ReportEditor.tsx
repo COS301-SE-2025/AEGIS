@@ -94,6 +94,21 @@ type SortableSectionItemProps = {
   deletingId: string | null;
   saveState: "idle" | "saving" | "saved" | "error";
 };
+// utils (same file or a helpers file)
+export function formatIsoDateTime(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",   // drop if you don't want seconds
+    hour12: false,
+    // timeZoneName: "short", // uncomment to show e.g. GMT
+  });
+}
 
 function SortableSectionItem({
   section,
@@ -221,6 +236,7 @@ const navigate = useNavigate(); // NEW
 const [recentReports, setRecentReports] = useState<RecentReport[]>([]); // NEW
 const [recentLoading, setRecentLoading] = useState(true);               // NEW
 const [recentError, setRecentError] = useState<string | null>(null);    // NEW
+const [lastModified, setLastModified] = useState<string>("");
 
   // fetch report
   // useEffect(() => {
@@ -247,58 +263,65 @@ const loadReport = useCallback(async (id: string) => {
   const token = sessionStorage.getItem("authToken");
   if (!token) return;
 
-  // Don’t force a wrong type here — read the raw payload and map it
+  // Read raw payload; backend may send either { metadata, content } or a flat object
   const { data } = await axios.get<any>(`${API_URL}/reports/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  // Support both shapes:
-  //  - new: { metadata, content }
-  //  - old: { id, name, content, ... }
-  const meta = (data && data.metadata) ? data.metadata : data;
+  const meta = data?.metadata ?? data;
 
-  // Sections (array) — prefer data.content, fallback to data.sections
-  const rawSections: any[] =
-    Array.isArray(data?.content) ? data.content :
-    Array.isArray(data?.sections) ? data.sections :
-    [];
+  // Sections from either data.content or data.sections
+  const rawSections: any[] = Array.isArray(data?.content)
+    ? data.content
+    : Array.isArray(data?.sections)
+    ? data.sections
+    : [];
 
   const mappedSections: ReportSection[] = rawSections.map((s) => ({
     id: String(s.id),
     title: String(s.title ?? ""),
     content: String(s.content ?? ""),
-    completed: !!s.completed, // local flag (defaults false)
+    completed: !!s.completed,
   }));
 
-  // Build the UI model that matches your existing Report interface
+  // Build a UI-friendly report (keeps your existing interface)
   const uiReport: Report = {
     id: String(meta?.id ?? ""),
-    name: String(meta?.name ?? ""),                  // <-- THIS is the report name you edit/show
-    type: String(meta?.status ?? meta?.type ?? ""),  // you’ve been using type as status in UI
+    name: String(meta?.name ?? ""),                          // report name
+    type: String(meta?.status ?? meta?.type ?? ""),         // often status
     content: mappedSections,
-    incidentId: String(meta?.report_number ?? ""),   // if that’s what you show as “Incident ID”
-    dateCreated: String(meta?.created_at ?? meta?.updated_at ?? ""),
-    analyst: String(meta?.analyst ?? ""),            // not present in payload; stays ""
+    incidentId: String(meta?.report_number ?? ""),          // what you show as “Incident ID”
+    dateCreated: String(
+      meta?.created_at ?? meta?.createdAt ?? meta?.date_created ?? ""
+    ),
+    analyst: String(meta?.author ?? meta?.analyst ?? ""),   // try author first
     case_id: String(meta?.case_id ?? ""),
   };
 
-  // Store the whole report (if you need it elsewhere)
+  // Push into state
   setReport(uiReport);
-
-  // Bind UI state in one place
   setSections(uiReport.content);
 
-  // IMPORTANT: set the title from metadata.name and sync the debounce guard
+  // Title + debounce guard stay in sync
   setReportTitle(uiReport.name);
   lastReportNameSavedRef.current = uiReport.name;
   setReportNameState("idle");
   setReportTitleDirty(false);
 
+  // Other fields
   setIncidentId(uiReport.incidentId ?? "");
   setDateCreated(uiReport.dateCreated ?? "");
   setAnalyst(uiReport.analyst ?? "");
   setReportType(uiReport.type ?? "");
   setCaseId(uiReport.case_id ?? "");
+
+  // NEW: last modified / updated-at (support multiple keys)
+  const lm =
+    meta?.updated_at ??
+    meta?.last_modified ??
+    meta?.lastModified ??
+    "";
+  setLastModified(String(lm));
 }, []);
 
 // put this near the top of your component file (or in a utils file)
@@ -822,6 +845,7 @@ useEffect(() => () => {
   if (reportNameTimerRef.current) window.clearTimeout(reportNameTimerRef.current);
 }, []);
 
+
   //   {
   //     id: 'security-incident-2024-001',
   //     title: 'Security Incident 2024-001',
@@ -1129,7 +1153,7 @@ const commitEditingTitle = useCallback(async () => {
   </div>
   <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
     <Clock className="w-4 h-4" />
-    <span>Date Created: {formatIsoDate(dateCreated)} </span>
+    <span>Last modified:  {lastModified ? formatIsoDateTime(lastModified) : "—"} </span>
   </div>
   <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
     <Users className="w-4 h-4" />
@@ -1263,8 +1287,8 @@ const commitEditingTitle = useCallback(async () => {
                     <span className="text-white ml-2">{caseId}</span>
                   </div>
                   <div>
-                    <span className="text-gray-400">Date Created:</span>
-                    <span className="text-white ml-2">{formatIsoDate(dateCreated)} </span>
+                    <span className="text-gray-400">Last modified:</span>
+                    <span className="text-white ml-2">{lastModified ? formatIsoDateTime(lastModified) : "—"} </span>
                   </div>
                   <div>
                     <span className="text-gray-400">Analyst:</span>

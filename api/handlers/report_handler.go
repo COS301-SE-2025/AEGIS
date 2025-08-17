@@ -12,6 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/lib/pq"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -24,52 +26,134 @@ func NewReportHandler(s report.ReportService) *ReportHandler {
 	return &ReportHandler{ReportService: s}
 }
 
-// GenerateReport creates a new report for a case.
-// handlers/report.go
-func (h *ReportHandler) GenerateReport(c *gin.Context) {
-	caseID, err := uuid.Parse(c.Param("caseID"))
-	if err != nil {
-		writeError(c, http.StatusBadRequest, "invalid_case_id", "invalid case ID")
-		return
-	}
+// handlers/report_handler.go
 
-	userID, ok := c.Get("userID")
-	if !ok {
-		writeError(c, http.StatusUnauthorized, "unauthorized", "user not authorized")
-		return
-	}
-	examinerID, err := uuid.Parse(userID.(string))
-	if err != nil {
-		writeError(c, http.StatusInternalServerError, "invalid_user_id", "invalid user ID format")
-		return
-	}
+type Claims struct {
+	UserID   uuid.UUID
+	TeamID   uuid.UUID
+	TenantID uuid.UUID
+	Role     string
+	Email    string
+	FullName string
+}
 
-	tenantIDStr := c.GetString("tenantID")
-	if tenantIDStr == "" {
-		writeError(c, http.StatusUnauthorized, "tenant_missing", "tenant not found")
-		return
+// helper to pull a string from gin context
+func getStr(c *gin.Context, key string) string {
+	if v, ok := c.Get(key); ok {
+		if s, ok2 := v.(string); ok2 {
+			return s
+		}
 	}
-	tenantID, err := uuid.Parse(tenantIDStr)
-	if err != nil {
-		writeError(c, http.StatusBadRequest, "invalid_tenant_id", "invalid tenant id")
-		return
-	}
+	return ""
+}
 
-	var teamID uuid.UUID
-	if s := c.GetString("teamID"); s != "" {
-		if teamID, err = uuid.Parse(s); err != nil {
-			writeError(c, http.StatusBadRequest, "invalid_team_id", "invalid team id")
-			return
+func ClaimsFromCtx(c *gin.Context) (Claims, error) {
+	// 1) If a fully-formed "claims" was set, prefer it
+	if v, ok := c.Get("claims"); ok {
+		if cl, ok2 := v.(Claims); ok2 {
+			return cl, nil
 		}
 	}
 
-	rep, err := h.ReportService.GenerateReport(c.Request.Context(), caseID, examinerID, tenantID, teamID)
+	// 2) Rebuild from individual keys set by AuthMiddleware
+	userIDStr := getStr(c, "userID")
+	tenantIDStr := getStr(c, "tenantID")
+	teamIDStr := getStr(c, "teamID")
+
+	if userIDStr == "" || tenantIDStr == "" {
+		return Claims{}, errors.New("missing required claims")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		writeError(c, http.StatusInternalServerError, "generate_failed", "failed to generate report")
+		return Claims{}, err
+	}
+
+	tenantID, err := uuid.Parse(tenantIDStr)
+	if err != nil {
+		return Claims{}, err
+	}
+
+	// team can be optional for some roles; use uuid.Nil if empty
+	var teamID uuid.UUID
+	if teamIDStr != "" {
+		teamID, err = uuid.Parse(teamIDStr)
+		if err != nil {
+			return Claims{}, err
+		}
+	}
+
+	return Claims{
+		UserID:   userID,
+		TenantID: tenantID,
+		TeamID:   teamID,
+		Role:     getStr(c, "userRole"),
+		Email:    getStr(c, "email"),
+		FullName: getStr(c, "fullName"),
+	}, nil
+}
+
+// Keep MustClaims as a thin wrapper, but now it won’t panic on normal paths
+func MustClaims(c *gin.Context) Claims {
+	cl, err := ClaimsFromCtx(c)
+	if err != nil {
+		panic(err)
+	}
+	return cl
+}
+
+// 23505 is Postgres unique_violation
+func IsUniqueViolation(err error) bool {
+	var pgxErr *pgconn.PgError
+	if errors.As(err, &pgxErr) {
+		return pgxErr.Code == "23505"
+	}
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) {
+		return string(pqErr.Code) == "23505"
+	}
+	return false
+}
+
+// GenerateReport creates a new report for a case.
+// handlers/report.go
+func (h *ReportHandler) GenerateReport(c *gin.Context) {
+	caseIDStr := c.Param("caseID")
+	caseID, err := uuid.Parse(caseIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid case id"})
+		return
+	}
+	ctx := c.Request.Context()
+
+	// 1) If a report already exists for this case, return it
+	if list, err := h.ReportService.GetReportsByCaseID(ctx, caseID); err == nil && len(list) > 0 {
+		c.JSON(http.StatusOK, gin.H{"id": list[0].ID})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"reportID": rep.ID, "status": "Report generated successfully"})
+	// 2) Otherwise create it
+	claims := MustClaims(c) // your JWT claims extraction (user/team/tenant)
+	rep, err := h.ReportService.GenerateReport(ctx, caseID, claims.UserID, claims.TenantID, claims.TeamID)
+	if err != nil {
+		// If a parallel request created it, surface the existing one
+		if IsUniqueViolation(err) {
+			if again, e2 := h.ReportService.GetReportsByCaseID(ctx, caseID); e2 == nil && len(again) > 0 {
+				c.JSON(http.StatusOK, gin.H{"id": again[0].ID})
+				return
+			}
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate report"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":            rep.ID,
+		"name":          rep.Name,
+		"status":        rep.Status,
+		"version":       rep.Version,
+		"last_modified": rep.UpdatedAt,
+	})
 }
 
 // GetReportByID retrieves a report with metadata and content.

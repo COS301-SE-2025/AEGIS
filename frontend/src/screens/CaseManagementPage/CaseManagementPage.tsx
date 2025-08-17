@@ -20,7 +20,8 @@ import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 import {ShareButton} from "../ShareCasePage/sharecasebutton";
 //
 import { useParams } from 'react-router-dom';
-
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 export const CaseManagementPage = () => {
 const storedUser = sessionStorage.getItem("user");
@@ -75,7 +76,7 @@ const getPriorityStyle = (priority: string) => {
 const { caseId } = useParams<{ caseId: string }>();
 
 
-
+const API_URL = "http://localhost:8080/api/v1";
 const [caseData, setCaseData] = useState<CaseData | null>(null);
 
 useEffect(() => {
@@ -324,7 +325,83 @@ useEffect(() => {
   };
 
 
+type Json = unknown;
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === "object";
 
+const extractReportId = (row: unknown): string | null => {
+  if (!isObj(row)) return null;
+  for (const k of ["id", "report_id", "reportId"]) {
+    const v = row[k];
+    if (typeof v === "string" && v.length > 0) return v;
+  }
+  return null;
+};
+
+const extractList = (payload: unknown): unknown[] => {
+  if (Array.isArray(payload)) return payload;
+  if (isObj(payload)) {
+    if (Array.isArray(payload.reports)) return payload.reports as unknown[];
+    if (Array.isArray(payload.data)) return payload.data as unknown[];
+    if (Array.isArray(payload.items)) return payload.items as unknown[];
+  }
+  return [];
+};
+
+async function getOrCreateReportForCase(caseId: string): Promise<string> {
+  const token = sessionStorage.getItem("authToken") || "";
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+  // 1) Try existing report(s)
+  try {
+    const res = await fetch(`${API_URL}/reports/cases/${caseId}`, { headers });
+    if (res.ok) {
+      const payload: Json = await res.json();
+      const list = extractList(payload);
+      if (list.length) {
+        const id = extractReportId(list[0]);
+        if (id) return id;
+      }
+    }
+  } catch (e) {
+    console.warn("GET reports by case failed; will try to create:", e);
+  }
+
+  // 2) Create if none
+  const createRes = await fetch(`${API_URL}/reports/cases/${caseId}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({}), // if your handler ignores body, this can be omitted
+  });
+
+  const createPayload: Json = await createRes.json();
+  // handle { id }, { report_id }, { reportId }, or { data: {...} }
+  let createdId = extractReportId(createPayload);
+  if (!createdId && isObj(createPayload) && isObj(createPayload.data)) {
+    createdId = extractReportId(createPayload.data);
+  }
+  if (!createdId) {
+    throw new Error("Could not parse report id from create response");
+  }
+  return createdId;
+}
+
+const [viewReportBusy, setViewReportBusy] = useState(false);
+const navigate = useNavigate();
+
+const handleViewReport = async () => {
+  if (!caseId) return;
+  setViewReportBusy(true);
+  try {
+    const reportId = await getOrCreateReportForCase(caseId);
+    navigate(`/report-editor/${reportId}`);
+  } catch (err) {
+    console.error(err);
+    alert("Could not open or create a report for this case.");
+  } finally {
+    setViewReportBusy(false);
+  }
+};
 
   // Evidence data
   // const evidenceItems = [
@@ -483,6 +560,14 @@ useEffect(() => {
                   <ShareButton caseId={caseId || ""} caseName={caseName} />
 
                 )}
+              </button>
+              <button
+                onClick={handleViewReport}
+                disabled={!caseId || viewReportBusy}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                <FileText className="w-4 h-4" />
+                {viewReportBusy ? "Opening…" : "View Report"}
               </button>
               <button
                 onClick={() => setShowFilterInput(!showFilterInput)}
