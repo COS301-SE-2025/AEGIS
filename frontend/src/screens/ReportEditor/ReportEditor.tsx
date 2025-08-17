@@ -33,6 +33,9 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { GripVertical } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { AlertTriangle } from "lucide-react";
+import { createRoot } from "react-dom/client";
 
 interface ReportSection {
   id: string;
@@ -60,7 +63,13 @@ interface Report {
   case_id?: string;
 }
 
-
+type ConfirmOpts = {
+  title: string;
+  description?: string;
+  confirmText?: string;
+  cancelText?: string;
+  danger?: boolean;
+};
 
 //type Section = { id: string; title: string; content: string; order: number; updated_at?: string }
 const API_URL = "http://localhost:8080/api/v1";
@@ -107,6 +116,90 @@ export function formatIsoDateTime(iso?: string) {
     second: "2-digit",   // drop if you don't want seconds
     hour12: false,
     // timeZoneName: "short", // uncomment to show e.g. GMT
+  });
+}
+export function confirm(opts: ConfirmOpts): Promise<boolean> {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  const cleanup = () => {
+    setTimeout(() => {
+      root.unmount();
+      container.remove();
+    }, 0);
+  };
+
+  return new Promise<boolean>((resolve) => {
+    function Modal() {
+      // Close on ESC
+      useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+          if (e.key === "Escape") {
+            resolve(false);
+            cleanup();
+          }
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+      }, []);
+
+      return (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => {
+              resolve(false);
+              cleanup();
+            }}
+          />
+          {/* Dialog */}
+          <div className="relative w-[min(420px,92vw)] max-h-[85vh] overflow-y-auto rounded-xl border border-gray-700 bg-gray-800 p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-400" />
+              <div className="flex-1">
+                <h3 className="text-white font-semibold">{opts.title}</h3>
+                {opts.description && (
+                  <p className="mt-1 text-sm text-gray-300">{opts.description}</p>
+                )}
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    className="rounded bg-gray-700 px-3 py-1.5 text-gray-200 hover:bg-gray-600"
+                    onClick={() => {
+                      resolve(false);
+                      cleanup();
+                    }}
+                  >
+                    {opts.cancelText ?? "Cancel"}
+                  </button>
+                  <button
+                    className={
+                      "rounded px-3 py-1.5 text-white " +
+                      (opts.danger
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-blue-600 hover:bg-blue-700")
+                    }
+                    onClick={() => {
+                      resolve(true);
+                      cleanup();
+                    }}
+                  >
+                    {opts.confirmText ?? "Confirm"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    root.render(<Modal />);
   });
 }
 
@@ -157,14 +250,7 @@ function SortableSectionItem({
       </div>
 
       <div className="flex items-center gap-2">
-        {/* completion dot */}
-        <div
-          className={`w-3 h-3 rounded-full border-2 ${
-            section.completed ? "bg-green-500 border-green-500" : "border-gray-400"
-          }`}
-          onClick={(e) => e.stopPropagation()}
-          title={section.completed ? "Completed" : "Mark completed"}
-        />
+      
 
         {/* delete */}
         <button
@@ -634,37 +720,65 @@ const handleAddSection = useCallback(async () => {
 }, [reportId, report?.id, newSectionTitle, activeSection, loadReport]);
 
 // Remove a section locally and keep the UI stable
-const handleDeleteSection = useCallback(async (sectionId: string) => {
-  const rid = reportId ?? report?.id;
-  if (!rid) return;
+const handleDeleteSection = useCallback(
+  async (sectionId: string) => {
+    const rid = reportId ?? report?.id;
+    if (!rid) return;
 
-  const idx = sections.findIndex(s => s.id === sectionId);
-  if (idx === -1) return;
-  if (!window.confirm("Delete this section?")) return;
+    const sec = sections.find((s) => s.id === sectionId);
 
-  const prevSections = sections;
-  const next = sections.filter(s => s.id !== sectionId);
+    const confirmed = await confirm({
+      title: "Delete this section?",
+      description: sec?.title ? `“${sec.title}” will be removed.` : undefined,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      danger: true,
+    });
+    if (!confirmed) return;
 
-  const newActive =
-    idx < activeSection ? activeSection - 1 :
-    idx === activeSection ? Math.max(0, activeSection - (idx === sections.length - 1 ? 1 : 0)) :
-    activeSection;
+    const idx = sections.findIndex((s) => s.id === sectionId);
+    if (idx === -1) return;
 
-  setSections(next);
-  setActiveSection(newActive);
+    // snapshot for rollback
+    const prevSections = sections;
+    const prevActive = activeSection;
 
-  try {
-    // If the section was never persisted, just stop here
-    if (sectionId.startsWith("local-")) return;
+    // optimistic UI
+    const next = sections.filter((s) => s.id !== sectionId);
+    const newActive =
+      idx < activeSection
+        ? activeSection - 1
+        : idx === activeSection
+        ? Math.max(0, activeSection - (idx === sections.length - 1 ? 1 : 0))
+        : activeSection;
 
-    await deleteSection(String(rid), sectionId);
-    await loadReport(String(rid));
-  } catch (e) {
-    console.error("Delete section failed", e);
-    setSections(prevSections); // rollback
-    setActiveSection(activeSection);
-  }
-}, [reportId, report?.id, sections, activeSection, loadReport]);
+    setDeletingId(sectionId);
+    setSections(next);
+    setActiveSection(newActive);
+
+    try {
+      // If it never existed server-side, we're done
+      if (sectionId.startsWith("local-")) {
+        toast.success("Section deleted");
+        return;
+      }
+
+      await deleteSection(String(rid), sectionId);
+      // Optional: re-fetch canonical state
+      await loadReport(String(rid));
+      toast.success("Section deleted");
+    } catch (e) {
+      console.error("Delete section failed", e);
+      // rollback
+      setSections(prevSections);
+      setActiveSection(prevActive);
+      toast.error("Failed to delete section");
+    } finally {
+      setDeletingId(null);
+    }
+  },
+  [reportId, report?.id, sections, activeSection, loadReport]
+);
 
 
 async function postAddSection(reportId: string, title: string, content = "", order?: number) {

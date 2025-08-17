@@ -115,7 +115,7 @@ func (s *ReportServiceImpl) GenerateReport(
 		{ID: primitive.NewObjectID(), Title: "Interpretation and Analysis", Content: "", Order: 6, CreatedAt: now, UpdatedAt: now},
 		{ID: primitive.NewObjectID(), Title: "Limitations", Content: "", Order: 7, CreatedAt: now, UpdatedAt: now},
 		{ID: primitive.NewObjectID(), Title: "Conclusion", Content: "", Order: 8, CreatedAt: now, UpdatedAt: now},
-		{ID: primitive.ObjectID{}, Title: "Appendices", Content: "", Order: 9, CreatedAt: now, UpdatedAt: now},
+		{ID: primitive.NewObjectID(), Title: "Appendices", Content: "", Order: 9, CreatedAt: now, UpdatedAt: now},
 		{ID: primitive.NewObjectID(), Title: "Certification", Content: "", Order: 10, CreatedAt: now, UpdatedAt: now},
 	}
 
