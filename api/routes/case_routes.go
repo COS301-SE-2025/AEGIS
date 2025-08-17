@@ -98,7 +98,11 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.DELETE("/timeline/:event_id", middleware.AuthMiddleware(), h.TimelineHandler.Delete)
 			// Reorder events for a case
 			protected.POST("/cases/:case_id/timeline/reorder", h.TimelineHandler.Reorder)
-
+			//chain of custody
+			protected.POST("/cases/:case_id/chain_of_custody", h.ChainOfCustodyHandler.AddEntry)
+			protected.PUT("/cases/:case_id/chain_of_custody/:id", h.ChainOfCustodyHandler.UpdateEntry)
+			protected.GET("/cases/:case_id/chain_of_custody/:id", h.ChainOfCustodyHandler.GetEntry)
+			protected.GET("/cases/:case_id/chain_of_custody", h.ChainOfCustodyHandler.GetEntries)
 			// ─── Metadata Evidence Upload ────────────────
 			protected.POST("/evidence", h.MetadataHandler.UploadEvidence)
 			// ─── Metadata Evidence Retrieval ─────────────

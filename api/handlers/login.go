@@ -64,6 +64,7 @@ type Handler struct {
 	IOCHandler                *IOCHandler
 	TimelineHandler           *TimelineHandler
 	EvidenceHandler           *EvidenceHandler
+	ChainOfCustodyHandler     *ChainOfCustodyHandler
 }
 
 func NewHandler(
@@ -95,6 +96,7 @@ func NewHandler(
 	IOCHandler *IOCHandler,
 	TimelineHandler *TimelineHandler,
 	EvidenceHandler *EvidenceHandler,
+	ChainOfCustodyHandler *ChainOfCustodyHandler,
 
 ) *Handler {
 	return &Handler{
@@ -126,6 +128,7 @@ func NewHandler(
 		IOCHandler:                IOCHandler,
 		TimelineHandler:           TimelineHandler,
 		EvidenceHandler:           EvidenceHandler,
+		ChainOfCustodyHandler:     ChainOfCustodyHandler,
 	}
 }
 

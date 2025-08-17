@@ -27,6 +27,7 @@ import (
 	"aegis-api/services_/case/case_evidence_totals"
 	"aegis-api/services_/case/case_tags"
 	update_case "aegis-api/services_/case/case_update"
+	"aegis-api/services_/chain_of_custody"
 	"aegis-api/services_/chat"
 	evidencecount "aegis-api/services_/evidence/evidence_count"
 	"aegis-api/services_/evidence/evidence_download"
@@ -116,6 +117,7 @@ func main() {
 		log.Fatalf("failed migrating timeline: %v", err)
 	}
 	evidenceCountRepo := evidencecount.NewEvidenceRepository(db.DB)
+	chainOfCustodyRepo := chain_of_custody.NewChainOfCustodyRepository(db.DB)
 	// ─── Email Sender (Mock) ────────────────────────────────────
 	emailSender := reset_password.NewMockEmailSender()
 
@@ -197,6 +199,10 @@ func main() {
 	uploadHandler := handlers.NewUploadHandler(uploadService, auditLogger)
 	metadataHandler := handlers.NewMetadataHandler(metadataService, auditLogger)
 	downloadHandler := handlers.NewDownloadHandler(downloadService, auditLogger)
+
+	// ─── Chain of Custody ─────────────────────────────────────
+	chainOfCustodyService := chain_of_custody.NewChainOfCustodyService(chainOfCustodyRepo)
+	chainOfCustodyHandler := handlers.NewChainOfCustodyHandler(chainOfCustodyService)
 
 	// ─── Messages / WebSocket ───────────────────────────────────
 	messageRepo := messages.NewMessageRepository(db.DB)
@@ -293,6 +299,7 @@ func main() {
 		iocHandler,
 		timelineHandler,
 		evidenceHandler,
+		chainOfCustodyHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────
