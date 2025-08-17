@@ -126,7 +126,7 @@ func main() {
 	authService := login.NewAuthService(userRepo)
 	resetService := reset_password.NewPasswordResetService(resetTokenRepo, userRepo, emailSender)
 	caseService := case_creation.NewCaseService(caseRepo, notificationService, hub)
-	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo, adminChecker, userAdapter)
+	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo, adminChecker, userAdapter, notificationService, hub)
 
 	listActiveCasesService := ListActiveCases.NewService(listActiveCasesRepo)
 	listClosedCasesService := ListClosedCases.NewService(listClosedCasesRepo)

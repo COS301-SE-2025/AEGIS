@@ -1,3 +1,0 @@
-## Best in the World
-
-# !

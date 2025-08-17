@@ -181,16 +181,19 @@ func (h *MetadataHandler) GetEvidenceByID(c *gin.Context) {
 func (h *MetadataHandler) GetEvidenceByCaseID(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	userRole, _ := c.Get("userRole")
-	email, _ := c.Get("email") // Optional, if you have this set
+	var emailStr string
+	if emailVal, ok := c.Get("email"); ok && emailVal != nil {
+		emailStr, _ = emailVal.(string)
+	}
 	actor := auditlog.Actor{
 		ID:        userID.(string),
 		Role:      userRole.(string),
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
-		Email:     email.(string), // Optional, if you have this set
+		Email:     emailStr,
 	}
 
-	caseIDStr := c.Param("case_id")
+	caseIDStr := c.Param("caseID")
 	caseID, err := uuid.Parse(caseIDStr)
 	if err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
