@@ -47,7 +47,7 @@ export const IOCPage = () => {
   const { case_id } = useParams<{ case_id: string }>(); // match route param naming
   const navigate = useNavigate();
 
-  const [caseName, setCaseName] = useState("");
+  // Removed unused caseName state
   const [iocs, setIocs] = useState<IOC[]>([]);
   const [type, setType] = useState("IP");
   const [value, setValue] = useState("");
@@ -68,12 +68,12 @@ export const IOCPage = () => {
         setLoading(true);
 
         // GET Case details
-        const caseRes = await axios.get<Case>(`http://localhost:8080/api/v1/cases/${case_id}`, {
+        await axios.get<Case>(`http://localhost:8080/api/v1/cases/${case_id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
-        setCaseName(caseRes.data.name);
+        // Removed setCaseName since caseName is unused
 
         // GET IOCs for case
         const iocRes = await axios.get<IOC[]>(`http://localhost:8080/api/v1/cases/${case_id}/iocs`, {

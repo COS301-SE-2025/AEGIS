@@ -8,11 +8,7 @@ import {
   MessageSquare,
   Search,
   Settings,
-  Share2,
-  Plus,
-  Calendar,  
-  Clock
-} from "lucide-react";
+  Share2} from "lucide-react";
 import { useState, useEffect  } from 'react';
 import { Link, useNavigate } from "react-router-dom";
 //thati added
@@ -298,8 +294,8 @@ useEffect(() => {
   }, [user?.id]);
 
   
-  const [newEventDescription, setNewEventDescription] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [] = useState('');
+  const [] = useState(false);
 
   //state declaration for filtering the timeline
   const [filterKeyword, setFilterKeyword] = useState('');
@@ -309,41 +305,11 @@ useEffect(() => {
 
 
   // ADD THESE NEW FUNCTIONS
-  const getCurrentTimestamp = () => {
-    const now = new Date();
-    const date = now.toISOString().split('T')[0]; // YYYY-MM-DD format
-    const time = now.toTimeString().slice(0, 5); // HH:MM format
-    return { date, time };
-  };
-
-    const addEvent = () => {
-      if (newEventDescription.trim()) {
-        const { date, time } = getCurrentTimestamp();
-        const newEvent = { date, time, description: newEventDescription.trim() };
-        
-        setTimelineEvents(prevEvents => [...prevEvents, newEvent]); //  use previous events
-        setNewEventDescription('');
-        setShowAddForm(false);
-        console.log("Adding event:", newEvent);
-        console.log("Current caseId:", caseId);
-
-      }
-      
-    };
 
 
-    const deleteEvent = (index: number) => {
-    const updatedEvents = [...timelineEvents];
-    updatedEvents.splice(index, 1);
-    setTimelineEvents(updatedEvents);
-  };
 
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      addEvent();
-    }
-  };
+
 
 
 

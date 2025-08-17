@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { Shield, Cpu, Users, Calendar, Hash, Info } from "lucide-react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { Shield, Cpu, Calendar, Hash } from "lucide-react";
 import axios from "axios";
 const BASE_URL = "http://localhost:8080/api/v1";
 
 export const ChainOfCustody = () => {
   const { caseId, entryId } = useParams();
-  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 

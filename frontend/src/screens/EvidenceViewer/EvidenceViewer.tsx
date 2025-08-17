@@ -22,10 +22,7 @@ import {
   FileText,
   Hash,
   Calendar,
-  MoreVertical,
-  Reply,
-  ThumbsUp
-} from "lucide-react";
+  MoreVertical} from "lucide-react";
 import axios from "axios";
 import { Link, useSearchParams } from "react-router-dom";
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
@@ -38,9 +35,7 @@ import { sendThreadMessage } from "./api";
 import { createAnnotationThread } from "./api";
 import { addThreadParticipant } from "./api";
 import { fetchThreadParticipants } from "./api";
-import { addReaction } from "./api";
 import { approveMessage } from "./api";
-import { removeReaction } from "./api";
 import{MessageCard} from "../../components/ui/MessageCard";
 
 // Import Select components from your UI library
@@ -166,26 +161,27 @@ function getCustodyDetails(chainOfCustody: any[]) {
   if (!Array.isArray(chainOfCustody) || chainOfCustody.length === 0) return {};
   const first = chainOfCustody[0];
   const last = chainOfCustody[chainOfCustody.length - 1];
+  // Add debug log to inspect entries
+  console.log("getCustodyDetails: first entry:", first);
+  console.log("getCustodyDetails: last entry:", last);
   return {
-    examiner: first?.forensic_info?.examiner || "",
+    examiner: first?.forensic_info?.examiner || first?.forensic_info?.Examiner || "",
     custodian: last?.custodian || last?.custodian_name || last?.user_name || "",
     acquisitionDate: last?.acquisition_date || last?.acquisitionDate || "",
     acquisitionTool: last?.acquisition_tool || last?.acquisitionTool || "",
     hash: last?.hash || "",
-    osVersion: last?.system_info?.osVersion || "",
+    osVersion: last?.system_info?.osVersion || last?.system_info?.os_version || "",
     architecture: last?.system_info?.architecture || "",
-    computerName: last?.system_info?.computerName || "",
+    computerName: last?.system_info?.computerName || last?.system_info?.computer_name || "",
     domain: last?.system_info?.domain || "",
-    lastBoot: last?.system_info?.lastBoot || "",
-    method: last?.forensic_info?.method || "",
-    location: last?.forensic_info?.location || "",
-    legalStatus: last?.forensic_info?.legalStatus || "",
-    notes: last?.forensic_info?.notes || "",
+    lastBoot: last?.system_info?.lastBoot || last?.system_info?.last_boot || "",
+    method: first?.forensic_info?.method || first?.forensic_info?.Method || "",
+    location: first?.forensic_info?.location || "",
+    legalStatus: first?.forensic_info?.legalStatus || first?.forensic_info?.legal_status || "",
+    notes: first?.forensic_info?.notes || "",
   };
 }
 const BASE_URL = "http://localhost:8080/api/v1";
-  const token = sessionStorage.getItem("authToken");
-const axiosConfig = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
   const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
@@ -223,8 +219,8 @@ const [chainOfCustody, setChainOfCustody] = useState<any[]>([]);
 const custodyDetails = getCustodyDetails(chainOfCustody);
 console.debug('Parsed custodyDetails:', custodyDetails);
 
-const [chainLoading, setChainLoading] = useState(false);
-const [chainError, setChainError] = useState<string | null>(null);
+const [chainLoading] = useState(false);
+const [chainError] = useState<string | null>(null);
 
 useEffect(() => {
   async function loadEvidence() {
@@ -275,6 +271,9 @@ useEffect(() => {
 }, [caseId, evidenceIdFromQuery]);
 
 useEffect(() => {
+  // Clear previous chain of custody data when switching files
+  setChainOfCustody([]);
+
   if (!selectedFile) {
     return;
   }
@@ -286,7 +285,7 @@ useEffect(() => {
   // Fetch chain of custody for selected evidence
   const fetchChainOfCustody = async () => {
     let res, parsedEntries;
-  const evidenceId = selectedFile.id;
+    const evidenceId = selectedFile.id;
 
     const token = sessionStorage.getItem("authToken");
     let axiosConfig = {};
@@ -296,18 +295,40 @@ useEffect(() => {
 
     try {
       res = await axios.get(`${BASE_URL}/cases/${selectedCaseId}/chain_of_custody?evidence_id=${evidenceId}`, axiosConfig);
+      console.log("Chain of Custody API raw response:", res.data);
       parsedEntries = Array.isArray(res.data)
-        ? res.data.map(entry => ({
-            ...entry,
-            forensic_info: typeof entry.forensic_info === 'string' ? safeParse(entry.forensic_info) : entry.forensic_info,
-            system_info: typeof entry.system_info === 'string' ? safeParse(entry.system_info) : entry.system_info,
-          }))
+        ? res.data.map(entry => {
+            // Parse JSON fields
+            const forensic_info = typeof entry.forensic_info === 'string' ? safeParse(entry.forensic_info) : entry.forensic_info || {};
+            const system_info = typeof entry.system_info === 'string' ? safeParse(entry.system_info) : entry.system_info || {};
+            // Add debug logs for parsed fields
+            console.log("Parsed forensic_info:", forensic_info);
+            console.log("Parsed system_info:", system_info);
+            // Map snake_case to camelCase
+            return {
+              ...entry,
+              forensic_info: {
+                notes: forensic_info.notes || forensic_info.Notes || "",
+                method: forensic_info.method || forensic_info.Method || "",
+                examiner: forensic_info.examiner || forensic_info.Examiner || "",
+                location: forensic_info.location || "",
+                legalStatus: forensic_info.legalStatus || forensic_info.legal_status || forensic_info.LegalStatus || "",
+              },
+              system_info: {
+                osVersion: system_info.osVersion || system_info.os_version || "",
+                architecture: system_info.architecture || "",
+                computerName: system_info.computerName || system_info.computer_name || "",
+                domain: system_info.domain || "",
+                lastBoot: system_info.lastBoot || system_info.last_boot || "",
+              }
+            };
+          })
         : [];
+      console.log("Chain of Custody parsed entries:", parsedEntries);
       setChainOfCustody(parsedEntries);
     } catch (err) {
       setChainOfCustody([]);
     }
-
   };
   // Safely parse JSON, fallback to empty object
   function safeParse(json: string) {
@@ -474,7 +495,7 @@ const handleSendMessage = async (overrideText?: string) => {
   }
 };
 
-const [profile, setProfile] = useState({
+const [profile] = useState({
     name: user?.name || "User",
     email: user?.email || "user@aegis.com",
     role: user?.role || "Admin",
@@ -542,29 +563,12 @@ const [profile, setProfile] = useState({
     filteredFiles.sort((a, b) => new Date(a.uploaded_at || '').getTime() - new Date(b.uploaded_at || '').getTime());
   }
 
-  function addNestedReply(messages: ThreadMessage[], parentId: string, reply: ThreadMessage): ThreadMessage[] {
-    return messages.map(msg => {
-      if (msg.id === parentId) {
-        return {
-          ...msg,
-          replies: [...(msg.replies || []), reply]
-        };
-      } else if (msg.replies) {
-        return {
-          ...msg,
-          replies: addNestedReply(msg.replies, parentId, reply)
-        };
-      }
-      return msg;
-    });
-  }
 
 
 // Add these helper functions inside the EvidenceViewer component (after existing functions)
-const handleAddReaction = async (messageId: string, emoji: string) => {
+const handleAddReaction = async () => {
   try {
     // Call the backend and get the updated message with reactions
-    const updatedMessage = await addReaction(messageId, user.id, emoji);
 
     // Update the threadMessages state: replace the old message with updatedMessage
     if (!selectedThread) return;
