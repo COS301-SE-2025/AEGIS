@@ -26,7 +26,8 @@ import {
   Reply,
   ThumbsUp
 } from "lucide-react";
-import { Link, } from "react-router-dom";
+import axios from "axios";
+import { Link, useSearchParams } from "react-router-dom";
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 //import { string } from "prop-types";
 import { useParams } from "react-router-dom";
@@ -41,8 +42,6 @@ import { addReaction } from "./api";
 import { approveMessage } from "./api";
 import { removeReaction } from "./api";
 import{MessageCard} from "../../components/ui/MessageCard";
-
-
 
 // Import Select components from your UI library
 import {
@@ -150,6 +149,43 @@ function buildNestedMessages(messages: ThreadMessage[]): ThreadMessage[] {
 
 
 export const EvidenceViewer  =() =>{
+// Helper to extract hashes from metadata JSON string
+function getHashesFromMetadata(metadata: string) {
+  try {
+    const meta = JSON.parse(metadata);
+    return {
+      sha256: meta.sha256 || "N/A",
+      md5: meta.md5 || "N/A"
+    };
+  } catch {
+    return { sha256: "N/A", md5: "N/A" };
+  }
+}
+// Helper to extract details from chainOfCustody
+function getCustodyDetails(chainOfCustody: any[]) {
+  if (!Array.isArray(chainOfCustody) || chainOfCustody.length === 0) return {};
+  const first = chainOfCustody[0];
+  const last = chainOfCustody[chainOfCustody.length - 1];
+  return {
+    examiner: first?.forensic_info?.examiner || "",
+    custodian: last?.custodian || last?.custodian_name || last?.user_name || "",
+    acquisitionDate: last?.acquisition_date || last?.acquisitionDate || "",
+    acquisitionTool: last?.acquisition_tool || last?.acquisitionTool || "",
+    hash: last?.hash || "",
+    osVersion: last?.system_info?.osVersion || "",
+    architecture: last?.system_info?.architecture || "",
+    computerName: last?.system_info?.computerName || "",
+    domain: last?.system_info?.domain || "",
+    lastBoot: last?.system_info?.lastBoot || "",
+    method: last?.forensic_info?.method || "",
+    location: last?.forensic_info?.location || "",
+    legalStatus: last?.forensic_info?.legalStatus || "",
+    notes: last?.forensic_info?.notes || "",
+  };
+}
+const BASE_URL = "http://localhost:8080/api/v1";
+  const token = sessionStorage.getItem("authToken");
+const axiosConfig = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
   const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
@@ -160,12 +196,35 @@ export const EvidenceViewer  =() =>{
     .toUpperCase();
 
 
+
 const { caseId } = useParams();
+const [searchParams] = useSearchParams();
+const evidenceIdFromQuery = searchParams.get("evidenceId");
 
 const [files, setFiles] = useState<FileItem[]>([]);
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState<string | null>(null);
 const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+
+const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>([]);   
+const [newThreadTitle, setNewThreadTitle] = useState('');
+const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+const [selectedThread, setSelectedThread] = useState<AnnotationThread | null>(null);
+const [replyingToMessageId, setReplyingToMessageId] = useState<string | null>(null);
+const [replyText, setReplyText] = useState('');
+const [newMessage, setNewMessage] = useState('');
+const [searchTerm, setSearchTerm] = useState('');
+const [activeTab, setActiveTab] = useState<'overview' | 'threads' | 'metadata' | 'chain'>('overview');
+
+const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([]);
+
+// Chain of Custody state
+const [chainOfCustody, setChainOfCustody] = useState<any[]>([]);
+const custodyDetails = getCustodyDetails(chainOfCustody);
+console.debug('Parsed custodyDetails:', custodyDetails);
+
+const [chainLoading, setChainLoading] = useState(false);
+const [chainError, setChainError] = useState<string | null>(null);
 
 useEffect(() => {
   async function loadEvidence() {
@@ -189,6 +248,22 @@ useEffect(() => {
       );
       setFiles(filesWithThreadCount);
       setError(null);
+      // Auto-select evidence if evidenceId is present in query
+      function ensureCaseId(file: FileItem | null): FileItem | null {
+        if (!file) return null;
+        // If file.caseId is missing or undefined, set it from caseId param
+        if (!file.caseId || file.caseId === "undefined") {
+          return { ...file, caseId: caseId ?? "" };
+        }
+        return file;
+      }
+      if (evidenceIdFromQuery) {
+        const found = filesWithThreadCount.find(f => f.id === evidenceIdFromQuery);
+        if (found) setSelectedFile(ensureCaseId(found));
+        else setSelectedFile(ensureCaseId(filesWithThreadCount[0] || null));
+      } else {
+        setSelectedFile(ensureCaseId(filesWithThreadCount[0] || null));
+      }
     } catch (err: any) {
       setError(err.message || "Failed to load evidence files");
     } finally {
@@ -197,46 +272,56 @@ useEffect(() => {
   }
 
   loadEvidence();
-}, [caseId]);
-
+}, [caseId, evidenceIdFromQuery]);
 
 useEffect(() => {
-  const handleClickOutside = (event: MouseEvent) => {
-    if (showReactionPicker !== null) {
-      const reactionPicker = document.querySelector('[class*="absolute bottom-full"]');
-      if (reactionPicker && !reactionPicker.contains(event.target as Node)) {
-        setShowReactionPicker(null);
-      }
+  if (!selectedFile) {
+    return;
+  }
+  const selectedCaseId = selectedFile.caseId;
+  if (!selectedCaseId || selectedCaseId === "undefined") {
+    return;
+  }
+
+  // Fetch chain of custody for selected evidence
+  const fetchChainOfCustody = async () => {
+    let res, parsedEntries;
+  const evidenceId = selectedFile.id;
+
+    const token = sessionStorage.getItem("authToken");
+    let axiosConfig = {};
+    if (token) {
+      axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
     }
+
+    try {
+      res = await axios.get(`${BASE_URL}/cases/${selectedCaseId}/chain_of_custody?evidence_id=${evidenceId}`, axiosConfig);
+      parsedEntries = Array.isArray(res.data)
+        ? res.data.map(entry => ({
+            ...entry,
+            forensic_info: typeof entry.forensic_info === 'string' ? safeParse(entry.forensic_info) : entry.forensic_info,
+            system_info: typeof entry.system_info === 'string' ? safeParse(entry.system_info) : entry.system_info,
+          }))
+        : [];
+      setChainOfCustody(parsedEntries);
+    } catch (err) {
+      setChainOfCustody([]);
+    }
+
   };
+  // Safely parse JSON, fallback to empty object
+  function safeParse(json: string) {
+    try {
+      return JSON.parse(json);
+    } catch {
+      return {};
+    }
+  }
 
-  document.addEventListener('mousedown', handleClickOutside);
-  return () => {
-    document.removeEventListener('mousedown', handleClickOutside);
-  };
-}, [showReactionPicker]);
-
-
-  const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>([]);   
-  const [newThreadTitle, setNewThreadTitle] = useState('');
-  const [selectedFile, setSelectedFile] = useState<FileItem | null>(files[0]);
-  const [selectedThread, setSelectedThread] = useState<AnnotationThread | null>(null);
-  const [replyingToMessageId, setReplyingToMessageId] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
-  const [newMessage, setNewMessage] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'threads' | 'metadata'>('overview');
-
-  const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([]);
-
-
-useEffect(() => {
-  if (!selectedFile) return;
-
+  // Fetch threads as before
   const loadThreads = async () => {
     try {
       const threads = await fetchThreadsByFile(selectedFile.id);
-      // For each thread, fetch its messages and set messageCount
       const threadsWithCounts = await Promise.all(
         threads.map(async (t: any) => {
           const rawMessages = await fetchThreadMessages(t.id);
@@ -248,7 +333,7 @@ useEffect(() => {
             createdBy: t.created_by,
             tags: t.Tags || [],
             participantCount: t.Participants?.length || 0,
-            messageCount: rawMessages.length, // <-- set actual count
+            messageCount: rawMessages.length,
             user: userName,
             avatar: userName.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
             time: new Date(t.created_at).toLocaleString(),
@@ -261,7 +346,12 @@ useEffect(() => {
     }
   };
 
+  fetchChainOfCustody();
   loadThreads();
+}, [selectedFile]);
+// Fetch evidence metadata for selected file
+useEffect(() => {
+  // Metadata will be derived from chainOfCustody entries
 }, [selectedFile]);
 
 
@@ -384,10 +474,7 @@ const handleSendMessage = async (overrideText?: string) => {
   }
 };
 
-
-
-
-  const [profile, setProfile] = useState({
+const [profile, setProfile] = useState({
     name: user?.name || "User",
     email: user?.email || "user@aegis.com",
     role: user?.role || "Admin",
@@ -1002,6 +1089,17 @@ if (!caseId || caseId === "undefined") {
                   {/* Tabs */}
                   <div className="flex items-center gap-6 border-b border-muted">
                     <button
+                    onClick={() => setActiveTab('chain')}
+                    className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'chain'
+                        ? 'text-blue-400 border-blue-400'
+                        : 'text-muted-foreground border-transparent hover:text-foreground hover:border-gray-600'
+                    }`}
+                  >
+                    Chain of Custody
+                  </button>
+
+                    <button
                       onClick={() => setActiveTab('overview')}
                       className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'overview'
@@ -1036,6 +1134,50 @@ if (!caseId || caseId === "undefined") {
 
                 {/* Tab Content */}
                 <div className="flex-1 overflow-y-auto p-6">
+                  {activeTab === 'chain' && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold">Chain of Custody Records</h3>
+                        <button
+                          className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"
+                          onClick={() => {
+                            if (selectedFile && selectedFile.id) {
+                              window.location.assign(`/chain-of-custody/${caseId}?evidenceId=${selectedFile.id}`);
+                            }
+                          }}
+                        >
+                          <span className="text-sm font-medium">+ Add Entry</span>
+                        </button>
+                      </div>
+                      <div className="bg-card p-4 rounded-lg">
+                        {chainLoading ? (
+                          <p className="text-muted-foreground text-sm">Loading chain of custody...</p>
+                        ) : chainError ? (
+                          <p className="text-red-500 text-sm">{chainError}</p>
+                        ) : chainOfCustody.length > 0 ? (
+                          chainOfCustody.map((entry, idx) => (
+                            <div key={entry.id || idx} className="flex items-center gap-3 mb-2">
+                              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{entry.custodian_name || entry.custodian || entry.user_name || "Unknown"}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {idx === 0
+                                    ? "Original Collector"
+                                    : (idx === chainOfCustody.length - 1
+                                        ? "Current Custodian"
+                                        : "Transferred")}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : ""}</p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-muted-foreground text-sm">No chain of custody entries yet.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {activeTab === 'overview' && (
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                       {/* Evidence Information */}
@@ -1047,12 +1189,12 @@ if (!caseId || caseId === "undefined") {
                         <div className="space-y-3 text-sm">
                           <div>
                             <span className="text-muted-foreground">Description:</span>
-                            <p className="text-muted-foreground mt-1">{selectedFile.description}</p>
+                            <p className="text-muted-foreground mt-1">{custodyDetails.notes || "No description available"}</p>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-muted-foreground">Size:</span>
-                              <p className="text-muted-foreground">{selectedFile.file_size}</p>
+                              <p className="text-muted-foreground">{formatFileSize(selectedFile.file_size)}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Type:</span>
@@ -1076,19 +1218,28 @@ if (!caseId || caseId === "undefined") {
                           Chain of Custody
                         </h3>
                         <div className="space-y-3">
-                          {Array.isArray(selectedFile.chainOfCustody) && selectedFile.chainOfCustody.map((person, index) => (
-                            <div key={index} className="flex items-center gap-3">
-                              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                              <div className="flex-1">
-                                <div className="text-sm font-medium">{person}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {index === 0 ? 'Original Collector' : 
-                                   (selectedFile.chainOfCustody && index === selectedFile.chainOfCustody.length - 1) ? 'Current Custodian' : 'Transferred'}
+                          {chainLoading ? (
+                            <p className="text-muted-foreground text-sm">Loading chain of custody...</p>
+                          ) : chainError ? (
+                            <p className="text-red-500 text-sm">{chainError}</p>
+                          ) : chainOfCustody.length > 0 ? (
+                            chainOfCustody.map((entry, index) => (
+                              <div key={entry.id || index} className="flex items-center gap-3">
+                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                <div className="flex-1">
+                                  <div className="text-sm font-medium">{entry.custodian_name || entry.custodian || entry.user_name || "Unknown"}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {index === 0 ? 'Original Collector' : 
+                                     (index === chainOfCustody.length - 1) ? 'Current Custodian' : 'Transferred'}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : ""}</div>
                                 </div>
+                                <CheckCircle className="w-4 h-4 text-green-400" />
                               </div>
-                              <CheckCircle className="w-4 h-4 text-green-400" />
-                            </div>
-                          ))}
+                            ))
+                          ) : (
+                            <p className="text-muted-foreground text-sm">No chain of custody entries yet.</p>
+                          )}
                         </div>
                       </div>
 
@@ -1101,15 +1252,15 @@ if (!caseId || caseId === "undefined") {
                         <div className="space-y-3 text-sm">
                           <div>
                             <span className="text-muted-foreground">Acquisition Date:</span>
-                            <p className="text-muted-foreground">{new Date(selectedFile.uploaded_at).toLocaleString()}</p>
+                            <p className="text-muted-foreground">{custodyDetails.acquisitionDate ? new Date(custodyDetails.acquisitionDate).toLocaleString() : "N/A"}</p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Tool Used:</span>
-                            <p className="text-muted-foreground">{selectedFile.acquisitionTool}</p>
+                            <p className="text-muted-foreground">{custodyDetails.acquisitionTool || "N/A"}</p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Hash:</span>
-                            <p className="text-muted-foreground font-mono text-xs break-all">{selectedFile.hash}</p>
+                            <p className="text-muted-foreground font-mono text-xs break-all">{custodyDetails.hash || "N/A"}</p>
                           </div>
                         </div>
                       </div>
@@ -1274,36 +1425,39 @@ if (!caseId || caseId === "undefined") {
                             </div>
                             <div>
                               <span className="text-muted-foreground">File Size:</span>
-                              <p className="text-muted-foreground">{selectedFile.file_size}</p>
+                              <p className="text-muted-foreground">{formatFileSize(selectedFile.file_size)}</p>
                             </div>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Hash Values:</span>
                             <div className="mt-2 space-y-2">
-                              <div className="bg-muted p-2 rounded">
-                                <div className="text-xs text-muted-foreground mb-1">SHA256:</div>
-                                <div className="text-muted-foreground font-mono text-xs break-all">
-                                  a1b2c3d4e5f6789abcdef1234567890abcdef1234567890abcdef1234567890ab
-                                </div>
-                              </div>
-                              <div className="bg-muted p-2 rounded">
-                                <div className="text-xs text-muted-foreground mb-1">MD5:</div>
-                                <div className="text-muted-foreground font-mono text-xs">
-                                  x1y2z3a4b5c6def7890abcdef123456
-                                </div>
-                              </div>
+                              {(() => {
+                                const hashes = getHashesFromMetadata(selectedFile.metadata);
+                                return (
+                                  <>
+                                    <div className="bg-muted p-2 rounded">
+                                      <div className="text-xs text-muted-foreground mb-1">SHA256:</div>
+                                      <div className="text-muted-foreground font-mono text-xs break-all">{hashes.sha256}</div>
+                                    </div>
+                                    <div className="bg-muted p-2 rounded">
+                                      <div className="text-xs text-muted-foreground mb-1">MD5:</div>
+                                      <div className="text-muted-foreground font-mono text-xs">{hashes.md5}</div>
+                                    </div>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
 
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-muted-foreground">Created:</span>
-                              <p className="text-muted-foreground">{new Date(selectedFile.uploaded_at || '').toLocaleString()}</p> /* created */
+                              <p className="text-muted-foreground">{new Date(selectedFile.uploaded_at || '').toLocaleString()}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Modified:</span>
-                              <p className="text-muted-foreground">{selectedFile.acquisitionDate ? new Date(selectedFile.acquisitionDate).toLocaleString() : "N/A"}</p>
+                              <p className="text-muted-foreground">{custodyDetails.acquisitionDate ? new Date(custodyDetails.acquisitionDate).toLocaleString() : "N/A"}</p>
                             </div>
                           </div>
                         </div>
@@ -1323,17 +1477,17 @@ if (!caseId || caseId === "undefined") {
                           
                           <div>
                             <span className="text-muted-foreground">Acquisition Method:</span>
-                            <p className="text-muted-foreground">Physical Image</p>
+                            <p className="text-muted-foreground">{custodyDetails.method || "N/A"}</p>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Source Device:</span>
-                            <p className="text-muted-foreground">Workstation WS-0234</p>
+                            <p className="text-muted-foreground">{custodyDetails.computerName || "N/A"}</p>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Examiner:</span>
-                            <p className="text-muted-foreground">{Array.isArray(selectedFile.chainOfCustody) && selectedFile.chainOfCustody.length > 0 ? selectedFile.chainOfCustody[0] : "N/A"}</p>
+                            <p className="text-muted-foreground">{custodyDetails.examiner || "N/A"}</p>
                           </div>
                           
                           <div>
@@ -1345,7 +1499,7 @@ if (!caseId || caseId === "undefined") {
                             <span className="text-muted-foreground">Legal Status:</span>
                             <div className="flex items-center gap-2 mt-1">
                               <CheckCircle className="w-4 h-4 text-green-400" />
-                              <span className="text-green-400">Admissible</span>
+                              <span className="text-green-400">{custodyDetails.legalStatus || "N/A"}</span>
                             </div>
                           </div>
                         </div>
@@ -1361,27 +1515,27 @@ if (!caseId || caseId === "undefined") {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-muted-foreground">OS Version:</span>
-                              <p className="text-muted-foreground">Windows 11 Pro</p>
+                              <p className="text-muted-foreground">{custodyDetails.osVersion || "N/A"}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Architecture:</span>
-                              <p className="text-muted-foreground">x64</p>
+                              <p className="text-muted-foreground">{custodyDetails.architecture || "N/A"}</p>
                             </div>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Computer Name:</span>
-                            <p className="text-muted-foreground">DESKTOP-WS0234</p>
+                            <p className="text-muted-foreground">{custodyDetails.computerName || "N/A"}</p>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Domain:</span>
-                            <p className="text-muted-foreground">CORPORATE.LOCAL</p>
+                            <p className="text-muted-foreground">{custodyDetails.domain || "N/A"}</p>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Last Boot:</span>
-                            <p className="text-muted-foreground">2024-03-15 08:30:15 UTC</p>
+                            <p className="text-muted-foreground">{custodyDetails.lastBoot || "N/A"}</p>
                           </div>
                         </div>
                       </div>
