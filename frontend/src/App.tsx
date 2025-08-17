@@ -26,6 +26,7 @@ import { SystemAdminDashboard } from "./screens/SystemAdminDashboard";
 import { TenantAdminDashboard } from "./screens/TenantAdminDashboard";
 import { TeamsPage } from "./screens/TeamsPage";
 import { IOCPage } from "./screens/IOCPage";
+import { ChainOfCustody } from "./screens/ChainOfCustody";
 //FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
 import { UploadEvidenceForm } from "./screens/UploadEvidencePage/UploadEvidencePage";
@@ -78,7 +79,8 @@ export default function App() {
       <Route path="/tenant-admin-dashboard" element={<TenantAdminDashboard />} />
       <Route path="/teams" element={<TeamsPage />} />
       <Route path="/cases/:case_id/iocs" element={<IOCPage />} />
-      
+      <Route path="/chain-of-custody/:caseId" element={<ChainOfCustody />} />
+
       {/* Fallback route */}
     </Routes>
     </ThemeProvider>

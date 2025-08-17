@@ -548,5 +548,16 @@ CREATE TABLE timeline_events (
 );
 CREATE INDEX idx_timeline_case_order ON timeline_events (case_id, "order");
 
-
+----Chain of Custody Entries table-----
+CREATE TABLE chain_of_custody (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    evidence_id UUID NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
+    custodian TEXT NOT NULL,
+    acquisition_date TIMESTAMP WITH TIME ZONE,
+    acquisition_tool TEXT,
+    system_info JSONB,  -- os_version, architecture, computer_name, domain, etc.
+    forensic_info JSONB, -- method, examiner, location, notes, legal_status
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
