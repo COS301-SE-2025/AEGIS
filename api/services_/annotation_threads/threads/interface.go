@@ -23,4 +23,6 @@ type AnnotationThreadService interface {
 	GetThreadByID(threadID uuid.UUID) (*AnnotationThread, error)
 	// GetUserByID retrieves threads by user ID (participant or creator).
 	GetUserByID(userID uuid.UUID) (*User, error)
+	CreateThreadWithParticipant(thread *AnnotationThread, tags []string, userID uuid.UUID) error
+	UpdateThreadTags(threadID uuid.UUID, tags []string) error
 }

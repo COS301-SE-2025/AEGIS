@@ -12,15 +12,17 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"aegis-api/pkg/websocket" // Adjust this path to match your module
-	"github.com/google/uuid"
+	"aegis-api/services_/notification"
 
+	"github.com/google/uuid"
 )
 
 func TestWebSocket_ReceivesThreadCreatedEvent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	// Create and run hub
-	hub := websocket.NewHub()
+	notificationService := &notification.NotificationService{} // You may need to initialize this properly
+	hub := websocket.NewHub(notificationService)
 	go hub.Run()
 
 	// Set up test Gin route
@@ -28,7 +30,8 @@ func TestWebSocket_ReceivesThreadCreatedEvent(t *testing.T) {
 	r.GET("/ws/cases/:case_id", func(c *gin.Context) {
 		caseID := c.Param("case_id")
 		userID := "test-user"
-		websocket.ServeWS(hub, c.Writer, c.Request, userID, caseID)
+		upgrader := gws.Upgrader{} // Use default settings or configure as needed
+		websocket.ServeWS(hub, upgrader, c.Writer, c.Request, userID, caseID)
 	})
 
 	// Start test server

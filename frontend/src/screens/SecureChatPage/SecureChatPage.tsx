@@ -22,7 +22,6 @@ import {
 import {Link} from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { toast } from 'react-hot-toast';
-import {jwtDecode} from "jwt-decode";
 import { MutableRefObject } from "react";
 
 // Type definitions
@@ -238,9 +237,9 @@ export const SecureChatPage = (): JSX.Element => {
   const [, setPreviewFileData] = useState<string>("");
   const [typingUsers, setTypingUsers] = useState<Record<number, string[]>>({});
   const [hasMounted, setHasMounted] = useState(false);
-  const [threads, setThreads] = useState<Thread[]>([]);
+  const [] = useState<Thread[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
-  const [socketConnected, setSocketConnected] = useState(false);
+  const [, setSocketConnected] = useState(false);
   const previousUrlRef = useRef<string | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -251,8 +250,7 @@ export const SecureChatPage = (): JSX.Element => {
   }
   const [activeCases, setActiveCases] = useState<Case[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState("");
-  const [retryCount, setRetryCount] = useState(0);
-  const MAX_RETRIES = 5;
+  // Removed unused setRetryCount state
 
 
   const handleTypingStatus = (msg: WebSocketMessage) => {
@@ -339,7 +337,7 @@ const [availableUsers, setAvailableUsers] = useState<{ user_email: string, role:
 
 
 const [token] = useState(sessionStorage.getItem("authToken"));
-const [userEmail, setUserEmail] = useState(() => {
+const [userEmail] = useState(() => {
   try {
     const token = sessionStorage.getItem("authToken");
     if (!token) return null;
@@ -363,7 +361,7 @@ const [showEditGroupModal, setShowEditGroupModal] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
 
   const [chatMessages, setChatMessages] = useState<ChatMessages>({});
-  const [teamMembers] = useState([
+  const [] = useState([
   { name: "Alex Morgan", role: "Forensics Analyst", color: "text-blue-400" },
   { name: "Jamie Lee", role: "Incident Responder", color: "text-red-400" },
   { name: "Riley Smith", role: "Malware Analyst", color: "text-green-400" }
@@ -375,21 +373,6 @@ const [showEditGroupModal, setShowEditGroupModal] = useState(false);
 
 
 
-const simulateTyping = (chatId: number, _?: string) => {
-  const user = "Alex Morgan (Forensics Analyst)";
-   setTypingUsers(prev => ({
-    ...prev,
-    [chatId]: [user]
-  }));
-
-  setTimeout(() => {
-    setTypingUsers(prev => ({
-      ...prev,
-      [chatId]: (prev[chatId] || []).filter(u => u !== user)
-    }));
-  },  15000 + Math.random() * 25000);
-
-};
 
   const filteredGroups = groups.filter(group =>
     group.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -1346,33 +1329,7 @@ const handleOpenAddMembersModal = async () => {
   }
 };
 
-const decoded = token ? jwtDecode<{ userId: string; name: string }>(token) : null;
 
-const handleSend = () => {
-  if (!message.trim() || !activeChat || !socketRef.current) return;
-
-  const userId = decoded?.userId || "";
-  const username = decoded?.name || "Unknown";
-
-  const newMessage = {
-    text: message,
-    groupId: String(activeChat.id),
-    senderId: userId,
-    senderName: username,
-    timestamp: new Date().toISOString(),
-    attachments: [] // Add file support later if needed
-  };
-
-  const wsMessage: WebSocketMessage = {
-    type: "new_message",
-    payload: newMessage
-  };
-
-  socketRef.current.send(JSON.stringify(wsMessage));
-
-  // Clear input
-  setMessage("");
-};
 
 
 

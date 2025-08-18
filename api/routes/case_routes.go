@@ -80,12 +80,35 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.GET("/cases/user/:user_id", h.CaseHandler.GetCasesByUserHandler)
 			protected.GET("/cases/filter", h.CaseHandler.GetFilteredCasesHandler)
 			protected.GET("/cases/:case_id", h.CaseHandler.GetCaseByIDHandler)
+
+			// Graphical Mapping - IOC Graph endpoints
+			protected.GET("/tenants/:tenantId/ioc-graph", middleware.AuthMiddleware(), h.IOCHandler.GetTenantIOCGraph)
+			protected.GET("/tenants/:tenantId/cases/:case_id/ioc-graph", middleware.AuthMiddleware(), h.IOCHandler.GetCaseIOCGraph)
+
+			protected.GET("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.GetIOCsByCase)
+			protected.POST("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.AddIOCToCase)
+			// ______timeline routes______________
+			// List all events for a case
+			protected.GET("/cases/:case_id/timeline", middleware.AuthMiddleware(), h.TimelineHandler.ListByCase)
+			// Create new event for a case
+			protected.POST("/cases/:case_id/timeline", middleware.AuthMiddleware(), h.TimelineHandler.Create)
+			// Update a timeline event by ID
+			protected.PATCH("/timeline/:event_id", middleware.AuthMiddleware(), h.TimelineHandler.Update)
+			// Delete a timeline event by ID
+			protected.DELETE("/timeline/:event_id", middleware.AuthMiddleware(), h.TimelineHandler.Delete)
+			// Reorder events for a case
+			protected.POST("/cases/:case_id/timeline/reorder", h.TimelineHandler.Reorder)
+			//chain of custody
+			protected.POST("/cases/:case_id/chain_of_custody", h.ChainOfCustodyHandler.AddEntry)
+			protected.PUT("/cases/:case_id/chain_of_custody/:id", h.ChainOfCustodyHandler.UpdateEntry)
+			protected.GET("/cases/:case_id/chain_of_custody/:id", h.ChainOfCustodyHandler.GetEntry)
+			protected.GET("/cases/:case_id/chain_of_custody", h.ChainOfCustodyHandler.GetEntries)
 			// ─── Metadata Evidence Upload ────────────────
 			protected.POST("/evidence", h.MetadataHandler.UploadEvidence)
 			// ─── Metadata Evidence Retrieval ─────────────
 			protected.GET("/evidence-metadata/:id", h.MetadataHandler.GetEvidenceByID)
 			protected.GET("/evidence-metadata/case/:case_id", h.MetadataHandler.GetEvidenceByCaseID)
-
+			protected.GET("/evidence/count/:tenantId", h.EvidenceHandler.GetEvidenceCount)
 			// ─── Admin: Users ────────────────────────────
 			protected.GET("/users", h.AdminService.ListUsers)
 

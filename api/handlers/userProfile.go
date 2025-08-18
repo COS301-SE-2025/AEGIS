@@ -2,16 +2,15 @@ package handlers
 
 import (
 	"aegis-api/services_/auditlog"
+	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/user/profile"
 	"aegis-api/structs"
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,15 +18,18 @@ import (
 type ProfileHandler struct {
 	profileService *profile.ProfileService
 	auditLogger    *auditlog.AuditLogger
+	ipfsClient     upload.IPFSClientImp
 }
 
 func NewProfileHandler(
 	profileService *profile.ProfileService,
 	auditLogger *auditlog.AuditLogger,
+	ipfsClient upload.IPFSClientImp,
 ) *ProfileHandler {
 	return &ProfileHandler{
 		profileService: profileService,
 		auditLogger:    auditLogger,
+		ipfsClient:     ipfsClient,
 	}
 }
 
@@ -77,7 +79,7 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 
 	//  Handle base64 image upload
 	if req.ImageBase64 != "" {
-		imageURL, err := SaveBase64Image(req.ID, req.ImageBase64)
+		imageURL, err := SaveBase64ImageToIPFS(h.ipfsClient, req.ID, req.ImageBase64)
 		if err != nil {
 			h.auditLogger.Log(c, auditlog.AuditLog{
 				Action:      "UPDATE_PROFILE",
@@ -85,11 +87,11 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 				Target:      auditlog.Target{Type: "user", ID: req.ID},
 				Service:     "profile",
 				Status:      "FAILED",
-				Description: "Failed to save profile picture: " + err.Error(),
+				Description: "Failed to upload profile picture to IPFS: " + err.Error(),
 			})
 			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
 				Error:   "image_upload_failed",
-				Message: "Failed to save profile picture",
+				Message: "Failed to upload profile picture to IPFS",
 			})
 			return
 		}
@@ -143,12 +145,11 @@ func (h *ProfileHandler) UpdateProfileHandler(c *gin.Context) {
 	})
 }
 
-// SaveBase64Image decodes a base64 image and stores it in ./uploads/ directory
-func SaveBase64Image(userID string, base64Str string) (string, error) {
+// SaveBase64ImageToIPFS uploads a base64 image to IPFS and returns the image URL
+func SaveBase64ImageToIPFS(ipfsClient upload.IPFSClientImp, userID string, base64Str string) (string, error) {
 	if base64Str == "" {
 		return "", errors.New("empty image")
 	}
-
 	// Strip metadata if present: "data:image/png;base64,..."
 	split := strings.SplitN(base64Str, ",", 2)
 	if len(split) != 2 {
@@ -161,17 +162,10 @@ func SaveBase64Image(userID string, base64Str string) (string, error) {
 		return "", err
 	}
 
-	// Create folder if not exists
-	uploadDir := "/app/uploads" // matches docker-compose volume
-	os.MkdirAll(uploadDir, os.ModePerm)
-
-	filenameOnly := userID + "_" + time.Now().Format("20060102150405") + ".png"
-	fullPath := fmt.Sprintf("%s/%s", uploadDir, filenameOnly)
-
-	if err := ioutil.WriteFile(fullPath, decoded, 0644); err != nil {
+	cid, err := ipfsClient.UploadFile(bytes.NewReader(decoded))
+	if err != nil {
 		return "", err
 	}
-
-	return "/uploads/" + filenameOnly, nil
-
+	ipfsURL := fmt.Sprintf("https://ipfs.io/ipfs/%s", cid)
+	return ipfsURL, nil
 }
