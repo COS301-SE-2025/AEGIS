@@ -8,21 +8,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
-// MockRepo implements the mock repository for testing
-type MockCollaboratorsRepo struct {
-	mock.Mock
-}
-
-func (m *MockCollaboratorsRepo) GetCollaboratorsByCaseID(caseID uuid.UUID) ([]get_collaborators.Collaborator, error) {
+func (m *MockRepo) GetCollaboratorsByCaseID(caseID uuid.UUID) ([]get_collaborators.Collaborator, error) {
 	args := m.Called(caseID)
 	return args.Get(0).([]get_collaborators.Collaborator), args.Error(1)
 }
 
 func TestGetCollaborators_SuccessSingle(t *testing.T) {
-	mockRepo := new(MockCollaboratorsRepo)
+	mockRepo := new(MockRepo)
 	service := get_collaborators.NewService(mockRepo)
 
 	caseID := uuid.New()
@@ -44,7 +38,7 @@ func TestGetCollaborators_SuccessSingle(t *testing.T) {
 }
 
 func TestGetCollaborators_EmptyResult(t *testing.T) {
-	mockRepo := new(MockCollaboratorsRepo)
+	mockRepo := new(MockRepo)
 	service := get_collaborators.NewService(mockRepo)
 
 	caseID := uuid.New()
@@ -57,7 +51,7 @@ func TestGetCollaborators_EmptyResult(t *testing.T) {
 }
 
 func TestGetCollaborators_RepoError(t *testing.T) {
-	mockRepo := new(MockCollaboratorsRepo)
+	mockRepo := new(MockRepo)
 	service := get_collaborators.NewService(mockRepo)
 
 	caseID := uuid.New()
@@ -71,7 +65,7 @@ func TestGetCollaborators_RepoError(t *testing.T) {
 }
 
 func TestGetCollaborators_MultipleResults(t *testing.T) {
-	mockRepo := new(MockCollaboratorsRepo)
+	mockRepo := new(MockRepo)
 	service := get_collaborators.NewService(mockRepo)
 
 	caseID := uuid.New()

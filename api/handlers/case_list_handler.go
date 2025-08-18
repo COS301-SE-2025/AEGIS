@@ -184,7 +184,7 @@ func (h *CaseHandler) GetCaseByIDHandler(c *gin.Context) {
 		return
 	}
 
-	caseDetails, err := h.ListCasesService.GetCaseByID(caseID, tenantID)
+	caseDetails, err := h.ListCasesService.GetCaseByID(tenantID, caseID)
 	if err != nil {
 		fmt.Printf("[GetCaseByIDHandler] failed: %v\n", err)
 		h.auditLogger.Log(c, auditlog.AuditLog{

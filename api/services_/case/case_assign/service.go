@@ -2,7 +2,6 @@ package case_assign
 
 import (
 	"aegis-api/pkg/websocket"
-	"aegis-api/services_/notification"
 	"errors"
 
 	"github.com/gin-gonic/gin"
@@ -13,16 +12,8 @@ func NewCaseAssignmentService(
 	repo CaseAssignmentRepoInterface,
 	adminChecker AdminChecker,
 	userRepo UserRepo,
-	notificationService notification.NotificationServiceInterface,
-	hub *websocket.Hub,
 ) *CaseAssignmentService {
-	return &CaseAssignmentService{
-		repo:                repo,
-		adminChecker:        adminChecker,
-		userRepo:            userRepo,
-		notificationService: notificationService,
-		hub:                 hub,
-	}
+	return &CaseAssignmentService{repo: repo, adminChecker: adminChecker, userRepo: userRepo}
 }
 
 // This method now takes the assigner's role directly
@@ -37,6 +28,7 @@ func (s *CaseAssignmentService) AssignUserToCase(
 	if assignerRole != "DFIR Admin" {
 		return errors.New("forbidden: admin privileges required")
 	}
+
 
 	// // Fetch both users
 	// assigner, err := s.userRepo.GetUserByID(assignerID)

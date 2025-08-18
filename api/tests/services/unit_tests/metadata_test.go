@@ -13,62 +13,9 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// Minimal IPFS mock for error test
-type MockIPFS_Struct struct {
-	mock.Mock
-}
-
-func (m *MockIPFS_Struct) UploadFile(r io.Reader) (string, error) {
-	args := m.Called(r)
-	return args.String(0), args.Error(1)
-}
-
-// Implement the Download method to satisfy upload.IPFSClientImp interface.
-func (m *MockIPFS_Struct) Download(cid string) (io.ReadCloser, error) {
-	args := m.Called(cid)
-	return args.Get(0).(io.ReadCloser), args.Error(1)
-}
-
-type MockEvidenceRepo struct {
-	mock.Mock
-}
-
-func (m *MockEvidenceRepo) SaveEvidence(e *metadata.Evidence) error {
-	args := m.Called(e)
-	return args.Error(0)
-}
-
-// Implement FindEvidenceByCaseID to satisfy metadata.Repository interface.
-func (m *MockEvidenceRepo) FindEvidenceByCaseID(caseID uuid.UUID) ([]metadata.Evidence, error) {
-	args := m.Called(caseID)
-	return args.Get(0).([]metadata.Evidence), args.Error(1)
-}
-
-func (m *MockEvidenceRepo) FindEvidenceByID(id uuid.UUID) (*metadata.Evidence, error) {
-	args := m.Called(id)
-	return args.Get(0).(*metadata.Evidence), args.Error(1)
-}
-
-// Use the MockIPFS defined in evidence_download_test.go, or rename this struct if both are needed.
-// For example, rename to MockIPFSUploader if you need both mocks:
-
-type MockIPFSUploaderMetadata struct {
-	mock.Mock
-}
-
-func (m *MockIPFSUploaderMetadata) UploadFile(r io.Reader) (string, error) {
-	args := m.Called(r)
-	return args.String(0), args.Error(1)
-}
-
-// Implement the Download method to satisfy upload.IPFSClientImp interface.
-func (m *MockIPFSUploaderMetadata) Download(cid string) (io.ReadCloser, error) {
-	args := m.Called(cid)
-	return args.Get(0).(io.ReadCloser), args.Error(1)
-}
 func TestUploadEvidence_Success(t *testing.T) {
-	mockRepo := new(MockEvidenceRepo)
-	mockIPFS := new(MockIPFSUploaderMetadata)
+	mockRepo := new(MockRepo)
+	mockIPFS := new(MockIPFS)
 	service := metadata.NewService(mockRepo, mockIPFS)
 
 	content := "Hello, AEGIS!"
@@ -122,8 +69,8 @@ func TestUploadEvidence_Success(t *testing.T) {
 }
 
 func TestUploadEvidence_IPFSError(t *testing.T) {
-	mockRepo := new(MockEvidenceRepo)
-	mockIPFS := new(MockIPFS_Struct)
+	mockRepo := new(MockRepo)
+	mockIPFS := new(MockIPFS)
 	service := metadata.NewService(mockRepo, mockIPFS)
 
 	fileReader := os.NewFile(0, os.DevNull) // dummy reader (non-readable for IPFS)

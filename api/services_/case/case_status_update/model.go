@@ -1,9 +1,8 @@
 package case_status_update
 
 import (
-	"time"
-
 	"github.com/google/uuid"
+	"time"
 )
 
 type Case struct {
@@ -15,5 +14,4 @@ type Case struct {
 	InvestigationStage string    `gorm:"type:investigation_stage;default:'analysis'" json:"investigation_stage"`
 	CreatedBy          uuid.UUID `gorm:"type:uuid" json:"created_by"`
 	CreatedAt          time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt          time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }

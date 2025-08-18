@@ -24,9 +24,9 @@ func (h *Hub) BroadcastNotificationToUser(tenantID, teamID, userID string, notif
 
 func NotifyUser(
 	hub *Hub,
-	service notification.NotificationServiceInterface,
+	service *notification.NotificationService,
 	userID, tenantID, teamID, title, message string,
-	) error {
+) error {
 	notif := notification.Notification{
 		ID:        uuid.New().String(),
 		UserID:    userID,

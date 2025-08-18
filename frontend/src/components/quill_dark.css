@@ -1,0 +1,96 @@
+.ql-snow {
+          border: 1px solid #374151 !important;
+          background-color: #1f2937 !important;
+        }
+        
+        .ql-snow .ql-toolbar {
+          border-bottom: 1px solid #374151 !important;
+          background-color: #1f2937 !important;
+        }
+        
+        .ql-snow .ql-container {
+          border-top: none !important;
+          background-color: #1f2937 !important;
+        }
+        
+        .ql-editor {
+          color: #e5e7eb !important;
+          background-color: #1f2937 !important;
+          min-height: 300px !important;
+          font-size: 16px !important;
+          line-height: 1.6 !important;
+        }
+        
+        .ql-editor.ql-blank::before {
+          color: #6b7280 !important;
+          font-style: italic;
+        }
+        
+        .ql-snow .ql-tooltip {
+          background-color: #374151 !important;
+          border: 1px solid #4b5563 !important;
+          color: #e5e7eb !important;
+        }
+        
+        .ql-snow .ql-tooltip input {
+          background-color: #1f2937 !important;
+          color: #e5e7eb !important;
+          border: 1px solid #4b5563 !important;
+        }
+        
+        .ql-snow .ql-picker-options {
+          background-color: #374151 !important;
+          border: 1px solid #4b5563 !important;
+        }
+        
+        .ql-snow .ql-picker-item:hover {
+          background-color: #4b5563 !important;
+          color: #e5e7eb !important;
+        }
+        
+        .ql-snow .ql-stroke {
+          stroke: #9ca3af !important;
+        }
+        
+        .ql-snow .ql-fill {
+          fill: #9ca3af !important;
+        }
+        
+        .ql-snow .ql-picker-label:hover .ql-stroke,
+        .ql-snow .ql-picker-label.ql-active .ql-stroke {
+          stroke: #e5e7eb !important;
+        }
+        
+        .ql-snow .ql-picker-label:hover .ql-fill,
+        .ql-snow .ql-picker-label.ql-active .ql-fill {
+          fill: #e5e7eb !important;
+        }
+
+        .ql-mentions {
+          width: 28px !important;
+          height: 28px !important;
+        }
+
+        .ql-mentions svg {
+          width: 18px;
+          height: 18px;
+        }
+
+        .mention {
+          display: inline-block;
+          margin: 0 2px;
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .mention-ioc {
+          background-color: #3B82F6 !important;
+        }
+
+        .mention-evidence {
+          background-color: #059669 !important;
+        }
+
+        .mention:hover {
+          opacity: 0.8;
+        }

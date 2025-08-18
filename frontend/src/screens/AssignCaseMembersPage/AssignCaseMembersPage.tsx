@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import {
@@ -26,9 +26,9 @@ const dfirRoles = [
 
 export function AssignCaseMembersForm(): JSX.Element {
   const navigate = useNavigate();
+
   const [members, setMembers] = useState<{ user: string; role: string }[]>([]);
   const [availableUsers, setAvailableUsers] = useState<{ id: string; name: string }[]>([]);
-  const { caseId } = useParams<{ caseId: string }>();
 
 useEffect(() => {
   const fetchUsers = async () => {
@@ -94,9 +94,10 @@ const handleSubmit = async (e: React.FormEvent) => {
     }
   }
 
-  //const currentCase = JSON.parse(localStorage.getItem("currentCase") || "{}");
+  const currentCase = JSON.parse(localStorage.getItem("currentCase") || "{}");
+  const currentCaseId = currentCase.ID || currentCase.id;
 
-  if (!caseId) {
+  if (!currentCaseId) {
     alert("No active case found. Please create or select a case first.");
     return;
   }
@@ -116,7 +117,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         },
         body: JSON.stringify({
           assignee_id: user.id,
-          case_id: caseId,
+          case_id: currentCaseId,
           role: member.role
         })
       });

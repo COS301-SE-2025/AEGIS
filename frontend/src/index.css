@@ -68,21 +68,4 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: #0d1117;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #30363d;
-    border-radius: 3px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #58a6ff;
-  }
-
 }

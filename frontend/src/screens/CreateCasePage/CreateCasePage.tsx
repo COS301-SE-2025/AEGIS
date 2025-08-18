@@ -124,7 +124,7 @@ const payload = {
   description: form.description,
   status: "open",
   priority: form.priority || "low",
-  investigation_stage: "analysis",
+  investigation_stage: "Triage",
   created_by: user.id,
   team_name: form.team,
   tenant_id: form.tenantId, // 🛠️ ADD THIS LINE

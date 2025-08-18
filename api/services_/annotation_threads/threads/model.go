@@ -62,8 +62,3 @@ type User struct {
 	EmailVerifiedAt   *time.Time
 	AcceptedTermsAt   *time.Time
 }
-
-// Force GORM to use the existing "threads" table
-func (AnnotationThread) TableName() string {
-	return "threads"
-}

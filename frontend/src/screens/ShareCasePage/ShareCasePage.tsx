@@ -33,7 +33,7 @@ export function ShareCaseForm(): JSX.Element {
       console.log("Payload:", payload);
 
       // TODO: Integrate API call here
-      
+
       alert(`Case "${caseName}" shared successfully with ${form.recipientEmail}!`);
       navigate('/dashboard');
     } catch (error) {

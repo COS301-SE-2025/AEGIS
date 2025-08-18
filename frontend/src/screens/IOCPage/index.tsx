@@ -1,1 +1,0 @@
-export {IOCPage} from "./IOCPage"
