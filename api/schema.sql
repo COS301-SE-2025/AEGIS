@@ -164,7 +164,6 @@ CREATE TABLE x3dh_signed_prekeys (
     private_key TEXT NOT NULL,   -- Encrypted
     signature TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    COLUMN expires_at TIMESTAMPTZ,
     expires_at TIMESTAMP
 );
 
@@ -220,7 +219,7 @@ CREATE TABLE annotation_threads (
   priority VARCHAR(50) DEFAULT 'medium',
   is_active BOOLEAN DEFAULT true,
   resolved_at TIMESTAMP,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
+  tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
     -- New Fields
 );
 
