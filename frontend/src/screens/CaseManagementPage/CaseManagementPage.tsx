@@ -22,6 +22,8 @@ import {ShareButton} from "../ShareCasePage/sharecasebutton";
 import { useParams } from 'react-router-dom';
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { ClipboardList } from "lucide-react";
+
 
 export const CaseManagementPage = () => {
 const storedUser = sessionStorage.getItem("user");
@@ -34,6 +36,8 @@ const storedUser = sessionStorage.getItem("user");
     .toUpperCase();
 
 const userRole = "admin"; // for now
+const [role, setRole] = useState<string>(user?.role || "");
+const isDFIRAdmin = role === "DFIR Admin";
 
 // Profile state
 const [, setProfile] = useState<{ name: string; email: string; role: string; image: string } | null>(null);
@@ -121,6 +125,25 @@ useEffect(() => {
   fetchCaseDetails();
 }, [caseId]);
 
+useEffect(() => {
+  if (!role) {
+    const token = sessionStorage.getItem("authToken");
+    if (token) {
+      try {
+        const [, payloadB64] = token.split(".");
+        const json = JSON.parse(
+          decodeURIComponent(
+            atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+              .split("")
+              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          )
+        );
+        if (json?.role) setRole(json.role);
+      } catch { /* ignore */ }
+    }
+  }
+}, [role]);
 
 const [assignedMembers, setAssignedMembers] = useState<{ name: string; role: string }[]>([]);
 
@@ -450,6 +473,12 @@ const handleViewReport = async () => {
             <MessageSquare className="w-6 h-6" />
             <span className="text-lg"><Link to="/secure-chat"> Secure Chat</Link></span>
           </div>
+              {isDFIRAdmin && (
+              <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+                <ClipboardList className="w-6 h-6" />
+                 <span className="text-lg"><Link to="/report-dashboard"> Report Dashboard</Link></span>
+              </div>
+            )}
         </nav>
 
         {/* User Profile */}

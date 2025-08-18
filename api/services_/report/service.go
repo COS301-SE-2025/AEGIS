@@ -51,27 +51,27 @@ type ReportServiceImpl struct {
 	repo      ReportRepository
 	mongoRepo ReportMongoRepository
 	// artifactsRepo   ReportArtifactsRepository
-	storage     Storage
-	auditLogger AuditLogger
-	authorizer  Authorizer
-	coCRepo     GormCoCRepo
+	// storage     Storage
+	// auditLogger AuditLogger
+	// authorizer  Authorizer
+	//coCRepo     GormCoCRepo
 }
 
 func NewReportService(
 	repo ReportRepository,
 	mongoRepo ReportMongoRepository,
-	storage Storage,
-	auditLogger AuditLogger,
-	authorizer Authorizer,
-	coCRepo GormCoCRepo,
+	// storage Storage,
+	// auditLogger AuditLogger,
+	// authorizer Authorizer,
+	//coCRepo GormCoCRepo,
 ) ReportService {
 	return &ReportServiceImpl{
-		repo:        repo,
-		mongoRepo:   mongoRepo,
-		storage:     storage,
-		auditLogger: auditLogger,
-		authorizer:  authorizer,
-		coCRepo:     coCRepo,
+		repo:      repo,
+		mongoRepo: mongoRepo,
+		// storage:     storage,
+		// auditLogger: auditLogger,
+		// authorizer:  authorizer,
+		//coCRepo:     coCRepo,
 	}
 }
 

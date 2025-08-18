@@ -118,9 +118,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 			RegisterCaseTagRoutes(protected, h.CaseTagHandler, h.PermissionChecker)
 
-			// ─── Chain of Custody ───────────────────────────────
-			RegisterCoCRoutes(protected, h.CoCHandler)
-
 			// ─── Report Generation ──────────────────────────────
 			RegisterReportRoutes(protected, h.ReportHandler)
 

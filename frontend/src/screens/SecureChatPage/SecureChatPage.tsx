@@ -24,7 +24,7 @@ import { useState, useEffect, useRef } from "react";
 import { toast } from 'react-hot-toast';
 import {jwtDecode} from "jwt-decode";
 import { MutableRefObject } from "react";
-
+import { ClipboardList } from "lucide-react";
 // Type definitions
 interface Message {
   id: number;
@@ -243,7 +243,10 @@ export const SecureChatPage = (): JSX.Element => {
   const [socketConnected, setSocketConnected] = useState(false);
   const previousUrlRef = useRef<string | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+    const storedUser = sessionStorage.getItem("user");
+    const user = storedUser ? JSON.parse(storedUser) : null;
+const [role, setRole] = useState<string>(user?.role || "");
+const isDFIRAdmin = role === "DFIR Admin";
   interface Case {
     id: string;
     title?: string;
@@ -305,6 +308,25 @@ const handleSelectGroup = (group: any) => {
     id,
   }));
 };
+useEffect(() => {
+  if (!role) {
+    const token = sessionStorage.getItem("authToken");
+    if (token) {
+      try {
+        const [, payloadB64] = token.split(".");
+        const json = JSON.parse(
+          decodeURIComponent(
+            atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+              .split("")
+              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          )
+        );
+        if (json?.role) setRole(json.role);
+      } catch { /* ignore */ }
+    }
+  }
+}, [role]);
 
 
   useEffect(() => {
@@ -1520,6 +1542,12 @@ const handleDeleteGroup = async () => {
               <MessageSquare className="w-5 h-5" />
               Secure Chat
             </button>
+                          {isDFIRAdmin && (
+              <Link to="/report-dashboard"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
+              <ClipboardList className="w-5 h-5" />
+              Report Dashboard
+            </button></Link>
+            )}
           </nav>
         </div>
       </div>)}
