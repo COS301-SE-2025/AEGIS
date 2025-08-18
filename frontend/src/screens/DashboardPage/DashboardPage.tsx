@@ -422,7 +422,7 @@ useEffect(() => {
               <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
                 <ClipboardList className="w-6 h-6" />
                 <Link to="/report-dashboard">
-                  <span className="text-lg">Report Dashboard</span>
+                  <span className="text-lg">Case Reports</span>
                 </Link>
               </div>
             )}

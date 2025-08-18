@@ -833,7 +833,7 @@ if (!caseId || caseId === "undefined") {
                  {isDFIRAdmin && (
                <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
               <ClipboardList className="w-5 h-5" />
-              <Link to="/report-dashboard"><span className="text-sm">Report Dashboard</span></Link>
+              <Link to="/report-dashboard"><span className="text-sm">Case Reports</span></Link>
             </div>
           )}
           </nav>
@@ -983,7 +983,7 @@ if (!caseId || caseId === "undefined") {
             </div>
                   <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
               <ClipboardList className="w-5 h-5" />
-              <Link to="/report-dashboard"><span className="text-sm">Report Dashboard</span></Link>
+              <Link to="/report-dashboard"><span className="text-sm">Case Reports</span></Link>
             </div>
           </nav>
         </div>

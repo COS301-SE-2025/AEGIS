@@ -476,7 +476,7 @@ const handleViewReport = async () => {
               {isDFIRAdmin && (
               <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
                 <ClipboardList className="w-6 h-6" />
-                 <span className="text-lg"><Link to="/report-dashboard"> Report Dashboard</Link></span>
+                 <span className="text-lg"><Link to="/report-dashboard"> Case Reports</Link></span>
               </div>
             )}
         </nav>
