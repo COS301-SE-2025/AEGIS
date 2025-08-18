@@ -2,7 +2,7 @@ import React, { useState,useEffect } from 'react';
 import { 
   Search, 
   //ChevronDown, 
-  Plus,
+  //Plus,
   Grid,
   List,
   FileText,
@@ -16,15 +16,17 @@ import {
   Shield,
   Bug
 } from 'lucide-react';
-import { Link } from "react-router-dom";
 import axios from 'axios';
-import { useParams } from 'react-router-dom';
+//import { useParams } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';  // React Router v6
 // Types
 interface ReportWithDetails {
   id: string;
-   reportID: string;
+  reportID: string;
   case_id: string;
+  case_name?: string;
+  team_id?: string;
+  team_name?: string;
   name: string;             // corresponds to report name
   type: string;
   status: 'draft' | 'review' | 'published';
@@ -36,115 +38,85 @@ interface ReportWithDetails {
 }
 
 
-interface ReportTemplate {
-  id: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  color: string;
-}
-interface Report {
-  name: string;
-  content: { title: string; content: string }[];
-}
+// interface ReportTemplate {
+//   id: string;
+//   title: string;
+//   description: string;
+//   icon: React.ReactNode;
+//   color: string;
+// }
+// interface Report {
+//   name: string;
+//   content: { title: string; content: string }[];
+// }
 
 
 export const ReportDashboard = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAuthor, setSelectedAuthor] = useState('All Authors');
-  const [selectedType, setSelectedType] = useState('All Types');
-  const [selectedTimeframe, setSelectedTimeframe] = useState('Last 30 days');
+  // const [selectedAuthor, setSelectedAuthor] = useState('All Authors');
+  // const [selectedType, setSelectedType] = useState('All Types');
+  // const [selectedTimeframe, setSelectedTimeframe] = useState('Last 30 days');
   
 const [reports, setReports] = useState<ReportWithDetails[]>([]);
-  const [selectedCaseId, setSelectedCaseId] = useState<string>('923f5f04-0641-4e10-b9f8-ef6fcfbecbc2');
-  const [error, setError] = useState<string | null>(null);
- const { reportId } = useParams<Record<string, string | undefined>>(); 
+  //const [selectedCaseId, setSelectedCaseId] = useState<string>('923f5f04-0641-4e10-b9f8-ef6fcfbecbc2');
+  const [_, setError] = useState<string | null>(null);
+//  const { reportId } = useParams<Record<string, string | undefined>>(); 
 
 
   // Change from Axios.AxiosResponse to axios.AxiosResponse (lowercase)
 
   // API URL - make sure to update with the correct URL
   const API_URL = 'http://localhost:8080/api/v1';
+const getTeamIdFromSession = (): string => {
+  try {
+    const raw = sessionStorage.getItem("user");
+    if (!raw) return "";
+    const u = JSON.parse(raw);
+    return u?.team_id || u?.teamId || "";
+  } catch {
+    return "";
+  }
+};
 
+const [teamId, setTeamId] = useState<string>(getTeamIdFromSession());
+
+useEffect(() => {
+  setTeamId(getTeamIdFromSession());
+}, []);
 
    // Fetch reports by case - move the axios call here
 // Fetch reports by case
 useEffect(() => {
-  const fetchReports = async () => {
+  const fetchReportsForTeam = async () => {
     try {
-      const token = sessionStorage.getItem('authToken'); // get your stored token
+      const token = sessionStorage.getItem("authToken");
       if (!token) {
-        console.error('No auth token found');
+        console.error("No auth token found");
+        return;
+      }
+      if (!teamId) {
+        console.warn("No teamId found in session; cannot load team reports.");
+        setReports([]);
         return;
       }
 
-      const response = await axios.get<ReportWithDetails[]>(
-        `${API_URL}/reports/cases/${selectedCaseId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      // New endpoint shape: GET /api/v1/reports/teams/:teamID  -> { reports: [...] }
+      const res = await axios.get<{ reports: ReportWithDetails[] }>(
+        `${API_URL}/reports/teams/${teamId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setReports(response.data);
-    } catch (error) {
-      console.error('Error fetching reports:', error);
+      setReports(Array.isArray(res.data?.reports) ? res.data.reports : []);
+    } catch (err) {
+      console.error("Error fetching team reports:", err);
+      setReports([]);
     }
   };
 
-  fetchReports();
-}, [selectedCaseId]);
+  fetchReportsForTeam();
+}, [teamId]);
 
-  // Generate a new report for the selected case
-// Generate a new report for the selected case
-const handleGenerateReport = async () => {
-  try {
-    const token = sessionStorage.getItem('authToken'); // make sure token exists
-    if (!token) {
-      console.error('No auth token found');
-      return;
-    }
-
-    const reportData: Partial<ReportWithDetails> = {
-      name: 'New Incident Report',
-      type: 'incident',
-      author: 'User',
-      collaborators: 3,
-      case_id: selectedCaseId,
-    };
-
-    // Call backend to create the report
-    const response = await axios.post<ReportWithDetails>(
-      `${API_URL}/reports/cases/${selectedCaseId}`,
-      reportData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    const newReport = response.data;
-
-    // Ensure unique key and all required fields for frontend
-    const normalizedReport: ReportWithDetails = {
-  ...newReport,
-  last_modified: newReport.last_modified || new Date().toISOString(),
-  id: newReport.reportID, // use the backend-generated UUID
-};
-
-
-    // Update reports state immediately
-    setReports((prevReports) => [...prevReports, normalizedReport]);
-
-    console.log('Report generated and added to state:', normalizedReport);
-
-  } catch (error) {
-    console.error('Error generating report:', error);
-  }
-};
 
 const formatTimestamp = (timestamp: string) => {
   if (!timestamp) return "";
@@ -165,6 +137,14 @@ const formatTimestamp = (timestamp: string) => {
   return date.toLocaleString("en-US", options); // e.g., "Dec 12, 2025 at 9:15 AM"
 };
 
+const shortId = (id?: string) => (id ? `${id.slice(0, 8)}…${id.slice(-4)}` : '');
+
+const Badge = ({ children }: { children: React.ReactNode }) => (
+  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs
+                   bg-gray-800 border border-gray-600 text-gray-200">
+    {children}
+  </span>
+);
 
 
 
@@ -199,78 +179,8 @@ const handleOpenReport = (reportId: string) => {
   navigate(`/report-editor/${reportId}`);
 };
 
-  const [report, setReport] = useState<Report | null>(null);
 
-
-
-  
-  const reportTemplates: ReportTemplate[] = [
-    {
-      id: 'incident-standard',
-      title: 'Incident Response - Standard',
-      description: 'Comprehensive incident response report template with timeline, impact assessment, and remediation steps.',
-      icon: <AlertTriangle className="w-6 h-6" />,
-      color: 'bg-blue-600'
-    },
-    {
-      id: 'forensic-analysis',
-      title: 'Forensic Analysis Report',
-      description: 'Detailed digital forensics examination template including evidence chain of custody and findings.',
-      icon: <Shield className="w-6 h-6" />,
-      color: 'bg-emerald-600'
-    },
-    {
-      id: 'malware-analysis',
-      title: 'Malware Analysis',
-      description: 'Structured template for malware reverse engineering and behavioral analysis documentation.',
-      icon: <Bug className="w-6 h-6" />,
-      color: 'bg-red-600'
-    }
-  ];
-
-  // const existingReports: ReportWithDetails[] = [
-  //   {
-  //     id: 'report-1',
-  //     name: 'Phishing Campaign Analysis - Q4 2024',
-  //     type: 'incident',
-  //     author: 'J. Doe',
-  //     collaborators: 3,
-  //     last_modified: 'Dec 15, 2024 at 4:30 PM',
-  //     status: 'draft',
-  //     caseId: '2024-001'
-  //   },
-  //   {
-  //     id: 'report-2',
-  //     name: 'Network Intrusion Investigation',
-  //     type: 'forensic',
-  //     author: 'M. Smith',
-  //     collaborators: 1,
-  //     last_modified: 'Dec 12, 2024 at 9:15 AM',
-  //     status: 'review',
-  //     caseId: '2024-002'
-  //   },
-  //   {
-  //     id: 'report-3',
-  //     name: 'Ransomware Incident Response',
-  //     type: 'incident',
-  //     author: 'A. Johnson',
-  //     collaborators: 2,
-  //     last_modified: 'Dec 10, 2024 at 6:45 PM',
-  //     status: 'published',
-  //     caseId: '2024-003'
-  //   },
-  //   {
-  //     id: 'report-4',
-  //     name: 'Data Breach Assessment',
-  //     type: 'forensic',
-  //     author: 'S. Williams',
-  //     collaborators: 4,
-  //     last_modified: 'Dec 8, 2024 at 11:20 AM',
-  //     status: 'published',
-  //     caseId: '2024-004'
-  //   }
-  // ];
-
+ 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-600';
@@ -289,24 +199,25 @@ const handleOpenReport = (reportId: string) => {
     }
   };
 
-  const ReportTemplateCard = ({ template }: { template: ReportTemplate }) => (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`${template.color} p-3 rounded-lg`}>
-          {template.icon}
-        </div>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-          Create
-        </button>
-      </div>
-      <h3 className="text-white font-semibold mb-2">{template.title}</h3>
-      <p className="text-gray-400 text-sm">{template.description}</p>
-    </div>
-  );
+  // const ReportTemplateCard = ({ template }: { template: ReportTemplate }) => (
+  //   <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors">
+  //     <div className="flex items-center justify-between mb-4">
+  //       <div className={`${template.color} p-3 rounded-lg`}>
+  //         {template.icon}
+  //       </div>
+  //       <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+  //         Create
+  //       </button>
+  //     </div>
+  //     <h3 className="text-white font-semibold mb-2">{template.title}</h3>
+  //     <p className="text-gray-400 text-sm">{template.description}</p>
+  //   </div>
+  // );
 
   const ReportCard = ({ report }: { report: ReportWithDetails }) => (
     <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors">
       <div className="flex items-start justify-between mb-4">
+
         <div>
           <h3 className="text-white font-semibold mb-1">{report.name}</h3>
           <p className="text-gray-400 text-sm">Last Modified: {formatTimestamp(report.last_modified)}</p>
@@ -315,6 +226,15 @@ const handleOpenReport = (reportId: string) => {
           <div className="flex items-center gap-1 text-gray-400">
             <Users className="w-4 h-4" />
             <span className="text-sm">{report.collaborators}</span>
+            <div className="hidden md:flex items-center gap-2 mx-4">
+          <Badge>
+            Team: {report.team_name ?? (report.team_id ? `#${shortId(report.team_id)}` : `#${shortId(teamId)}`)}
+          </Badge>
+          <Badge>
+            Case: {report.case_name ?? (report.case_id ? shortId(report.case_id) : 'Unknown')}
+          </Badge>
+        </div>
+
           </div>
           <span className={`w-2 h-2 rounded-full ${getStatusColor(report.status)}`}></span>
         </div>
@@ -363,23 +283,28 @@ const handleOpenReport = (reportId: string) => {
         </div>
         
         <div className="flex items-center gap-2 ml-4">
-          <button className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors">
-            Open
-          </button>
-          <button className="p-1.5 text-gray-400 hover:text-white transition-colors">
-            <Download className="w-4 h-4" />
-          </button>
+          <button 
+            onClick={() => handleOpenReport(report.id)}  
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+              Open
+            </button>
+                    <button
+              onClick={() => downloadReport(report.id)}
+              className="p-2 text-gray-400 hover:text-white transition-colors"
+            >
+              <Download className="w-4 h-4" />
+            </button>
         </div>
       </div>
     </div>
   );
 
-  const filteredReports = reports.filter(report => {
-  const matchesSearch = (report.name ?? '').toLowerCase().includes(searchTerm.toLowerCase());
-  const matchesAuthor = selectedAuthor === 'All Authors' || (report.author ?? '') === selectedAuthor;
-  const matchesType = selectedType === 'All Types' || (report.type ?? '') === selectedType;
-  return matchesSearch && matchesAuthor && matchesType;
-});
+//   const filteredReports = reports.filter(report => {
+//   const matchesSearch = (report.name ?? '').toLowerCase().includes(searchTerm.toLowerCase());
+//   const matchesAuthor = selectedAuthor === 'All Authors' || (report.author ?? '') === selectedAuthor;
+//   const matchesType = selectedType === 'All Types' || (report.type ?? '') === selectedType;
+//   return matchesSearch && matchesAuthor && matchesType;
+// });
 
 
 
@@ -390,7 +315,9 @@ const handleOpenReport = (reportId: string) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold text-white">Report Dashboard</h1>
-            <span className="text-gray-400">Case #2024-001</span>
+            <span className="text-gray-400">Team #{shortId(teamId)}</span>
+
+
           </div>
           <div className="flex items-center gap-3">
             {/* <Link to="/case-management">
@@ -398,17 +325,7 @@ const handleOpenReport = (reportId: string) => {
               Case management
             </button>
             </Link> */}
-            <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
-                        <FileText className="w-6 h-6" />
-                        <Link to="/case-management"><span className="text-lg">Case Management</span></Link>
-                      </div>
-             <button 
-              onClick={handleGenerateReport}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              New Report
-            </button>
+      
           </div>
         </div>
       </div>
@@ -428,7 +345,7 @@ const handleOpenReport = (reportId: string) => {
           </div>
 
           <div className="flex items-center gap-2">
-            <select 
+            {/* <select 
               value={selectedAuthor}
               onChange={(e) => setSelectedAuthor(e.target.value)}
               className="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
@@ -438,9 +355,9 @@ const handleOpenReport = (reportId: string) => {
               <option>M. Smith</option>
               <option>A. Johnson</option>
               <option>S. Williams</option>
-            </select>
+            </select> */}
 
-            <select 
+            {/* <select 
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
               className="bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
@@ -460,19 +377,12 @@ const handleOpenReport = (reportId: string) => {
               <option>Last 7 days</option>
               <option>Last 90 days</option>
               <option>All time</option>
-            </select>
+            </select> */}
           </div>
         </div>
 
         {/* Report Templates */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-white mb-4">Report Templates</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {reportTemplates.map(template => (
-              <ReportTemplateCard key={template.id} template={template} />
-            ))}
-          </div>
-        </div>
+    
 
         {/* Existing Reports */}
         <div>
@@ -502,23 +412,26 @@ const handleOpenReport = (reportId: string) => {
             </div>
           </div>
 
-          {viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             {filteredReports.map((report, index) => (
-              <ReportCard
-                key={report.id ?? `report-${index}`} // fallback to index if id is missing
-                report={report}
-              />
-            ))}
+         {viewMode === 'grid' ? (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {reports.map((report, index) => (
+      <ReportCard
+        key={report.id ?? `report-${index}`}
+        report={report}
+      />
+    ))}
+  </div>
+) : (
+  <div className="space-y-3">
+    {reports.map((report, index) => (
+      <ReportListItem
+        key={report.id ?? `report-${index}`}
+        report={report}
+      />
+    ))}
+  </div>
+)}
 
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredReports.map(report => (
-                <ReportListItem key={report.id} report={report} />
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>

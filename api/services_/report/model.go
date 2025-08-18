@@ -49,14 +49,18 @@ type ReportInterface interface {
 	DownloadReport(ctx context.Context, reportID uuid.UUID) (*Report, error)
 }
 type ReportWithDetails struct {
-	ID            uuid.UUID `json:"id"`
-	CaseID        uuid.UUID `json:"case_id"`
-	Name          string    `json:"name"`
-	Type          string    `json:"type"`
-	Status        string    `json:"status"`
-	Version       int       `json:"version"`
-	LastModified  string    `json:"last_modified"`
-	FilePath      string    `json:"file_path"`
-	Author        string    `json:"author"`
-	Collaborators int       `json:"collaborators"`
+	ID       uuid.UUID `json:"id"`
+	CaseID   uuid.UUID `json:"case_id"`
+	TeamID   uuid.UUID `json:"team_id"`   // NEW
+	CaseName string    `json:"case_name"` // NEW (from cases table)
+	TeamName string    `json:"team_name"` // NEW (from teams table)
+
+	Name          string `json:"name"`
+	Type          string `json:"type"`
+	Status        string `json:"status"`
+	Version       int    `json:"version"`
+	LastModified  string `json:"last_modified"` // keep as string; we’ll format in SQL
+	FilePath      string `json:"file_path"`
+	Author        string `json:"author"`
+	Collaborators int    `json:"collaborators"`
 }

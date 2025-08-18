@@ -43,6 +43,7 @@ type ReportService interface {
 	ReorderCustomSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newOrder int) error // ... your existing methods ...
 	ListRecentReports(ctx context.Context, opts RecentReportsOptions) ([]RecentReport, error)
 	UpdateReportName(ctx context.Context, reportID uuid.UUID, name string) (*Report, error) // NEW
+	GetReportsByTeamID(ctx context.Context, tenantID, teamID uuid.UUID) ([]ReportWithDetails, error)
 }
 
 // ReportServiceImpl is the concrete implementation of ReportService.
@@ -50,27 +51,27 @@ type ReportServiceImpl struct {
 	repo      ReportRepository
 	mongoRepo ReportMongoRepository
 	// artifactsRepo   ReportArtifactsRepository
-	storage     Storage
-	auditLogger AuditLogger
-	authorizer  Authorizer
-	coCRepo     GormCoCRepo
+	// storage     Storage
+	// auditLogger AuditLogger
+	// authorizer  Authorizer
+	//coCRepo     GormCoCRepo
 }
 
 func NewReportService(
 	repo ReportRepository,
 	mongoRepo ReportMongoRepository,
-	storage Storage,
-	auditLogger AuditLogger,
-	authorizer Authorizer,
-	coCRepo GormCoCRepo,
+	// storage Storage,
+	// auditLogger AuditLogger,
+	// authorizer Authorizer,
+	//coCRepo GormCoCRepo,
 ) ReportService {
 	return &ReportServiceImpl{
-		repo:        repo,
-		mongoRepo:   mongoRepo,
-		storage:     storage,
-		auditLogger: auditLogger,
-		authorizer:  authorizer,
-		coCRepo:     coCRepo,
+		repo:      repo,
+		mongoRepo: mongoRepo,
+		// storage:     storage,
+		// auditLogger: auditLogger,
+		// authorizer:  authorizer,
+		//coCRepo:     coCRepo,
 	}
 }
 
@@ -442,4 +443,13 @@ func (s *ReportServiceImpl) UpdateReportName(ctx context.Context, reportID uuid.
 	// }
 
 	return updated, nil
+}
+
+// service_impl.go
+// services_/report/service_impl.go
+func (s *ReportServiceImpl) GetReportsByTeamID(
+	ctx context.Context,
+	tenantID, teamID uuid.UUID,
+) ([]ReportWithDetails, error) {
+	return s.repo.GetReportsByTeamID(ctx, tenantID, teamID)
 }

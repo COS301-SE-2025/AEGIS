@@ -41,7 +41,7 @@ import { addReaction } from "./api";
 import { approveMessage } from "./api";
 import { removeReaction } from "./api";
 import{MessageCard} from "../../components/ui/MessageCard";
-
+import { ClipboardList } from "lucide-react";
 
 
 // Import Select components from your UI library
@@ -242,52 +242,72 @@ export const EvidenceViewer  =() =>{
   //     priority: 'medium'
   //   }
   // ];
-
+const [role, setRole] = useState<string>(user?.role || "");
+const isDFIRAdmin = role === "DFIR Admin";
   
-
-  const initialAnnotationThreads: AnnotationThread[] = [
-    
-    {
-      id: '1',
-      title: 'Suspicious PowerShell activity detected',
-      user: 'Forensic.Analyst.1',
-      avatar: 'FA',
-      time: '2 hours ago',
-      messageCount: 5,
-      participantCount: 3,
-      isActive: true,
-      status: 'open',
-      priority: 'high',
-      tags: ['PowerShell', 'Malware', 'Initial Analysis'],
-      fileId: '1'
-    },
-    {
-      id: '2',
-      title: 'Memory strings analysis findings',
-      user: 'Senior.Analyst',
-      avatar: 'SA',
-      time: '4 hours ago',
-      messageCount: 8,
-      participantCount: 2,
-      status: 'pending_approval',
-      priority: 'medium',
-      tags: ['Memory Analysis', 'Strings', 'IOCs'],
-      fileId: '1'
-    },
-    {
-      id: '3',
-      title: 'Malware classification needed',
-      user: 'Malware.Specialist',
-      avatar: 'MS',
-      time: '6 hours ago',
-      messageCount: 3,
-      participantCount: 4,
-      status: 'open',
-      priority: 'high',
-      tags: ['Classification', 'Signature Analysis'],
-      fileId: '2'
+useEffect(() => {
+  if (!role) {
+    const token = sessionStorage.getItem("authToken");
+    if (token) {
+      try {
+        const [, payloadB64] = token.split(".");
+        const json = JSON.parse(
+          decodeURIComponent(
+            atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+              .split("")
+              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          )
+        );
+        if (json?.role) setRole(json.role);
+      } catch { /* ignore */ }
     }
-  ];
+  }
+}, [role]);
+
+  // const initialAnnotationThreads: AnnotationThread[] = [
+    
+  //   {
+  //     id: '1',
+  //     title: 'Suspicious PowerShell activity detected',
+  //     user: 'Forensic.Analyst.1',
+  //     avatar: 'FA',
+  //     time: '2 hours ago',
+  //     messageCount: 5,
+  //     participantCount: 3,
+  //     isActive: true,
+  //     status: 'open',
+  //     priority: 'high',
+  //     tags: ['PowerShell', 'Malware', 'Initial Analysis'],
+  //     fileId: '1'
+  //   },
+  //   {
+  //     id: '2',
+  //     title: 'Memory strings analysis findings',
+  //     user: 'Senior.Analyst',
+  //     avatar: 'SA',
+  //     time: '4 hours ago',
+  //     messageCount: 8,
+  //     participantCount: 2,
+  //     status: 'pending_approval',
+  //     priority: 'medium',
+  //     tags: ['Memory Analysis', 'Strings', 'IOCs'],
+  //     fileId: '1'
+  //   },
+  //   {
+  //     id: '3',
+  //     title: 'Malware classification needed',
+  //     user: 'Malware.Specialist',
+  //     avatar: 'MS',
+  //     time: '6 hours ago',
+  //     messageCount: 3,
+  //     participantCount: 4,
+  //     status: 'open',
+  //     priority: 'high',
+  //     tags: ['Classification', 'Signature Analysis'],
+  //     fileId: '2'
+  //   }
+  // ];
 
     
 const { caseId } = useParams();
@@ -810,6 +830,12 @@ if (!caseId || caseId === "undefined") {
               <MessageSquare className="w-5 h-5" />
               <Link to="/secure-chat"><span className="text-sm">Secure chat</span></Link>
             </div>
+                 {isDFIRAdmin && (
+               <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <ClipboardList className="w-5 h-5" />
+              <Link to="/report-dashboard"><span className="text-sm">Case Reports</span></Link>
+            </div>
+          )}
           </nav>
         </div>
 
@@ -954,6 +980,10 @@ if (!caseId || caseId === "undefined") {
             <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
               <MessageSquare className="w-5 h-5" />
               <Link to="/secure-chat"><span className="text-sm">Secure chat</span></Link>
+            </div>
+                  <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <ClipboardList className="w-5 h-5" />
+              <Link to="/report-dashboard"><span className="text-sm">Case Reports</span></Link>
             </div>
           </nav>
         </div>

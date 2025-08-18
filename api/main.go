@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"os"
-	"time"
 
 	"aegis-api/db"
 
@@ -27,7 +26,6 @@ import (
 	"aegis-api/services_/case/case_evidence_totals"
 	"aegis-api/services_/case/case_tags"
 	update_case "aegis-api/services_/case/case_update"
-	coc "aegis-api/services_/chain_of_custody"
 	"aegis-api/services_/chat"
 	"aegis-api/services_/evidence/evidence_download"
 	"aegis-api/services_/evidence/evidence_tag"
@@ -36,8 +34,8 @@ import (
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/notification"
 	"aegis-api/services_/report"
-	"aegis-api/services_/user/profile"
 	"aegis-api/services_/report/update_status"
+	"aegis-api/services_/user/profile"
 
 	//"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -248,20 +246,20 @@ func main() {
 
 	// ─── Chain of Custody (CoC) ─────────────────────────────
 	// Create an adapter for the AuditLogger to fit the coc.Auditor interface
-	auditAdapter := &coc.AuditLogAdapter{
-		AuditLogger: auditLogger, // Use the existing AuditLogger
-	}
+	// auditAdapter := &coc.AuditLogAdapter{
+	// 	AuditLogger: auditLogger, // Use the existing AuditLogger
+	// }
 
 	// Initialize the CoC service (pass it as a value, not a pointer)
-	cocSvc := coc.Service{
-		Repo:      coc.GormRepo{DB: db.DB}, // Initialize repository (GORM)
-		Authz:     coc.SimpleAuthz{},       // Placeholder for RBAC (role-based access control)
-		Audit:     auditAdapter,            // Use the adapter for AuditLogger
-		DedupeWin: 3 * time.Second,         // Deduplication window (optional)
-	}
+	// cocSvc := coc.Service{
+	// 	Repo:      coc.GormRepo{DB: db.DB}, // Initialize repository (GORM)
+	// 	Authz:     coc.SimpleAuthz{},       // Placeholder for RBAC (role-based access control)
+	// 	Audit:     auditAdapter,            // Use the adapter for AuditLogger
+	// 	DedupeWin: 3 * time.Second,         // Deduplication window (optional)
+	// }
 
 	// Initialize the handler, passing a pointer to cocSvc to avoid copying sync.Mutex
-	cocHandler := handlers.NewCoCHandler(cocSvc, auditLogger) // Pass the service pointer
+	// cocHandler := handlers.NewCoCHandler(cocSvc, auditLogger) // Pass the service pointer
 
 	// ─── Report Service Initialization ─────────────────────
 
@@ -269,7 +267,7 @@ func main() {
 	// ─── Report Service Initialization ─────────────────────────────
 
 	reportRepo := report.NewReportRepository(db.DB)
-	coCRepo := report.NewCoCRepo(db.DB)
+	// coCRepo := report.NewCoCRepo(db.DB)
 	reportContentCollection := mongoDatabase.Collection("report_contents")
 
 	reportMongoRepo := report.NewReportMongoRepo(reportContentCollection)
@@ -278,21 +276,19 @@ func main() {
 		reportRepo,
 		//nil,         // ReportArtifactsRepo
 		reportMongoRepo,
-		nil,         // Storage
-		auditLogger, // AuditLogger
-		nil,         // Authorizer
-		coCRepo,
+		// nil,         // Storage
+		// auditLogger, // AuditLogger
+		// nil,         // Authorizer
+		// coCRepo,
 	)
 	reportHandler := handlers.NewReportHandler(reportService)
 
-
 	// ─── Report Status Update ─────────────────────────────
 
-	reportStatusRepo := update_status.NewReportStatusRepository(db.DB);
-	reportStatusService := update_status.NewReportStatusService(reportStatusRepo);
-	reportStatusHandler := handlers.NewReportStatusHandler(reportStatusService);
+	reportStatusRepo := update_status.NewReportStatusRepository(db.DB)
+	reportStatusService := update_status.NewReportStatusService(reportStatusRepo)
+	reportStatusHandler := handlers.NewReportStatusHandler(reportStatusService)
 
-	
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -320,7 +316,7 @@ func main() {
 		tenantRepo, // Pass the tenant repository
 		userRepo,   // Pass the user repository
 		notificationService,
-		cocHandler,    // Chain of Custody handler
+		// cocHandler,    // Chain of Custody handler
 		reportHandler, // Report generation handler
 		reportStatusHandler,
 	)

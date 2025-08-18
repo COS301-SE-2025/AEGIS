@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -640,4 +641,43 @@ func (h *ReportHandler) UpdateReportName(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, updated) // full Report JSON
+}
+
+func (h *ReportHandler) GetReportsForTeam(c *gin.Context) {
+	// tenant from token (AuthMiddleware sets this)
+	tenantIDVal, _ := c.Get("tenantID")
+	tenantIDStr := fmt.Sprint(tenantIDVal)
+	tenantUUID, err := uuid.Parse(tenantIDStr)
+	if err != nil || tenantUUID == uuid.Nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid tenant in token"})
+		return
+	}
+
+	// team from URL
+	teamIDParam := c.Param("teamID")
+	teamUUID, err := uuid.Parse(teamIDParam)
+	if err != nil || teamUUID == uuid.Nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team id"})
+		return
+	}
+
+	// (Optional) enforce team from token equals URL team for DFIR roles:
+	if roleVal, ok := c.Get("userRole"); ok && (roleVal == "DFIR Admin" || roleVal == "DFIR User") {
+		if claimTeamVal, ok := c.Get("teamID"); ok {
+			if claimTeamStr := fmt.Sprint(claimTeamVal); claimTeamStr != "" {
+				if claimTeamUUID, e := uuid.Parse(claimTeamStr); e == nil && claimTeamUUID != teamUUID {
+					c.JSON(http.StatusForbidden, gin.H{"error": "team mismatch"})
+					return
+				}
+			}
+		}
+	}
+
+	reports, err := h.ReportService.GetReportsByTeamID(c.Request.Context(), tenantUUID, teamUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch team reports"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"reports": reports})
 }
