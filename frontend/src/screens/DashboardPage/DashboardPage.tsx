@@ -80,7 +80,7 @@ const [notifications] = useState<Notification[]>([]);
 // Add these new state variables after your existing useState declarations
 const [availableTiles, setAvailableTiles] = useState([
   {
-    id: 'ongoing-cases',
+    id: "ongoing-cases",
     value: openCases.length.toString(),
     label: "Cases ongoing",
     color: "text-[#636ae8]",
@@ -88,7 +88,7 @@ const [availableTiles, setAvailableTiles] = useState([
     isVisible: true,
   },
   {
-    id: 'closed-cases',
+    id: "closed-cases",
     value: closedCases.length.toString(),
     label: "Cases Closed",
     color: "text-green-500",
@@ -96,21 +96,15 @@ const [availableTiles, setAvailableTiles] = useState([
     isVisible: true,
   },
   {
-    id: 'evidence-count',
+    id: "evidence-count",
     value: evidenceCount.toString(),
     label: "Evidence Collected",
     color: "text-sky-500",
     icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
     isVisible: true,
   },
-
-const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
-// NEW: keep a role state (fallback to what's in sessionStorage, if present)
-const [role, setRole] = useState<string>(user?.role || "");
-const isDFIRAdmin = role === "DFIR Admin";
-
   {
-    id: 'total-alerts',
+    id: "total-alerts",
     value: "12", // Replace with actual data
     label: "Active Alerts",
     color: "text-red-500",
@@ -119,9 +113,11 @@ const isDFIRAdmin = role === "DFIR Admin";
   },
 ]);
 
-
-const [showTileCustomizer, setShowTileCustomizer] = useState(false);
+// ✅ these are outside of the array
 const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
+const [role, setRole] = useState<string>(user?.role || "");
+const isDFIRAdmin = role === "DFIR Admin";
+const [showTileCustomizer, setShowTileCustomizer] = useState(false);
 
 useEffect(() => {
   const fetchCases = async () => {

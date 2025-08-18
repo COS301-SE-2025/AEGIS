@@ -220,9 +220,6 @@ useEffect(() => {
     
 const { caseId } = useParams();
 
-
-
-const { caseId } = useParams();
 const [searchParams] = useSearchParams();
 const evidenceIdFromQuery = searchParams.get("evidenceId");
 

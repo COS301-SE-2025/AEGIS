@@ -346,14 +346,13 @@ func main() {
 		tenantRepo, // Pass the tenant repository
 		userRepo,   // Pass the user repository
 		notificationService,
-
+		reportHandler,
 		reportStatusHandler,
 
 		iocHandler,
 		timelineHandler,
 		evidenceHandler,
 		chainOfCustodyHandler,
-
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

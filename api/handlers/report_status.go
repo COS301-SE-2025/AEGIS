@@ -3,9 +3,10 @@ package handlers
 import (
 	"net/http"
 
+	"aegis-api/services_/report/update_status"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"aegis-api/services_/report/update_status"
 )
 
 type UpdateStatusRequest struct {
@@ -23,7 +24,7 @@ func NewReportStatusHandler(service update_status.ReportStatusService) *ReportSt
 
 
 func (h *ReportStatusHandler) UpdateStatus(c *gin.Context) {
-	idParam := c.Param("id")
+	idParam := c.Param("reportID")
 	reportID, err := uuid.Parse(idParam)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})

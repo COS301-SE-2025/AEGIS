@@ -18,7 +18,7 @@ import {ShareButton} from "../ShareCasePage/sharecasebutton";
 import { useParams } from 'react-router-dom';
 
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+
 import { ClipboardList } from "lucide-react";
 
 
@@ -406,7 +406,7 @@ async function getOrCreateReportForCase(caseId: string): Promise<string> {
 }
 
 const [viewReportBusy, setViewReportBusy] = useState(false);
-const navigate = useNavigate();
+
 
 const handleViewReport = async () => {
   if (!caseId) return;
