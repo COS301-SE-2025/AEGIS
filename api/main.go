@@ -10,7 +10,6 @@ import (
 	"aegis-api/middleware"
 	"aegis-api/pkg/websocket"
 	"aegis-api/routes"
-	graphicalmapping "aegis-api/services_/GraphicalMapping"
 	"aegis-api/services_/admin/get_collaborators"
 	"aegis-api/services_/annotation_threads/messages"
 	annotationthreads "aegis-api/services_/annotation_threads/threads"
@@ -27,21 +26,15 @@ import (
 	"aegis-api/services_/case/case_evidence_totals"
 	"aegis-api/services_/case/case_tags"
 	update_case "aegis-api/services_/case/case_update"
-	"aegis-api/services_/chain_of_custody"
 	"aegis-api/services_/chat"
-	evidencecount "aegis-api/services_/evidence/evidence_count"
 	"aegis-api/services_/evidence/evidence_download"
 	"aegis-api/services_/evidence/evidence_tag"
 	"aegis-api/services_/evidence/evidence_viewer"
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/notification"
-
 	"aegis-api/services_/report"
 	"aegis-api/services_/report/update_status"
-
-	"aegis-api/services_/timeline"
-
 	"aegis-api/services_/user/profile"
 
 	//"github.com/gin-gonic/gin"
@@ -114,15 +107,7 @@ func main() {
 	listActiveCasesRepo := ListActiveCases.NewActiveCaseRepository(db.DB)
 	listClosedCasesRepo := ListClosedCases.NewClosedCaseRepository(db.DB)
 	listCasesRepo := ListCases.NewGormCaseQueryRepository(db.DB)
-	iocRepo := graphicalmapping.NewIOCRepository(db.DB)
 
-	//timeline
-	timelineRepo := timeline.NewRepository(db.DB)
-	if err := timelineRepo.AutoMigrate(); err != nil {
-		log.Fatalf("failed migrating timeline: %v", err)
-	}
-	evidenceCountRepo := evidencecount.NewEvidenceRepository(db.DB)
-	chainOfCustodyRepo := chain_of_custody.NewChainOfCustodyRepository(db.DB)
 	// ─── Email Sender (Mock) ────────────────────────────────────
 	emailSender := reset_password.NewMockEmailSender()
 
@@ -131,7 +116,7 @@ func main() {
 	authService := login.NewAuthService(userRepo)
 	resetService := reset_password.NewPasswordResetService(resetTokenRepo, userRepo, emailSender)
 	caseService := case_creation.NewCaseService(caseRepo, notificationService, hub)
-	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo, adminChecker, userAdapter, notificationService, hub)
+	caseAssignService := case_assign.NewCaseAssignmentService(caseAssignRepo, adminChecker, userAdapter)
 
 	listActiveCasesService := ListActiveCases.NewService(listActiveCasesRepo)
 	listClosedCasesService := ListClosedCases.NewService(listClosedCasesRepo)
@@ -167,12 +152,6 @@ func main() {
 	// ─── List Users ─────────────────────────────────────────────
 	listUserRepo := ListUsers.NewUserRepository(db.DB)
 	listUserService := ListUsers.NewListUserService(listUserRepo)
-	// ioc
-	iocService := graphicalmapping.NewIOCService(iocRepo)
-	//timeline
-	timelineService := timeline.NewService(timelineRepo)
-
-	evidenceCountService := evidencecount.NewEvidenceService(evidenceCountRepo)
 
 	// ─── Handlers ───────────────────────────────────────────────
 	adminHandler := handlers.NewAdminService(regService, listUserService, nil, nil, auditLogger)
@@ -188,12 +167,8 @@ func main() {
 		userAdapter, // UserRepo
 		updateCaseService,
 	)
-	//ioc
-	iocHandler := handlers.NewIOCHandler(iocService)
-	//timeline
-	timelineHandler := handlers.NewTimelineHandler(timelineService)
+
 	// ─── Evidence Upload/Download/Metadata ──────────────────────
-	evidenceHandler := handlers.NewEvidenceHandler(evidenceCountService)
 	metadataRepo := metadata.NewGormRepository(db.DB)
 	ipfsClient := upload.NewIPFSClient("")
 
@@ -204,10 +179,6 @@ func main() {
 	uploadHandler := handlers.NewUploadHandler(uploadService, auditLogger)
 	metadataHandler := handlers.NewMetadataHandler(metadataService, auditLogger)
 	downloadHandler := handlers.NewDownloadHandler(downloadService, auditLogger)
-
-	// ─── Chain of Custody ─────────────────────────────────────
-	chainOfCustodyService := chain_of_custody.NewChainOfCustodyService(chainOfCustodyRepo)
-	chainOfCustodyHandler := handlers.NewChainOfCustodyHandler(chainOfCustodyService)
 
 	// ─── Messages / WebSocket ───────────────────────────────────
 	messageRepo := messages.NewMessageRepository(db.DB)
@@ -235,8 +206,7 @@ func main() {
 	// User Profile Service
 	profileRepo := profile.NewGormProfileRepository(db.DB)
 	profileService := profile.NewProfileService(profileRepo)
-	profileIPFSClient := upload.NewIPFSClient("")
-	profileHandler := handlers.NewProfileHandler(profileService, auditLogger, profileIPFSClient)
+	profileHandler := handlers.NewProfileHandler(profileService, auditLogger)
 
 	// ─── Evidence Tagging ─────────────────────────────
 	evidenceTagRepo := evidence_tag.NewEvidenceTagRepository(db.DB)

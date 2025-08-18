@@ -6,24 +6,24 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	//"github.com/stretchr/testify/mock"
 
 	"aegis-api/services_/user/update_user_role"
 )
 
-type MockUpdateUserRoleRepo struct {
-	mock.Mock
-}
+// MockUserRepo mocks the UserRepository interface
+// type MockUserRepo struct {
+// 	mock.Mock
+// }
 
-func (m *MockUpdateUserRoleRepo) UpdateRoleAndMirror(userID uuid.UUID, role string) error {
+func (m *MockUserRepo) UpdateRoleAndMirror(userID uuid.UUID, role string) error {
 	args := m.Called(userID, role)
 	return args.Error(0)
 }
 
 func TestUpdateUserRole_Success(t *testing.T) {
-	repo := new(MockUpdateUserRoleRepo)
+	repo := new(MockUserRepo)
 	svc := update_user_role.NewUserService(repo)
 
 	uid := uuid.New()
@@ -39,7 +39,7 @@ func TestUpdateUserRole_Success(t *testing.T) {
 }
 
 func TestUpdateUserRole_InvalidUUID(t *testing.T) {
-	repo := new(MockUpdateUserRoleRepo)
+	repo := new(MockUserRepo)
 	svc := update_user_role.NewUserService(repo)
 
 	err := svc.UpdateUserRole("not-a-uuid", "Generic user")
@@ -48,7 +48,7 @@ func TestUpdateUserRole_InvalidUUID(t *testing.T) {
 }
 
 func TestUpdateUserRole_InvalidRole(t *testing.T) {
-	repo := new(MockUpdateUserRoleRepo)
+	repo := new(MockUserRepo)
 	svc := update_user_role.NewUserService(repo)
 
 	uid := uuid.New()
@@ -59,7 +59,7 @@ func TestUpdateUserRole_InvalidRole(t *testing.T) {
 }
 
 func TestUpdateUserRole_RepoError(t *testing.T) {
-	repo := new(MockUpdateUserRoleRepo)
+	repo := new(MockUserRepo)
 	svc := update_user_role.NewUserService(repo)
 
 	uid := uuid.New()

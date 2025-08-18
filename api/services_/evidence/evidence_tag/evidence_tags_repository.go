@@ -6,7 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+	"gorm.io/gorm/clause" 
+	
 )
 
 type EvidenceTagRepository interface {
@@ -53,6 +54,7 @@ func (r *evidenceTagRepository) AddTagsToEvidence(ctx context.Context, userID, e
 	})
 }
 
+
 func (r *evidenceTagRepository) RemoveTagsFromEvidence(ctx context.Context, userID, evidenceID uuid.UUID, tags []string) error {
 	for _, tagName := range tags {
 		normalized := strings.TrimSpace(strings.ToLower(tagName))
@@ -60,11 +62,8 @@ func (r *evidenceTagRepository) RemoveTagsFromEvidence(ctx context.Context, user
 		if err := r.db.WithContext(ctx).Where("name = ?", normalized).First(&tag).Error; err != nil {
 			continue // silently skip if tag doesn't exist
 		}
-		err := r.db.Where("evidence_id = ? AND tag_id = ?", evidenceID.String(), tag.ID).
-			Delete(&EvidenceTag{}).Error
-		if err != nil {
-			return err
-		}
+		r.db.Where("evidence_id = ? AND tag_id = ?", evidenceID, tag.ID).
+			Delete(&EvidenceTag{})
 	}
 	return nil
 }

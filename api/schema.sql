@@ -61,7 +61,7 @@ CREATE TYPE user_role AS ENUM (
     'Threat Hunter'                     -- Proactively searches for hidden or advanced threats
 );
 
-CREATE TYPE case_status AS ENUM ('open','Open', 'under_review','Under Review', 'closed','Ongoing','Archived');
+CREATE TYPE case_status AS ENUM ('open', 'under_review', 'closed','ongoing','archived');
 CREATE TYPE case_priority AS ENUM ('low', 'medium', 'high', 'critical','time-sensitive');
 CREATE TYPE investigation_stage AS ENUM (
     'Triage',
@@ -166,6 +166,7 @@ CREATE TABLE x3dh_signed_prekeys (
     private_key TEXT NOT NULL,   -- Encrypted
     signature TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    COLUMN expires_at TIMESTAMPTZ,
     expires_at TIMESTAMP
 );
 
@@ -277,18 +278,10 @@ CREATE TABLE message_reactions (
 );
 
 CREATE TABLE threads (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    title varchar(255) NOT NULL,
-    file_id uuid NOT NULL,
-    case_id uuid NOT NULL,
-    created_by uuid NOT NULL,
-    created_at timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    status varchar(50) DEFAULT 'open',
-    priority varchar(50) DEFAULT 'medium',
-    is_active boolean DEFAULT true,
-    resolved_at timestamp DEFAULT NULL
-
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
 );
 
 ALTER TABLE thread_messages
@@ -322,28 +315,6 @@ CREATE TABLE IF NOT EXISTS evidence (
     team_id   UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE
 );
 
---IOCS
-CREATE TABLE iocs (
-    id SERIAL PRIMARY KEY,
-    tenant_id UUID NOT NULL,
-    case_id UUID NOT NULL,
-    type VARCHAR(50) NOT NULL,
-    value VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    -- Foreign key constraints
-    CONSTRAINT fk_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-    CONSTRAINT fk_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
-
-    -- Prevent duplicate IOC entries per case
-    CONSTRAINT unique_case_ioc UNIQUE (case_id, type, value)
-);
-
--- Indexes for performance
-CREATE INDEX idx_iocs_tenant_id ON iocs(tenant_id);
-CREATE INDEX idx_iocs_case_id ON iocs(case_id);
-CREATE INDEX idx_iocs_type_value ON iocs(type, value);
-CREATE INDEX idx_iocs_tenant_type_value ON iocs(tenant_id, type, value);
 
 
 -- Optional indexes for performance
@@ -517,62 +488,45 @@ CREATE TABLE case_user_roles (
 CREATE INDEX idx_case_user_roles_case_id ON case_user_roles(case_id);
 CREATE INDEX idx_case_user_roles_user_id ON case_user_roles(user_id);
 
-
-
--- iocs related tables
-CREATE TABLE iocs (
-    id SERIAL PRIMARY KEY,
-    tenant_id UUID NOT NULL,
-    case_id UUID NOT NULL,
-    type VARCHAR(50) NOT NULL,
-    value VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    -- Foreign key constraints
-    CONSTRAINT fk_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-    CONSTRAINT fk_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
-
-    -- Prevent duplicate IOC entries per case
-    CONSTRAINT unique_case_ioc UNIQUE (case_id, type, value)
+CREATE TABLE entries (
+    id VARCHAR(255) PRIMARY KEY,
+    case_id VARCHAR(255) NOT NULL,
+    evidence_id VARCHAR(255) NOT NULL,
+    actor_id VARCHAR(255),
+    action VARCHAR(255) NOT NULL,
+    reason TEXT,
+    location TEXT,
+    hash_md5 VARCHAR(32),
+    hash_sha1 VARCHAR(40),
+    hash_sha256 VARCHAR(64),
+    occurred_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    
+ 
 );
 
--- Indexes for performance
-CREATE INDEX idx_iocs_tenant_id ON iocs(tenant_id);
-CREATE INDEX idx_iocs_case_id ON iocs(case_id);
-CREATE INDEX idx_iocs_type_value ON iocs(type, value);
-CREATE INDEX idx_iocs_tenant_type_value ON iocs(tenant_id, type, value);
+-- === Chain of Custody (AEGIS) Final Schema — Updated ===
+-- Assumes you already have: cases(id), evidence(id), users(id)
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
---Timeline Events Table
-CREATE TABLE timeline_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  case_id uuid NOT NULL REFERENCES cases(id),
-  description text NOT NULL,
-  evidence jsonb NOT NULL DEFAULT '[]'::jsonb,
-  tags jsonb NOT NULL DEFAULT '[]'::jsonb,
-  severity varchar(20),
-  analyst_id uuid,
-  analyst_name varchar(255),
-  "order" integer NOT NULL DEFAULT 0,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  deleted_at timestamptz
-);
-CREATE INDEX idx_timeline_case_order ON timeline_events (case_id, "order");
+-- 1) Actions we actually support now
+DO $$ BEGIN
+  CREATE TYPE coc_action AS ENUM (
+    'upload',    -- evidence first inserted into the system
+    'download',  -- evidence retrieved from the system
+    'archive',   -- evidence moved to long-term storage
+    'view'       -- evidence opened/viewed in Evidence Viewer
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-----Chain of Custody Entries table-----
-CREATE TABLE chain_of_custody (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    evidence_id UUID NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
-    custodian TEXT NOT NULL,
-    acquisition_date TIMESTAMP WITH TIME ZONE,
-    acquisition_tool TEXT,
-    system_info JSONB,  -- os_version, architecture, computer_name, domain, etc.
-    forensic_info JSONB, -- method, examiner, location, notes, legal_status
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- 2) Main CoC table
+CREATE TABLE IF NOT EXISTS chain_of_custody (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
+  case_id      UUID NOT NULL REFERENCES cases(id)    ON DELETE CASCADE,
+  evidence_id  UUID NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
+  actor_id     UUID              REFERENCES users(id), -- who performed the action (nullable for system)
 
   action       coc_action NOT NULL,
 ---  reason       TEXT,           -- justification / notes (optional)

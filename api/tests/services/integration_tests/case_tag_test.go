@@ -258,7 +258,7 @@ func verifyTagsSaved(t *testing.T, db *gorm.DB, caseID uuid.UUID, expectedTags [
 	t.Errorf("Could not verify tags were saved. Schema: %+v", schema)
 }
 
-func cleanupTestData(_ *testing.T, db *gorm.DB, caseID, userID uuid.UUID) {
+func cleanupTestData(t *testing.T, db *gorm.DB, caseID, userID uuid.UUID) {
 	// Clean up test data
 	db.Exec("DELETE FROM case_tags WHERE case_id = $1", caseID)
 	db.Exec("DELETE FROM cases WHERE id = $1", caseID)
