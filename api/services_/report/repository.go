@@ -20,6 +20,7 @@ type ReportRepository interface {
 	DownloadReport(ctx context.Context, reportID uuid.UUID) (*Report, error)
 	UpdateReportName(ctx context.Context, reportID uuid.UUID, name string) (*Report, error)
 	ListRecentCandidates(ctx context.Context, opts RecentReportsOptions, candidateLimit int) ([]Report, error)
+	GetReportsByTeamID(ctx context.Context, tenantID, teamID uuid.UUID) ([]ReportWithDetails, error)
 }
 
 type ReportsRepoImpl struct {
@@ -90,16 +91,64 @@ func (repo *ReportsRepoImpl) GetAllReports(ctx context.Context) ([]Report, error
 	return reports, nil
 }
 
+// services_/report/repository.go
+func (repo *ReportsRepoImpl) GetReportsByTeamID(
+	ctx context.Context,
+	tenantID, teamID uuid.UUID,
+) ([]ReportWithDetails, error) {
+	var out []ReportWithDetails
+	err := repo.DB.WithContext(ctx).Raw(`
+        SELECT
+            r.id,
+            r.case_id,
+            r.team_id,
+            r.name,
+            ''::text AS type, -- fallback: you can switch to r.type when column exists
+            r.status,
+            r.version,
+            to_char(r.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS last_modified,
+            r.file_path,
+            COALESCE(u.full_name, u.email) AS author,
+            (SELECT COUNT(*) FROM case_user_roles cur WHERE cur.case_id = r.case_id) AS collaborators,
+            c.title      AS case_name,  -- from cases
+            c.team_name  AS team_name   -- from cases
+        FROM reports r
+        JOIN users u  ON r.examiner_id = u.id
+        JOIN cases c  ON r.case_id     = c.id
+                     AND c.tenant_id   = r.tenant_id   -- tenant safety
+        WHERE r.tenant_id = ? AND r.team_id = ?
+        ORDER BY r.updated_at DESC
+    `, tenantID, teamID).Scan(&out).Error
+	return out, err
+}
+
 // Repository layer: returns raw time.Time
-func (repo *ReportsRepoImpl) GetReportsByCaseID(ctx context.Context, caseID uuid.UUID) ([]ReportWithDetails, error) {
-	reports := []ReportWithDetails{}
-	err := repo.DB.Raw(`
-        SELECT r.id, r.case_id, r.name, r.status, r.version, r.updated_at as last_modified,
-               r.file_path, u.full_name as author,
-               (SELECT COUNT(*) FROM case_user_roles cur WHERE cur.case_id = r.case_id) as collaborators
+func (repo *ReportsRepoImpl) GetReportsByCaseID(
+	ctx context.Context,
+	caseID uuid.UUID,
+) ([]ReportWithDetails, error) {
+	var reports []ReportWithDetails
+	err := repo.DB.WithContext(ctx).Raw(`
+        SELECT
+            r.id,
+            r.case_id,
+            r.team_id,
+            r.name,
+            ''::text AS type, -- fallback
+            r.status,
+            r.version,
+            to_char(r.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS last_modified,
+            r.file_path,
+            COALESCE(u.full_name, u.email) AS author,
+            (SELECT COUNT(*) FROM case_user_roles cur WHERE cur.case_id = r.case_id) AS collaborators,
+            c.title     AS case_name,
+            c.team_name AS team_name
         FROM reports r
         JOIN users u ON r.examiner_id = u.id
+        JOIN cases c ON r.case_id     = c.id
+                    AND c.tenant_id   = r.tenant_id
         WHERE r.case_id = ?
+        ORDER BY r.updated_at DESC
     `, caseID).Scan(&reports).Error
 	if err != nil {
 		return nil, err
