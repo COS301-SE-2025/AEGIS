@@ -34,5 +34,7 @@ func RegisterReportRoutes(router *gin.RouterGroup, handler *handlers.ReportHandl
 
 		// Report name update endpoint
 		report.PUT("/:reportID/name", handler.UpdateReportName) // Update report name
+
+		//report.PUT("/:reportID/status", statusHandler.UpdateStatus) // Update report status
 	}
 }

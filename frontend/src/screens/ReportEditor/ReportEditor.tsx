@@ -74,6 +74,19 @@ type ConfirmOpts = {
 //type Section = { id: string; title: string; content: string; order: number; updated_at?: string }
 const API_URL = "http://localhost:8080/api/v1";
 
+
+async function putReportStatus(reportId: string, status: "draft" | "review" | "published") {
+  const token = sessionStorage.getItem("authToken");
+  console.log("report id:",reportId)
+  const res = await axios.put(
+    `${API_URL}/reports/${reportId}/status`,
+    { status },
+    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+  );
+  return res.data;
+}
+
+
 // keep endpoint the same; just return a simple result
 async function putSectionContent(reportId: string, sectionId: string, content: string) {
   const token = sessionStorage.getItem("authToken");
@@ -1216,36 +1229,36 @@ const commitEditingTitle = useCallback(async () => {
       <div className="w-full flex">
         {/* Report Sections Navigation */}
         <div className="w-80 bg-gray-850 border-r border-gray-700 p-4">
-<div className="mb-6">
-  <div className="flex items-center gap-2">
-    <input
-      type="text"
-      value={reportTitle}
-      onChange={(e) => {
-        setReportTitle(e.target.value);
-        scheduleReportNameSave(e.target.value);
-      }}
-      onBlur={() => flushReportNameNow()}
-      className="w-full bg-transparent text-white font-semibold text-lg border-none outline-none"
-      placeholder="Untitled report"
-    />
-    {/* status dot */}
-    {reportNameState === "saving" && <Loader2 className="w-4 h-4 animate-spin text-gray-300" />}
-    {reportNameState === "saved" && !reportTitleDirty && <CheckCircle className="w-4 h-4 text-emerald-500" />}
-    {reportNameState === "error" && <XCircle className="w-4 h-4 text-red-500" />}
-  </div>
+        <div className="mb-6">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={reportTitle}
+              onChange={(e) => {
+                setReportTitle(e.target.value);
+                scheduleReportNameSave(e.target.value);
+              }}
+              onBlur={() => flushReportNameNow()}
+              className="w-full bg-transparent text-white font-semibold text-lg border-none outline-none"
+              placeholder="Untitled report"
+            />
+            {/* status dot */}
+            {reportNameState === "saving" && <Loader2 className="w-4 h-4 animate-spin text-gray-300" />}
+            {reportNameState === "saved" && !reportTitleDirty && <CheckCircle className="w-4 h-4 text-emerald-500" />}
+            {reportNameState === "error" && <XCircle className="w-4 h-4 text-red-500" />}
+          </div>
 
-  <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
-    <Calendar className="w-4 h-4" />
-    <span>{incidentId}</span>
-  </div>
-  <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
-    <Clock className="w-4 h-4" />
-    <span>Last modified:  {lastModified ? formatIsoDateTime(lastModified) : "—"} </span>
-  </div>
-  <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
-  </div>
-</div>
+          <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
+            <Calendar className="w-4 h-4" />
+            <span>{incidentId}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
+            <Clock className="w-4 h-4" />
+            <span>Last modified:  {lastModified ? formatIsoDateTime(lastModified) : "—"} </span>
+          </div>
+          <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
+          </div>
+        </div>
 
 
   {/* Section List */}
@@ -1561,6 +1574,29 @@ const commitEditingTitle = useCallback(async () => {
   </span>
 </div>
 
+<div className="flex items-center gap-2">
+  <label className="text-gray-300 text-sm">Status:</label>
+  <select
+    value={reportType}  // you mapped `status` into `reportType`
+    onChange={async (e) => {
+      const newStatus = e.target.value as "draft" | "review" | "published";
+      if (!reportId) return;
+      try {
+        await putReportStatus(reportId, newStatus);
+        setReportType(newStatus); // update UI
+        toast.success(`Report status updated to ${newStatus}`);
+      } catch (err) {
+        console.error("Status update failed", err);
+        toast.error("Failed to update status");
+      }
+    }}
+    className="bg-gray-800 text-white px-2 py-1 rounded border border-gray-700"
+  >
+    <option value="draft">Draft</option>
+    <option value="review">Review</option>
+    <option value="published">Published</option>
+  </select>
+</div>
 
 
                   {/* <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">

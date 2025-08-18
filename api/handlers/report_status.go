@@ -21,12 +21,6 @@ func NewReportStatusHandler(service update_status.ReportStatusService) *ReportSt
 	return &ReportStatusHandler{service: service}
 }
 
-func (h *ReportStatusHandler) RegisterRoutes(r *gin.Engine) {
-	group := r.Group("/api/v1/reports")
-	{
-		group.PUT("/:id/status", h.UpdateStatus)
-	}
-}
 
 func (h *ReportStatusHandler) UpdateStatus(c *gin.Context) {
 	idParam := c.Param("id")

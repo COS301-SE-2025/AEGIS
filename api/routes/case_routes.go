@@ -124,8 +124,8 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			// ─── Report Generation ──────────────────────────────
 			RegisterReportRoutes(protected, h.ReportHandler)
 
-			// ─── Report Status Update ─────────────────────────────
-			RegisterReportStatusRoutes(protected, h.ReportStatusHandler)
+			// // ─── Report Status Update ─────────────────────────────
+			 RegisterReportStatusRoutes(protected, h.ReportStatusHandler)
 
 		}
 	}
