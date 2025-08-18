@@ -19,6 +19,7 @@ type Case struct {
 	TenantID           uuid.UUID `gorm:"column:tenant_id;type:uuid;not null" json:"tenant_id"`
 	TeamID             uuid.UUID `gorm:"column:team_id;type:uuid" json:"team_id"`
 	CreatedAt          time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt          time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
 }
 
 type CreateCaseRequest struct {

@@ -12,7 +12,7 @@ type CaseAssignmentService struct {
 	repo                CaseAssignmentRepoInterface
 	adminChecker        AdminChecker
 	userRepo            UserRepo
-	notificationService *notification.NotificationService
+	notificationService notification.NotificationServiceInterface
 	hub                 *websocket.Hub
 }
 type CaseUserRole struct {

@@ -4,6 +4,8 @@ import (
 	"strings"
 	"time"
 
+	"fmt"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -35,6 +37,53 @@ func (r *AnnotationThreadRepository) CreateThread(thread *AnnotationThread, tags
 		return nil
 	})
 }
+func (r *AnnotationThreadRepository) CreateThreadWithParticipant(thread *AnnotationThread, tags []string, userID uuid.UUID) error {
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(thread).Error; err != nil {
+			return err
+		}
+
+		for _, tag := range tags {
+			tagRecord := ThreadTag{
+				ThreadID: thread.ID,
+				TagName:  tag,
+			}
+			if err := tx.Create(&tagRecord).Error; err != nil {
+				return err
+			}
+		}
+
+		participant := ThreadParticipant{
+			ThreadID: thread.ID,
+			UserID:   userID,
+			JoinedAt: time.Now(),
+		}
+		if err := tx.Create(&participant).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+func (r *AnnotationThreadRepository) UpdateThreadTags(threadID uuid.UUID, tags []string) error {
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		// Remove old tags
+		if err := tx.Where("thread_id = ?", threadID).Delete(&ThreadTag{}).Error; err != nil {
+			return err
+		}
+		// Add new tags
+		for _, tag := range tags {
+			tagRecord := ThreadTag{
+				ThreadID: threadID,
+				TagName:  tag,
+			}
+			if err := tx.Create(&tagRecord).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
 
 func (r *AnnotationThreadRepository) GetThreadsByFile(fileID uuid.UUID) ([]AnnotationThread, error) {
 	var threads []AnnotationThread
@@ -53,8 +102,13 @@ func (r *AnnotationThreadRepository) UpdateThreadStatus(threadID uuid.UUID, stat
 }
 
 func (r *AnnotationThreadRepository) AddParticipant(threadID, userID uuid.UUID) error {
+	var t AnnotationThread
+	if err := r.DB.First(&t, "id = ?", threadID).Error; err != nil {
+		return fmt.Errorf("thread does not exist: %w", err)
+	}
+
 	participant := ThreadParticipant{ThreadID: threadID, UserID: userID}
-	return r.DB.FirstOrCreate(&participant, ThreadParticipant{ThreadID: threadID, UserID: userID}).Error
+	return r.DB.FirstOrCreate(&participant, participant).Error
 }
 
 func (r *AnnotationThreadRepository) GetThreadParticipants(threadID uuid.UUID) ([]ThreadParticipant, error) {

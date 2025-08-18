@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -26,6 +28,7 @@ func (r *GormUpdateCaseRepository) UpdateCase(ctx context.Context, req *UpdateCa
 			"description":         req.Description,
 			"status":              req.Status,
 			"investigation_stage": req.InvestigationStage,
+			"updated_at":          time.Now(), // Update the timestamp
 		})
 
 	if result.Error != nil {

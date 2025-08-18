@@ -25,8 +25,12 @@ import { TeamRegistrationPage } from "./screens/TeamRegistrationPage";
 import { SystemAdminDashboard } from "./screens/SystemAdminDashboard";
 import { TenantAdminDashboard } from "./screens/TenantAdminDashboard";
 import { TeamsPage } from "./screens/TeamsPage";
+
 import { ReportDashboard } from "./screens/ReportDashboard/ReportDashboard";
 import {ReportEditor} from "./screens/ReportEditor/ReportEditor";
+import { IOCPage } from "./screens/IOCPage";
+import { ChainOfCustody } from "./screens/ChainOfCustody";
+
 //FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
 import { UploadEvidenceForm } from "./screens/UploadEvidencePage/UploadEvidencePage";
@@ -100,8 +104,8 @@ export default function App() {
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/dashboard" element={<DashBoardPage />} />
       <Route path="/create-case" element={<CreateCaseForm />} />
-      <Route path ="/upload-evidence" element={<UploadEvidenceForm />} />
-      <Route path = "/assign-case-members" element={<AssignCaseMembersForm />} />
+      <Route path ="/upload-evidence/:caseId" element={<UploadEvidenceForm />} />
+      <Route path = "/assign-case-members/:caseId" element={<AssignCaseMembersForm />} />
       <Route path="/evidence-viewer/:caseId" element={<EvidenceViewer />} />
       <Route path="/case-management/:caseId" element={<CaseManagementPage />} />
       <Route path="/case-management" element={<CaseManagementPage />} />
@@ -132,7 +136,9 @@ export default function App() {
       <Route path="/system-admin-dashboard" element={<SystemAdminDashboard />} />
       <Route path="/tenant-admin-dashboard" element={<TenantAdminDashboard />} />
       <Route path="/teams" element={<TeamsPage />} />
-      
+      <Route path="/cases/:case_id/iocs" element={<IOCPage />} />
+      <Route path="/chain-of-custody/:caseId" element={<ChainOfCustody />} />
+
       {/* Fallback route */}
     </Routes>
     </ThemeProvider>

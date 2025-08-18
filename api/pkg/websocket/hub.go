@@ -180,15 +180,6 @@ func (h *Hub) BroadcastToGroup(groupID string, message chat.WebSocketMessage) er
 		return fmt.Errorf("broadcast channel full or not ready")
 	}
 }
-func toWebSocketMessage(event chat.WebSocketEvent) chat.WebSocketMessage {
-	return chat.WebSocketMessage{
-		Type:      chat.MessageType(event.Type),
-		Payload:   event.Payload,
-		GroupID:   event.GroupID,
-		UserEmail: event.UserEmail,
-		Timestamp: event.Timestamp,
-	}
-}
 
 // Send typing start notification
 // Send typing start notification
@@ -353,18 +344,6 @@ func (h *Hub) HandleConnection(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-// Helper to wait for channel closure
-func clientClosed(c *Client) <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
-		for range c.Send {
-			// consume until closed
-		}
-		close(done)
-	}()
-	return done
-}
-
 func (c *Client) readPump() {
 	defer func() {
 		c.Hub.unregister <- c
@@ -382,11 +361,6 @@ func (c *Client) readPump() {
 		messageType, rawMessage, err := c.Conn.ReadMessage()
 		if err != nil {
 			log.Printf("❌ Read error (%v): %v", messageType, err)
-			break
-		}
-
-		if err != nil {
-			log.Printf("❌ Read error from %s: %v", c.UserID, err)
 			break
 		}
 

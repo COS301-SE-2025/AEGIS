@@ -211,7 +211,7 @@ func (s *Annotationthreadservice) GetUserByID(userID uuid.UUID) (*User, error) {
 }
 
 // isLeadInvestigator is a placeholder for permission logic.
-func isLeadInvestigator(userID uuid.UUID) bool {
+func isLeadInvestigator(_ uuid.UUID) bool {
 	return true
 }
 

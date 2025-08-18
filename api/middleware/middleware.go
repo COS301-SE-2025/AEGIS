@@ -59,9 +59,9 @@ func AuthMiddleware() gin.HandlerFunc {
 		role, ok3 := getStringClaim(claims, "role")
 		fullName, _ := getStringClaim(claims, "full_name")
 		tenantID, ok4 := getStringClaim(claims, "tenant_id")
-		teamID, _ := getStringClaim(claims, "team_id") // teamID can be empty for some roles
 
-		// Basic claim checks (teamID optional here)
+		teamID, _ := getStringClaim(claims, "team_id")
+
 		if !ok1 || !ok2 || !ok3 || !ok4 || userID == "" || email == "" || role == "" || tenantID == "" {
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
