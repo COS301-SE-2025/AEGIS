@@ -306,6 +306,7 @@ const [reportTitleDirty, setReportTitleDirty] = useState(false);
 const reportNameTimerRef = useRef<number | null>(null);
 const lastReportNameSavedRef = useRef<string>("");
 const [caseId, setCaseId] = useState("");
+const [isPreviewMode, setIsPreviewMode] = useState(false);
 
 // local-only section helpers (so we can skip API calls until backend is wired)
 const makeLocalId = () =>
@@ -628,6 +629,15 @@ const flushAndDownload = async () => {
   await flushSaveNow(sections[activeSection]?.content ?? "", { force: true });
   await downloadReport(id);
 };
+
+//toggle preview
+//toggle preview
+const togglePreview = useCallback(async () => {
+  if (!isPreviewMode && (dirty || saveState === "saving")) {
+    await flushSaveNow(sections[activeSection]?.content ?? "", { force: true });
+  }
+  setIsPreviewMode(prev => !prev);
+}, [isPreviewMode, dirty, saveState, flushSaveNow, sections, activeSection]);
 
 useEffect(() => { // NEW
   let cancelled = false;
@@ -1375,90 +1385,98 @@ const commitEditingTitle = useCallback(async () => {
 
               {/* Current Section */}
             {sections && sections[activeSection] && (
-  <div className="mb-6">
-    {editingTitleSectionId === sections[activeSection].id ? (
-      <div className="flex items-center gap-2">
-        <input
-          autoFocus
-          value={tempSectionTitle}
-          onChange={(e) => { setTempSectionTitle(e.target.value); setTitleDirty(true); }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); commitEditingTitle(); }
-            if (e.key === "Escape") { e.preventDefault(); cancelEditingTitle(); }
-          }}
-          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white w-full max-w-xl"
-          placeholder="Section title"
-        />
-        <button
-          type="button"
-          onClick={commitEditingTitle}
-          disabled={!tempSectionTitle.trim()}
-          className="p-2 rounded-lg bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-          title="Save"
-        >
-          <Check className="w-4 h-4" />
-        </button>
-        <button
-          type="button"
-          onClick={cancelEditingTitle}
-          className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
-          title="Cancel"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-    ) : (
-      <div className="flex items-center gap-3">
-  <h2
-    className="text-2xl font-semibold text-white"
-    onDoubleClick={() => startEditingTitle(sections[activeSection])} // optional: dbl-click to rename
-    title="Double-click to rename"
-  >
-    {sections[activeSection].title}
-  </h2>
-
-  {/* rename pencil opens the header editor */}
-  <button
-    type="button"
-    disabled={saveState === "saving" || editingTitleSectionId !== null}
-    onClick={() => startEditingTitle(sections[activeSection])}
-    className="p-2 rounded-lg hover:bg-gray-700 text-gray-300 disabled:opacity-50"
-    aria-label="Rename section"
-    title={saveState === "saving" ? "Saving… please wait" : "Rename section"}
-  >
-    <Pencil className="w-4 h-4" />
-  </button>
-
-  {titleSaving === "saving" && (
-    <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />
-  )}
-  {titleSaving === "error" && (
-    <span className="text-sm text-red-400">Save failed</span>
-  )}
-  {titleSaving === "saved" && (
-    <span className="text-sm text-emerald-400">Saved</span>
-  )}
-</div>
-
-    )}
-  </div>
-)}
-
-
-
-              {/* React Quill Editor */}
-              {sections && sections[activeSection] && (
-          <div className="mb-8">
-            <ReactQuill
-              theme="snow"
-              value={sections[activeSection]?.content?? ""}
-              onChange={handleEditorChange}
-              modules={modules}
-              formats={formats}
-              placeholder="Start writing your report content here..."
+      <div className="mb-6">
+        {editingTitleSectionId === sections[activeSection].id ? (
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              value={tempSectionTitle}
+              onChange={(e) => { setTempSectionTitle(e.target.value); setTitleDirty(true); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); commitEditingTitle(); }
+                if (e.key === "Escape") { e.preventDefault(); cancelEditingTitle(); }
+              }}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white w-full max-w-xl"
+              placeholder="Section title"
             />
+            <button
+              type="button"
+              onClick={commitEditingTitle}
+              disabled={!tempSectionTitle.trim()}
+              className="p-2 rounded-lg bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+              title="Save"
+            >
+              <Check className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={cancelEditingTitle}
+              className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
+              title="Cancel"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
+        ) : (
+          <div className="flex items-center gap-3">
+      <h2
+        className="text-2xl font-semibold text-white"
+        onDoubleClick={() => startEditingTitle(sections[activeSection])} // optional: dbl-click to rename
+        title="Double-click to rename"
+      >
+        {sections[activeSection].title}
+      </h2>
+
+      {/* rename pencil opens the header editor */}
+      <button
+        type="button"
+        disabled={saveState === "saving" || editingTitleSectionId !== null}
+        onClick={() => startEditingTitle(sections[activeSection])}
+        className="p-2 rounded-lg hover:bg-gray-700 text-gray-300 disabled:opacity-50"
+        aria-label="Rename section"
+        title={saveState === "saving" ? "Saving… please wait" : "Rename section"}
+      >
+        <Pencil className="w-4 h-4" />
+      </button>
+
+      {titleSaving === "saving" && (
+        <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />
+      )}
+      {titleSaving === "error" && (
+        <span className="text-sm text-red-400">Save failed</span>
+      )}
+      {titleSaving === "saved" && (
+        <span className="text-sm text-emerald-400">Saved</span>
+      )}
+    </div>
+
         )}
+      </div>
+    )}
+
+
+
+                  {/* React Quill Editor */}
+                  {sections && sections[activeSection] && (
+              <div className="mb-8">
+                {isPreviewMode ? (
+                <div 
+                  className="prose prose-invert max-w-none bg-gray-800 p-6 rounded-lg border border-gray-700"
+                  dangerouslySetInnerHTML={{ __html: sections[activeSection]?.content || '<p class="text-gray-400 italic">No content yet...</p>' }}
+                  style={{ minHeight: '500px', color: '#e5e7eb', lineHeight: '1.6' }}
+                />
+              ) : (
+                <ReactQuill
+                  theme="snow"
+                  value={sections[activeSection]?.content?? ""}
+                  onChange={handleEditorChange}
+                  modules={modules}
+                  formats={formats}
+                  placeholder="Start writing your report content here..."
+                />
+              )}
+              </div>
+            )}
 
 
               {/* Evidence Tables for specific sections */}
@@ -1545,10 +1563,22 @@ const commitEditingTitle = useCallback(async () => {
 
 
 
-                  <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">
+                  {/* <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors">
                     <Eye className="w-4 h-4 inline mr-2" />
                     Preview
-                  </button>
+                  </button> */}
+
+                  <button 
+                  onClick={togglePreview}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    isPreviewMode 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  <Eye className="w-4 h-4 inline mr-2" />
+                  {isPreviewMode ? 'Edit' : 'Preview'}
+                </button>
                 </div>
                 
                 {/* <div className="flex items-center gap-2 text-sm text-gray-400">
