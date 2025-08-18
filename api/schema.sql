@@ -63,7 +63,7 @@ CREATE TYPE user_role AS ENUM (
 
 CREATE TYPE case_status AS ENUM ('open','Open', 'under_review','Under Review', 'closed','Ongoing','Archived');
 CREATE TYPE case_priority AS ENUM ('low', 'medium', 'high', 'critical','time-sensitive');
-CREATE TYPE investigation_stage_new AS ENUM (
+CREATE TYPE investigation_stage AS ENUM (
     'Triage',
     'Evidence Collection',
     'Analysis',
@@ -74,7 +74,22 @@ CREATE TYPE investigation_stage_new AS ENUM (
     'Case Closure & Review'
 );
 
+CREATE TABLE tenants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
+CREATE TABLE teams (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_name TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_teams_tenant FOREIGN KEY (tenant_id)
+    REFERENCES tenants(id) ON DELETE CASCADE
+);
 -- STEP 1: Create ENUM for token status (if it doesn't exist yet)
 DO $$
 BEGIN
@@ -124,21 +139,8 @@ CREATE TABLE notifications (
 );
 
 
-CREATE TABLE tenants (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE teams (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_name TEXT NOT NULL,
-  tenant_id UUID NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-  CONSTRAINT fk_teams_tenant FOREIGN KEY (tenant_id)
-    REFERENCES tenants(id) ON DELETE CASCADE
-);
+
 
 CREATE TABLE tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -184,12 +186,13 @@ CREATE TABLE IF NOT EXISTS cases (
     title TEXT NOT NULL,
     description TEXT,
     status case_status DEFAULT 'open',
-    investigation_stage investigation_stage DEFAULT 'analysis',
+    investigation_stage investigation_stage DEFAULT 'Triage',
     priority case_priority DEFAULT 'medium',
     team_name TEXT NOT NULL,
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     -- New Fields
+    team_id UUID REFERENCES teams(id) ON DELETE SET NULL, -- Link to team
     tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
 );
 
@@ -252,7 +255,7 @@ CREATE TABLE thread_messages (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- New Fields
-    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
+    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
 );
 
 CREATE TABLE message_mentions (
@@ -285,6 +288,7 @@ CREATE TABLE threads (
     priority varchar(50) DEFAULT 'medium',
     is_active boolean DEFAULT true,
     resolved_at timestamp DEFAULT NULL
+
 );
 
 ALTER TABLE thread_messages
@@ -311,7 +315,7 @@ CREATE TABLE IF NOT EXISTS evidence (
     file_size INTEGER CHECK (file_size >= 0),
     checksum TEXT NOT NULL,
     metadata JSONB, -- stores metadata as a key-value JSON object
-    uploaded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    uploaded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     -- New Fields
     -- 🔹 Multi-tenancy fields
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -343,8 +347,15 @@ CREATE INDEX idx_iocs_tenant_type_value ON iocs(tenant_id, type, value);
 
 
 -- Optional indexes for performance
-CREATE INDEX idx_evidence_metadata_evidence_id ON evidence_metadata(evidence_id);
-CREATE INDEX idx_evidence_metadata_key ON evidence_metadata(key);
+-- Index for searching by case
+CREATE INDEX idx_evidence_case_id ON evidence(case_id);
+
+-- Index for searching by tenant/team
+CREATE INDEX idx_evidence_tenant_id ON evidence(tenant_id);
+CREATE INDEX idx_evidence_team_id   ON evidence(team_id);
+
+-- Index for searching by checksum (fast duplicate detection)
+CREATE INDEX idx_evidence_checksum  ON evidence(checksum);
 
 -- Tags and linking table
 CREATE TABLE IF NOT EXISTS tags (
@@ -367,8 +378,8 @@ CREATE TABLE IF NOT EXISTS evidence_tags (
 ---------------------------
 
 ------------------------
---****************************
--- Permissions table
+--****************************--
+--Permissions table
 CREATE TABLE IF NOT EXISTS permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT UNIQUE NOT NULL,
@@ -376,30 +387,30 @@ CREATE TABLE IF NOT EXISTS permissions (
 );
 
 -- Insert: User Management
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'user:create', 'Create/register a new user'),
-(gen_random_uuid(), 'user:view', 'View user details'),
-(gen_random_uuid(), 'user:update', 'Edit user details'),
-(gen_random_uuid(), 'user:delete', 'Remove a user from the system'),
-(gen_random_uuid(), 'user:assign_role', 'Assign roles to users'),
-(gen_random_uuid(), 'user:verify', 'Manually verify a user''s account'),
-(gen_random_uuid(), 'user:reset_password', 'Initiate password reset for a user');
+-- INSERT INTO permissions (id, name, description) VALUES
+-- (gen_random_uuid(), 'user:create', 'Create/register a new user'),
+-- (gen_random_uuid(), 'user:view', 'View user details'),
+-- (gen_random_uuid(), 'user:update', 'Edit user details'),
+-- (gen_random_uuid(), 'user:delete', 'Remove a user from the system'),
+-- (gen_random_uuid(), 'user:assign_role', 'Assign roles to users'),
+-- (gen_random_uuid(), 'user:verify', 'Manually verify a user''s account'),
+-- (gen_random_uuid(), 'user:reset_password', 'Initiate password reset for a user');
 
 -- Insert: Evidence Management
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'evidence:upload', 'Upload new evidence file'),
-(gen_random_uuid(), 'evidence:view', 'View/download evidence'),
-(gen_random_uuid(), 'evidence:delete', 'Delete evidence (soft/hard delete)'),
-(gen_random_uuid(), 'evidence:update_metadata', 'Edit metadata fields for evidence'),
-(gen_random_uuid(), 'evidence:tag', 'Assign tags to evidence'),
-(gen_random_uuid(), 'evidence:assign_analyst', 'Assign an analyst to a specific evidence item'),
-(gen_random_uuid(), 'evidence:verify_checksum', 'Validate integrity of uploaded file'),
-(gen_random_uuid(), 'evidence:view_logs', 'View audit logs related to evidence actions');
+-- INSERT INTO permissions (id, name, description) VALUES
+-- (gen_random_uuid(), 'evidence:upload', 'Upload new evidence file'),
+-- (gen_random_uuid(), 'evidence:view', 'View/download evidence'),
+-- (gen_random_uuid(), 'evidence:delete', 'Delete evidence (soft/hard delete)'),
+-- (gen_random_uuid(), 'evidence:update_metadata', 'Edit metadata fields for evidence'),
+-- (gen_random_uuid(), 'evidence:tag', 'Assign tags to evidence'),
+-- (gen_random_uuid(), 'evidence:assign_analyst', 'Assign an analyst to a specific evidence item'),
+-- (gen_random_uuid(), 'evidence:verify_checksum', 'Validate integrity of uploaded file'),
+-- (gen_random_uuid(), 'evidence:view_logs', 'View audit logs related to evidence actions');
 
 -- Extend Evidence Tagging
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'evidence:create_tag', 'Create new tags for evidence'),
-(gen_random_uuid(), 'evidence:remove_tag', 'Remove existing tags from evidence');
+-- INSERT INTO permissions (id, name, description) VALUES
+-- (gen_random_uuid(), 'evidence:create_tag', 'Create new tags for evidence'),
+-- (gen_random_uuid(), 'evidence:remove_tag', 'Remove existing tags from evidence');
 
 -- Insert: Specialized Evidence Analysis
 -- INSERT INTO permissions (id, name, description) VALUES
@@ -414,29 +425,29 @@ INSERT INTO permissions (id, name, description) VALUES
 -- (gen_random_uuid(), 'analysis:reverse_engineer', 'Reverse engineer a binary/malware sample');
 
 -- Insert: Case Management
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'case:create', 'Create a new case'),
-(gen_random_uuid(), 'case:view', 'View case details'),
-(gen_random_uuid(), 'case:update', 'Update case information'),
-(gen_random_uuid(), 'case:assign_user', 'Assign user to case'),
-(gen_random_uuid(), 'case:change_status', 'Change case status (open, review, closed)'),
-(gen_random_uuid(), 'case:set_priority', 'Set or modify case priority'),
-(gen_random_uuid(), 'case:archive', 'Archive or lock case for compliance purposes');
+-- INSERT INTO permissions (id, name, description) VALUES
+-- (gen_random_uuid(), 'case:create', 'Create a new case'),
+-- (gen_random_uuid(), 'case:view', 'View case details'),
+-- (gen_random_uuid(), 'case:update', 'Update case information'),
+-- (gen_random_uuid(), 'case:assign_user', 'Assign user to case'),
+-- (gen_random_uuid(), 'case:change_status', 'Change case status (open, review, closed)'),
+-- (gen_random_uuid(), 'case:set_priority', 'Set or modify case priority'),
+-- (gen_random_uuid(), 'case:archive', 'Archive or lock case for compliance purposes');
 
 -- Case Tagging
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'case:tag', 'Assign tags to cases'),
-(gen_random_uuid(), 'case:create_tag', 'Create new tags for cases'),
-(gen_random_uuid(), 'case:remove_tag', 'Remove existing tags from cases');
+-- INSERT INTO permissions (id, name, description) VALUES
+-- (gen_random_uuid(), 'case:tag', 'Assign tags to cases'),
+-- (gen_random_uuid(), 'case:create_tag', 'Create new tags for cases'),
+-- (gen_random_uuid(), 'case:remove_tag', 'Remove existing tags from cases');
 
 
 -- Insert: Dashboard & Audit
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'dashboard:view', 'View dashboards with case/evidence summaries'),
-(gen_random_uuid(), 'audit:view_all', 'View all system-level audit logs'),
-(gen_random_uuid(), 'audit:view_case', 'View audit logs related to a specific case'),
-(gen_random_uuid(), 'audit:view_user', 'View audit actions performed by a user'),
-(gen_random_uuid(), 'audit:generate_report', 'Export/print audit or investigation report');
+-- INSERT INTO permissions (id, name, description) VALUES
+-- (gen_random_uuid(), 'dashboard:view', 'View dashboards with case/evidence summaries'),
+-- (gen_random_uuid(), 'audit:view_all', 'View all system-level audit logs'),
+-- (gen_random_uuid(), 'audit:view_case', 'View audit logs related to a specific case'),
+-- (gen_random_uuid(), 'audit:view_user', 'View audit actions performed by a user'),
+-- (gen_random_uuid(), 'audit:generate_report', 'Export/print audit or investigation report');
 
 -- Insert: Compliance & Legal
 -- INSERT INTO permissions (id, name, description) VALUES
@@ -448,34 +459,34 @@ INSERT INTO permissions (id, name, description) VALUES
 
 
 -- Log Exporting
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'audit:export_case_log', 'Export audit logs for a specific case'),
-(gen_random_uuid(), 'audit:export_user_log', 'Export audit logs for a specific user');
+-- INSERT INTO permissions (id, name, description) VALUES
+-- (gen_random_uuid(), 'audit:export_case_log', 'Export audit logs for a specific case'),
+-- (gen_random_uuid(), 'audit:export_user_log', 'Export audit logs for a specific user');
 
 -- Annotation and Commenting
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'comment:create', 'Add a comment to a case or evidence'),
-(gen_random_uuid(), 'comment:reply', 'Reply to an existing comment thread'),
-(gen_random_uuid(), 'comment:edit', 'Edit your own comment'),
-(gen_random_uuid(), 'comment:delete', 'Delete a comment you authored'),
-(gen_random_uuid(), 'comment:moderate', 'Moderate or remove inappropriate comments'),
-(gen_random_uuid(), 'thread:create', 'Start a new annotation thread on a case or file'),
-(gen_random_uuid(), 'thread:close', 'Close or archive a thread to prevent new replies');
+-- INSERT INTO permissions (id, name, description) VALUES
+-- (gen_random_uuid(), 'comment:create', 'Add a comment to a case or evidence'),
+-- (gen_random_uuid(), 'comment:reply', 'Reply to an existing comment thread'),
+-- (gen_random_uuid(), 'comment:edit', 'Edit your own comment'),
+-- (gen_random_uuid(), 'comment:delete', 'Delete a comment you authored'),
+-- (gen_random_uuid(), 'comment:moderate', 'Moderate or remove inappropriate comments'),
+-- (gen_random_uuid(), 'thread:create', 'Start a new annotation thread on a case or file'),
+-- (gen_random_uuid(), 'thread:close', 'Close or archive a thread to prevent new replies');
 
 -- Case Collaboration
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'collaboration:add_member', 'Add member to a case collaboration team'),
-(gen_random_uuid(), 'collaboration:remove_member', 'Remove member from a case team'),
-(gen_random_uuid(), 'collaboration:change_role', 'Update user role within a case'),
-(gen_random_uuid(), 'collaboration:message', 'Send secure messages within a case context');
+-- INSERT INTO permissions (id, name, description) VALUES
+-- (gen_random_uuid(), 'collaboration:add_member', 'Add member to a case collaboration team'),
+-- (gen_random_uuid(), 'collaboration:remove_member', 'Remove member from a case team'),
+-- (gen_random_uuid(), 'collaboration:change_role', 'Update user role within a case'),
+-- (gen_random_uuid(), 'collaboration:message', 'Send secure messages within a case context');
 
--- Secure Chat
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'chat:create_room', 'Create a new chat room for a case'),
-(gen_random_uuid(), 'chat:send_message', 'Send a message in a secure chat'),
-(gen_random_uuid(), 'chat:view_history', 'View chat history'),
-(gen_random_uuid(), 'chat:delete_message', 'Delete your message from chat'),
-(gen_random_uuid(), 'chat:moderate', 'Moderate chat content or users');
+-- -- Secure Chat
+-- INSERT INTO permissions (id, name, description) VALUES
+-- (gen_random_uuid(), 'chat:create_room', 'Create a new chat room for a case'),
+-- (gen_random_uuid(), 'chat:send_message', 'Send a message in a secure chat'),
+-- (gen_random_uuid(), 'chat:view_history', 'View chat history'),
+-- (gen_random_uuid(), 'chat:delete_message', 'Delete your message from chat'),
+-- (gen_random_uuid(), 'chat:moderate', 'Moderate chat content or users');
 
 -- Maps ENUM roles to permissions directly
 CREATE TABLE enum_role_permissions (
@@ -505,6 +516,8 @@ CREATE TABLE case_user_roles (
 -- Indexes to support performance (optional but recommended)
 CREATE INDEX idx_case_user_roles_case_id ON case_user_roles(case_id);
 CREATE INDEX idx_case_user_roles_user_id ON case_user_roles(user_id);
+
+
 
 -- iocs related tables
 CREATE TABLE iocs (
@@ -560,3 +573,229 @@ CREATE TABLE chain_of_custody (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+
+  action       coc_action NOT NULL,
+---  reason       TEXT,           -- justification / notes (optional)
+
+  location     TEXT,           -- physical/logical location (optional)
+  hash_md5     TEXT,           -- legacy compatibility (optional)
+  hash_sha1    TEXT,           -- legacy compatibility (optional)
+  hash_sha256  TEXT,           -- canonical integrity hash
+
+  occurred_at  TIMESTAMPTZ NOT NULL,                -- when the action happened
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()   -- when we recorded it
+);
+
+-- 3) Helpful indexes for fast lookups
+CREATE INDEX IF NOT EXISTS idx_coc_case_time
+  ON chain_of_custody (case_id, occurred_at);
+
+CREATE INDEX IF NOT EXISTS idx_coc_evidence_time
+  ON chain_of_custody (evidence_id, occurred_at);
+
+CREATE INDEX IF NOT EXISTS idx_coc_actor
+  ON chain_of_custody (actor_id);
+
+CREATE INDEX IF NOT EXISTS idx_coc_action
+  ON chain_of_custody (action);
+
+-- 4) Append-only enforcement
+CREATE OR REPLACE FUNCTION forbid_coc_update_delete()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'Chain of Custody entries are immutable';
+END $$;
+
+CREATE TRIGGER trg_coc_no_update
+BEFORE UPDATE ON chain_of_custody
+FOR EACH ROW EXECUTE FUNCTION forbid_coc_update_delete();
+
+CREATE TRIGGER trg_coc_no_delete
+BEFORE DELETE ON chain_of_custody
+FOR EACH ROW EXECUTE FUNCTION forbid_coc_update_delete();
+
+-- 5) Convenience view with actor data for UI
+CREATE OR REPLACE VIEW v_chain_of_custody_with_actor AS
+SELECT
+  c.id,
+  c.case_id,
+  c.evidence_id,
+  c.actor_id,
+  u.name  AS actor_name,
+  u.email AS actor_email,
+  c.action,
+  c.reason,
+  c.location,
+  c.hash_md5,
+  c.hash_sha1,
+  c.hash_sha256,
+  c.occurred_at,
+  c.created_at
+FROM chain_of_custody c
+LEFT JOIN users u ON u.id = c.actor_id
+ORDER BY c.occurred_at ASC, c.created_at ASC;
+
+
+
+-- For reference (no change needed if this already exists)
+CREATE TABLE IF NOT EXISTS report_hashes (
+  id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_id UUID NOT NULL REFERENCES report_devices(id) ON DELETE CASCADE,
+  md5       TEXT,
+  sha1      TEXT,
+  sha256    TEXT,
+  context   TEXT,  -- e.g., "acquisition image", "working copy"
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- ALTER TABLE case_reports
+--   ADD COLUMN IF NOT EXISTS acquisition_methods  TEXT,  -- how imaging/collection was done
+--   ADD COLUMN IF NOT EXISTS analysis_techniques  TEXT;  -- e.g., keyword search, timeline analysis
+
+
+DO $$ BEGIN
+  CREATE TYPE report_status  AS ENUM ('draft', 'published', 'review', 'archived');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE report_format  AS ENUM ('pdf','json','csv');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS case_reports (
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id                   UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  examiner_id               UUID NOT NULL REFERENCES users(id),
+  
+  -- Name and file path fields for report metadata
+  name                      VARCHAR(255) NOT NULL,  -- Name of the report
+  file_path                 VARCHAR(255) NOT NULL,  -- Path to the report file
+  
+  -- Narrative fields for the report's content
+  scope                     TEXT,
+  objectives                TEXT,
+  limitations               TEXT,
+  tools_methods             TEXT,   -- Simplified: single text field
+  final_conclusion          TEXT,
+  evidence_summary          TEXT,
+  certification_statement   TEXT,
+  date_examined             DATE,
+
+  -- Lifecycle / admin fields
+  status                    report_status NOT NULL DEFAULT 'draft',
+  version                   INTEGER NOT NULL DEFAULT 1,
+  report_number             TEXT UNIQUE,   -- Optional human-friendly ID
+  
+  -- Timestamps
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_case_reports_case_id     ON case_reports(case_id);
+CREATE INDEX IF NOT EXISTS idx_case_reports_examiner_id ON case_reports(examiner_id);
+CREATE INDEX IF NOT EXISTS idx_case_reports_status      ON case_reports(status);
+-- 1) Create the helper function (idempotent)
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at := NOW();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_case_reports_updated_at
+BEFORE UPDATE ON case_reports
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+
+-- First, create the report_status enum type (PostgreSQL)
+-- Enable UUID generation (PostgreSQL)
+-- Enable UUID generation (PostgreSQL)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create enum type for report status
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'report_status') THEN
+        CREATE TYPE report_status AS ENUM ('draft', 'review', 'published');
+    END IF;
+END
+$$;
+
+-- Create the reports table
+CREATE TABLE reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tenant_id UUID NOT NULL,                    -- 🔒 tenant scope
+    team_id   UUID NOT NULL,     
+    case_id UUID NOT NULL,                     -- Links report to a specific case
+    examiner_id UUID NOT NULL,                 -- Who created the report
+    name VARCHAR(255) NOT NULL,                 -- Report title
+    mongo_id CHAR(24),                          -- MongoDB ObjectID in 24-char hex format
+    report_number VARCHAR(255) UNIQUE,          -- Optional unique report number
+    status report_status DEFAULT 'draft',       -- Current report status
+    version INTEGER NOT NULL DEFAULT 1,         -- Versioning
+    date_examined DATE,                         -- Optional examination date
+    file_path VARCHAR(255) NOT NULL,            -- Path to PDF or stored file
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for better query performance
+CREATE INDEX idx_reports_case_id ON reports(case_id);
+CREATE INDEX idx_reports_examiner_id ON reports(examiner_id);
+CREATE INDEX idx_reports_status ON reports(status);
+CREATE INDEX idx_reports_created_at ON reports(created_at);
+CREATE INDEX idx_reports_report_number ON reports(report_number);
+CREATE INDEX idx_reports_date_examined ON reports(date_examined);
+
+-- Add foreign key constraints (uncomment if you have related tables)
+-- ALTER TABLE reports ADD CONSTRAINT fk_reports_case_id 
+--     FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE;
+-- ALTER TABLE reports ADD CONSTRAINT fk_reports_examiner_id 
+--     FOREIGN KEY (examiner_id) REFERENCES users(id) ON DELETE RESTRICT;
+
+-- Create trigger to automatically update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_reports_updated_at 
+    BEFORE UPDATE ON reports 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Alternative for MySQL (if not using PostgreSQL)
+/*
+CREATE TABLE reports (
+    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    case_id CHAR(36) NOT NULL,
+    examiner_id CHAR(36) NOT NULL,
+    scope TEXT,
+    objectives TEXT,
+    limitations TEXT,
+    tools_methods TEXT,
+    final_conclusion TEXT,
+    evidence_summary TEXT,
+    certification_statement TEXT,
+    date_examined DATE,
+    status ENUM('draft', 'published', 'archived', 'pending', 'reviewed') DEFAULT 'draft',
+    version INTEGER NOT NULL DEFAULT 1,
+    report_number VARCHAR(255) UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    
+    INDEX idx_reports_case_id (case_id),
+    INDEX idx_reports_examiner_id (examiner_id),
+    INDEX idx_reports_status (status),
+    INDEX idx_reports_created_at (created_at),
+    INDEX idx_reports_report_number (report_number),
+    INDEX idx_reports_date_examined (date_examined)
+);
+*/

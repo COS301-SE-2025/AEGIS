@@ -36,7 +36,12 @@ import (
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/notification"
+
+	"aegis-api/services_/report"
+	"aegis-api/services_/report/update_status"
+
 	"aegis-api/services_/timeline"
+
 	"aegis-api/services_/user/profile"
 
 	//"github.com/gin-gonic/gin"
@@ -269,6 +274,51 @@ func main() {
 		DB: db.DB,
 	}
 
+	// ─── Chain of Custody (CoC) ─────────────────────────────
+	// Create an adapter for the AuditLogger to fit the coc.Auditor interface
+	// auditAdapter := &coc.AuditLogAdapter{
+	// 	AuditLogger: auditLogger, // Use the existing AuditLogger
+	// }
+
+	// Initialize the CoC service (pass it as a value, not a pointer)
+	// cocSvc := coc.Service{
+	// 	Repo:      coc.GormRepo{DB: db.DB}, // Initialize repository (GORM)
+	// 	Authz:     coc.SimpleAuthz{},       // Placeholder for RBAC (role-based access control)
+	// 	Audit:     auditAdapter,            // Use the adapter for AuditLogger
+	// 	DedupeWin: 3 * time.Second,         // Deduplication window (optional)
+	// }
+
+	// Initialize the handler, passing a pointer to cocSvc to avoid copying sync.Mutex
+	// cocHandler := handlers.NewCoCHandler(cocSvc, auditLogger) // Pass the service pointer
+
+	// ─── Report Service Initialization ─────────────────────
+
+	// Initialize the repository and service for report generation and management
+	// ─── Report Service Initialization ─────────────────────────────
+
+	reportRepo := report.NewReportRepository(db.DB)
+	// coCRepo := report.NewCoCRepo(db.DB)
+	reportContentCollection := mongoDatabase.Collection("report_contents")
+
+	reportMongoRepo := report.NewReportMongoRepo(reportContentCollection)
+
+	reportService := report.NewReportService(
+		reportRepo,
+		//nil,         // ReportArtifactsRepo
+		reportMongoRepo,
+		// nil,         // Storage
+		// auditLogger, // AuditLogger
+		// nil,         // Authorizer
+		// coCRepo,
+	)
+	reportHandler := handlers.NewReportHandler(reportService)
+
+	// ─── Report Status Update ─────────────────────────────
+
+	reportStatusRepo := update_status.NewReportStatusRepository(db.DB)
+	reportStatusService := update_status.NewReportStatusService(reportStatusRepo)
+	reportStatusHandler := handlers.NewReportStatusHandler(reportStatusService)
+
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -296,10 +346,14 @@ func main() {
 		tenantRepo, // Pass the tenant repository
 		userRepo,   // Pass the user repository
 		notificationService,
+
+		reportStatusHandler,
+
 		iocHandler,
 		timelineHandler,
 		evidenceHandler,
 		chainOfCustodyHandler,
+
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

@@ -37,6 +37,8 @@ import { addThreadParticipant } from "./api";
 import { fetchThreadParticipants } from "./api";
 import { approveMessage } from "./api";
 import{MessageCard} from "../../components/ui/MessageCard";
+import { ClipboardList } from "lucide-react";
+
 
 // Import Select components from your UI library
 import {
@@ -190,6 +192,33 @@ const BASE_URL = "http://localhost:8080/api/v1";
     .map((part: string) => part[0])
     .join("")
     .toUpperCase();
+
+const [role, setRole] = useState<string>(user?.role || "");
+const isDFIRAdmin = role === "DFIR Admin";
+  
+useEffect(() => {
+  if (!role) {
+    const token = sessionStorage.getItem("authToken");
+    if (token) {
+      try {
+        const [, payloadB64] = token.split(".");
+        const json = JSON.parse(
+          decodeURIComponent(
+            atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+              .split("")
+              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          )
+        );
+        if (json?.role) setRole(json.role);
+      } catch { /* ignore */ }
+    }
+  }
+}, [role]);
+
+
+    
+const { caseId } = useParams();
 
 
 
@@ -726,6 +755,12 @@ if (!caseId || caseId === "undefined") {
               <MessageSquare className="w-5 h-5" />
               <Link to="/secure-chat"><span className="text-sm">Secure chat</span></Link>
             </div>
+                 {isDFIRAdmin && (
+               <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <ClipboardList className="w-5 h-5" />
+              <Link to="/report-dashboard"><span className="text-sm">Case Reports</span></Link>
+            </div>
+          )}
           </nav>
         </div>
 
@@ -870,6 +905,10 @@ if (!caseId || caseId === "undefined") {
             <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
               <MessageSquare className="w-5 h-5" />
               <Link to="/secure-chat"><span className="text-sm">Secure chat</span></Link>
+            </div>
+                  <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <ClipboardList className="w-5 h-5" />
+              <Link to="/report-dashboard"><span className="text-sm">Case Reports</span></Link>
             </div>
           </nav>
         </div>

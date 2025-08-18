@@ -61,10 +61,15 @@ type Handler struct {
 	TenantRepo                registration.TenantRepository
 	UserRepo                  registration.UserRepository // Optional, if you have a user repository
 	NotificationService       *notification.NotificationService
+
+	ReportHandler       *ReportHandler       // Optional: Report generation handler
+	ReportStatusHandler *ReportStatusHandler // Optional: Report status update handler
+
 	IOCHandler                *IOCHandler
 	TimelineHandler           *TimelineHandler
 	EvidenceHandler           *EvidenceHandler
 	ChainOfCustodyHandler     *ChainOfCustodyHandler
+
 }
 
 func NewHandler(
@@ -93,6 +98,9 @@ func NewHandler(
 	tenantRepo registration.TenantRepository, // Optional, if you have a tenant repository
 	userRepo registration.UserRepository, // Optional, if you have a user repository
 	notificationService *notification.NotificationService,
+
+	reportHandler *ReportHandler, // Optional: Report generation handler
+	reportStatusHandler *ReportStatusHandler, // Optional: Report status update handler
 	IOCHandler *IOCHandler,
 	TimelineHandler *TimelineHandler,
 	EvidenceHandler *EvidenceHandler,
@@ -125,10 +133,14 @@ func NewHandler(
 		TenantRepo:                tenantRepo, // Optional, if you have a tenant repository
 		UserRepo:                  userRepo,   // Optional, if you have a user repository
 		NotificationService:       notificationService,
+
+		ReportHandler:       reportHandler,       // Optional: Report generation handler
+		ReportStatusHandler: reportStatusHandler, // Optional: Report status update handler
+
 		IOCHandler:                IOCHandler,
 		TimelineHandler:           TimelineHandler,
 		EvidenceHandler:           EvidenceHandler,
-		ChainOfCustodyHandler:     ChainOfCustodyHandler,
+
 	}
 }
 
