@@ -1107,7 +1107,7 @@ const commitEditingTitle = useCallback(async () => {
         .ql-editor {
           color: #e5e7eb !important;
           background-color: #1f2937 !important;
-          min-height: 300px !important;
+          min-height: 500px !important;
           font-size: 16px !important;
           line-height: 1.6 !important;
         }
@@ -1156,90 +1156,54 @@ const commitEditingTitle = useCallback(async () => {
         .ql-snow .ql-picker-label.ql-active .ql-fill {
           fill: #e5e7eb !important;
         }
+                
+                /* Fix dropdown text colors */
+        .ql-snow .ql-picker-label {
+          color: #9ca3af !important;
+        }
+
+        .ql-snow .ql-picker-label:hover,
+        .ql-snow .ql-picker-label.ql-active {
+          color: #e5e7eb !important;
+        }
+
+        .ql-snow .ql-picker-item {
+          color: #e5e7eb !important;
+        }
+
+        .ql-snow .ql-picker-item:hover {
+          color: #ffffff !important;
+          background-color: #4b5563 !important;
+        }
+
+        /* Fix header dropdown specifically */
+        .ql-snow .ql-picker.ql-header .ql-picker-label {
+          color: #9ca3af !important;
+        }
+
+        .ql-snow .ql-picker.ql-header .ql-picker-label:hover,
+        .ql-snow .ql-picker.ql-header .ql-picker-label.ql-active {
+          color: #e5e7eb !important;
+        }
+
+        .ql-snow .ql-picker.ql-header .ql-picker-item {
+          color: #e5e7eb !important;
+        }
+
+        .ql-snow .ql-picker-options .ql-picker-item {
+          color: #e5e7eb !important;
+          background-color: transparent !important;
+        }
+
+        .ql-snow .ql-picker-options .ql-picker-item:hover {
+          color: #ffffff !important;
+          background-color: #4b5563 !important;
+        }
       `}</style>
 
-      {/* Left Sidebar */}
-      <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
-        {/* Logo & Header */}
-        <div className="p-4 border-b border-gray-700">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded flex items-center justify-center">
-              <img
-                src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
-                alt="AEGIS Logo"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <span className="text-white font-bold text-xl">AEGIS</span>
-          </div>
-        </div>
-
-        {/* Recent Reports */}
-        <div className="p-4 border-b border-gray-700">
-          <h3 className="text-gray-300 font-medium mb-3 flex items-center justify-between">
-  <span>Recent Reports</span>
-  <button
-    onClick={refreshRecent}
-    className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded"
-  >
-    Refresh
-  </button>
-</h3>
-
-
-  {recentLoading && (
-    <div className="space-y-2">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="animate-pulse h-10 bg-gray-700/60 rounded-lg" />
-      ))}
-    </div>
-  )}
-
-  {!recentLoading && recentError && (
-    <div className="text-sm text-red-400">{recentError}</div>
-  )}
-
-  {!recentLoading && !recentError && (
-    <div className="space-y-2">
-      {recentReports.length === 0 && (
-        <div className="text-sm text-gray-400">No recent reports yet.</div>
-      )}
-
-      {recentReports.map((r) => (
-        <button
-          key={r.id}
-          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700 transition-colors text-left"
-          onClick={() => openReport(r.id)}
-          disabled={saveState === "saving"} // avoid switching mid-save
-        >
-          <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span
-                className={`w-2 h-2 rounded-full ${getStatusDot(r.status)}`}
-              />
-              <span className="text-white text-sm truncate">{r.title}</span>
-            </div>
-            <p className="text-gray-400 text-xs">{timeAgo(r.lastModified)}</p>
-          </div>
-        </button>
-      ))}
-    </div>
-  )}
-</div>
-
-
-        {/* New Report Button */}
-        <div className="p-4">
-          <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            <Plus className="w-4 h-4" />
-            New Report
-          </button>
-        </div>
-      </div>
-
+   
       {/* Main Content */}
-      <div className="flex-1 flex">
+      <div className="w-full flex">
         {/* Report Sections Navigation */}
         <div className="w-80 bg-gray-850 border-r border-gray-700 p-4">
 <div className="mb-6">
@@ -1270,8 +1234,6 @@ const commitEditingTitle = useCallback(async () => {
     <span>Last modified:  {lastModified ? formatIsoDateTime(lastModified) : "—"} </span>
   </div>
   <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
-    <Users className="w-4 h-4" />
-    <span>Analyst: {analyst}</span>
   </div>
 </div>
 
@@ -1360,10 +1322,6 @@ const commitEditingTitle = useCallback(async () => {
           <div className="bg-gray-800 border-b border-gray-700 p-4">
             <div className="flex items-center justify-between">
               <div>
-              <h2 className="text-white font-semibold text-lg">
-                {`Case: ${caseId?.trim() ? caseId : "ID"}`}
-              </h2>
-
 
                 <div className="flex items-center gap-4 text-sm text-gray-400 mt-1">
                   <span className="flex items-center gap-1">
@@ -1388,8 +1346,8 @@ const commitEditingTitle = useCallback(async () => {
           </div>
 
           {/* Editor Content */}
-          <div className="flex-1 p-8 overflow-y-auto">
-            <div className="max-w-4xl mx-auto">
+          <div className="flex-1 p-6 overflow-y-auto">
+            <div className="max-w-5xl mx-auto">
               {/* Report Header */}
               <div className="mb-8">
                 <h1 className="text-3xl font-bold text-white mb-4">
@@ -1404,10 +1362,10 @@ const commitEditingTitle = useCallback(async () => {
                     <span className="text-gray-400">Last modified:</span>
                     <span className="text-white ml-2">{lastModified ? formatIsoDateTime(lastModified) : "—"} </span>
                   </div>
-                  <div>
+                  {/* <div>
                     <span className="text-gray-400">Analyst:</span>
                     <span className="text-white ml-2">{analyst}</span>
-                  </div>
+                  </div> */}
                   <div>
                     <span className="text-gray-400">Report Type:</span>
                     <span className="text-white ml-2">{reportType}</span>
