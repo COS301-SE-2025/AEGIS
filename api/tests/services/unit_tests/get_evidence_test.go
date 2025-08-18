@@ -62,7 +62,7 @@ func setupTestRouter(service *MockMetadataService) (*gin.Engine, *httptest.Respo
 		handler.GetEvidenceByID(c)
 	})
 
-	router.GET("/evidence/case/:caseID", func(c *gin.Context) {
+	router.GET("/evidence/case/:case_id", func(c *gin.Context) {
 		c.Set("userID", "test-user-id")
 		c.Set("userRole", "Analyst")
 		handler.GetEvidenceByCaseID(c)

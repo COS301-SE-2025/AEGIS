@@ -193,7 +193,7 @@ func (h *MetadataHandler) GetEvidenceByCaseID(c *gin.Context) {
 		Email:     emailStr,
 	}
 
-	caseIDStr := c.Param("caseID")
+	caseIDStr := c.Param("case_id")
 	caseID, err := uuid.Parse(caseIDStr)
 	if err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{

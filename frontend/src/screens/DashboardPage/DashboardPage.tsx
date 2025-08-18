@@ -69,10 +69,10 @@ interface Notification {
 
 const [openCases, setOpenCases] = useState([]);
 const [closedCases, setClosedCases] = useState([]);
-const [archivedCases, setArchivedCases] = useState([]); // <-- Add this line
+const [archivedCases] = useState([]); // <-- Add this line
 const [evidenceCount, setEvidenceCount] = useState(0);
 const [evidenceError, setEvidenceError] = useState<string | null>(null);
-const [notifications, setNotifications] = useState<Notification[]>([]);
+const [notifications] = useState<Notification[]>([]);
 // Add these new state variables after your existing useState declarations
 const [availableTiles, setAvailableTiles] = useState([
   {
@@ -323,26 +323,6 @@ useEffect(() => {
   fetchCasesCount();
 }, []);
 
-const metricCards = [
-  {
-    value: openCases.length.toString(),
-    label: "Cases ongoing",
-    color: "text-[#636ae8]",
-    icon: <Briefcase className="w-[75px] h-[52px] text-[#636ae8] flex-shrink-0" />,
-  },
-  {
-    value: closedCases.length.toString(),
-    label: "Cases Closed",
-    color: "text-green-500",
-    icon: <CheckCircle className="w-[75px] h-[52px] text-green-500 flex-shrink-0" />,
-  },
-  {
-    value: evidenceCount.toString(),
-    label: "Evidence Collected",
-    color: "text-sky-500",
-    icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
-  },
-];
 
 // Define getIcon ABOVE the .map
 const getIcon = (action: string) => {
@@ -794,125 +774,131 @@ const handleSaveCase = async () => {
               </div>
             ) : (
               <div className="flex flex-wrap gap-6">
-                {caseCards.map((card) => (
-                  <div
-                    key={card.id}
-                    className="relative flex flex-col justify-between items-center w-[460px] h-[450px] p-4 bg-card border border rounded-[8px]"
-                  >
-                    <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2 z-10">
-                      {/* Edit button (below) */}
-                      <button
-                        onClick={() => {
-                          setEditingCase(card);
-                          setUpdatedStatus(card.status || "open");              // ✅ fallback to current or default
-                          setUpdatedStage(card.investigation_stage || "Triage");// ✅ fallback
-                          setUpdatedTitle(card.title);
-                          setUpdatedDescription(card.description);
-                        }}
-                        className="text-muted-foreground hover:text-blue-500 transition-colors"
-                        title="Edit Case"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      {/* Delete button  */}
-                      <button
-                        onClick={async () => {
-                          const confirmed = window.confirm("Are you sure you want to archive this case?");
-                          if (!confirmed) return;
+                {caseCards.map((card) => {
+                  console.log("Evidence Card ID:", card.id);
+                  return (
+                    <div
+                      key={card.id}
+                      className="relative flex flex-col justify-between items-center w-[460px] h-[450px] p-4 bg-card border border rounded-[8px]"
+                    >
+                      <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2 z-10">
+                        {/* Edit button (below) */}
+                        <button
+                          onClick={() => {
+                            setEditingCase(card);
+                            setUpdatedStatus(card.status || "open");
+                            setUpdatedStage(card.investigation_stage || "Triage");
+                            setUpdatedTitle(card.title);
+                            setUpdatedDescription(card.description);
+                          }}
+                          className="text-muted-foreground hover:text-blue-500 transition-colors"
+                          title="Edit Case"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        {/* Delete button  */}
+                        <button
+                          onClick={async () => {
+                            const confirmed = window.confirm("Are you sure you want to archive this case?");
+                            if (!confirmed) return;
 
-                          const token = sessionStorage.getItem("authToken") || "";
+                            const token = sessionStorage.getItem("authToken") || "";
 
-                          try {
-                            const res = await fetch(`http://localhost:8080/api/v1/cases/${card.id}`, {
-                              method: "PATCH",
-                              headers: {
-                                "Content-Type": "application/json",
-                                Authorization: `Bearer ${token}`,
-                              },
-                              body: JSON.stringify({ status: "archived" }),
-                            });
+                            try {
+                              const res = await fetch(`http://localhost:8080/api/v1/cases/${card.id}`, {
+                                method: "PATCH",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  Authorization: `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({ status: "archived" }),
+                              });
 
-                            if (res.ok) {
-                              // Remove from active list immediately
-                              setCaseCards(prev => prev.filter(c => c.id !== card.id));
-                            } else {
-                              alert("Failed to archive the case.");
+                              if (res.ok) {
+                                setCaseCards(prev => prev.filter(c => c.id !== card.id));
+                              } else {
+                                alert("Failed to archive the case.");
+                              }
+                            } catch (error) {
+                              console.error("Archive error:", error);
+                              alert("An error occurred.");
                             }
-                          } catch (error) {
-                            console.error("Archive error:", error);
-                            alert("An error occurred.");
-                          }
-                        }}
-                        className="text-muted-foreground hover:text-red-500 transition-colors"
-                        title="Archive Case"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                          }}
+                          className="text-muted-foreground hover:text-red-500 transition-colors"
+                          title="Archive Case"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
 
-                    </div>
-
-                    <img
-                      src={card.image || "https://www.cwilson.com/app/uploads/2022/11/iStock-962094400-1024x565.jpg"}
-                      alt={card.description || "Case image"}
-                      width={331}
-                      height={180}
-                      className="rounded-md mb-3"
-                    />
-                    <h3 className="text-white text-lg font-bold text-center mb-1">
-                      {card.title || "Untitled Case"}
-                    </h3>
-                    <div className="text-sm text-muted-foreground text-center mb-2">
-                      Team: {card.team_name} |  Last Activity: {
-                      card.lastActivity
-                        ? new Date(card.lastActivity).toLocaleString("en-GB", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: false
-                          })
-                        : "Unknown"
-                    }
-                    </div>
-                    <div className="flex justify-between items-center w-full text-xs mb-1">
-                      <div className="flex items-center gap-1">
-                        <span
-                          className={cn(
-                            "w-2 h-2 rounded-full",
-                            card.priority === "critical"
-                              ? "bg-red-500"
-                              : card.priority === "high"
-                              ? "bg-orange-400"
-                              : card.priority === "mid"
-                              ? "bg-yellow-400"
-                              : "bg-green-400"
-                          )}
-                        ></span>
-                        <span className="text-muted-foreground capitalize">{card.priority}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                        <span className="text-muted-foreground">Ongoing</span>
-                      </div>
-                    </div>
-                    <Progress
-                      value={card.progress}
-                      className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
-                    />
-                    <Link  to={`/evidence-viewer/${card.id}`}>
-                      <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
-                        View Evidence Details
-                      </button>
-                    </Link>
-                    <Link to={`/case-management/${card.id}`}>
-                      <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
-                        View Details
-                      </button>
-                    </Link>
 
-                  </div>
-                ))}
+                      <img
+                        src={card.image || "https://www.cwilson.com/app/uploads/2022/11/iStock-962094400-1024x565.jpg"}
+                        alt={card.description || "Case image"}
+                        width={331}
+                        height={180}
+                        className="rounded-md mb-3"
+                      />
+                      <h3 className="text-white text-lg font-bold text-center mb-1">
+                        {card.title || "Untitled Case"}
+                      </h3>
+                      <div className="text-sm text-muted-foreground text-center mb-2">
+                        Team: {card.team_name} |  Last Activity: {
+                        card.lastActivity
+                          ? new Date(card.lastActivity).toLocaleString("en-GB", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: false
+                            })
+                          : "Unknown"
+                      }
+                      </div>
+                      <div className="flex justify-between items-center w-full text-xs mb-1">
+                        <div className="flex items-center gap-1">
+                          <span
+                            className={cn(
+                              "w-2 h-2 rounded-full",
+                              card.priority === "critical"
+                                ? "bg-red-500"
+                                : card.priority === "high"
+                                ? "bg-orange-400"
+                                : card.priority === "mid"
+                                ? "bg-yellow-400"
+                                : "bg-green-400"
+                            )}
+                          ></span>
+                          <span className="text-muted-foreground capitalize">{card.priority}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                          <span className="text-muted-foreground">Ongoing</span>
+                        </div>
+                      </div>
+                      <Progress
+                        value={card.progress}
+                        className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
+                      />
+                      <Link to={card.id && card.id.length === 36 ? `/evidence-viewer/${card.id}` : "#"}>
+                        <button
+                          className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted"
+                          disabled={!card.id || card.id.length !== 36}
+                          title={!card.id || card.id.length !== 36 ? "Invalid Case ID" : "View Evidence Details"}
+                        >
+                          View Evidence Details
+                        </button>
+                      </Link>
+                      <Link to={`/case-management/${card.id}`}>
+                        <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
+                          View Details
+                        </button>
+                      </Link>
+
+                    </div>
+                  );
+                })}
                 {editingCase && (
                 <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
                   <div className="bg-card p-6 rounded-2xl shadow-lg border border-border w-full max-w-md">
