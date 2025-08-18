@@ -37,6 +37,7 @@ import (
 	"aegis-api/services_/notification"
 	"aegis-api/services_/report"
 	"aegis-api/services_/user/profile"
+	"aegis-api/services_/report/update_status"
 
 	//"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -283,6 +284,15 @@ func main() {
 		coCRepo,
 	)
 	reportHandler := handlers.NewReportHandler(reportService)
+
+
+	// ─── Report Status Update ─────────────────────────────
+
+	reportStatusRepo := update_status.NewReportStatusRepository(db.DB);
+	reportStatusService := update_status.NewReportStatusService(reportStatusRepo);
+	reportStatusHandler := handlers.NewReportStatusHandler(reportStatusService);
+
+	
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -312,6 +322,7 @@ func main() {
 		notificationService,
 		cocHandler,    // Chain of Custody handler
 		reportHandler, // Report generation handler
+		reportStatusHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

@@ -63,6 +63,7 @@ type Handler struct {
 	NotificationService       *notification.NotificationService
 	CoCHandler                *CoCHandler
 	ReportHandler             *ReportHandler // Optional: Report generation handler
+	ReportStatusHandler		*ReportStatusHandler // Optional: Report status update handler
 }
 
 func NewHandler(
@@ -93,6 +94,7 @@ func NewHandler(
 	notificationService *notification.NotificationService,
 	coCHandler *CoCHandler, // Chain of Custody handler
 	reportHandler *ReportHandler, // Optional: Report generation handler
+	reportStatusHandler *ReportStatusHandler, // Optional: Report status update handler
 ) *Handler {
 	return &Handler{
 		AdminService:              adminSvc,
@@ -122,6 +124,7 @@ func NewHandler(
 		NotificationService:       notificationService,
 		CoCHandler:                coCHandler,
 		ReportHandler:             reportHandler, // Optional: Report generation handler
+		ReportStatusHandler:       reportStatusHandler, // Optional: Report status update handler
 	}
 }
 
