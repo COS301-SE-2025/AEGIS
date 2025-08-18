@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Button } from "../../components/ui/button";
 import { ShieldPlus, UploadCloud } from "lucide-react";
@@ -8,7 +8,7 @@ export function UploadEvidenceForm(): JSX.Element {
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const navigate = useNavigate();
-  const { caseId } = useParams<{ caseId: string }>(); 
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -35,11 +35,14 @@ export function UploadEvidenceForm(): JSX.Element {
 
     // Load current case from localStorage
    const currentCase = JSON.parse(localStorage.getItem("currentCase") || "{}");
+const caseId = currentCase.ID || currentCase.id;
 
 if (!caseId) {
   alert("No active case found. Please create or select a case first.");
   return;
 }
+
+
 
     // Load current user from sessionStorage
     const user = JSON.parse(sessionStorage.getItem("user") || "{}");

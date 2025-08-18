@@ -28,7 +28,6 @@ func (s *Service) GetAllCases(tenantID string) ([]Case, error) {
 			TeamName:           c.TeamName,
 			CreatedAt:          c.CreatedAt,
 			TenantID:           c.TenantID, // Ensure TenantID is included
-			UpdatedAt:          c.UpdatedAt,
 		}
 	}
 
@@ -53,7 +52,6 @@ func (s *Service) GetCasesByUser(userID string, tenantID string) ([]Case, error)
 			TeamName:           c.TeamName,
 			CreatedAt:          c.CreatedAt,
 			TenantID:           c.TenantID, // Ensure TenantID is included
-			UpdatedAt:          c.UpdatedAt,
 		}
 	}
 
@@ -98,7 +96,6 @@ func (s *Service) GetCaseByID(caseID string, tenantID string) (*Case, error) {
 		TeamName:           c.TeamName,
 		CreatedAt:          c.CreatedAt,
 		TenantID:           c.TenantID, // Ensure TenantID is included
-		UpdatedAt:          c.UpdatedAt,
 	}
 	return result, nil
 }

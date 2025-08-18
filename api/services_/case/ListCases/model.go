@@ -20,7 +20,6 @@ type Case struct {
 	TeamName           string    `gorm:"column:team_name;type:text;not null" json:"team_name"`
 	CreatedAt          time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 	TenantID           uuid.UUID `gorm:"column:tenant_id;type:uuid;not null" json:"tenant_id"`
-	UpdatedAt          time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"` // ✅ New field for tracking updates
 }
 
 type CaseFilter struct {
