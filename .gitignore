@@ -62,7 +62,7 @@ out/
 #  Testing
 # --------------------------------------
 coverage/
-testdata/
+#testdata/
 
 
 # Environment variables
