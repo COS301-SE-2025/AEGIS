@@ -25,8 +25,6 @@ import { TeamRegistrationPage } from "./screens/TeamRegistrationPage";
 import { SystemAdminDashboard } from "./screens/SystemAdminDashboard";
 import { TenantAdminDashboard } from "./screens/TenantAdminDashboard";
 import { TeamsPage } from "./screens/TeamsPage";
-import { IOCPage } from "./screens/IOCPage";
-import { ChainOfCustody } from "./screens/ChainOfCustody";
 //FORMS
 import {CreateCaseForm} from "./screens/CreateCasePage/CreateCasePage";
 import { UploadEvidenceForm } from "./screens/UploadEvidencePage/UploadEvidencePage";

@@ -19,9 +19,6 @@ import { useState, useEffect } from "react";
 import { Progress } from "../../components/ui/progress";
 import { cn } from "../../lib/utils";
 import { SidebarToggleButton } from "../../context/SidebarToggleContext";
-import { ThreatLandscape } from "../../components/ui/ThreatLandscape";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import React from "react";
 
 
 interface CaseCard {
@@ -112,6 +109,7 @@ const [availableTiles, setAvailableTiles] = useState([
 
 const [showTileCustomizer, setShowTileCustomizer] = useState(false);
 const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
+
 
 useEffect(() => {
   const fetchCases = async () => {

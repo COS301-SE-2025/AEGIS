@@ -36,7 +36,6 @@ import (
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/notification"
-	"aegis-api/services_/timeline"
 	"aegis-api/services_/user/profile"
 
 	//"github.com/gin-gonic/gin"
@@ -296,10 +295,6 @@ func main() {
 		tenantRepo, // Pass the tenant repository
 		userRepo,   // Pass the user repository
 		notificationService,
-		iocHandler,
-		timelineHandler,
-		evidenceHandler,
-		chainOfCustodyHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

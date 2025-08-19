@@ -38,6 +38,8 @@ import { fetchThreadParticipants } from "./api";
 import { approveMessage } from "./api";
 import{MessageCard} from "../../components/ui/MessageCard";
 
+
+
 // Import Select components from your UI library
 import {
   Select,
@@ -191,7 +193,103 @@ const BASE_URL = "http://localhost:8080/api/v1";
     .join("")
     .toUpperCase();
 
+  // Enhanced sample data
+  // const files: FileItem[] = [
+  //   {
+  //     id: '1',
+  //     name: 'system_memory.dmp',
+  //     type: 'memory_dump',
+  //     size: '8.2 GB',
+  //     hash: 'SHA256: a1b2c3d4e5f6789abc...',
+  //     created: '2024-03-15T14:30:00Z',
+  //     description: 'Memory dump of workstation WS-0234 captured using FTK Imager following detection of unauthorized PowerShell activity',
+  //     status: 'verified',
+  //     chainOfCustody: ['Agent.Smith', 'Forensic.Analyst.1', 'Lead.Investigator'],
+  //     acquisitionDate: '2024-03-15T14:30:00Z',
+  //     acquisitionTool: 'FTK Imager v4.7.1',
+  //     integrityCheck: 'passed',
+  //     threadCount: 3,
+  //     priority: 'high'
+  //   },
+  //   {
+  //     id: '2',
+  //     name: 'malware_sample.exe',
+  //     type: 'executable',
+  //     size: '1.8 MB',
+  //     hash: 'MD5: x1y2z3a4b5c6def...',
+  //     created: '2024-03-14T09:15:00Z',
+  //     description: 'Suspected malware executable recovered from infected system',
+  //     status: 'pending',
+  //     chainOfCustody: ['Field.Agent.2'],
+  //     acquisitionDate: '2024-03-14T09:15:00Z',
+  //     acquisitionTool: 'Manual Collection',
+  //     integrityCheck: 'pending',
+  //     threadCount: 1,
+  //     priority: 'high'
+  //   },
+  //   {
+  //     id: '3',
+  //     name: 'network_capture.pcap',
+  //     type: 'network_capture',
+  //     size: '245 MB',
+  //     hash: 'SHA1: abc123def456...',
+  //     created: '2024-03-13T16:45:00Z',
+  //     description: 'Network traffic capture during incident timeframe',
+  //     status: 'verified',
+  //     chainOfCustody: ['Network.Analyst', 'Forensic.Analyst.1'],
+  //     acquisitionDate: '2024-03-13T16:45:00Z',
+  //     acquisitionTool: 'Wireshark v4.0.3',
+  //     integrityCheck: 'passed',
+  //     threadCount: 2,
+  //     priority: 'medium'
+  //   }
+  // ];
 
+  
+
+  const initialAnnotationThreads: AnnotationThread[] = [
+    
+    {
+      id: '1',
+      title: 'Suspicious PowerShell activity detected',
+      user: 'Forensic.Analyst.1',
+      avatar: 'FA',
+      time: '2 hours ago',
+      messageCount: 5,
+      participantCount: 3,
+      isActive: true,
+      status: 'open',
+      priority: 'high',
+      tags: ['PowerShell', 'Malware', 'Initial Analysis'],
+      fileId: '1'
+    },
+    {
+      id: '2',
+      title: 'Memory strings analysis findings',
+      user: 'Senior.Analyst',
+      avatar: 'SA',
+      time: '4 hours ago',
+      messageCount: 8,
+      participantCount: 2,
+      status: 'pending_approval',
+      priority: 'medium',
+      tags: ['Memory Analysis', 'Strings', 'IOCs'],
+      fileId: '1'
+    },
+    {
+      id: '3',
+      title: 'Malware classification needed',
+      user: 'Malware.Specialist',
+      avatar: 'MS',
+      time: '6 hours ago',
+      messageCount: 3,
+      participantCount: 4,
+      status: 'open',
+      priority: 'high',
+      tags: ['Classification', 'Signature Analysis'],
+      fileId: '2'
+    }
+  ];
 
 const { caseId } = useParams();
 const [searchParams] = useSearchParams();

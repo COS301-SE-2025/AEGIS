@@ -16,7 +16,7 @@ import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 import {ShareButton} from "../ShareCasePage/sharecasebutton";
 //
 import { useParams } from 'react-router-dom';
-import { InvestigationTimeline } from "../../components/ui/Timeline";
+
 
 export const CaseManagementPage = () => {
 const storedUser = sessionStorage.getItem("user");
@@ -68,6 +68,8 @@ const getPriorityStyle = (priority: string) => {
 //case ID
 const { caseId } = useParams<{ caseId: string }>();
 const navigate = useNavigate();
+
+
 
 const [caseData, setCaseData] = useState<CaseData | null>(null);
 
@@ -305,7 +307,6 @@ useEffect(() => {
 
 
   // ADD THESE NEW FUNCTIONS
-
 
 
 
