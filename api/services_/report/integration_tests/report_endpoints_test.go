@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func TestGenerateReport_EndToEnd(t *testing.T) {
@@ -216,4 +217,136 @@ func TestUpdateSectionContent_EmptyAllowed(t *testing.T) {
 	}
 	require.NotNil(t, found)
 	require.Equal(t, "", found["content"])
+}
+
+// ---------------------------
+// Tests
+// ---------------------------
+
+func TestGetReportsByCaseID(t *testing.T) {
+	_, caseID := createReport(t)
+
+	w := doRequest("GET", "/reports/cases/"+caseID.String(), "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	items := mustArrayOrItems(t, w.Body.Bytes())
+	require.NotEmpty(t, items)
+}
+
+func TestGetReportByID_ThenDelete(t *testing.T) {
+	repID, _ := createReport(t)
+
+	w := doRequest("GET", "/reports/"+repID.String(), "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	root := decodeJSON(t, w.Body.Bytes())
+	gotID := mustFindString(t, root, "id", "report_id", "ID")
+	require.Equal(t, repID.String(), gotID)
+
+	w = doRequest("DELETE", "/reports/"+repID.String(), "")
+	require.True(t, w.Code == http.StatusNoContent || w.Code == http.StatusOK, w.Body.String())
+
+	w = doRequest("GET", "/reports/"+repID.String(), "")
+	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+}
+
+func TestUpdateReportName(t *testing.T) {
+	repID, _ := createReport(t)
+
+	newName := "Forensic Report – " + time.Now().Format(time.RFC3339)
+	w := doRequest("PUT", "/reports/"+repID.String()+"/name", fmt.Sprintf(`{"name":%q}`, newName))
+	require.True(t, w.Code == http.StatusNoContent || w.Code == http.StatusOK, w.Body.String())
+
+	w = doRequest("GET", "/reports/"+repID.String(), "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	root := decodeJSON(t, w.Body.Bytes())
+	gotName := mustFindString(t, root, "name", "report_name", "title")
+	require.Equal(t, newName, gotName)
+}
+
+func TestSection_TitleUpdate_And_Delete(t *testing.T) {
+	repID, _ := createReport(t)
+
+	secID := addSectionFindOID(t, repID, "Alpha", "first content", 1)
+
+	// Update title
+	w := doRequest("PUT",
+		"/reports/"+repID.String()+"/sections/"+secID.Hex()+"/title",
+		`{"title":"Alpha (Renamed)"}`,
+	)
+	require.True(t, w.Code == http.StatusNoContent || w.Code == http.StatusOK, w.Body.String())
+
+	// Verify title in Mongo with sections._id filter
+	var doc bson.M
+	require.NoError(t, mongoColl.FindOne(tcCtx, bson.M{
+		"report_id":    repID.String(),
+		"tenant_id":    FixedTenantID.String(),
+		"team_id":      FixedTeamID.String(),
+		"sections._id": secID,
+	}).Decode(&doc))
+
+	ok := false
+	for _, raw := range doc["sections"].(primitive.A) {
+		if m, ok2 := raw.(bson.M); ok2 && m["_id"] == secID {
+			ok = m["title"] == "Alpha (Renamed)"
+			break
+		}
+	}
+	require.True(t, ok, "expected title updated in Mongo")
+
+	// Delete the section
+	w = doRequest("DELETE", "/reports/"+repID.String()+"/sections/"+secID.Hex(), "")
+	require.True(t, w.Code == http.StatusNoContent || w.Code == http.StatusOK, w.Body.String())
+
+	// Confirm the section with that _id no longer exists
+	err := mongoColl.FindOne(context.Background(), bson.M{
+		"report_id": repID.String(),
+		"tenant_id": FixedTenantID.String(),
+		"team_id":   FixedTeamID.String(),
+		"sections": bson.M{
+			"$elemMatch": bson.M{"_id": secID},
+		},
+	}).Err()
+	require.Equal(t, mongo.ErrNoDocuments, err)
+}
+
+func TestGetReportsForTeam(t *testing.T) {
+	repID, _ := createReport(t)
+
+	w := doRequest("GET", "/reports/teams/"+FixedTeamID.String(), "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	items := mustFindArray(t, w.Body.Bytes())
+	found := false
+	for _, raw := range items {
+		if m, ok := raw.(map[string]any); ok {
+			id := ""
+			if v, _ := m["id"].(string); v != "" {
+				id = v
+			}
+			if id == "" {
+				if v, _ := m["report_id"].(string); v != "" {
+					id = v
+				}
+			}
+			if id == repID.String() {
+				found = true
+				break
+			}
+		}
+	}
+	require.True(t, found, "expected created report in team listing")
+}
+
+func TestDownloadReportJSON(t *testing.T) {
+	repID, _ := createReport(t)
+
+	w := doRequest("GET", "/reports/"+repID.String()+"/download/json", "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+	root := decodeJSON(t, w.Body.Bytes())
+	id := mustFindString(t, root, "id", "report_id")
+	require.Equal(t, repID.String(), id)
 }

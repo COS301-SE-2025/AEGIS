@@ -196,6 +196,7 @@ func TestMain(m *testing.M) {
 		fmt.Println("startPostgres:", err)
 		os.Exit(1)
 	}
+
 	mongoC, mongoClient, mongoDB, mongoColl, err = startMongo(tcCtx)
 	if err != nil {
 		fmt.Println("startMongo:", err)
@@ -205,9 +206,19 @@ func TestMain(m *testing.M) {
 
 	router = buildRouter()
 
+	// ✅ Seed without *testing.T
+	if err := seedCoreFixtures(); err != nil {
+		fmt.Println("seedCoreFixtures:", err)
+		_ = mongoClient.Disconnect(tcCtx)
+		_ = mongoC.Terminate(tcCtx)
+		_ = pgSQL.Close()
+		_ = pgC.Terminate(tcCtx)
+		os.Exit(1)
+	}
+
 	code := m.Run()
 
-	// teardown
+	// teardown...
 	if mongoClient != nil {
 		_ = mongoClient.Disconnect(tcCtx)
 	}
