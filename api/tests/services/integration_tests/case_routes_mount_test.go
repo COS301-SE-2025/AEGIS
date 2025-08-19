@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"aegis-api/handlers"
+	graphicalmapping "aegis-api/services_/GraphicalMapping"
 	lac "aegis-api/services_/case/ListActiveCases"
 	case_creation "aegis-api/services_/case/case_creation"
 	timeline "aegis-api/services_/timeline"
@@ -272,4 +274,21 @@ func registerTimelineTestEndpoints(r *gin.Engine) {
 		}
 		c.Status(http.StatusNoContent)
 	})
+}
+func registerGraphicalMappingTestEndpoints(r *gin.Engine) {
+	// You need a test IOC service/repo. Adjust as needed for your setup:
+	testIOCService := graphicalmapping.NewIOCService(graphicalmapping.NewIOCRepository(pgDB))
+	testIOCHandler := handlers.NewIOCHandler(testIOCService)
+
+	// GET /tenants/:tenantId/ioc-graph
+	r.GET("/tenants/:tenantId/ioc-graph", testIOCHandler.GetTenantIOCGraph)
+
+	// GET /tenants/:tenantId/cases/:case_id/ioc-graph
+	r.GET("/tenants/:tenantId/cases/:case_id/ioc-graph", testIOCHandler.GetCaseIOCGraph)
+
+	// GET /cases/:case_id/iocs
+	r.GET("/cases/:case_id/iocs", testIOCHandler.GetIOCsByCase)
+
+	// POST /cases/:case_id/iocs
+	r.POST("/cases/:case_id/iocs", testIOCHandler.AddIOCToCase)
 }

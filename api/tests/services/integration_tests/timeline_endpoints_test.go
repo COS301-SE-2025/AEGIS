@@ -152,3 +152,69 @@ func Test_ReorderTimelineEvents(t *testing.T) {
 	w = doRequest("POST", "/cases/"+caseID+"/timeline/reorder", reorderBody)
 	require.Equal(t, http.StatusNoContent, w.Code, w.Body.String()) //
 }
+
+func Test_CreateTimelineEvent_MissingDescription(t *testing.T) {
+	// Create a case
+	title := "Timeline Case " + time.Now().Format(time.RFC3339Nano)
+	caseBody := fmt.Sprintf(`{
+		"title": %q,
+		"description": "timeline test",
+		"team_name": "test-team",
+		"status": "open"
+	}`, title)
+	w := doRequest("POST", "/cases", caseBody)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	resp := decodeJSON(t, w.Body.Bytes())
+	caseID := resp["id"].(string)
+
+	// Try to create event with missing description
+	eventBody := fmt.Sprintf(`{
+		"case_id": %q,
+		"title": "Event Missing Description"
+	}`, caseID)
+	w = doRequest("POST", "/cases/"+caseID+"/timeline", eventBody)
+	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+}
+
+func Test_GetTimelineEvents_NonExistentCase(t *testing.T) {
+	nonExistentCaseID := "00000000-0000-0000-0000-000000000000"
+	w := doRequest("GET", "/cases/"+nonExistentCaseID+"/timeline", "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var events []map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &events)
+	require.NoError(t, err)
+	require.Empty(t, events)
+}
+
+func Test_UpdateTimelineEvent_NotFound(t *testing.T) {
+	nonExistentEventID := "00000000-0000-0000-0000-000000000000"
+	updateBody := `{"description": "Should not update"}`
+	w := doRequest("PATCH", "/timeline/"+nonExistentEventID, updateBody)
+	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+}
+
+func Test_DeleteTimelineEvent_NotFound(t *testing.T) {
+	nonExistentEventID := "00000000-0000-0000-0000-000000000000"
+	w := doRequest("DELETE", "/timeline/"+nonExistentEventID, "")
+	require.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
+}
+
+func Test_ReorderTimelineEvents_InvalidBody(t *testing.T) {
+	// Create a case
+	title := "Reorder Invalid Body Case " + time.Now().Format(time.RFC3339Nano)
+	caseBody := fmt.Sprintf(`{
+		"title": %q,
+		"description": "timeline test",
+		"team_name": "test-team",
+		"status": "open"
+	}`, title)
+	w := doRequest("POST", "/cases", caseBody)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	resp := decodeJSON(t, w.Body.Bytes())
+	caseID := resp["id"].(string)
+
+	// Send invalid reorder body
+	reorderBody := `{"bad_field": ["id1", "id2"]}`
+	w = doRequest("POST", "/cases/"+caseID+"/timeline/reorder", reorderBody)
+	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+}
