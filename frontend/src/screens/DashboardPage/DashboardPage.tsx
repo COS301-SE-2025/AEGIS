@@ -77,41 +77,86 @@ const [archivedCases] = useState([]); // <-- Add this line
 const [evidenceCount, setEvidenceCount] = useState(0);
 const [evidenceError, setEvidenceError] = useState<string | null>(null);
 const [notifications] = useState<Notification[]>([]);
+const [searchQuery, setSearchQuery] = useState("");
+  interface DashboardTile {
+  id: string;
+  value: string;
+  label: string;
+  color: string;
+  icon: React.ReactElement;
+  isVisible: boolean;
+}
 // Add these new state variables after your existing useState declarations
-const [availableTiles, setAvailableTiles] = useState([
-  {
-    id: "ongoing-cases",
-    value: openCases.length.toString(),
-    label: "Cases ongoing",
-    color: "text-[#636ae8]",
-    icon: <Briefcase className="w-[75px] h-[52px] text-[#636ae8] flex-shrink-0" />,
-    isVisible: true,
-  },
-  {
-    id: "closed-cases",
-    value: closedCases.length.toString(),
-    label: "Cases Closed",
-    color: "text-green-500",
-    icon: <CheckCircle className="w-[75px] h-[52px] text-green-500 flex-shrink-0" />,
-    isVisible: true,
-  },
-  {
-    id: "evidence-count",
-    value: evidenceCount.toString(),
-    label: "Evidence Collected",
-    color: "text-sky-500",
-    icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
-    isVisible: true,
-  },
-  {
-    id: "total-alerts",
-    value: "12", // Replace with actual data
-    label: "Active Alerts",
-    color: "text-red-500",
-    icon: <AlertTriangle className="w-[75px] h-[52px] text-red-500 flex-shrink-0" />,
-    isVisible: false,
-  },
-]);
+const [availableTiles, setAvailableTiles] = useState<DashboardTile[]>(() => {
+  // Define the default tiles configuration
+  const getDefaultTiles = () => [
+    {
+      id: "ongoing-cases",
+      value: "0", // Will be updated by other effects
+      label: "Cases ongoing",
+      color: "text-[#636ae8]",
+      icon: <Briefcase className="w-[75px] h-[52px] text-[#636ae8] flex-shrink-0" />,
+      isVisible: true,
+    },
+    {
+      id: "closed-cases",
+      value: "0", // Will be updated by other effects
+      label: "Cases Closed",
+      color: "text-green-500",
+      icon: <CheckCircle className="w-[75px] h-[52px] text-green-500 flex-shrink-0" />,
+      isVisible: true,
+    },
+    {
+      id: "evidence-count",
+      value: "0", // Will be updated by other effects
+      label: "Evidence Collected",
+      color: "text-sky-500",
+      icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
+      isVisible: true,
+    },
+    {
+      id: "total-alerts",
+      value: "12", // Replace with actual data
+      label: "Active Alerts",
+      color: "text-red-500",
+      icon: <AlertTriangle className="w-[75px] h-[52px] text-red-500 flex-shrink-0" />,
+      isVisible: false,
+    },
+  ];
+
+
+
+  const defaultTiles = getDefaultTiles();
+
+  // Check if there are saved preferences in localStorage
+  const savedTiles = localStorage.getItem("dashboardTiles");
+  if (savedTiles) {
+    try {
+      const savedConfig: Array<{id: string; isVisible: boolean}> = JSON.parse(savedTiles);
+      return defaultTiles.map(tile => {
+        const saved = savedConfig.find((s) => s.id === tile.id);
+        return saved ? { ...tile, isVisible: saved.isVisible } : tile;
+      });
+    } catch (e) {
+      console.error("Error parsing saved tiles:", e);
+      return defaultTiles;
+    }
+  }
+  
+  return defaultTiles;
+});
+
+// Dashboard Tile Customization persistence
+useEffect(() => {
+  // Only save the visibility and order, not the React elements
+  const tileConfig = availableTiles.map(tile => ({
+    id: tile.id,
+    isVisible: tile.isVisible
+  }));
+  console.log('Saving to localStorage:', tileConfig); // Add this for debugging
+  localStorage.setItem("dashboardTiles", JSON.stringify(tileConfig));
+}, [availableTiles]);
+
 
 // ✅ these are outside of the array
 const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
@@ -249,11 +294,14 @@ const handleDragEnd = (result: DropResult) => {
 };
 
 const toggleTileVisibility = (tileId: string) => {
-  setAvailableTiles(prev =>
-    prev.map(tile =>
+  console.log('Toggling tile:', tileId); // Add this for debugging
+  setAvailableTiles(prev => {
+    const updated = prev.map(tile =>
       tile.id === tileId ? { ...tile, isVisible: !tile.isVisible } : tile
-    )
-  );
+    );
+    console.log('Updated tiles:', updated); // Add this for debugging
+    return updated;
+  });
 };
 useEffect(() => {
   const fetchRecentActivities = async () => {
@@ -585,13 +633,15 @@ useEffect(() => {
             
 
             <div className="flex items-center gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input
-                  className="w-80 h-12 bg-card border border-muted rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                  placeholder="Search cases, evidence, users"
-                />
-              </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <input
+                className="w-80 h-12 bg-card border border-muted rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                placeholder="Search cases"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
               <Link to="/notifications">
                 <button className="relative p-2 text-muted-foreground hover:text-white transition-colors">
                   <Bell className="w-6 h-6" />
@@ -818,7 +868,14 @@ useEffect(() => {
               </div>
             ) : (
               <div className="flex flex-wrap gap-6">
-                {caseCards.map((card) => {
+              {caseCards
+                .filter(card => 
+                  searchQuery === "" || 
+                  card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  card.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  card.team_name.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map((card) => {
                   console.log("Evidence Card ID:", card.id);
                   return (
                     <div
