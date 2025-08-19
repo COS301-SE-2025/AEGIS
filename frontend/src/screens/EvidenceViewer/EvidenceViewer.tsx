@@ -312,9 +312,12 @@ useEffect(() => {
     
 const { caseId } = useParams();
 
+  // const [allFiles] = useState<FileItem[]>(() => {
+  //   const stored = localStorage.getItem("evidenceFiles");
+  //   return stored ? JSON.parse(stored) : [];
+  // });
 
-const [searchParams] = useSearchParams();
-const evidenceIdFromQuery = searchParams.get("evidenceId");
+  // const files = allFiles.filter(file => String(file.caseId) === String(caseId));
 
 
   const [files, setFiles] = useState<FileItem[]>([]);

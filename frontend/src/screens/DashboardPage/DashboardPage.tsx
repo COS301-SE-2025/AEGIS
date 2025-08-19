@@ -75,50 +75,12 @@ interface Notification {
 const [openCases, setOpenCases] = useState([]);
 const [closedCases, setClosedCases] = useState([]);
 const [evidenceCount, setEvidenceCount] = useState(0);
+const [notifications, setNotifications] = useState<Notification[]>([]);
 
-const [evidenceError, setEvidenceError] = useState<string | null>(null);
-const [notifications] = useState<Notification[]>([]);
-// Add these new state variables after your existing useState declarations
-const [availableTiles, setAvailableTiles] = useState([
-  {
-    id: "ongoing-cases",
-    value: openCases.length.toString(),
-    label: "Cases ongoing",
-    color: "text-[#636ae8]",
-    icon: <Briefcase className="w-[75px] h-[52px] text-[#636ae8] flex-shrink-0" />,
-    isVisible: true,
-  },
-  {
-    id: "closed-cases",
-    value: closedCases.length.toString(),
-    label: "Cases Closed",
-    color: "text-green-500",
-    icon: <CheckCircle className="w-[75px] h-[52px] text-green-500 flex-shrink-0" />,
-    isVisible: true,
-  },
-  {
-    id: "evidence-count",
-    value: evidenceCount.toString(),
-    label: "Evidence Collected",
-    color: "text-sky-500",
-    icon: <Database className="w-[75px] h-[52px] text-sky-500 flex-shrink-0" />,
-    isVisible: true,
-  },
-  {
-    id: "total-alerts",
-    value: "12", // Replace with actual data
-    label: "Active Alerts",
-    color: "text-red-500",
-    icon: <AlertTriangle className="w-[75px] h-[52px] text-red-500 flex-shrink-0" />,
-    isVisible: false,
-  },
-]);
-
-// ✅ these are outside of the array
 const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
+// NEW: keep a role state (fallback to what's in sessionStorage, if present)
 const [role, setRole] = useState<string>(user?.role || "");
 const isDFIRAdmin = role === "DFIR Admin";
-const [showTileCustomizer, setShowTileCustomizer] = useState(false);
 
 
 useEffect(() => {
