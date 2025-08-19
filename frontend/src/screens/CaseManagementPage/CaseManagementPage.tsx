@@ -20,8 +20,8 @@ import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 import {ShareButton} from "../ShareCasePage/sharecasebutton";
 //
 import { useParams } from 'react-router-dom';
-import axios from "axios";
 
+import { useNavigate } from "react-router-dom";
 import { ClipboardList } from "lucide-react";
 
 
@@ -38,7 +38,7 @@ const storedUser = sessionStorage.getItem("user");
 const userRole = "admin"; // for now
 const [role, setRole] = useState<string>(user?.role || "");
 const isDFIRAdmin = role === "DFIR Admin";
-
+const navigate = useNavigate();
 // Profile state
 const [, setProfile] = useState<{ name: string; email: string; role: string; image: string } | null>(null);
  

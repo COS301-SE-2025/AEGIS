@@ -7,8 +7,6 @@ import {
   MessageSquare,
   Search,
   Settings,
-  // SlidersHorizontal,
-  // ArrowUpDown,
   Download,
   Share,
   Send,
