@@ -11,6 +11,6 @@ func RegisterReportStatusRoutes(router *gin.RouterGroup, handler *handlers.Repor
 	reportStatus := router.Group("/reports")
 	{
 
-		reportStatus.PUT("/:reportID/status", handler.UpdateStatus)
+		reportStatus.PUT("/status/:reportID", handler.UpdateStatus)
 	}
 }
