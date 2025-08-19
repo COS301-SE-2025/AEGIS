@@ -61,15 +61,20 @@ func (s *Service) CreateCase(req *CreateCaseRequest) (*Case, error) {
 	}
 
 	// ✅ Trigger a notification for the case creator
-	go websocket.NotifyUser(
-		s.hub,
-		s.notificationService,
-		creatorUUID.String(),
-		req.TenantID.String(),
-		req.TeamID.String(),
-		"Case Created",
-		"Your case \""+req.Title+"\" has been created successfully.",
-	)
+	// after s.repo.CreateCase(newCase) succeeds
+
+	// Only notify if deps are wired
+	if s.hub != nil && s.notificationService != nil {
+		go websocket.NotifyUser(
+			s.hub,
+			s.notificationService,
+			creatorUUID.String(),
+			req.TenantID.String(),
+			req.TeamID.String(),
+			"Case Created",
+			`Your case "`+req.Title+`" has been created successfully.`,
+		)
+	}
 
 	return newCase, nil
 }
