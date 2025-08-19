@@ -123,6 +123,9 @@ func main() {
 	}
 	evidenceCountRepo := evidencecount.NewEvidenceRepository(db.DB)
 	chainOfCustodyRepo := chain_of_custody.NewChainOfCustodyRepository(db.DB)
+	if chainOfCustodyRepo == nil {
+		log.Fatal("Failed to create chain of custody repository")
+	}
 	// ─── Email Sender (Mock) ────────────────────────────────────
 	emailSender := reset_password.NewMockEmailSender()
 
@@ -207,6 +210,9 @@ func main() {
 
 	// ─── Chain of Custody ─────────────────────────────────────
 	chainOfCustodyService := chain_of_custody.NewChainOfCustodyService(chainOfCustodyRepo)
+	if chainOfCustodyService == nil {
+		log.Fatal("Failed to create chain of custody service")
+	}
 	chainOfCustodyHandler := handlers.NewChainOfCustodyHandler(chainOfCustodyService)
 
 	// ─── Messages / WebSocket ───────────────────────────────────

@@ -65,11 +65,10 @@ type Handler struct {
 	ReportHandler       *ReportHandler       // Optional: Report generation handler
 	ReportStatusHandler *ReportStatusHandler // Optional: Report status update handler
 
-	IOCHandler                *IOCHandler
-	TimelineHandler           *TimelineHandler
-	EvidenceHandler           *EvidenceHandler
-	ChainOfCustodyHandler     *ChainOfCustodyHandler
-
+	IOCHandler            *IOCHandler
+	TimelineHandler       *TimelineHandler
+	EvidenceHandler       *EvidenceHandler
+	ChainOfCustodyHandler *ChainOfCustodyHandler
 }
 
 func NewHandler(
@@ -137,10 +136,10 @@ func NewHandler(
 		ReportHandler:       reportHandler,       // Optional: Report generation handler
 		ReportStatusHandler: reportStatusHandler, // Optional: Report status update handler
 
-		IOCHandler:                IOCHandler,
-		TimelineHandler:           TimelineHandler,
-		EvidenceHandler:           EvidenceHandler,
-
+		IOCHandler:            IOCHandler,
+		TimelineHandler:       TimelineHandler,
+		EvidenceHandler:       EvidenceHandler,
+		ChainOfCustodyHandler: ChainOfCustodyHandler,
 	}
 }
 

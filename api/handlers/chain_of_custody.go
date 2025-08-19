@@ -20,6 +20,17 @@ func NewChainOfCustodyHandler(service chain_of_custody.ChainOfCustodyService) *C
 
 // POST /api/v1/chain_of_custody
 func (h *ChainOfCustodyHandler) AddEntry(c *gin.Context) {
+	if h == nil {
+		fmt.Println("ERROR: Handler is nil")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Handler not initialized"})
+		return
+	}
+	if h.service == nil {
+		fmt.Println("ERROR: Service is nil in ChainOfCustodyHandler")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Service not initialized"})
+		return
+	}
+
 	var custody chain_of_custody.ChainOfCustody
 	if err := c.ShouldBindJSON(&custody); err != nil {
 		fmt.Printf("Bind error: %v\n", err)
