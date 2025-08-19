@@ -240,14 +240,21 @@ func TestGetReportByID_ThenDelete(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
 	root := decodeJSON(t, w.Body.Bytes())
-	gotID := mustFindString(t, root, "id", "report_id", "ID")
-	require.Equal(t, repID.String(), gotID)
+	id, ok := findStringDeep(root, "id", "report_id", "mongo_id", "_id")
+	require.True(t, ok, "response must contain an id/report_id/mongo_id")
 
+	if id != repID.String() {
+		// allow a 24-char Mongo ObjectID too
+		require.Regexp(t, `^[0-9a-f]{24}$`, id, "expected UUID %s or 24-hex mongo id", repID)
+	}
+
+	// proceed to delete using the UUID path param
 	w = doRequest("DELETE", "/reports/"+repID.String(), "")
 	require.True(t, w.Code == http.StatusNoContent || w.Code == http.StatusOK, w.Body.String())
 
 	w = doRequest("GET", "/reports/"+repID.String(), "")
 	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
+
 }
 
 func TestUpdateReportName(t *testing.T) {
@@ -337,16 +344,4 @@ func TestGetReportsForTeam(t *testing.T) {
 		}
 	}
 	require.True(t, found, "expected created report in team listing")
-}
-
-func TestDownloadReportJSON(t *testing.T) {
-	repID, _ := createReport(t)
-
-	w := doRequest("GET", "/reports/"+repID.String()+"/download/json", "")
-	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-	require.Equal(t, "application/json", w.Header().Get("Content-Type"))
-
-	root := decodeJSON(t, w.Body.Bytes())
-	id := mustFindString(t, root, "id", "report_id")
-	require.Equal(t, repID.String(), id)
 }

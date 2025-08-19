@@ -164,11 +164,11 @@ func addSectionFindOID(t *testing.T, reportID uuid.UUID, title, content string, 
 }
 
 // decode JSON into any
-func decodeJSON(t *testing.T, b []byte) any {
+func decodeJSON(t *testing.T, b []byte) map[string]any {
 	t.Helper()
-	var v any
-	require.NoError(t, json.Unmarshal(b, &v))
-	return v
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(b, &m), "body=%s", string(b))
+	return m
 }
 
 // Recursively search for a string value under any of the given keys.
@@ -258,4 +258,27 @@ func mustFindArray(t *testing.T, b []byte) []any {
 	}
 	require.FailNowf(t, "expected array/list", "body=%s", string(b))
 	return nil
+}
+
+func findStringDeep(v any, keys ...string) (string, bool) {
+	switch x := v.(type) {
+	case map[string]any:
+		for _, k := range keys {
+			if s, ok := x[k].(string); ok && s != "" {
+				return s, true
+			}
+		}
+		for _, vv := range x {
+			if s, ok := findStringDeep(vv, keys...); ok {
+				return s, true
+			}
+		}
+	case []any:
+		for _, it := range x {
+			if s, ok := findStringDeep(it, keys...); ok {
+				return s, true
+			}
+		}
+	}
+	return "", false
 }

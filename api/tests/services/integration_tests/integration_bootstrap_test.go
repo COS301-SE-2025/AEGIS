@@ -30,6 +30,14 @@ import (
 	"gorm.io/gorm"
 )
 
+// at top-level (same package: integration_test)
+type RouteMount func(root *gin.RouterGroup)
+
+var routeMounts []RouteMount
+
+// Call this in test files to add routes into the shared Gin router:
+func RegisterRoutes(m RouteMount) { routeMounts = append(routeMounts, m) }
+
 //go:embed testdata/schema.sql
 var embeddedSchema []byte
 
@@ -44,6 +52,26 @@ var (
 	mongoColl   *mongo.Collection
 	router      *gin.Engine
 )
+
+func buildRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+
+	// existing report wiring...
+	pgRepo := report.NewReportRepository(pgDB)
+	mRepo := report.NewReportMongoRepo(mongoColl)
+	svc := report.NewReportService(pgRepo, mRepo)
+	h := handlers.NewReportHandler(svc)
+
+	r := gin.New()
+	r.Use(gin.Recovery(), stubAuth())
+
+	routesPkg.RegisterReportRoutes(r.Group(""), h) // your existing line
+
+	// NEW: mount case endpoints for tests
+	registerCaseTestEndpoints(r)
+
+	return r
+}
 
 func writeSchemaToTemp() (string, error) {
 	dir, err := os.MkdirTemp("", "schema-*")
@@ -169,22 +197,6 @@ func stubAuth() gin.HandlerFunc {
 		c.Set("teamID", gid)
 		c.Next()
 	}
-}
-
-func buildRouter() *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	pgRepo := report.NewReportRepository(pgDB)
-	mRepo := report.NewReportMongoRepo(mongoColl)
-	svc := report.NewReportService(pgRepo, mRepo)
-	h := handlers.NewReportHandler(svc)
-
-	r := gin.New()
-	r.Use(gin.Recovery(), stubAuth())
-
-	// Only the endpoints you intend to test now:
-	// Use the real routes:
-	routesPkg.RegisterReportRoutes(r.Group(""), h)
-	return r
 }
 
 func TestMain(m *testing.M) {
