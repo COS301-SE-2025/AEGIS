@@ -18,6 +18,8 @@ import (
 
 	"github.com/docker/go-connections/nat"
 
+	chatrepo "aegis-api/services_/chat"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -72,6 +74,21 @@ func buildRouter() *gin.Engine {
 	registerCaseAssignmentTestEndpoints(r) // Case assign bootstrap
 	registerEvidenceTestEndpoints(r)       // Evidence Upload with metadata bootstrap
 	registerEvidenceDownloadTestEndpoints(r)
+
+	// ---- Chat (add this) ----
+	chatRepo := chatrepo.NewChatRepository(mongoDB) // creates indexes internally
+	chatSev := chatrepo.NewChatService(chatRepo, nil, nil)
+
+	// OPTION A: if you have a Chat service layer:
+	// chatSvc := chatservice.NewService(chatRepo)
+	// chatH   := handlers.NewChatHandler(chatSvc)
+
+	// OPTION B: if handler accepts the repo directly:
+	chatH := handlers.NewChatHandler(chatSev, nil) // adjust to your ctor signature
+
+	// Mount under the same root group used in your tests
+	routesPkg.RegisterChatRoutes(r.Group(""), chatH)
+
 	return r
 }
 
