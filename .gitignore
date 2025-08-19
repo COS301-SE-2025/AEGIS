@@ -94,3 +94,6 @@ uploads/
 
 # Local/binary artifacts
 uploads/
+
+# Windows device filenames
+NUL
