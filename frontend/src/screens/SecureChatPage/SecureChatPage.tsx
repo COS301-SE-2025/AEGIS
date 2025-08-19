@@ -740,47 +740,79 @@ const [userId] = useState(() => {
 const sendWebSocketMessage = async () => {
   if (!activeChat || !message.trim() || !userId || !userEmail) return;
 
-  const payload: NewMessagePayload = {
-    messageId: crypto.randomUUID(),
-    text: message.trim(),
-    senderId: userId,
-    senderName: userEmail,
-    groupId: String(activeChat.id), 
-    timestamp: new Date().toISOString(),
-  };
+  // Always persist to database first
+  try {
+    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender_email: userEmail,
+        sender_name: "You",
+        content: message,
+        message_type: "text"
+      })
+    });
 
-  const wsMessage: WebSocketMessage = {
-    type: "new_message",
-    payload,
-    timestamp: payload.timestamp,
-    groupId: String(activeChat.id), 
-    userEmail,
-  };
+    const newMessage = await res.json();
+    
+    // Post-process the message from the database response
+    const processedMessage: Message = {
+      id: newMessage.id,
+      user: newMessage.sender_name || newMessage.sender_email,
+      color: newMessage.sender_email === userEmail ? "text-green-400" : "text-blue-400",
+      content: newMessage.content,
+      time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: "read",
+      self: newMessage.sender_email === userEmail,
+      attachments: (newMessage.attachments && newMessage.attachments.length > 0)
+        ? newMessage.attachments.map((attachment: any) => ({
+            file_name: attachment.file_name,
+            file_type: attachment.file_type,
+            file_size: Number(attachment.file_size?.$numberLong || attachment.file_size || 0),
+            url: attachment.url,
+            hash: attachment.hash,
+            isImage: attachment.file_type.startsWith("image/") ||
+              attachment.url?.match(/\.(png|jpe?g|gif|bmp|webp)$/i)
+          }))
+        : []
+    };
 
-  if (socketRef.current?.readyState !== WebSocket.OPEN) {
-    toast.error("WebSocket is disconnected. Falling back to HTTP.");
-    await sendMessage(); // fallback HTTP
-    return;
+    // Add to UI
+    setChatMessages(prev => ({
+      ...prev,
+      [activeChat.id]: [...(prev[activeChat.id] || []), processedMessage]
+    }));
+
+    // Then send via WebSocket for real-time delivery to others
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      const wsMessage: WebSocketMessage = {
+        type: "new_message",
+        payload: {
+          messageId: newMessage.id,
+          text: message.trim(),
+          senderId: userId,
+          senderName: userEmail,
+          groupId: String(activeChat.id), 
+          timestamp: newMessage.created_at,
+        },
+        timestamp: newMessage.created_at,
+        groupId: String(activeChat.id), 
+        userEmail,
+      };
+      
+      socketRef.current.send(JSON.stringify(wsMessage));
+    }
+
+  } catch (err) {
+    console.error("Failed to send message:", err);
+    toast.error("Failed to send message");
   }
 
-  socketRef.current.send(JSON.stringify(wsMessage));
-
-  const newMessage: Message = {
-   id: payload.messageId as unknown as number,
-    user: payload.senderName,
-    color: "text-green-400",
-    content: payload.text,
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    status: "sending",
-    self: true,
-  };
-
-  setChatMessages(prev => ({
-    ...prev,
-    [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
-  }));
-
   setMessage(""); // clear input
+  setReplyingTo(null);
 };
 
 const handleSendMessage = async (e?: React.MouseEvent | React.KeyboardEvent) => {
