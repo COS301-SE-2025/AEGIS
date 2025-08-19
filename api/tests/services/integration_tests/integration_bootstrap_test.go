@@ -74,6 +74,7 @@ func buildRouter() *gin.Engine {
 	registerCaseAssignmentTestEndpoints(r) // Case assign bootstrap
 	registerEvidenceTestEndpoints(r)       // Evidence Upload with metadata bootstrap
 	registerEvidenceDownloadTestEndpoints(r)
+	registerTimelineTestEndpoints(r)
 
 	// ---- Chat (add this) ----
 	chatRepo := chatrepo.NewChatRepository(mongoDB) // creates indexes internally
