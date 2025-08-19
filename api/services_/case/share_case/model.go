@@ -14,7 +14,7 @@ type Token struct {
 	Type      string     `gorm:"type:VARCHAR(30);not null"`
 	ExpiresAt *time.Time
 	Used      bool `gorm:"default:false"`
-	Uses      int  `gorm:"default:0"`
-	MaxUses   *int
+	//Uses      int  `gorm:"default:0"`
+	//MaxUses   *int
 	CreatedAt time.Time
 }

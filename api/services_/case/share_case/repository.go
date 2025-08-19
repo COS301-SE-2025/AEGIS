@@ -19,7 +19,7 @@ func CreateCaseShareToken(db *gorm.DB, userID uuid.UUID, caseID uuid.UUID, expir
 		Token:     token,
 		Type:      "CASE_SHARE",
 		ExpiresAt: &exp,
-		MaxUses:   &maxUses,
+		//MaxUses:   &maxUses,
 		CreatedAt: time.Now(),
 	}
 	if err := db.Create(&entry).Error; err != nil {
@@ -39,9 +39,9 @@ func GetValidCaseToken(db *gorm.DB, rawToken string) (*Token, error) {
 		return nil, errors.New("token expired")
 	}
 
-	if token.MaxUses != nil && token.Uses >= *token.MaxUses {
-		return nil, errors.New("token usage limit reached")
-	}
+	// if token.MaxUses != nil && token.Uses >= *token.MaxUses {
+	// 	return nil, errors.New("token usage limit reached")
+	// }
 
 	return &token, nil
 }

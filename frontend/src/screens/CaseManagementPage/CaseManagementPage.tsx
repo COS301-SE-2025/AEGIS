@@ -8,22 +8,15 @@ import {
   MessageSquare,
   Search,
   Settings,
-  Share2,
-  Plus,
-  Calendar,  
-  Clock
-} from "lucide-react";
+  Share2} from "lucide-react";
 import { useState, useEffect  } from 'react';
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 //thati added
 import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 import {ShareButton} from "../ShareCasePage/sharecasebutton";
 //
 import { useParams } from 'react-router-dom';
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
-import { ClipboardList } from "lucide-react";
-
+import { InvestigationTimeline } from "../../components/ui/Timeline";
 
 export const CaseManagementPage = () => {
 const storedUser = sessionStorage.getItem("user");
@@ -36,8 +29,6 @@ const storedUser = sessionStorage.getItem("user");
     .toUpperCase();
 
 const userRole = "admin"; // for now
-const [role, setRole] = useState<string>(user?.role || "");
-const isDFIRAdmin = role === "DFIR Admin";
 
 // Profile state
 const [, setProfile] = useState<{ name: string; email: string; role: string; image: string } | null>(null);
@@ -74,13 +65,10 @@ const getPriorityStyle = (priority: string) => {
   }
 };
 
-
-
 //case ID
 const { caseId } = useParams<{ caseId: string }>();
+const navigate = useNavigate();
 
-
-const API_URL = "http://localhost:8080/api/v1";
 const [caseData, setCaseData] = useState<CaseData | null>(null);
 
 useEffect(() => {
@@ -94,13 +82,19 @@ useEffect(() => {
           "Content-Type": "application/json",
         },
       });
+       if (!res.ok) {
+        console.error("Failed to fetch case:", res.status, res.statusText);
+        return;
+      }
 
-    const text = await res.text();
-    console.log("Raw response text:", text);
+    const raw = await res.json();
+      console.log("Raw response json:", raw);
 
-    const raw = JSON.parse(text);
+      if (!raw.case) {
+        console.error("Response missing 'case' field");
+        return;
+      }
     const caseDataRaw = raw.case; // ✅ This is the actual case object
-
   const normalized = {
     id: caseDataRaw.id,
     creator: caseDataRaw.created_by,
@@ -109,8 +103,8 @@ useEffect(() => {
     attackType: caseDataRaw.title,
     description: caseDataRaw.description,
     createdAt: caseDataRaw.created_at,
-    updatedAt: caseDataRaw.created_at, // assuming no update time
-    lastActivity: caseDataRaw.created_at,
+    updatedAt: caseDataRaw.updated_at,
+    lastActivity: caseDataRaw.updated_at,
     progress: caseDataRaw.status === "closed" ? 100 : 50,
     image: "",
   };
@@ -125,27 +119,9 @@ useEffect(() => {
   fetchCaseDetails();
 }, [caseId]);
 
-useEffect(() => {
-  if (!role) {
-    const token = sessionStorage.getItem("authToken");
-    if (token) {
-      try {
-        const [, payloadB64] = token.split(".");
-        const json = JSON.parse(
-          decodeURIComponent(
-            atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
-              .split("")
-              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-              .join("")
-          )
-        );
-        if (json?.role) setRole(json.role);
-      } catch { /* ignore */ }
-    }
-  }
-}, [role]);
 
 const [assignedMembers, setAssignedMembers] = useState<{ name: string; role: string }[]>([]);
+const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
 
 useEffect(() => {
   const fetchCollaborators = async () => {
@@ -183,26 +159,44 @@ useEffect(() => {
   fetchCollaborators();
 }, [caseId]);
 
-
-const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
-
 useEffect(() => {
-  const stored = localStorage.getItem("evidenceFiles");
-  if (stored && caseId) {
-    const parsed = JSON.parse(stored);
-    const matching = parsed.filter((e: any) => String(e.caseId) === caseId);
-    setEvidenceItems(matching);
-  }
+  const fetchEvidence = async () => {
+    if (!caseId) return;
+    try {
+      const token = sessionStorage.getItem("authToken");
+      const res = await fetch(`http://localhost:8080/api/v1/evidence-metadata/case/${caseId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!res.ok) throw new Error("Failed to fetch evidence");
+      const data = await res.json();
+      setEvidenceItems(data || []);
+    } catch (err) {
+      console.error("Error fetching evidence:", err);
+      setEvidenceItems([]);
+    }
+  };
+  fetchEvidence();
 }, [caseId]);
 
-console.log("Current caseId from URL:", caseId);
 
+// useEffect(() => {
+//   const stored = localStorage.getItem("evidenceFiles");
+//   if (stored && caseId) {
+//     const parsed = JSON.parse(stored);
+//     const matching = parsed.filter((e: any) => String(e.caseId) === caseId);
+//     setEvidenceItems(matching);
+//   }
+// }, [caseId]);
+
+console.log("Current caseId from URL:", caseId);
 
 const caseName = caseData?.attackType || "Unknown Case";
 console.log("Loaded case data:", caseData);
 console.log("Assigned members:", assignedMembers);
 console.log("Evidence items:", evidenceItems);
-
 
 const updateCaseTimestamp = (caseId: string) => {
   const stored = localStorage.getItem("cases");
@@ -300,8 +294,8 @@ useEffect(() => {
   }, [user?.id]);
 
   
-  const [newEventDescription, setNewEventDescription] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [] = useState('');
+  const [] = useState(false);
 
   //state declaration for filtering the timeline
   const [filterKeyword, setFilterKeyword] = useState('');
@@ -311,120 +305,14 @@ useEffect(() => {
 
 
   // ADD THESE NEW FUNCTIONS
-  const getCurrentTimestamp = () => {
-    const now = new Date();
-    const date = now.toISOString().split('T')[0]; // YYYY-MM-DD format
-    const time = now.toTimeString().slice(0, 5); // HH:MM format
-    return { date, time };
-  };
-
-    const addEvent = () => {
-      if (newEventDescription.trim()) {
-        const { date, time } = getCurrentTimestamp();
-        const newEvent = { date, time, description: newEventDescription.trim() };
-        
-        setTimelineEvents(prevEvents => [...prevEvents, newEvent]); //  use previous events
-        setNewEventDescription('');
-        setShowAddForm(false);
-        console.log("Adding event:", newEvent);
-        console.log("Current caseId:", caseId);
-
-      }
-      
-    };
 
 
-    const deleteEvent = (index: number) => {
-    const updatedEvents = [...timelineEvents];
-    updatedEvents.splice(index, 1);
-    setTimelineEvents(updatedEvents);
-  };
 
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      addEvent();
-    }
-  };
 
 
-type Json = unknown;
-const isObj = (v: unknown): v is Record<string, unknown> =>
-  v !== null && typeof v === "object";
 
-const extractReportId = (row: unknown): string | null => {
-  if (!isObj(row)) return null;
-  for (const k of ["id", "report_id", "reportId"]) {
-    const v = row[k];
-    if (typeof v === "string" && v.length > 0) return v;
-  }
-  return null;
-};
 
-const extractList = (payload: unknown): unknown[] => {
-  if (Array.isArray(payload)) return payload;
-  if (isObj(payload)) {
-    if (Array.isArray(payload.reports)) return payload.reports as unknown[];
-    if (Array.isArray(payload.data)) return payload.data as unknown[];
-    if (Array.isArray(payload.items)) return payload.items as unknown[];
-  }
-  return [];
-};
-
-async function getOrCreateReportForCase(caseId: string): Promise<string> {
-  const token = sessionStorage.getItem("authToken") || "";
-  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-
-  // 1) Try existing report(s)
-  try {
-    const res = await fetch(`${API_URL}/reports/cases/${caseId}`, { headers });
-    if (res.ok) {
-      const payload: Json = await res.json();
-      const list = extractList(payload);
-      if (list.length) {
-        const id = extractReportId(list[0]);
-        if (id) return id;
-      }
-    }
-  } catch (e) {
-    console.warn("GET reports by case failed; will try to create:", e);
-  }
-
-  // 2) Create if none
-  const createRes = await fetch(`${API_URL}/reports/cases/${caseId}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({}), // if your handler ignores body, this can be omitted
-  });
-
-  const createPayload: Json = await createRes.json();
-  // handle { id }, { report_id }, { reportId }, or { data: {...} }
-  let createdId = extractReportId(createPayload);
-  if (!createdId && isObj(createPayload) && isObj(createPayload.data)) {
-    createdId = extractReportId(createPayload.data);
-  }
-  if (!createdId) {
-    throw new Error("Could not parse report id from create response");
-  }
-  return createdId;
-}
-
-const [viewReportBusy, setViewReportBusy] = useState(false);
-const navigate = useNavigate();
-
-const handleViewReport = async () => {
-  if (!caseId) return;
-  setViewReportBusy(true);
-  try {
-    const reportId = await getOrCreateReportForCase(caseId);
-    navigate(`/report-editor/${reportId}`);
-  } catch (err) {
-    console.error(err);
-    alert("Could not open or create a report for this case.");
-  } finally {
-    setViewReportBusy(false);
-  }
-};
 
   // Evidence data
   // const evidenceItems = [
@@ -473,12 +361,6 @@ const handleViewReport = async () => {
             <MessageSquare className="w-6 h-6" />
             <span className="text-lg"><Link to="/secure-chat"> Secure Chat</Link></span>
           </div>
-              {isDFIRAdmin && (
-              <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
-                <ClipboardList className="w-6 h-6" />
-                 <span className="text-lg"><Link to="/report-dashboard"> Case Reports</Link></span>
-              </div>
-            )}
         </nav>
 
         {/* User Profile */}
@@ -591,19 +473,18 @@ const handleViewReport = async () => {
                 )}
               </button>
               <button
-                onClick={handleViewReport}
-                disabled={!caseId || viewReportBusy}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                <FileText className="w-4 h-4" />
-                {viewReportBusy ? "Opening…" : "View Report"}
-              </button>
-              <button
                 onClick={() => setShowFilterInput(!showFilterInput)}
                 className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500"
               >
                 <Filter className="w-4 h-4" />
                 Filter Timeline
+              </button>
+                    {/* Add IOC button */}
+              <button
+              onClick={() => navigate(`/cases/${caseId}/iocs`)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 border border-transparent rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Add IOC
               </button>
 
           {showFilterInput && (
@@ -753,10 +634,10 @@ const handleViewReport = async () => {
                 <div className="space-y-3">
                   {Array.isArray(evidenceItems) && evidenceItems.length > 0 ? (
                   evidenceItems.map((item: any, index: number) => (
-                      <div key={index} className="flex items-center gap-3">
-                        <Paperclip className="w-5 h-5 text-blue-500" />
+                      <div key={item.id} className="flex items-center gap-3">
+                       <Link to={`/evidence-viewer/${caseId}`}><Paperclip className="w-5 h-5 text-blue-500" /></Link>
                         <span className="text-blue-500 hover:text-blue-400 cursor-pointer">
-                          {item.name || `Evidence #${index + 1}`}
+                          {item.filename || `Evidence #${index + 1}`}
                         </span>
                       </div>
                     ))
@@ -767,113 +648,14 @@ const handleViewReport = async () => {
               </div>
             </div>
           </div>
-
-
             {/* Investigation Timeline Section */}
-            <div className="lg:col-span-2">
-              <div className="bg-card border border-bg-accent rounded-lg p-6">
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-semibold text-foreground">Investigation Timeline</h2>
-                  <button
-                    onClick={() => setShowAddForm(!showAddForm)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-foreground rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus size={18} />
-                    Add Event
-                  </button>
-                </div>
-
-                {/* Add Event Form */}
-                {showAddForm && (
-                  <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Calendar size={16} className="text-blue-600" />
-                      <span className="text-sm text-blue-800">
-                        Will be timestamped: {getCurrentTimestamp().date} at {getCurrentTimestamp().time}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newEventDescription}
-                        onChange={(e) => setNewEventDescription(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Enter event description..."
-                        className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => {
-                          addEvent(); // your existing function
-                          if (caseId) updateCaseTimestamp(caseId); // update the timestamp after adding the event
-                        }}
-                        disabled={!newEventDescription.trim()}
-                        className="px-4 py-2 bg-green-600 text-foreground rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Add
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setShowAddForm(false);
-                          setNewEventDescription('');
-                        }}
-                        className="px-4 py-2 bg-gray-500 text-foreground rounded-md hover:bg-gray-600 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="relative">
-                  {/* Timeline events */}
-                  {timelineEvents  .filter(event => {
-                    const matchesKeyword = event.description.toLowerCase().includes(filterKeyword.toLowerCase());
-                    const matchesDate = !filterDate || event.date === filterDate;
-                    return matchesKeyword && matchesDate;
-                  })
-                  .map((event, index) => (
-                    <div key={index} className="flex items-start mb-8 relative">
-                      {/* Timeline line */}
-                      {index < timelineEvents.length - 1 && (
-                        <div className="absolute left-20 top-10 w-0.5 h-16 bg-muted"></div>
-                      )}
-                      
-                      {/* Date and time */}
-                      <div className="w-32 text-right pr-4">
-                        <div className="text-muted-foreground text-sm flex items-center justify-end gap-1">
-                          <Calendar size={12} />
-                          {event.date}
-                        </div>
-                        <div className="text-muted-foreground text-sm flex items-center justify-end gap-1">
-                          <Clock size={12} />
-                          {event.time}
-                        </div>
-                      </div>
-
-                      {/* Timeline marker */}
-                      <div className="w-8 h-8 bg-blue-600 rounded-full border-4 border-background flex items-center justify-center relative z-10">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                      </div>
-
-                      {/* Event description */}
-                      <div className="flex-1 ml-4">
-                        <div className="bg-muted border border rounded-lg p-4 flex justify-between items-center">
-                          <p className="text-foreground">{event.description}</p>
-                          <button
-                            onClick={() => deleteEvent(index)}
-                            className="ml-4 px-2 py-1 text-xs text-red-600 hover:underline"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <InvestigationTimeline
+              caseId={caseId || ""}
+              evidenceItems={evidenceItems}
+              timelineEvents={timelineEvents}
+              setTimelineEvents={setTimelineEvents}
+              updateCaseTimestamp={updateCaseTimestamp}
+            />
           </div>
           </>
           )}

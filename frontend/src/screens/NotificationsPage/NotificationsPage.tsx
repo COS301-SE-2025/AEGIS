@@ -18,32 +18,6 @@ type Notification = {
   archived: boolean;
 };
 
-const mockData: Notification[] = [
-  {
-    id: "1",
-    title: "Case Updated",
-    message: "Case #123 was updated by Responder Alpha.",
-    timestamp: "2025-07-24 14:32",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "2",
-    title: "Evidence Uploaded",
-    message: "New evidence uploaded to Case #456.",
-    timestamp: "2025-07-23 10:12",
-    read: true,
-    archived: false,
-  },
-  {
-    id: "3",
-    title: "New Assignment",
-    message: "You were assigned to Case #789.",
-    timestamp: "2025-07-22 09:00",
-    read: false,
-    archived: true,
-  },
-];
 
 export const NotificationsPage = () => {
  // const [notifications, setNotifications] = useState<Notification[]>(mockData);
@@ -55,7 +29,6 @@ const wsRef = useRef<WebSocket | null>(null);
 const [notifications, setNotifications] = useState<Notification[]>([]);
 const token = sessionStorage.getItem("authToken");
 const tenantID = sessionStorage.getItem("tenantId"); // store on login
-const teamID = sessionStorage.getItem("teamId");     // store on login
 
 // Compute unread notifications
 const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;

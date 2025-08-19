@@ -20,7 +20,12 @@ func NewAnnotationThreadService(repo AnnotationThreadRepository, hub *websocket.
 		hub:  hub}
 }
 
-func (s *Annotationthreadservice) CreateThread(caseID, fileID, userID uuid.UUID, title string, tags []string, priority ThreadPriority) (*AnnotationThread, error) {
+func (s *Annotationthreadservice) CreateThread(
+	caseID, fileID, userID uuid.UUID,
+	title string, tags []string,
+	priority ThreadPriority,
+) (*AnnotationThread, error) {
+
 	thread := &AnnotationThread{
 		ID:        uuid.New(),
 		Title:     title,
@@ -34,13 +39,11 @@ func (s *Annotationthreadservice) CreateThread(caseID, fileID, userID uuid.UUID,
 		UpdatedAt: time.Now(),
 	}
 
-	err := s.repo.CreateThread(thread, tags)
+	// Thread + initial participant + tags inserted in one transaction
+	err := s.repo.CreateThreadWithParticipant(thread, tags, userID)
 	if err != nil {
 		return nil, err
 	}
-
-	// Automatically add creator as participant
-	_ = s.repo.AddParticipant(thread.ID, userID)
 
 	// Notify via WebSocket
 	payload := websocket.ThreadCreatedPayload{
@@ -55,6 +58,7 @@ func (s *Annotationthreadservice) CreateThread(caseID, fileID, userID uuid.UUID,
 	if err := websocket.SendThreadCreated(s.hub, payload); err != nil {
 		return nil, errors.New("failed to send thread created event: " + err.Error())
 	}
+
 	return thread, nil
 }
 
@@ -142,6 +146,26 @@ func (s *Annotationthreadservice) GetThreadByID(threadID uuid.UUID) (*Annotation
 // GetUserByID retrieves a user by ID.
 func (s *Annotationthreadservice) GetUserByID(userID uuid.UUID) (*User, error) {
 	return s.repo.GetUserByID(userID)
+}
+
+// CreateThreadWithParticipant adds a participant to an existing thread with tags.
+func (s *Annotationthreadservice) CreateThreadWithParticipant(thread *AnnotationThread, tags []string, participantID uuid.UUID) error {
+	// Optionally update tags if needed
+	if len(tags) > 0 {
+		if err := s.repo.UpdateThreadTags(thread.ID, tags); err != nil {
+			return err
+		}
+	}
+	// Add participant
+	if err := s.AddParticipant(thread.ID, participantID); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UpdateThreadTags updates the tags for a given thread.
+func (s *Annotationthreadservice) UpdateThreadTags(threadID uuid.UUID, tags []string) error {
+	return s.repo.UpdateThreadTags(threadID, tags)
 }
 
 // Placeholder for actual role verification

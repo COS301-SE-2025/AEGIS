@@ -106,10 +106,6 @@ export async function fetchThreadsByFile(fileID: string) {
 export async function sendThreadMessage(threadId: string, body: any) {
   const token = sessionStorage.getItem("authToken");
 
-  console.log("API call - Thread ID:", threadId);
-  console.log("API call - Request body:", body);
-  console.log("API call - Token exists:", !!token);
-
   const res = await fetch(`http://localhost:8080/api/v1/threads/${threadId}/messages`, {
     method: "POST",
     headers: {
@@ -225,13 +221,14 @@ export const addReaction = async (messageID: string, userID: string, type: strin
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`
     },
-    body: JSON.stringify({ user_id: userID, type })
+    body: JSON.stringify({ user_id: userID, reaction: type }) // backend expects 'reaction' not 'type'
   });
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error(error.message || "Failed to add reaction");
   }
+  return await res.json(); // return updated message object
 };
 
 export const removeReaction = async (messageID: string, userID: string) => {

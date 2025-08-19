@@ -11,6 +11,11 @@ type NotificationService struct {
 	DB *gorm.DB
 }
 
+// Interface for mocking NotificationService in tests
+type NotificationServiceInterface interface {
+	SaveNotification(n *Notification) error
+}
+
 // NewNotificationService creates a new NotificationService with the given DB
 func NewNotificationService(db *gorm.DB) *NotificationService {
 	return &NotificationService{

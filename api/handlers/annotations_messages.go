@@ -261,6 +261,21 @@ func (h *MessageHandler) AddReaction(c *gin.Context) {
 		return
 	}
 
+	// Fetch the updated message with reactions
+	updatedMsg, err := h.service.GetMessageByID(messageID)
+	if err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action:      "ADD_REACTION",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "message_reaction", ID: messageID.String()},
+			Service:     "annotation_messages",
+			Status:      "FAILED",
+			Description: "Failed to fetch updated message: " + err.Error(),
+		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Reaction added but failed to fetch updated message"})
+		return
+	}
+
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action:      "ADD_REACTION",
 		Actor:       actor,
@@ -270,7 +285,7 @@ func (h *MessageHandler) AddReaction(c *gin.Context) {
 		Description: "Reaction added successfully",
 	})
 
-	c.JSON(http.StatusOK, gin.H{"message": "Reaction added"})
+	c.JSON(http.StatusOK, updatedMsg)
 }
 
 func (h *MessageHandler) RemoveReaction(c *gin.Context) {

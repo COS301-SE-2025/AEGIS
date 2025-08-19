@@ -54,12 +54,10 @@ func TestAddTagsToCase(t *testing.T) {
 		WithArgs(tagName).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1)) // tag ID = 1
 
-	// Insert into case_tags
+		// Insert into case_tags
 	mock.ExpectExec(regexp.QuoteMeta(
 		`INSERT INTO "case_tags" ("case_id","tag_id") VALUES ($1,$2) ON CONFLICT DO NOTHING`,
-	)).
-		WithArgs(caseID, 1).
-		WillReturnResult(sqlmock.NewResult(1, 1))
+	)).WithArgs(caseID, 1).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	mock.ExpectCommit()
 

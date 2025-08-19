@@ -437,9 +437,9 @@ func TestIsUserInGroup_NilContext(t *testing.T) {
 	email := "user@example.com"
 
 	// Simulate nil context (should not panic, but context.Context cannot be nil in practice)
-	repo.On("IsUserInGroup", nil, groupID, email).Return(false, errors.New("nil context"))
+	repo.On("IsUserInGroup", mock.Anything, groupID, email).Return(false, errors.New("nil context"))
 
-	ok, err := repo.IsUserInGroup(nil, groupID, email)
+	ok, err := repo.IsUserInGroup(context.TODO(), groupID, email)
 	assert.Error(t, err)
 	assert.False(t, ok)
 	assert.EqualError(t, err, "nil context")
