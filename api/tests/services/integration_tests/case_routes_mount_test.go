@@ -8,9 +8,13 @@ import (
 
 	lac "aegis-api/services_/case/ListActiveCases"
 	case_creation "aegis-api/services_/case/case_creation"
+	timeline "aegis-api/services_/timeline"
+
+	"encoding/json"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	// existing imports...
 )
 
@@ -89,8 +93,8 @@ func registerCaseTestEndpoints(r *gin.Engine) {
 	})
 
 	// GET /cases/:id (200 or 404)
-	r.GET("/cases/:id", func(c *gin.Context) {
-		id, err := uuid.Parse(c.Param("id"))
+	r.GET("/cases/:case_id", func(c *gin.Context) {
+		id, err := uuid.Parse(c.Param("case_id"))
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 			return
@@ -119,7 +123,7 @@ func registerCaseTestEndpoints(r *gin.Engine) {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"id":                  id.String(),
+			"case_id":             id.String(),
 			"title":               title,
 			"description":         description,
 			"team_name":           teamName,
@@ -147,4 +151,125 @@ func registerCaseTestEndpoints(r *gin.Engine) {
 		c.JSON(200, items)
 	})
 
+}
+func registerTimelineTestEndpoints(r *gin.Engine) {
+	// Initialize testTimelineService before using it
+	testTimelineService := timeline.NewService(timeline.NewRepository(pgDB)) // Use the correct constructor for the timeline service
+
+	// List all events for a case
+	r.GET("/cases/:case_id/timeline", func(c *gin.Context) {
+		caseID := c.Param("case_id")
+		events, err := testTimelineService.ListEvents(caseID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, events)
+	})
+
+	// Create new event for a case
+	r.POST("/cases/:case_id/timeline", func(c *gin.Context) {
+		caseID := c.Param("case_id")
+		var req struct {
+			Description string   `json:"description" binding:"required"`
+			Evidence    []string `json:"evidence"`
+			Tags        []string `json:"tags"`
+			Severity    string   `json:"severity"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		ev := &timeline.TimelineEvent{
+			CaseID:      caseID,
+			Description: req.Description,
+			Severity:    req.Severity,
+			AnalystID:   FixedUserID.String(),
+			AnalystName: "Test Analyst",
+		}
+		// Convert evidence/tags to JSON
+		ev.Evidence = datatypes.JSON([]byte("[]"))
+		ev.Tags = datatypes.JSON([]byte("[]"))
+		if len(req.Evidence) > 0 {
+			b, _ := json.Marshal(req.Evidence)
+			ev.Evidence = datatypes.JSON(b)
+		}
+		if len(req.Tags) > 0 {
+			b, _ := json.Marshal(req.Tags)
+			ev.Tags = datatypes.JSON(b)
+		}
+		created, err := testTimelineService.AddEvent(ev)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, created)
+	})
+
+	// Update a timeline event by ID
+	r.PATCH("/timeline/:event_id", func(c *gin.Context) {
+		eventID := c.Param("event_id")
+		var req struct {
+			Description *string   `json:"description"`
+			Evidence    *[]string `json:"evidence"`
+			Tags        *[]string `json:"tags"`
+			Severity    *string   `json:"severity"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		event, err := testTimelineService.GetEventByID(eventID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
+			return
+		}
+		if req.Description != nil {
+			event.Description = *req.Description
+		}
+		if req.Severity != nil {
+			event.Severity = *req.Severity
+		}
+		if req.Evidence != nil {
+			b, _ := json.Marshal(*req.Evidence)
+			event.Evidence = datatypes.JSON(b)
+		}
+		if req.Tags != nil {
+			b, _ := json.Marshal(*req.Tags)
+			event.Tags = datatypes.JSON(b)
+		}
+		updated, err := testTimelineService.UpdateEvent(event)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, updated)
+	})
+
+	// Delete a timeline event by ID
+	r.DELETE("/timeline/:event_id", func(c *gin.Context) {
+		eventID := c.Param("event_id")
+		if err := testTimelineService.DeleteEvent(eventID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	})
+
+	// Reorder events for a case
+	r.POST("/cases/:case_id/timeline/reorder", func(c *gin.Context) {
+		caseID := c.Param("case_id")
+		var req struct {
+			OrderedIDs []string `json:"ordered_ids" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+			return
+		}
+		if err := testTimelineService.ReorderEvents(caseID, req.OrderedIDs); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	})
 }
