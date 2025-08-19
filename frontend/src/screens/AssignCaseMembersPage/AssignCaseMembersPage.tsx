@@ -50,7 +50,7 @@ useEffect(() => {
       setAvailableUsers(users);
     } catch (err) {
       console.error("Fetch failed:", err);
-      alert("Failed to load users");
+      //alert("Failed to load users");
     }
   };
   fetchUsers();
@@ -83,13 +83,13 @@ const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
   if (members.length === 0) {
-    alert("Please add at least one member.");
+    //alert("Please add at least one member.");
     return;
   }
 
   for (const m of members) {
     if (!m.user.trim() || !m.role.trim()) {
-      alert("Please fill in user and role for all members.");
+      //alert("Please fill in user and role for all members.");
       return;
     }
   }
@@ -97,7 +97,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   //const currentCase = JSON.parse(localStorage.getItem("currentCase") || "{}");
 
   if (!caseId) {
-    alert("No active case found. Please create or select a case first.");
+    //alert("No active case found. Please create or select a case first.");
     return;
   }
 
@@ -127,11 +127,11 @@ const handleSubmit = async (e: React.FormEvent) => {
       }
     }
 
-    alert("All members assigned successfully!");
+    //alert("All members assigned successfully!");
     navigate(-1);
   } catch (err: any) {
     console.error(err);
-    alert(`Error assigning members: ${err.message}`);
+    //alert(`Error assigning members: ${err.message}`);
   }
 };
 

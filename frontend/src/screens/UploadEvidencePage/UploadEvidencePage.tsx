@@ -37,14 +37,14 @@ export function UploadEvidenceForm(): JSX.Element {
    const currentCase = JSON.parse(localStorage.getItem("currentCase") || "{}");
 
 if (!caseId) {
-  alert("No active case found. Please create or select a case first.");
+  //alert("No active case found. Please create or select a case first.");
   return;
 }
 
     // Load current user from sessionStorage
     const user = JSON.parse(sessionStorage.getItem("user") || "{}");
     if (!user.id) {
-      alert("No user session found. Please log in again.");
+     // alert("No user session found. Please log in again.");
       return;
     }
 
@@ -67,11 +67,11 @@ if (!caseId) {
 });
 
 
-      alert("Evidence uploaded successfully!");
+      //alert("Evidence uploaded successfully!");
       navigate(-1);
     } catch (err: any) {
       console.error("Upload failed:", err.response?.data || err);
-      alert("Failed to upload evidence. Check console for details.");
+      //alert("Failed to upload evidence. Check console for details.");
     }
   };
 

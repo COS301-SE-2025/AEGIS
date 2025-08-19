@@ -112,7 +112,7 @@ axios.get<{ id: string; name: string }>(`http://localhost:8080/api/v1/teams/${de
     e.preventDefault();
 
     if (!form.creatorId) {
-      alert("Cannot create case: user ID not found in session. Please log in again.");
+      //alert("Cannot create case: user ID not found in session. Please log in again.");
       return;
     }
 
@@ -152,7 +152,7 @@ const payload = {
 
 
       if (response.status === 201) {
-        alert("Case created successfully!");
+        //alert("Case created successfully!");
         clearSavedFormData();
         const data = response.data as { case: { ID: string } };
         navigate(`/case/${data.case.ID}/next-steps`);
@@ -162,7 +162,7 @@ const payload = {
       }
     } catch (error: any) {
       console.error("Error creating case:", error.response?.data || error);
-      alert("Failed to create case. Please check console for details.");
+      //alert("Failed to create case. Please check console for details.");
     }
   };
 

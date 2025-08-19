@@ -141,7 +141,7 @@ const addEvent = async () => {
     updateCaseTimestamp(caseId);
   } catch (err) {
     console.error(err);
-    alert("Failed to add event.");
+    //alert("Failed to add event.");
   }
 };
 
@@ -210,7 +210,7 @@ const deleteEvent = async (index: number) => {
     setTimelineEvents(timelineEvents.filter((_, i) => i !== index));
   } catch (err) {
     console.error(err);
-    alert("Failed to delete event.");
+    //alert("Failed to delete event.");
   }
 };
 
@@ -231,7 +231,7 @@ const saveEdit = async () => {
     setEditingIndex(null);
   } catch (err) {
     console.error(err);
-    alert("Failed to update event.");
+    //alert("Failed to update event.");
   }
 };
 
@@ -249,7 +249,7 @@ const onDragEnd = async (result: any) => {
     await reorderTimelineEvents(caseId, orderedIds);
   } catch (err) {
     console.error(err);
-    alert("Failed to reorder events.");
+    //alert("Failed to reorder events.");
   }
 };
 

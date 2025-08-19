@@ -34,11 +34,11 @@ export function ShareCaseForm(): JSX.Element {
 
       // TODO: Integrate API call here
       
-      alert(`Case "${caseName}" shared successfully with ${form.recipientEmail}!`);
+      //alert(`Case "${caseName}" shared successfully with ${form.recipientEmail}!`);
       navigate('/dashboard');
     } catch (error) {
       console.error("Error sharing case:", error);
-      alert("Failed to share the case. Please try again.");
+      //alert("Failed to share the case. Please try again.");
     }
   };
 

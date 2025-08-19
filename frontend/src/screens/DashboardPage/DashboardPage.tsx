@@ -430,10 +430,10 @@ const handleSaveCase = async () => {
       )
     );
 
-    alert("Case updated successfully!");
+    //alert("Case updated successfully!");
   } catch (err) {
     console.error("Error updating case:", err);
-    alert("Failed to update case");
+   // alert("Failed to update case");
   }
 };
 
@@ -918,11 +918,11 @@ useEffect(() => {
                               if (res.ok) {
                                 setCaseCards(prev => prev.filter(c => c.id !== card.id));
                               } else {
-                                alert("Failed to archive the case.");
+                               // alert("Failed to archive the case.");
                               }
                             } catch (error) {
                               console.error("Archive error:", error);
-                              alert("An error occurred.");
+                              //alert("An error occurred.");
                             }
                           }}
                           className="text-muted-foreground hover:text-red-500 transition-colors"
