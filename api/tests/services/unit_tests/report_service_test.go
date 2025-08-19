@@ -36,7 +36,7 @@ import (
 /* ----------------------------- Mocks ----------------------------- */
 
 // MockRepo stubs the ReportRepository. Each method delegates to testify/mock.
-type MockRepo struct{ mock.Mock }
+//type MockRepo struct{ mock.Mock }
 
 func (m *MockRepo) SaveReport(ctx context.Context, r *report.Report) error {
 	args := m.Called(ctx, r)
