@@ -25,7 +25,7 @@ import {
   MoreVertical} from "lucide-react";
 import axios from "axios";
 import { Link, useSearchParams } from "react-router-dom";
-import { SidebarToggleButton } from '../../context/SidebarToggleContext';
+import { SidebarToggleButton, useSidebar } from '../../context/SidebarToggleContext';
 //import { string } from "prop-types";
 import { useParams } from "react-router-dom";
 import { fetchEvidenceByCaseId } from "./api";
@@ -193,105 +193,34 @@ const BASE_URL = "http://localhost:8080/api/v1";
     .join("")
     .toUpperCase();
 
-  // Enhanced sample data
-  // const files: FileItem[] = [
-  //   {
-  //     id: '1',
-  //     name: 'system_memory.dmp',
-  //     type: 'memory_dump',
-  //     size: '8.2 GB',
-  //     hash: 'SHA256: a1b2c3d4e5f6789abc...',
-  //     created: '2024-03-15T14:30:00Z',
-  //     description: 'Memory dump of workstation WS-0234 captured using FTK Imager following detection of unauthorized PowerShell activity',
-  //     status: 'verified',
-  //     chainOfCustody: ['Agent.Smith', 'Forensic.Analyst.1', 'Lead.Investigator'],
-  //     acquisitionDate: '2024-03-15T14:30:00Z',
-  //     acquisitionTool: 'FTK Imager v4.7.1',
-  //     integrityCheck: 'passed',
-  //     threadCount: 3,
-  //     priority: 'high'
-  //   },
-  //   {
-  //     id: '2',
-  //     name: 'malware_sample.exe',
-  //     type: 'executable',
-  //     size: '1.8 MB',
-  //     hash: 'MD5: x1y2z3a4b5c6def...',
-  //     created: '2024-03-14T09:15:00Z',
-  //     description: 'Suspected malware executable recovered from infected system',
-  //     status: 'pending',
-  //     chainOfCustody: ['Field.Agent.2'],
-  //     acquisitionDate: '2024-03-14T09:15:00Z',
-  //     acquisitionTool: 'Manual Collection',
-  //     integrityCheck: 'pending',
-  //     threadCount: 1,
-  //     priority: 'high'
-  //   },
-  //   {
-  //     id: '3',
-  //     name: 'network_capture.pcap',
-  //     type: 'network_capture',
-  //     size: '245 MB',
-  //     hash: 'SHA1: abc123def456...',
-  //     created: '2024-03-13T16:45:00Z',
-  //     description: 'Network traffic capture during incident timeframe',
-  //     status: 'verified',
-  //     chainOfCustody: ['Network.Analyst', 'Forensic.Analyst.1'],
-  //     acquisitionDate: '2024-03-13T16:45:00Z',
-  //     acquisitionTool: 'Wireshark v4.0.3',
-  //     integrityCheck: 'passed',
-  //     threadCount: 2,
-  //     priority: 'medium'
-  //   }
-  // ];
-
+const [role, setRole] = useState<string>(user?.role || "");
+const isDFIRAdmin = role === "DFIR Admin";
+//const {sidebarVisible, toggleSidebar} = useSidebar();
   
-
-  const initialAnnotationThreads: AnnotationThread[] = [
-    
-    {
-      id: '1',
-      title: 'Suspicious PowerShell activity detected',
-      user: 'Forensic.Analyst.1',
-      avatar: 'FA',
-      time: '2 hours ago',
-      messageCount: 5,
-      participantCount: 3,
-      isActive: true,
-      status: 'open',
-      priority: 'high',
-      tags: ['PowerShell', 'Malware', 'Initial Analysis'],
-      fileId: '1'
-    },
-    {
-      id: '2',
-      title: 'Memory strings analysis findings',
-      user: 'Senior.Analyst',
-      avatar: 'SA',
-      time: '4 hours ago',
-      messageCount: 8,
-      participantCount: 2,
-      status: 'pending_approval',
-      priority: 'medium',
-      tags: ['Memory Analysis', 'Strings', 'IOCs'],
-      fileId: '1'
-    },
-    {
-      id: '3',
-      title: 'Malware classification needed',
-      user: 'Malware.Specialist',
-      avatar: 'MS',
-      time: '6 hours ago',
-      messageCount: 3,
-      participantCount: 4,
-      status: 'open',
-      priority: 'high',
-      tags: ['Classification', 'Signature Analysis'],
-      fileId: '2'
+useEffect(() => {
+  if (!role) {
+    const token = sessionStorage.getItem("authToken");
+    if (token) {
+      try {
+        const [, payloadB64] = token.split(".");
+        const json = JSON.parse(
+          decodeURIComponent(
+            atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+              .split("")
+              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          )
+        );
+        if (json?.role) setRole(json.role);
+      } catch { /* ignore */ }
     }
-  ];
+  }
+}, [role]);
 
+
+    
 const { caseId } = useParams();
+
 const [searchParams] = useSearchParams();
 const evidenceIdFromQuery = searchParams.get("evidenceId");
 
@@ -792,8 +721,7 @@ if (!caseId || caseId === "undefined") {
   return (
     <div className="min-h-screen bg-background text-foreground flex">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-background border-r border-border p-4 flex flex-col justify-between z-10">
-        <div>
+      <aside className="fixed left-0 top-0 h-screen w-64 bg-background border-r border-border p-6 flex flex-col sidebar-toggle-target">        <div>
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-lg overflow-hidden">
@@ -855,17 +783,17 @@ if (!caseId || caseId === "undefined") {
         </div>
       </aside>
 
+      {/* Main Content */}
       <main className="ml-64 flex-grow bg-background flex">
         {/* Header */}
-        <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border-border p-4">
-          <div className="flex items-center justify-between">
+        <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border-border p-4 header-toggle-target">            <div className="flex items-center justify-between">
             {/* Case Number and Tabs */}
             <div className="flex items-center gap-4">
               <div className="bg-gray-600 text-white px-3 py-1 rounded text-sm font-medium">
                 No Case Selected
               </div>
               <div className="flex items-center gap-6">
-                <SidebarToggleButton/>
+                
                 <Link to="/dashboard">
                   <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                     Dashboard
@@ -1001,7 +929,7 @@ if (!caseId || caseId === "undefined") {
       </aside>
 
       {/* Main Content */}
-      <main className="ml-64 flex-grow bg-background flex">
+      <main className="ml-80 min-h-screen bg-background">
         
         {/* Header */}
         <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border-border p-4">
@@ -1133,7 +1061,7 @@ if (!caseId || caseId === "undefined") {
                 >
                   <div className="flex items-start gap-3">
                     <File className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 text-left">
+                    <div className="flex-1 min-w-0 text-left">
                       <div className="font-medium text-sm truncate mb-1">{file.filename}</div>
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`inline-flex items-center gap-1 text-xs ${getStatusColor(file.status || "pending")}`}>
