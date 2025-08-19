@@ -79,7 +79,7 @@ async function putReportStatus(reportId: string, status: "draft" | "review" | "p
   const token = sessionStorage.getItem("authToken");
   console.log("report id:",reportId)
   const res = await axios.put(
-    `${API_URL}/reports/${reportId}/status`,
+    `${API_URL}/reports/status/${reportId}`,
     { status },
     { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
   );
