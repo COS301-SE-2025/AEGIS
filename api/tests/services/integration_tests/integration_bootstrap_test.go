@@ -69,7 +69,8 @@ func buildRouter() *gin.Engine {
 
 	// NEW: mount case endpoints for tests
 	registerCaseTestEndpoints(r)
-	registerCaseAssignmentTestEndpoints(r)
+	registerCaseAssignmentTestEndpoints(r) // Case assign bootstrap
+	registerEvidenceTestEndpoints(r)       // Evidence Upload with metadata bootstrap
 
 	return r
 }
