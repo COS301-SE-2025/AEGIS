@@ -190,10 +190,19 @@ var (
 )
 
 func stubAuth() gin.HandlerFunc {
-	uid := FixedUserID.String()
-	tid := FixedTenantID.String()
-	gid := FixedTeamID.String()
 	return func(c *gin.Context) {
+		uid := c.GetHeader("X-Test-UserID")
+		tid := c.GetHeader("X-Test-TenantID")
+		gid := c.GetHeader("X-Test-TeamID")
+		if uid == "" {
+			uid = FixedUserID.String()
+		}
+		if tid == "" {
+			tid = FixedTenantID.String()
+		}
+		if gid == "" {
+			gid = FixedTeamID.String()
+		}
 		c.Set("userID", uid)
 		c.Set("tenantID", tid)
 		c.Set("teamID", gid)

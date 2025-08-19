@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	lac "aegis-api/services_/case/ListActiveCases"
 	case_creation "aegis-api/services_/case/case_creation"
 
 	"github.com/gin-gonic/gin"
@@ -131,4 +132,19 @@ func registerCaseTestEndpoints(r *gin.Engine) {
 			"created_at":          createdAt.Format(time.RFC3339),
 		})
 	})
+
+	r.GET("/cases/active", func(c *gin.Context) {
+		uid := c.GetString("userID")
+		tid := c.GetString("tenantID")
+		gid := c.GetString("teamID")
+
+		repo := lac.NewActiveCaseRepository(pgDB)
+		items, err := repo.GetActiveCasesByUserID(tcCtx, uid, tid, gid)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, items)
+	})
+
 }
