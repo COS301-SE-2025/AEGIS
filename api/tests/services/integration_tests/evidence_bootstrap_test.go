@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	metadata "aegis-api/services_/evidence/metadata"
@@ -18,7 +19,18 @@ import (
 )
 
 // ---- fake IPFS client for tests ----
-type fakeIPFS struct{}
+//type fakeIPFS struct{}
+
+func newFakeIPFS() *fakeIPFS { return &fakeIPFS{store: map[string][]byte{}} }
+
+// Shared fake IPFS with in-memory store
+type fakeIPFS struct {
+	mu    sync.Mutex
+	store map[string][]byte
+}
+
+// single shared instance for all endpoints
+var testIPFS *fakeIPFS
 
 func (f *fakeIPFS) UploadFile(r io.Reader) (string, error) {
 	// consume full stream to mimic real upload
@@ -31,7 +43,12 @@ func (f *fakeIPFS) UploadFile(r io.Reader) (string, error) {
 // Most IPFS client interfaces use (string) -> (io.ReadCloser, error).
 // If your interface returns io.Reader instead, just change the return type accordingly.
 func (f *fakeIPFS) Download(cid string) (io.ReadCloser, error) {
-	// Return an empty body (or some canned bytes) as a ReadCloser
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if b, ok := f.store[cid]; ok {
+		return io.NopCloser(bytes.NewReader(b)), nil
+	}
+	// if not found, still return something
 	return io.NopCloser(bytes.NewReader([]byte("fake-content"))), nil
 }
 

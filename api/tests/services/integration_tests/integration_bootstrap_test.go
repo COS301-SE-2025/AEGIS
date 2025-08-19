@@ -71,7 +71,7 @@ func buildRouter() *gin.Engine {
 	registerCaseTestEndpoints(r)
 	registerCaseAssignmentTestEndpoints(r) // Case assign bootstrap
 	registerEvidenceTestEndpoints(r)       // Evidence Upload with metadata bootstrap
-
+	registerEvidenceDownloadTestEndpoints(r)
 	return r
 }
 
