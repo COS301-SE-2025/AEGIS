@@ -740,7 +740,7 @@ const [userId] = useState(() => {
 const sendWebSocketMessage = async () => {
   if (!activeChat || !message.trim() || !userId || !userEmail) return;
 
-  // Always persist to database first
+  // persist to database first regardless
   try {
     const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
       method: 'POST',
@@ -786,7 +786,7 @@ const sendWebSocketMessage = async () => {
       [activeChat.id]: [...(prev[activeChat.id] || []), processedMessage]
     }));
 
-    // Then send via WebSocket for real-time delivery to others
+    // send via WebSocket for real-time delivery to others only AFTER persisting
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       const wsMessage: WebSocketMessage = {
         type: "new_message",
