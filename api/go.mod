@@ -4,7 +4,7 @@ go 1.24.3
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/gin-contrib/cors v1.7.6
+	github.com/gin-contrib/cors v1.7.4
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
@@ -14,14 +14,14 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/lib/pq v1.10.9
-	github.com/stretchr/testify v1.10.0
-	go.mongodb.org/mongo-driver v1.17.3
+	github.com/stretchr/testify v1.9.0
+	go.mongodb.org/mongo-driver v1.15.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.41.0
 	golang.org/x/net v0.43.0
-	gorm.io/driver/postgres v1.6.0
-	gorm.io/driver/sqlite v1.6.0
-	gorm.io/gorm v1.30.0
+	gorm.io/driver/postgres v1.5.7
+	gorm.io/driver/sqlite v1.5.7
+	gorm.io/gorm v1.25.9
 )
 
 require (
@@ -34,7 +34,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.9 // indirect
-	github.com/gin-contrib/sse v1.1.0 // indirect
+	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.26.0 // indirect

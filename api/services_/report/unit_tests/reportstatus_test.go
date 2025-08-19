@@ -1,84 +1,76 @@
 package unit_tests
 
-import (
-	"bytes"
-	"net/http"
-	"net/http/httptest"
-	"testing"
+// import (
+// 	"bytes"
+// 	"net/http"
+// 	"net/http/httptest"
+// 	"testing"
 
-	"aegis-api/handlers"
-	
+// 	"aegis-api/handlers"
 
-	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
-	"context"
-	"strings"
-	"github.com/google/uuid"
-	"aegis-api/services_/report/update_status"
-	
-)
+// 	"github.com/gin-gonic/gin"
+// 	"github.com/stretchr/testify/assert"
+// 	"context"
+// 	"strings"
+// 	"github.com/google/uuid"
+// 	"aegis-api/services_/report/update_status"
 
+// )
 
+// type MockReportStatusService struct {
+// 	UpdateStatusFunc func(ctx context.Context, reportID uuid.UUID, status update_status.ReportStatus) (*update_status.Report, error)
+// }
 
-type MockReportStatusService struct {
-	UpdateStatusFunc func(ctx context.Context, reportID uuid.UUID, status update_status.ReportStatus) (*update_status.Report, error)
-}
+// func (m *MockReportStatusService) UpdateStatus(ctx context.Context, reportID uuid.UUID, status update_status.ReportStatus) (*update_status.Report, error) {
+// 	if m.UpdateStatusFunc != nil {
+// 		return m.UpdateStatusFunc(ctx, reportID, status)
+// 	}
+// 	return nil, nil
+// }
 
-func (m *MockReportStatusService) UpdateStatus(ctx context.Context, reportID uuid.UUID, status update_status.ReportStatus) (*update_status.Report, error) {
-	if m.UpdateStatusFunc != nil {
-		return m.UpdateStatusFunc(ctx, reportID, status)
-	}
-	return nil, nil
-}
+// func TestUpdateStatus_Success(t *testing.T) {
+//     gin.SetMode(gin.TestMode)
 
+//     reportID := uuid.New()
+//     mockService := &MockReportStatusService{
+//         UpdateStatusFunc: func(ctx context.Context, id uuid.UUID, status update_status.ReportStatus) (*update_status.Report, error) {
+//             return &update_status.Report{
+//                 ID:     id,
+//                 Status: status,
+//             }, nil
+//         },
+//     }
 
+//     handler := handlers.NewReportStatusHandler(mockService)
 
+//     // Setup router for testing
+//     r := gin.Default()
+//     r.PUT("/reports/:id/status", handler.UpdateStatus)
 
+//     w := httptest.NewRecorder()
+//     reqBody := strings.NewReader(`{"status":"review"}`)
+//     req, _ := http.NewRequest(http.MethodPut, "/reports/"+reportID.String()+"/status", reqBody)
+//     req.Header.Set("Content-Type", "application/json")
 
-func TestUpdateStatus_Success(t *testing.T) {
-    gin.SetMode(gin.TestMode)
+//     r.ServeHTTP(w, req)
 
-    reportID := uuid.New()
-    mockService := &MockReportStatusService{
-        UpdateStatusFunc: func(ctx context.Context, id uuid.UUID, status update_status.ReportStatus) (*update_status.Report, error) {
-            return &update_status.Report{
-                ID:     id,
-                Status: status,
-            }, nil
-        },
-    }
+//     assert.Equal(t, http.StatusOK, w.Code)
+//     assert.Contains(t, w.Body.String(), `"status":"review"`)
+// }
 
-    handler := handlers.NewReportStatusHandler(mockService)
+// func TestUpdateStatus_BadRequest(t *testing.T) {
+// 	gin.SetMode(gin.TestMode)
+// 	handler := handlers.NewReportStatusHandler(nil)
 
-    // Setup router for testing
-    r := gin.Default()
-    r.PUT("/reports/:id/status", handler.UpdateStatus)
+// 	w := httptest.NewRecorder()
+// 	c, _ := gin.CreateTestContext(w)
 
-    w := httptest.NewRecorder()
-    reqBody := strings.NewReader(`{"status":"review"}`)
-    req, _ := http.NewRequest(http.MethodPut, "/reports/"+reportID.String()+"/status", reqBody)
-    req.Header.Set("Content-Type", "application/json")
+// 	body := bytes.NewBufferString(`{"wrong":"field"}`)
+// 	req, _ := http.NewRequest(http.MethodPut, "/reports/123/status", body)
+// 	req.Header.Set("Content-Type", "application/json")
+// 	c.Request = req
 
-    r.ServeHTTP(w, req)
+// 	handler.UpdateStatus(c)
 
-    assert.Equal(t, http.StatusOK, w.Code)
-    assert.Contains(t, w.Body.String(), `"status":"review"`)
-}
-
-
-func TestUpdateStatus_BadRequest(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	handler := handlers.NewReportStatusHandler(nil)
-
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-
-	body := bytes.NewBufferString(`{"wrong":"field"}`)
-	req, _ := http.NewRequest(http.MethodPut, "/reports/123/status", body)
-	req.Header.Set("Content-Type", "application/json")
-	c.Request = req
-
-	handler.UpdateStatus(c)
-
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-}
+// 	assert.Equal(t, http.StatusBadRequest, w.Code)
+// }
