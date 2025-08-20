@@ -6,6 +6,7 @@ import (
 
 type CaseQueryRepository interface {
 	QueryCases(filter CaseFilter) ([]Case, error)
-	GetAllCases() ([]case_creation.Case, error)
-	GetCasesByUser(userID string) ([]case_creation.Case, error)
+	GetAllCases(tenantID string) ([]case_creation.Case, error)
+	GetCasesByUser(userID string, tenantID string) ([]case_creation.Case, error)
+	GetCaseByID(caseID string, tenantID string) (*case_creation.Case, error)
 }

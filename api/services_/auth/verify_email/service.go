@@ -16,8 +16,8 @@ func VerifyEmail(db *gorm.DB, rawToken string) error {
 	err = db.Model(&User{}).
 		Where("id = ?", token.UserID).
 		Updates(map[string]interface{}{
-			"Isverified":      true,
-			"EmailVerifiedAt": time.Now(),
+			"is_verified":       true,
+			"email_verified_at": time.Now(),
 		}).Error
 	if err != nil {
 		return errors.New("failed to update user verification")

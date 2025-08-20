@@ -2,33 +2,80 @@ package evidence_tag
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
-	"aegis-api/repositories"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-type EvidenceTagService interface {
-	TagEvidence(ctx context.Context, userID, evidenceID uuid.UUID, tags []string) error
-	UntagEvidence(ctx context.Context, userID, evidenceID uuid.UUID, tags []string) error
-	GetEvidenceTags(ctx context.Context, evidenceID uuid.UUID) ([]string, error)
+type EvidenceTagRepository interface {
+	AddTagsToEvidence(ctx context.Context, userID, evidenceID uuid.UUID, tags []string) error
+	RemoveTagsFromEvidence(ctx context.Context, userID, evidenceID uuid.UUID, tags []string) error
+	GetTagsForEvidence(ctx context.Context, evidenceID uuid.UUID) ([]string, error)
 }
 
-type evidenceTagService struct {
-	repo repositories.EvidenceTagRepository
+type evidenceTagRepository struct {
+	db *gorm.DB
 }
 
-func NewEvidenceTagService(repo repositories.EvidenceTagRepository) EvidenceTagService {
-	return &evidenceTagService{repo: repo}
+func NewEvidenceTagRepository(db *gorm.DB) EvidenceTagRepository {
+	return &evidenceTagRepository{db: db}
 }
 
-func (s *evidenceTagService) TagEvidence(ctx context.Context, userID, evidenceID uuid.UUID, tags []string) error {
-	return s.repo.AddTagsToEvidence(ctx, userID, evidenceID, tags)
+func (r *evidenceTagRepository) AddTagsToEvidence(ctx context.Context, userID, evidenceID uuid.UUID, tags []string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, tagName := range tags {
+			normalized := strings.TrimSpace(strings.ToLower(tagName))
+			var tag Tag
+			if err := tx.Where("name = ?", normalized).First(&tag).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					tag = Tag{Name: normalized}
+					if err := tx.Create(&tag).Error; err != nil {
+						return err
+					}
+				} else {
+					return err
+				}
+			}
+
+			evidenceTag := EvidenceTag{
+				EvidenceID: evidenceID,
+				TagID:      tag.ID,
+			}
+			if err := tx.Clauses(
+				clause.OnConflict{DoNothing: true}, // ✅ correct syntax
+			).Create(&evidenceTag).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
-func (s *evidenceTagService) UntagEvidence(ctx context.Context, userID, evidenceID uuid.UUID, tags []string) error {
-	return s.repo.RemoveTagsFromEvidence(ctx, userID, evidenceID, tags)
+func (r *evidenceTagRepository) RemoveTagsFromEvidence(ctx context.Context, userID, evidenceID uuid.UUID, tags []string) error {
+	for _, tagName := range tags {
+		normalized := strings.TrimSpace(strings.ToLower(tagName))
+		var tag Tag
+		if err := r.db.WithContext(ctx).Where("name = ?", normalized).First(&tag).Error; err != nil {
+			continue // silently skip if tag doesn't exist
+		}
+		err := r.db.Where("evidence_id = ? AND tag_id = ?", evidenceID.String(), tag.ID).
+			Delete(&EvidenceTag{}).Error
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (s *evidenceTagService) GetEvidenceTags(ctx context.Context, evidenceID uuid.UUID) ([]string, error) {
-	return s.repo.GetTagsForEvidence(ctx, evidenceID)
+func (r *evidenceTagRepository) GetTagsForEvidence(ctx context.Context, evidenceID uuid.UUID) ([]string, error) {
+	var tags []string
+	err := r.db.WithContext(ctx).
+		Table("tags").
+		Select("tags.name").
+		Joins("JOIN evidence_tags ON tags.id = evidence_tags.tag_id").
+		Where("evidence_tags.evidence_id = ?", evidenceID).
+		Scan(&tags).Error
+	return tags, err
 }

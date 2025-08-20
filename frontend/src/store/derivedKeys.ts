@@ -2,8 +2,8 @@ import { create } from 'zustand';
 
 interface SharedKeyStore {
   keys: Record<string, Uint8Array>; // key: userId, value: derived shared key
-  setSharedKey: (userId: string, key: Uint8Array) => void;
-  getSharedKey: (userId: string) => Uint8Array | undefined;
+  setSharedKey: (_: string, _unused: Uint8Array) => void;
+  getSharedKey: (_: string) => Uint8Array | undefined;
   clearAllKeys: () => void;
 }
 

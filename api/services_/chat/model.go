@@ -20,15 +20,21 @@ type ChatGroup struct {
 	IsActive    bool               `bson:"is_active" json:"is_active"`
 	LastMessage *LastMessage       `bson:"last_message,omitempty" json:"last_message,omitempty"`
 	Settings    *GroupSettings     `bson:"settings,omitempty" json:"settings,omitempty"`
+	CaseID      string             `bson:"case_id" json:"case_id"`
+	GroupURL    string             `bson:"group_url,omitempty" json:"group_url,omitempty"`
 }
 
 // Member represents a group member
 type Member struct {
+	UserID      string    `bson:"user_id" json:"user_id"` // ✅ Add for notifications
 	UserEmail   string    `bson:"user_email" json:"user_email"`
 	Role        string    `bson:"role" json:"role"` // "admin", "member"
 	JoinedAt    time.Time `bson:"joined_at" json:"joined_at"`
 	IsActive    bool      `bson:"is_active" json:"is_active"`
 	Permissions []string  `bson:"permissions,omitempty" json:"permissions,omitempty"`
+
+	TenantID string `bson:"tenant_id,omitempty" json:"tenant_id,omitempty"` // ✅ Add for multi-tenancy
+	TeamID   string `bson:"team_id,omitempty" json:"team_id,omitempty"`     // ✅ Add for multi-tenancy
 }
 
 // GroupSettings represents group configuration
@@ -49,10 +55,19 @@ type LastMessage struct {
 	Timestamp   time.Time          `bson:"timestamp" json:"timestamp"`
 	MessageType string             `bson:"message_type" json:"message_type"`
 }
+type NewMessagePayload struct {
+	MessageID   string        `json:"messageId"`
+	Text        string        `json:"text"`
+	SenderID    string        `json:"senderId"`
+	SenderName  string        `json:"senderName"`
+	GroupID     string        `json:"groupId"`
+	Timestamp   string        `json:"timestamp"`
+	Attachments []*Attachment `json:"attachments,omitempty"`
+}
 
 // Message represents a chat message
 type Message struct {
-	ID            primitive.ObjectID     `bson:"_id,omitempty" json:"id"`
+	ID            string                 `bson:"_id,omitempty" json:"id"`
 	GroupID       primitive.ObjectID     `bson:"group_id" json:"group_id"`
 	SenderEmail   string                 `bson:"sender_email" json:"sender_email"`
 	SenderName    string                 `bson:"sender_name" json:"sender_name"`
@@ -117,24 +132,32 @@ type User struct {
 type EventType string
 
 const (
-	EventNewMessage   EventType = "new_message"
-	EventMessageRead  EventType = "message_read"
-	EventUserJoined   EventType = "user_joined"
-	EventUserLeft     EventType = "user_left"
-	EventGroupUpdated EventType = "group_updated"
-	EventGroupDeleted EventType = "group_deleted"
-	EventTypingStart  EventType = "typing_start"
-	EventTypingStop   EventType = "typing_stop"
-	EventUserOnline   EventType = "user_online"
-	EventUserOffline  EventType = "user_offline"
+	EventNewMessage           EventType = "new_message"
+	EventMessageRead          EventType = "message_read"
+	EventUserJoined           EventType = "user_joined"
+	EventUserLeft             EventType = "user_left"
+	EventGroupUpdated         EventType = "group_updated"
+	EventGroupDeleted         EventType = "group_deleted"
+	EventTypingStart          EventType = "typing_start"
+	EventTypingStop           EventType = "typing_stop"
+	EventUserOnline           EventType = "user_online"
+	EventUserOffline          EventType = "user_offline"
+	EventNotification         EventType = "notification"
+	EventMarkNotificationRead EventType = "mark_notification_read"
+	EventArchiveNotification  EventType = "archive_notification"
+	EventDeleteNotification   EventType = "delete_notification"
 )
+
+type MarkReadPayload struct {
+	NotificationIDs []string `json:"notificationIds"`
+}
 
 // WebSocketEvent represents a real-time event
 type WebSocketEvent struct {
 	Type      EventType   `json:"type"`
 	GroupID   string      `json:"group_id,omitempty"`
-	Data      interface{} `json:"data"`
-	Timestamp int64       `json:"timestamp"`
+	Payload   interface{} `json:"payload"`
+	Timestamp time.Time   `json:"timestamp"`
 	UserEmail string      `json:"user_email,omitempty"`
 }
 

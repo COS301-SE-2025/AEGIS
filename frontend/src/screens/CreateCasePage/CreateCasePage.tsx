@@ -11,9 +11,14 @@ import {
 } from "../../components/ui/select";
 import { ShieldAlert } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
+import axios from "axios";
+import { jwtDecode } from "jwt-decode";
+
 
 export function CreateCaseForm(): JSX.Element {
   const navigate = useNavigate();
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+
 
   const [form, setForm] = useState({
     creator: "",
@@ -21,52 +26,80 @@ export function CreateCaseForm(): JSX.Element {
     priority: "",
     attackType: "",
     description: "",
+    creatorId: "", // from session storage
+    tenantId: "", // from session storage
+    
   });
 
-  type CreateCaseFormField = keyof typeof form;
-
-  // Load saved form data on component mount
-  useEffect(() => {
-    const savedFormData = localStorage.getItem("tempCreateCaseForm");
-    if (savedFormData) {
-      try {
-        const parsedData = JSON.parse(savedFormData);
-        setForm(parsedData);
-      } catch (error) {
-        console.error("Error loading saved form data:", error);
-      }
-    }
-  }, []);
-
-  // Save form data to localStorage whenever form changes
-  useEffect(() => {
-    localStorage.setItem("tempCreateCaseForm", JSON.stringify(form));
-  }, [form]);
-
-  // Clear saved form data (call this after successful case creation)
-  const clearSavedFormData = () => {
-    localStorage.removeItem("tempCreateCaseForm");
+    type CreateCaseFormField = keyof typeof form;
+    type DecodedToken = {
+    user_id: string;
+    tenant_id: string;
+    team_id: string;
+    team_name: string;
+    full_name: string;
+    role: string;
+    exp: number;
+    email: string;
   };
 
-  // Mock activity logging function
-  const logActivity = (caseId: string, action: string, details: any = {}) => {
-    const activities = JSON.parse(localStorage.getItem("caseActivities") || "[]");
-    
-    const newActivity = {
-      id: `activity-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      caseId,
-      action,
-      details,
-      timestamp: new Date().toISOString(),
-      user: form.creator || "Unknown User",
-      userRole: "Case Creator"
-    };
+  useEffect(() => {
+  const savedFormData = localStorage.getItem("tempCreateCaseForm");
+  if (savedFormData) {
+    try {
+      setForm(JSON.parse(savedFormData));
+    } catch (error) {
+      console.error("Error loading saved form data:", error);
+    }
+  }
 
-    activities.push(newActivity);
-    localStorage.setItem("caseActivities", JSON.stringify(activities));
-    
-    // Optional: Console log for debugging
-    console.log("Activity logged:", newActivity);
+  const userStr = sessionStorage.getItem("user");
+  const token = sessionStorage.getItem("authToken");
+
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      setForm(prev => ({ ...prev, creatorId: user.id }));
+    } catch (err) {
+      console.error("Failed to parse user:", err);
+    }
+  }
+
+  if (token) {
+    try {
+      const decoded = jwtDecode<DecodedToken>(token);
+      setForm(prev => ({
+      ...prev,
+      tenantId: decoded.tenant_id,
+      team: decoded.team_name, 
+    }));
+    } catch (err) {
+      console.error("Failed to decode token:", err);
+    }
+  }
+}, []);
+
+  useEffect(() => {
+  const token = sessionStorage.getItem("authToken");
+  if (!token) return;
+
+  const decoded = jwtDecode<DecodedToken>(token);
+  setForm(prev => ({ ...prev, tenantId: decoded.tenant_id }));
+
+  // Use team_id here, NOT tenant_id
+axios.get<{ id: string; name: string }>(`http://localhost:8080/api/v1/teams/${decoded.team_id}`)
+  .then((res) => {
+    setTeams([res.data]);  // wrap in array so you can map safely
+  })
+  .catch(err => {
+    console.error("Failed to load teams:", err);
+  });
+
+}, []);
+
+
+  const clearSavedFormData = () => {
+    localStorage.removeItem("tempCreateCaseForm");
   };
 
   const handleChange =
@@ -75,46 +108,63 @@ export function CreateCaseForm(): JSX.Element {
       setForm({ ...form, [field]: e.target.value });
     };
 
-const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
 
-  const stored = localStorage.getItem("cases");
-  const cases = stored ? JSON.parse(stored) : [];
+    if (!form.creatorId) {
+      //alert("Cannot create case: user ID not found in session. Please log in again.");
+      return;
+    }
 
-  const newId = cases.length > 0 ? Math.max(...cases.map((c: any) => c.id || 0)) + 1 : 1;
+const user = JSON.parse(sessionStorage.getItem("user") || "{}");
+console.log("User from session:", user);
 
-  const now = new Date().toISOString();
-
-const newCase = {
-  id: newId,
-  ...form,
-  lastActivity: now.split("T")[0],
-  createdAt: now,
-  updatedAt: now,
-  progress: 0,
-  image:
-    "https://th.bing.com/th/id/OIP.kq_Qib5c_49zZENmpMnuLQHaDt?w=331&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
+const payload = {
+  title: form.attackType,
+  description: form.description,
+  status: "open",
+  priority: form.priority || "low",
+  investigation_stage: "Triage",
+  created_by: user.id,
+  team_name: form.team,
+  tenant_id: form.tenantId, // 🛠️ ADD THIS LINE
 };
 
-  cases.push(newCase);
-  localStorage.setItem("cases", JSON.stringify(cases));
-  localStorage.setItem("currentCaseId", String(newCase.id)); //  Save this for future use
+    console.log("Submitting payload:", payload);
+   const token = sessionStorage.getItem("authToken");
+   console.log("Token:", token);
+   if (token) {
+  const base64Payload = token.split('.')[1];
+  const decoded = JSON.parse(atob(base64Payload));
+  console.log("Decoded token payload:", decoded);
+}
 
-  logActivity(String(newId), "Case Created", {
-    priority: form.priority,
-    attackType: form.attackType,
-    team: form.team,
-    description: form.description.substring(0, 100) + "..."
-  });
-
-  clearSavedFormData();
-
-  // ✅ Show a confirmation and redirect to action selection
-  alert("Case created successfully!");
-  navigate(`/case/${newCase.id}/next-steps`);
-};
+    try {
+      const response = await axios.post(
+  "http://localhost:8080/api/v1/cases",
+  payload,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  }
+);
 
 
+      if (response.status === 201) {
+        //alert("Case created successfully!");
+        clearSavedFormData();
+        const data = response.data as { case: { ID: string } };
+        navigate(`/case/${data.case.ID}/next-steps`);
+        // Save the case ID to localStorage so upload can find it
+      localStorage.setItem("currentCase", JSON.stringify(data.case));
+
+      }
+    } catch (error: any) {
+      console.error("Error creating case:", error.response?.data || error);
+      //alert("Failed to create case. Please check console for details.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
@@ -124,31 +174,24 @@ const newCase = {
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Creator */}
-          <div>
-            <label className="block mb-1 text-sm">Name of Person Creating the Case</label>
-            <Input
-              className="bg-muted border-border text-foreground placeholder-muted-foreground"
-              placeholder="e.g. Alice Johnson"
-              value={form.creator}
-              onChange={handleChange("creator")}
-              required
-            />
-          </div>
+    
+      <div>
+        <label className="block mb-1 text-sm">Team Name</label>
+        <select
+          className="w-full p-2 border rounded bg-muted text-foreground"
+          value={form.team}
+          onChange={(e) => setForm({ ...form, team: e.target.value })}
+          required
+        >
+          <option value="">Select a team</option>
+          {teams.map((team) => (
+            <option key={team.id} value={team.name}>
+              {team.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
-          {/* Team */}
-          <div>
-            <label className="block mb-1 text-sm">Team Name</label>
-            <Input
-              className="bg-muted border-border text-foreground placeholder-muted-foreground"
-              placeholder="e.g. AEGIS Forensics"
-              value={form.team}
-              onChange={handleChange("team")}
-              required
-            />
-          </div>
-
-          {/* Priority */}
           <div>
             <label className="block mb-1 text-sm">Case Priority</label>
             <Select onValueChange={(value: string) => setForm({ ...form, priority: value })}>
@@ -157,7 +200,7 @@ const newCase = {
               </SelectTrigger>
               <SelectContent className="bg-zinc-800 text-popover-foreground">
                 <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="mid">Mid</SelectItem>
+                <SelectItem value="medium">Mid</SelectItem>
                 <SelectItem value="high">High</SelectItem>
                 <SelectItem value="critical">Critical</SelectItem>
                 <SelectItem value="time-sensitive">Time Sensitive</SelectItem>
@@ -165,7 +208,6 @@ const newCase = {
             </Select>
           </div>
 
-          {/* Attack Type */}
           <div>
             <label className="block mb-1 text-sm">Type of Attack</label>
             <Input
@@ -173,10 +215,10 @@ const newCase = {
               placeholder="e.g. Ransomware, Malware, Phishing"
               value={form.attackType}
               onChange={handleChange("attackType")}
+              required
             />
           </div>
 
-          {/* Description */}
           <div>
             <label className="block mb-1 text-sm">Short Description</label>
             <Textarea
@@ -187,7 +229,16 @@ const newCase = {
               rows={4}
             />
           </div>
-
+          <div className="flex justify-between items-center pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(-1)}
+              className="border-muted-foreground text-muted-foreground hover:bg-muted"
+            >
+              Cancel
+            </Button>
+          
           
           <Button
             type="submit"
@@ -195,6 +246,7 @@ const newCase = {
           >
             Create Case
           </Button>
+          </div>
         </form>
       </div>
     </div>

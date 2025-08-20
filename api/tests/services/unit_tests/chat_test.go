@@ -141,10 +141,11 @@ func (m *MockChatRepository) IsUserInGroup(ctx context.Context, groupID primitiv
 	args := m.Called(ctx, groupID, userEmail)
 	return args.Bool(0), args.Error(1)
 }
-func (m *MockChatRepository) GetUndeliveredMessages(ctx context.Context, groupID string, limit int, before *primitive.ObjectID) ([]*chat.Message, error) {
-	args := m.Called(ctx, groupID, limit, before)
-	return args.Get(0).([]*chat.Message), args.Error(1)
-}
+
+// func (m *MockChatRepository) GetUndeliveredMessages(ctx context.Context, groupID string, limit int, before *primitive.ObjectID) ([]*chat.Message, error) {
+// 	args := m.Called(ctx, groupID, limit, before)
+// 	return args.Get(0).([]*chat.Message), args.Error(1)
+// }
 
 type MockIPFSUploader struct {
 	mock.Mock
@@ -264,7 +265,7 @@ func TestAddMemberToGroup_DBError(t *testing.T) {
 func TestCreateMessage_Success(t *testing.T) {
 	repo := new(MockChatRepository)
 	msg := &chat.Message{
-		ID:      primitive.NewObjectID(),
+		ID:      primitive.NewObjectID().Hex(),
 		Content: "Hello",
 	}
 
@@ -277,7 +278,7 @@ func TestCreateMessage_Success(t *testing.T) {
 func TestCreateMessage_DBError(t *testing.T) {
 	repo := new(MockChatRepository)
 	msg := &chat.Message{
-		ID:      primitive.NewObjectID(),
+		ID:      primitive.NewObjectID().Hex(),
 		Content: "Hello",
 	}
 
@@ -419,7 +420,7 @@ func TestAddMemberToGroup_DuplicateMember(t *testing.T) {
 func TestCreateMessage_EmptyContent(t *testing.T) {
 	repo := new(MockChatRepository)
 	msg := &chat.Message{
-		ID:      primitive.NewObjectID(),
+		ID:      primitive.NewObjectID().Hex(),
 		Content: "",
 	}
 
@@ -436,9 +437,9 @@ func TestIsUserInGroup_NilContext(t *testing.T) {
 	email := "user@example.com"
 
 	// Simulate nil context (should not panic, but context.Context cannot be nil in practice)
-	repo.On("IsUserInGroup", nil, groupID, email).Return(false, errors.New("nil context"))
+	repo.On("IsUserInGroup", mock.Anything, groupID, email).Return(false, errors.New("nil context"))
 
-	ok, err := repo.IsUserInGroup(nil, groupID, email)
+	ok, err := repo.IsUserInGroup(context.TODO(), groupID, email)
 	assert.Error(t, err)
 	assert.False(t, ok)
 	assert.EqualError(t, err, "nil context")

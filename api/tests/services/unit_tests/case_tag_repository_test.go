@@ -11,7 +11,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"aegis-api/repositories"
+	"aegis-api/services_/case/case_tags"
 )
 
 func setupTestDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, func()) {
@@ -32,7 +32,7 @@ func TestAddTagsToCase(t *testing.T) {
 	db, mock, closeFn := setupTestDB(t)
 	defer closeFn()
 
-	repo := repositories.NewCaseTagRepository(db)
+	repo := case_tags.NewCaseTagRepository(db)
 
 	caseID := uuid.New()
 	userID := uuid.New()
@@ -54,12 +54,10 @@ func TestAddTagsToCase(t *testing.T) {
 		WithArgs(tagName).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1)) // tag ID = 1
 
-	// Insert into case_tags
+		// Insert into case_tags
 	mock.ExpectExec(regexp.QuoteMeta(
 		`INSERT INTO "case_tags" ("case_id","tag_id") VALUES ($1,$2) ON CONFLICT DO NOTHING`,
-	)).
-		WithArgs(caseID, 1).
-		WillReturnResult(sqlmock.NewResult(1, 1))
+	)).WithArgs(caseID, 1).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	mock.ExpectCommit()
 

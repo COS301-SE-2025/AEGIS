@@ -1,10 +1,18 @@
-name: Go Unit Tests
+name: test
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
 
 jobs:
-  test:
+  test-backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ./api
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -12,10 +20,50 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.21
+          go-version: "1.24.3"
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('api/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Install dependencies
         run: go mod download
 
-      - name: Run unit tests
-        run: go test ./tests/services/Unit_tests/... -v -cover
+      # Use runtime coverage so we can merge results from multiple go test runs
+      - name: Prepare coverage dir
+        run: echo "COVER_DIR=$(mktemp -d)" >> $GITHUB_ENV
+
+      - name: Run unit tests (with coverage)
+        run: |
+          go test -v ./tests/services/unit_tests/... \
+            -cover -covermode=atomic -coverpkg=./... \
+            -test.gocoverdir="$COVER_DIR"
+
+      # Integration tests spin Postgres/Mongo with testcontainers-go (Docker is available on GH runners)
+      - name: Run integration tests (with coverage)
+        env:
+          # keep Ryuk enabled; testcontainers works fine on GH runners
+          TESTCONTAINERS_RYUK_DISABLED: "false"
+        run: |
+          go test -v -count=1 ./tests/services/integration_tests \
+            -cover -covermode=atomic -coverpkg=./... \
+            -test.gocoverdir="$COVER_DIR"
+
+      - name: Generate combined coverage
+        run: |
+          go tool covdata textfmt -i="$COVER_DIR" -o=coverage.out
+          go tool cover -func=coverage.out | tee coverage-summary.txt
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            api/coverage.out
+            api/coverage-summary.txt

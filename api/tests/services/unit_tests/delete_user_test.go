@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"aegis-api/services/delete_user"
+	"aegis-api/services_/admin/delete_user"
 )
 
 // Mock repository

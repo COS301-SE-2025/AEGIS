@@ -28,18 +28,18 @@ func GetValidToken(db *gorm.DB, rawToken string) (*Token, error) {
 	if token.ExpiresAt != nil && time.Now().After(*token.ExpiresAt) {
 		return nil, errors.New("token expired")
 	}
-	if token.MaxUses != nil && token.Uses >= *token.MaxUses {
-		return nil, errors.New("token usage limit reached")
-	}
+	// if token.MaxUses != nil && token.Uses >= *token.MaxUses {
+	// 	return nil, errors.New("token usage limit reached")
+	// }
 	return &token, nil
 }
 
 func IncrementTokenUse(db *gorm.DB, token *Token) error {
-	update := db.Model(token).Update("uses", gorm.Expr("uses + 1"))
-	if token.MaxUses != nil && *token.MaxUses == 1 {
-		update = update.Update("used", true)
-	}
-	return update.Error
+	//update := db.Model(token).Update("uses", gorm.Expr("uses + 1"))
+	// if token.MaxUses != nil && *token.MaxUses == 1 {
+	// 	update = update.Update("used", true)
+	// }
+	return nil
 }
 
 func CreateEmailVerificationToken(db *gorm.DB, userID uuid.UUID) (string, error) {
@@ -50,8 +50,8 @@ func CreateEmailVerificationToken(db *gorm.DB, userID uuid.UUID) (string, error)
 		Type:      "EMAIL_VERIFY",
 		Used:      false,
 		CreatedAt: time.Now(),
-		// ExpiresAt: nil, for never expiring tokens (for registration)
-		MaxUses: ptrInt(1),
+		ExpiresAt: nil, // for never expiring tokens (for registration)
+		//MaxUses: ptrInt(1),
 	}
 	if err := db.Create(&entry).Error; err != nil {
 		return "", err

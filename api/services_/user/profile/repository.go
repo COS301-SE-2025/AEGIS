@@ -1,8 +1,6 @@
 package profile
 
 import (
-	"aegis-api/db"
-
 	"gorm.io/gorm"
 )
 
@@ -12,8 +10,8 @@ type GormProfileRepository struct {
 }
 
 // NewGormProfileRepository creates and returns a new repository instance.
-func NewGormProfileRepository() *GormProfileRepository {
-	return &GormProfileRepository{}
+func NewGormProfileRepository(db *gorm.DB) *GormProfileRepository {
+	return &GormProfileRepository{db: db}
 }
 
 // GetProfileByID retrieves the user's profile by their UUID.
@@ -31,7 +29,7 @@ func (r *GormProfileRepository) GetProfileByID(userID string) (*UserProfile, err
 // UpdateProfile updates the full_name, email, and profile_picture_url of the user.
 // The ID field is used to identify which user to update.
 func (r *GormProfileRepository) UpdateProfile(data *UpdateProfileRequest) error {
-	return db.DB.Exec(`
+	return r.db.Exec(`
 		UPDATE users
 		SET full_name = ?, email = ?, profile_picture_url = ?
 		WHERE id = ?

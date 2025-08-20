@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -19,16 +20,32 @@ const (
 
 type MongoRepository struct {
 	db *mongo.Database
+	//notifier events.GroupNotifier // Optional notifier
 }
 
 // NewChatRepository creates a new MongoDB chat repository
-func NewChatRepository(db *mongo.Database) ChatRepository {
+func NewChatRepository(db *mongo.Database) *MongoRepository {
 	repo := &MongoRepository{db: db}
-
-	// Create indexes
 	repo.createIndexes()
-
 	return repo
+}
+
+func (r *MongoRepository) UpdateGroupImage(ctx context.Context, groupID primitive.ObjectID, imageURL string) error {
+	collection := r.db.Collection(GroupsCollection)
+	filter := bson.M{"_id": groupID}
+	update := bson.M{
+		"$set": bson.M{
+			"group_url":  imageURL,
+			"updated_at": time.Now(),
+		},
+	}
+
+	_, err := collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to update group image: %w", err)
+	}
+
+	return nil
 }
 
 // createIndexes creates necessary MongoDB indexes
@@ -69,6 +86,10 @@ func (r *MongoRepository) createIndexes() {
 
 // Group operations
 func (r *MongoRepository) CreateGroup(ctx context.Context, group *ChatGroup) error {
+	if group.CaseID == "" {
+		return errors.New("case_id is required to create a group")
+	}
+
 	collection := r.db.Collection(GroupsCollection)
 
 	group.CreatedAt = time.Now()
@@ -106,10 +127,20 @@ func (r *MongoRepository) GetGroupByID(ctx context.Context, groupID primitive.Ob
 func (r *MongoRepository) GetUserGroups(ctx context.Context, userEmail string) ([]*ChatGroup, error) {
 	collection := r.db.Collection(GroupsCollection)
 
+	// Include groups where user is either a member or the creator
 	filter := bson.M{
-		"members.user_email": userEmail,
-		"members.is_active":  true,
-		"is_active":          true,
+		"$and": []bson.M{
+			{"is_active": true},
+			{"$or": []bson.M{
+				{"members": bson.M{
+					"$elemMatch": bson.M{
+						"user_email": userEmail,
+						"is_active":  true,
+					},
+				}},
+				{"created_by": userEmail},
+			}},
+		},
 	}
 
 	opts := options.Find().SetSort(bson.D{{Key: "updated_at", Value: -1}})
@@ -147,6 +178,31 @@ func (r *MongoRepository) UpdateGroup(ctx context.Context, group *ChatGroup) err
 	return nil
 }
 
+func (r *MongoRepository) GetGroupsByCaseID(ctx context.Context, caseID primitive.ObjectID) ([]*ChatGroup, error) {
+	collection := r.db.Collection(GroupsCollection)
+
+	filter := bson.M{
+		"case_id":   caseID,
+		"is_active": true,
+	}
+
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get groups for case: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var groups []*ChatGroup
+	for cursor.Next(ctx) {
+		var group ChatGroup
+		if err := cursor.Decode(&group); err == nil {
+			groups = append(groups, &group)
+		}
+	}
+
+	return groups, nil
+}
+
 func (r *MongoRepository) DeleteGroup(ctx context.Context, groupID primitive.ObjectID) error {
 	collection := r.db.Collection(GroupsCollection)
 
@@ -165,9 +221,18 @@ func (r *MongoRepository) DeleteGroup(ctx context.Context, groupID primitive.Obj
 
 	return nil
 }
-
 func (r *MongoRepository) AddMemberToGroup(ctx context.Context, groupID primitive.ObjectID, member *Member) error {
 	collection := r.db.Collection(GroupsCollection)
+
+	existing := collection.FindOne(ctx, bson.M{
+		"_id":                groupID,
+		"members.user_email": member.UserEmail,
+	})
+	if existing.Err() == nil {
+		return fmt.Errorf("user already a member of this group")
+	} else if existing.Err() != mongo.ErrNoDocuments {
+		return existing.Err()
+	}
 
 	member.JoinedAt = time.Now()
 	member.IsActive = true
@@ -182,6 +247,11 @@ func (r *MongoRepository) AddMemberToGroup(ctx context.Context, groupID primitiv
 	if err != nil {
 		return fmt.Errorf("failed to add member to group: %w", err)
 	}
+
+	// // ✅ Trigger notification without direct websocket dependency
+	// if r.notifier != nil {
+	// 	_ = r.notifier.NotifyMemberAdded(groupID.Hex(), member.UserEmail)
+	// }
 
 	return nil
 }
@@ -259,7 +329,11 @@ func (r *MongoRepository) CreateMessage(ctx context.Context, message *Message) e
 		return fmt.Errorf("failed to create message: %w", err)
 	}
 
-	message.ID = result.InsertedID.(primitive.ObjectID)
+	oid, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
+		return fmt.Errorf("failed to convert inserted ID to ObjectID")
+	}
+	message.ID = oid.Hex()
 	return nil
 }
 
@@ -521,7 +595,7 @@ func (r *MongoRepository) IsGroupAdmin(ctx context.Context, groupID primitive.Ob
 	return count > 0, nil
 }
 
-//mark messages as delivered
+// mark messages as delivered
 // This function marks messages as delivered for a specific group and user.
 func (r *MongoRepository) MarkMessagesAsDelivered(ctx context.Context, groupID primitive.ObjectID, messageIDs []primitive.ObjectID, userEmail string) error {
 	collection := r.db.Collection(MessagesCollection)
@@ -597,4 +671,3 @@ func (r *MongoRepository) GetUndeliveredMessages(ctx context.Context, userEmail 
 
 	return messages, nil
 }
-

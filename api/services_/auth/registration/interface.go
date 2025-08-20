@@ -1,6 +1,9 @@
 package registration
 
-import "gorm.io/gorm"
+import (
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 type UserRepository interface {
 	CreateUser(user *User) error
@@ -10,4 +13,7 @@ type UserRepository interface {
 	GetUserByID(userID string) (*User, error)
 	UpdateUserTokenInfo(user *User) error
 	GetDB() *gorm.DB // Returns the underlying database connection, if needed
+	FindAll() ([]User, error)
+	FindByTenantID(tenantID uuid.UUID) ([]User, error)
+	FindByTeamIDAndRole(teamID uuid.UUID, role string) (*User, error)
 }

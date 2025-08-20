@@ -17,10 +17,10 @@ export default function NextStepsPage() {
         </p>
 
         <div className="space-y-3">
-          <Button className="w-full" onClick={() => navigate("/upload-evidence")}>
+          <Button className="w-full" onClick={() => navigate(`/upload-evidence/${caseId}`)}>
             Upload Evidence
           </Button>
-          <Button className="w-full" onClick={() => navigate("/assign-case-members")}>
+          <Button className="w-full" onClick={() => navigate(`/assign-case-members/${caseId}`)}>
             Assign Members
           </Button>
           <Button

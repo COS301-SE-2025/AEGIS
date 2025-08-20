@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -98,6 +99,11 @@ func (u *ipfsUploader) UploadBytes(ctx context.Context, data []byte, fileName st
 		Size string `json:"Size"`
 	}
 
+	sizeInt, err := strconv.ParseInt(ipfsResp.Size, 10, 64)
+	if err != nil {
+		sizeInt = int64(len(data)) // fallback to actual file data size
+	}
+
 	if err := json.NewDecoder(resp.Body).Decode(&ipfsResp); err != nil {
 		return nil, fmt.Errorf("failed to parse IPFS response: %w", err)
 	}
@@ -105,7 +111,7 @@ func (u *ipfsUploader) UploadBytes(ctx context.Context, data []byte, fileName st
 	result := &IPFSUploadResult{
 		Hash:     ipfsResp.Hash,
 		URL:      u.GetFileURL(ipfsResp.Hash),
-		Size:     int64(len(data)),
+		Size:     sizeInt,
 		FileName: fileName,
 	}
 
@@ -115,7 +121,7 @@ func (u *ipfsUploader) UploadBytes(ctx context.Context, data []byte, fileName st
 // GetFileURL generates a URL for accessing an IPFS file
 func (u *ipfsUploader) GetFileURL(hash string) string {
 
-	return fmt.Sprintf("%s/ipfs/%s", u.baseURL, hash)
+	return fmt.Sprintf("http://localhost:8081/ipfs/%s", hash)
 }
 
 // DeleteFile unpins a file from IPFS (equivalent to deletion)

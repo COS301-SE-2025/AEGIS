@@ -1,13 +1,18 @@
 package case_assign
 
-import "github.com/google/uuid"
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
 
 type AdminChecker interface {
-	IsAdmin(userID uuid.UUID) (bool, error)
+	IsAdminFromContext(ctx *gin.Context) (bool, error)
 }
 
 type CaseAssignmentRepoInterface interface {
-	AssignRole(userID, caseID uuid.UUID, role string) error
+	AssignRole(userID, caseID uuid.UUID, role string, tenantID uuid.UUID) error
 	UnassignRole(userID, caseID uuid.UUID) error
-	IsAdmin(userID uuid.UUID) (bool, error)
+}
+type UserRepo interface {
+	GetUserByID(userID uuid.UUID) (*User, error)
 }

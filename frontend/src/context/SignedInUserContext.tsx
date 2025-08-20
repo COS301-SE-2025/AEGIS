@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-
+import { useCallback } from "react";
 interface Role {
   id: string;
   name: string;
@@ -17,7 +17,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (token: string) => void;
+  login: (_: string) => void;
   logout: () => void;
   refreshUser: () => Promise<void>; // <-- added
 }
@@ -46,41 +46,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
-  const fetchUser = async () => {
-    const token = sessionStorage.getItem("authToken");
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
 
-    try {
-      const res = await fetch("http://localhost:8080/api/v1/user/info", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
 
-      if (!res.ok) throw new Error("Unauthorized");
+const fetchUser = useCallback(async () => {
+  const token = sessionStorage.getItem("authToken");
+  if (!token) {
+    setUser(null);
+    setLoading(false);
+    return;
+  }
 
-      const data = await res.json();
-      setUser(data.data);
-    } catch (error) {
-      console.error("Failed to fetch user:", error);
-      logout();
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const res = await fetch("http://localhost:8080/api/v1/user/info", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) throw new Error("Unauthorized");
+
+    const data = await res.json();
+    setUser(data.data);
+  } catch (error) {
+    console.error("Failed to fetch user:", error);
+    logout();
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   const refreshUser = async () => {
     setLoading(true);
     await fetchUser();
   };
 
-  useEffect(() => {
-    fetchUser();
-  }, []);
+useEffect(() => {
+  fetchUser();
+}, [fetchUser]);
+
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>

@@ -18,6 +18,11 @@ type MockRepo struct {
 	mock.Mock
 }
 
+func (m *MockRepo) SaveEvidence(e *metadata.Evidence) error {
+	args := m.Called(e)
+	return args.Error(0)
+}
+
 func (m *MockRepo) FindEvidenceByID(id uuid.UUID) (*metadata.Evidence, error) {
 	args := m.Called(id)
 	if ev := args.Get(0); ev != nil {
@@ -26,18 +31,20 @@ func (m *MockRepo) FindEvidenceByID(id uuid.UUID) (*metadata.Evidence, error) {
 	return nil, args.Error(1)
 }
 
-// Add SaveEvidence to satisfy metadata.Repository interface
-func (m *MockRepo) SaveEvidence(evidence *metadata.Evidence) error {
-	args := m.Called(evidence)
-	return args.Error(0)
+func (m *MockRepo) FindEvidenceByCaseID(caseID uuid.UUID) ([]metadata.Evidence, error) {
+	args := m.Called(caseID)
+	if evs := args.Get(0); evs != nil {
+		return evs.([]metadata.Evidence), args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 type MockIPFS struct {
 	mock.Mock
 }
 
-func (m *MockIPFS) UploadFile(path string) (string, error) {
-	args := m.Called(path)
+func (m *MockIPFS) UploadFile(reader io.Reader) (string, error) {
+	args := m.Called(reader)
 	return args.String(0), args.Error(1)
 }
 

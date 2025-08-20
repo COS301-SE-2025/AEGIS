@@ -3,7 +3,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 interface SidebarContextType {
   sidebarVisible: boolean;
   toggleSidebar: () => void;
-  setSidebarVisible: (visible: boolean) => void;
+  setSidebarVisible: (_: boolean) => void;
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);

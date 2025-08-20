@@ -14,12 +14,8 @@ export const VerifyEmailPage = () => {
       return;
     }
 
-    fetch("/api/auth/verify-email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ token }),
+    fetch(`http://localhost:8080/api/v1/auth/verify?token=${encodeURIComponent(token)}`, {
+      method: "GET",
     })
       .then((response) => {
         if (response.ok) {
@@ -36,7 +32,8 @@ export const VerifyEmailPage = () => {
   useEffect(() => {
     if (status === "success") {
       const timer = setTimeout(() => {
-        navigate("/login");
+      const token = searchParams.get("token");
+      navigate(`/terms?token=${encodeURIComponent(token ?? "")}`);
       }, 2000);
       return () => clearTimeout(timer);
     }

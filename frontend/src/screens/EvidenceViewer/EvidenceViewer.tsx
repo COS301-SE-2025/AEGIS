@@ -1,5 +1,4 @@
-
-import {useEffect, useState } from "react";
+import {useEffect, useState, ReactNode } from "react";
 import {
   Bell,
   File,
@@ -8,8 +7,8 @@ import {
   MessageSquare,
   Search,
   Settings,
-  SlidersHorizontal,
-  ArrowUpDown,
+  // SlidersHorizontal,
+  // ArrowUpDown,
   Download,
   Share,
   Send,
@@ -23,14 +22,23 @@ import {
   FileText,
   Hash,
   Calendar,
-  MoreVertical,
-  Reply,
-  ThumbsUp
-} from "lucide-react";
-import { Link } from "react-router-dom";
-import { SidebarToggleButton } from '../../context/SidebarToggleContext';
-import { string } from "prop-types";
+  MoreVertical} from "lucide-react";
+import axios from "axios";
+import { Link, useSearchParams } from "react-router-dom";
+import { SidebarToggleButton, useSidebar } from '../../context/SidebarToggleContext';
+//import { string } from "prop-types";
 import { useParams } from "react-router-dom";
+import { fetchEvidenceByCaseId } from "./api";
+import { fetchThreadsByFile } from "./api"; 
+import { fetchThreadMessages } from "./api";
+import { sendThreadMessage } from "./api";
+import { createAnnotationThread } from "./api";
+import { addThreadParticipant } from "./api";
+import { fetchThreadParticipants } from "./api";
+import { approveMessage } from "./api";
+import{MessageCard} from "../../components/ui/MessageCard";
+import { ClipboardList } from "lucide-react";
+
 
 // Import Select components from your UI library
 import {
@@ -41,23 +49,42 @@ import {
   SelectItem
 } from "../../components/ui/select";
 
-// Define file structure
+
+// Helper to get user name from session storage if userId matches current user
+function getUserNameById(userId: string): string {
+  const storedUser = sessionStorage.getItem("user");
+  if (!storedUser) return "Unknown";
+  const user = JSON.parse(storedUser);
+  if (user.id === userId) return user.name || user.email || "Unknown";
+  return userId; // fallback to userId if not found
+}
 interface FileItem {
-  caseId: any;
-  id: string;
-  name: string;
-  type: 'executable' | 'log' | 'image' | 'document' | 'memory_dump' | 'network_capture';
-  size?: string;
-  hash?: string;
-  created?: string;
-  description?: string;
-  status: 'verified' | 'pending' | 'failed';
-  chainOfCustody: string[];
-  acquisitionDate: string;
-  acquisitionTool: string;
-  integrityCheck: 'passed' | 'failed' | 'pending';
-  threadCount: number;
-  priority: 'high' | 'medium' | 'low';
+  hash: ReactNode;
+  id: string; // Corresponds to Go's `ID` (uuid.UUID)
+  caseId: string; // Corresponds to Go's `CaseID` (uuid.UUID)
+  uploaded_by: string; // Corresponds to Go's `UploadedBy` (uuid.UUID)
+  filename: string; // Corresponds to Go's `Filename`
+  file_type: string; // Corresponds to Go's `FileType`
+  ipfs_cid: string; // Corresponds to Go's `IpfsCID`
+  file_size: number; // Corresponds to Go's `FileSize` (int64)
+  checksum: string; // Corresponds to Go's `Checksum`
+  metadata: string; // Corresponds to Go's `Metadata` (JSON string)
+  uploaded_at: string; // Corresponds to Go's `UploadedAt` (time.Time)
+  description?: string; // These would likely be parsed from 'metadata' JSON
+  status?: 'verified' | 'pending' | 'failed' | string; // Parsed from 'metadata'
+  chainOfCustody?: string[]; // Parsed from 'metadata'
+  acquisitionDate?: string; // Parsed from 'metadata'
+  acquisitionTool?: string; // Parsed from 'metadata'
+  integrityCheck?: 'passed' | 'failed' | 'pending' | string; // Parsed from 'metadata'
+  threadCount?: number; // Parsed from 'metadata'
+  priority?: 'high' | 'medium' | 'low' | string; // Parsed from 'metadata'
+}
+
+
+ interface ThreadTag {
+  id: string;        // UUID
+  thread_id: string; // UUID
+  tag_name: string;
 }
 
 interface AnnotationThread {
@@ -71,22 +98,92 @@ interface AnnotationThread {
   isActive?: boolean;
   status: 'open' | 'resolved' | 'pending_approval';
   priority: 'high' | 'medium' | 'low';
-  tags: string[];
+  tags: ThreadTag[];
   fileId: string;
+  createdBy?: string; // UUID of the user who created the thread
 }
+
+
 
 interface ThreadMessage {
   id: string;
-  user: string;
-  avatar: string;
-  time: string;
+  threadID: string;
+  parentMessageID?: string | null;
+  userID: string;
   message: string;
   isApproved?: boolean;
-  reactions: { type: string; count: number; users: string[] }[];
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  mentions: { messageID: string; mentionedUserID: string; createdAt: string }[];
+  reactions: { id: string; messageID: string; userID: string; reaction: string; createdAt: string }[];
+
+  // Optional, if you still want to display replies in nested form:
   replies?: ThreadMessage[];
 }
 
+
+function buildNestedMessages(messages: ThreadMessage[]): ThreadMessage[] {
+  const messageMap: { [id: string]: ThreadMessage & { replies: ThreadMessage[] } } = {};
+  const topLevel: ThreadMessage[] = [];
+
+  messages.forEach((msg) => {
+    messageMap[msg.id] = { ...msg, replies: [] };
+  });
+
+  messages.forEach((msg) => {
+    if (msg.parentMessageID && messageMap[msg.parentMessageID]) {
+      messageMap[msg.parentMessageID].replies.push(messageMap[msg.id]);
+    } else {
+      topLevel.push(messageMap[msg.id]);
+    }
+  });
+
+  return topLevel;
+}
+
+
+
 export const EvidenceViewer  =() =>{
+// Helper to extract hashes from metadata JSON string
+function getHashesFromMetadata(metadata: string) {
+  try {
+    const meta = JSON.parse(metadata);
+    return {
+      sha256: meta.sha256 || "N/A",
+      md5: meta.md5 || "N/A"
+    };
+  } catch {
+    return { sha256: "N/A", md5: "N/A" };
+  }
+}
+// Helper to extract details from chainOfCustody
+function getCustodyDetails(chainOfCustody: any[]) {
+  if (!Array.isArray(chainOfCustody) || chainOfCustody.length === 0) return {};
+  const first = chainOfCustody[0];
+  const last = chainOfCustody[chainOfCustody.length - 1];
+  // Add debug log to inspect entries
+  console.log("getCustodyDetails: first entry:", first);
+  console.log("getCustodyDetails: last entry:", last);
+  return {
+    examiner: first?.forensic_info?.examiner || first?.forensic_info?.Examiner || "",
+    custodian: last?.custodian || last?.custodian_name || last?.user_name || "",
+    acquisitionDate: last?.acquisition_date || last?.acquisitionDate || "",
+    acquisitionTool: last?.acquisition_tool || last?.acquisitionTool || "",
+    hash: last?.hash || "",
+    osVersion: last?.system_info?.osVersion || last?.system_info?.os_version || "",
+    architecture: last?.system_info?.architecture || "",
+    computerName: last?.system_info?.computerName || last?.system_info?.computer_name || "",
+    domain: last?.system_info?.domain || "",
+    lastBoot: last?.system_info?.lastBoot || last?.system_info?.last_boot || "",
+    method: first?.forensic_info?.method || first?.forensic_info?.Method || "",
+    location: first?.forensic_info?.location || "",
+    legalStatus: first?.forensic_info?.legalStatus || first?.forensic_info?.legal_status || "",
+    notes: first?.forensic_info?.notes || "",
+  };
+}
+const BASE_URL = "http://localhost:8080/api/v1";
   const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
@@ -96,204 +193,336 @@ export const EvidenceViewer  =() =>{
     .join("")
     .toUpperCase();
 
-  // Enhanced sample data
-  // const files: FileItem[] = [
-  //   {
-  //     id: '1',
-  //     name: 'system_memory.dmp',
-  //     type: 'memory_dump',
-  //     size: '8.2 GB',
-  //     hash: 'SHA256: a1b2c3d4e5f6789abc...',
-  //     created: '2024-03-15T14:30:00Z',
-  //     description: 'Memory dump of workstation WS-0234 captured using FTK Imager following detection of unauthorized PowerShell activity',
-  //     status: 'verified',
-  //     chainOfCustody: ['Agent.Smith', 'Forensic.Analyst.1', 'Lead.Investigator'],
-  //     acquisitionDate: '2024-03-15T14:30:00Z',
-  //     acquisitionTool: 'FTK Imager v4.7.1',
-  //     integrityCheck: 'passed',
-  //     threadCount: 3,
-  //     priority: 'high'
-  //   },
-  //   {
-  //     id: '2',
-  //     name: 'malware_sample.exe',
-  //     type: 'executable',
-  //     size: '1.8 MB',
-  //     hash: 'MD5: x1y2z3a4b5c6def...',
-  //     created: '2024-03-14T09:15:00Z',
-  //     description: 'Suspected malware executable recovered from infected system',
-  //     status: 'pending',
-  //     chainOfCustody: ['Field.Agent.2'],
-  //     acquisitionDate: '2024-03-14T09:15:00Z',
-  //     acquisitionTool: 'Manual Collection',
-  //     integrityCheck: 'pending',
-  //     threadCount: 1,
-  //     priority: 'high'
-  //   },
-  //   {
-  //     id: '3',
-  //     name: 'network_capture.pcap',
-  //     type: 'network_capture',
-  //     size: '245 MB',
-  //     hash: 'SHA1: abc123def456...',
-  //     created: '2024-03-13T16:45:00Z',
-  //     description: 'Network traffic capture during incident timeframe',
-  //     status: 'verified',
-  //     chainOfCustody: ['Network.Analyst', 'Forensic.Analyst.1'],
-  //     acquisitionDate: '2024-03-13T16:45:00Z',
-  //     acquisitionTool: 'Wireshark v4.0.3',
-  //     integrityCheck: 'passed',
-  //     threadCount: 2,
-  //     priority: 'medium'
-  //   }
-  // ];
-
-  const initialAnnotationThreads: AnnotationThread[] = [
-    
-    {
-      id: '1',
-      title: 'Suspicious PowerShell activity detected',
-      user: 'Forensic.Analyst.1',
-      avatar: 'FA',
-      time: '2 hours ago',
-      messageCount: 5,
-      participantCount: 3,
-      isActive: true,
-      status: 'open',
-      priority: 'high',
-      tags: ['PowerShell', 'Malware', 'Initial Analysis'],
-      fileId: '1'
-    },
-    {
-      id: '2',
-      title: 'Memory strings analysis findings',
-      user: 'Senior.Analyst',
-      avatar: 'SA',
-      time: '4 hours ago',
-      messageCount: 8,
-      participantCount: 2,
-      status: 'pending_approval',
-      priority: 'medium',
-      tags: ['Memory Analysis', 'Strings', 'IOCs'],
-      fileId: '1'
-    },
-    {
-      id: '3',
-      title: 'Malware classification needed',
-      user: 'Malware.Specialist',
-      avatar: 'MS',
-      time: '6 hours ago',
-      messageCount: 3,
-      participantCount: 4,
-      status: 'open',
-      priority: 'high',
-      tags: ['Classification', 'Signature Analysis'],
-      fileId: '2'
+const [role, setRole] = useState<string>(user?.role || "");
+const isDFIRAdmin = role === "DFIR Admin";
+//const {sidebarVisible, toggleSidebar} = useSidebar();
+  
+useEffect(() => {
+  if (!role) {
+    const token = sessionStorage.getItem("authToken");
+    if (token) {
+      try {
+        const [, payloadB64] = token.split(".");
+        const json = JSON.parse(
+          decodeURIComponent(
+            atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+              .split("")
+              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          )
+        );
+        if (json?.role) setRole(json.role);
+      } catch { /* ignore */ }
     }
-  ];
+  }
+}, [role]);
+
 
     
-const caseId = String(useParams().caseId);
+const { caseId } = useParams();
 
-  const [allFiles, setAllFiles] = useState<FileItem[]>(() => {
-    const stored = localStorage.getItem("evidenceFiles");
-    return stored ? JSON.parse(stored) : [];
-  });
+const [searchParams] = useSearchParams();
+const evidenceIdFromQuery = searchParams.get("evidenceId");
 
-  const files = allFiles.filter(file => String(file.caseId) === String(caseId));
+const [files, setFiles] = useState<FileItem[]>([]);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
 
-  const uniqueTypes = Array.from(
-  new Set(files.map(file => file.type).filter(Boolean))
-);
+const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>([]);   
+const [newThreadTitle, setNewThreadTitle] = useState('');
+const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+const [selectedThread, setSelectedThread] = useState<AnnotationThread | null>(null);
+const [replyingToMessageId, setReplyingToMessageId] = useState<string | null>(null);
+const [replyText, setReplyText] = useState('');
+const [newMessage, setNewMessage] = useState('');
+const [searchTerm, setSearchTerm] = useState('');
+const [activeTab, setActiveTab] = useState<'overview' | 'threads' | 'metadata' | 'chain'>('overview');
 
+const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([]);
 
-  const threadMessages: ThreadMessage[] = [
-    {
-      id: '1',
-      user: 'Forensic.Analyst.1',
-      avatar: 'FA',
-      time: '2 hours ago',
-      message: 'Found suspicious PowerShell commands in memory dump. @Senior.Analyst please review the decoded base64 strings.',
-      isApproved: true,
-      reactions: [
-        { type: '👍', count: 2, users: ['Senior.Analyst', 'Lead.Investigator'] }
-      ],
-      replies: [
-        {
-          id: '1-1',
-          user: 'Senior.Analyst',
-          avatar: 'SA',
-          time: '1 hour ago',
-          message: 'Confirmed. This appears to be a fileless attack. Initiating deeper memory analysis.',
-          isApproved: true,
-          reactions: []
+// Chain of Custody state
+const [chainOfCustody, setChainOfCustody] = useState<any[]>([]);
+const custodyDetails = getCustodyDetails(chainOfCustody);
+console.debug('Parsed custodyDetails:', custodyDetails);
+
+const [chainLoading] = useState(false);
+const [chainError] = useState<string | null>(null);
+
+useEffect(() => {
+  async function loadEvidence() {
+    if (!caseId || caseId === "undefined") {
+      setFiles([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const evidenceFiles = await fetchEvidenceByCaseId(caseId);
+      // For each file, fetch its threads and set threadCount
+      const filesWithThreadCount = await Promise.all(
+        evidenceFiles.map(async (file: any) => {
+          const threads = await fetchThreadsByFile(file.id);
+          return {
+            ...file,
+            threadCount: Array.isArray(threads) ? threads.length : 0,
+          };
+        })
+      );
+      setFiles(filesWithThreadCount);
+      setError(null);
+      // Auto-select evidence if evidenceId is present in query
+      function ensureCaseId(file: FileItem | null): FileItem | null {
+        if (!file) return null;
+        // If file.caseId is missing or undefined, set it from caseId param
+        if (!file.caseId || file.caseId === "undefined") {
+          return { ...file, caseId: caseId ?? "" };
         }
-      ]
-    },
-    {
-      id: '2',
-      user: 'Junior.Analyst',
-      avatar: 'JA',
-      time: '1 hour ago',
-      message: 'Should we also check for persistence mechanisms?',
-      isApproved: false,
-      reactions: []
+        return file;
+      }
+      if (evidenceIdFromQuery) {
+        const found = filesWithThreadCount.find(f => f.id === evidenceIdFromQuery);
+        if (found) setSelectedFile(ensureCaseId(found));
+        else setSelectedFile(ensureCaseId(filesWithThreadCount[0] || null));
+      } else {
+        setSelectedFile(ensureCaseId(filesWithThreadCount[0] || null));
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to load evidence files");
+    } finally {
+      setLoading(false);
     }
-  ];
+  }
 
-  const [annotationThreads, setAnnotationThreads] = useState<AnnotationThread[]>(() => {
-  const saved = localStorage.getItem('annotationThreads');
-  return saved ? JSON.parse(saved) : initialAnnotationThreads;
-});
-
-
+  loadEvidence();
+}, [caseId, evidenceIdFromQuery]);
 
 useEffect(() => {
-  localStorage.setItem('annotationThreads', JSON.stringify(annotationThreads));
-}, [annotationThreads]);
+  // Clear previous chain of custody data when switching files
+  setChainOfCustody([]);
 
-  const [newThreadTitle, setNewThreadTitle] = useState('');
-  const [selectedFile, setSelectedFile] = useState<FileItem | null>(files[0]);
-  const [selectedThread, setSelectedThread] = useState<AnnotationThread | null>(null);
-  const [replyingToMessageId, setReplyingToMessageId] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
-  const [newMessage, setNewMessage] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'threads' | 'metadata'>('overview');
-  const [allThreadMessages, setAllThreadMessages] = useState<{ [threadId: string]: ThreadMessage[] }>(() => {
-    const saved = localStorage.getItem('allThreadMessages');
-    return saved ? JSON.parse(saved) : { '1': threadMessages };
-  });
+  if (!selectedFile) {
+    return;
+  }
+  const selectedCaseId = selectedFile.caseId;
+  if (!selectedCaseId || selectedCaseId === "undefined") {
+    return;
+  }
 
-useEffect(() => {
-  localStorage.setItem('allThreadMessages', JSON.stringify(allThreadMessages));
-}, [allThreadMessages]);
+  // Fetch chain of custody for selected evidence
+  const fetchChainOfCustody = async () => {
+    let res, parsedEntries;
+    const evidenceId = selectedFile.id;
 
+    const token = sessionStorage.getItem("authToken");
+    let axiosConfig = {};
+    if (token) {
+      axiosConfig = { headers: { Authorization: `Bearer ${token}` } };
+    }
 
-  const handleSendMessage = () => {
-  if (!newMessage.trim() || !selectedThread) return;
+    try {
+      res = await axios.get(`${BASE_URL}/cases/${selectedCaseId}/chain_of_custody?evidence_id=${evidenceId}`, axiosConfig);
+      console.log("Chain of Custody API raw response:", res.data);
+      parsedEntries = Array.isArray(res.data)
+        ? res.data.map(entry => {
+            // Parse JSON fields
+            const forensic_info = typeof entry.forensic_info === 'string' ? safeParse(entry.forensic_info) : entry.forensic_info || {};
+            const system_info = typeof entry.system_info === 'string' ? safeParse(entry.system_info) : entry.system_info || {};
+            // Add debug logs for parsed fields
+            console.log("Parsed forensic_info:", forensic_info);
+            console.log("Parsed system_info:", system_info);
+            // Map snake_case to camelCase
+            return {
+              ...entry,
+              forensic_info: {
+                notes: forensic_info.notes || forensic_info.Notes || "",
+                method: forensic_info.method || forensic_info.Method || "",
+                examiner: forensic_info.examiner || forensic_info.Examiner || "",
+                location: forensic_info.location || "",
+                legalStatus: forensic_info.legalStatus || forensic_info.legal_status || forensic_info.LegalStatus || "",
+              },
+              system_info: {
+                osVersion: system_info.osVersion || system_info.os_version || "",
+                architecture: system_info.architecture || "",
+                computerName: system_info.computerName || system_info.computer_name || "",
+                domain: system_info.domain || "",
+                lastBoot: system_info.lastBoot || system_info.last_boot || "",
+              }
+            };
+          })
+        : [];
+      console.log("Chain of Custody parsed entries:", parsedEntries);
+      setChainOfCustody(parsedEntries);
+    } catch (err) {
+      setChainOfCustody([]);
+    }
+  };
+  // Safely parse JSON, fallback to empty object
+  function safeParse(json: string) {
+    try {
+      return JSON.parse(json);
+    } catch {
+      return {};
+    }
+  }
 
-  interface NewMsg extends ThreadMessage {}
-
-  const newMsg: NewMsg = {
-    id: Date.now().toString(),
-    user: profile.name,
-    avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
-    time: 'Just now',
-    message: newMessage,
-    isApproved: false,
-    reactions: [],
-    replies: []
+  // Fetch threads as before
+  const loadThreads = async () => {
+    try {
+      const threads = await fetchThreadsByFile(selectedFile.id);
+      const threadsWithCounts = await Promise.all(
+        threads.map(async (t: any) => {
+          const rawMessages = await fetchThreadMessages(t.id);
+          const userName = getUserNameById(t.created_by);
+          return {
+            ...t,
+            fileId: t.file_id,
+            caseId: t.case_id,
+            createdBy: t.created_by,
+            tags: t.Tags || [],
+            participantCount: t.Participants?.length || 0,
+            messageCount: rawMessages.length,
+            user: userName,
+            avatar: userName.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
+            time: new Date(t.created_at).toLocaleString(),
+          };
+        })
+      );
+      setAnnotationThreads(threadsWithCounts);
+    } catch (err) {
+      console.error("Failed to load threads", err);
+    }
   };
 
-  setAllThreadMessages(prev => ({
-    ...prev,
-    [selectedThread.id]: [...(prev[selectedThread.id] || []), newMsg]
+  fetchChainOfCustody();
+  loadThreads();
+}, [selectedFile]);
+// Fetch evidence metadata for selected file
+useEffect(() => {
+  // Metadata will be derived from chainOfCustody entries
+}, [selectedFile]);
+
+
+function formatMessages(rawMessages: any[]): ThreadMessage[] {
+  return rawMessages.map((m) => ({
+    id: m.ID,
+    threadID: m.ThreadID,
+    parentMessageID: m.ParentMessageID ?? m.parentMessageID ?? null, // ensure field is always present
+    userID: m.UserID,
+    message: m.Message,
+    isApproved: m.IsApproved,
+    approvedBy: m.ApprovedBy,
+    approvedAt: m.ApprovedAt,
+    createdAt: m.CreatedAt ? new Date(m.CreatedAt).toLocaleString() : "",
+    updatedAt: m.UpdatedAt ? new Date(m.UpdatedAt).toLocaleString() : "",
+    mentions: m.Mentions || [],
+    reactions: (m.Reactions || []).map((r: any) => ({
+      id: r.ID,
+      messageID: r.MessageID,
+      userID: r.UserID,
+      reaction: r.Reaction,
+      createdAt: r.CreatedAt ? new Date(r.CreatedAt).toLocaleString() : "",
+    })),
+    replies: [],
   }));
-  setNewMessage('');
+}
+
+
+
+useEffect(() => {
+  if (!selectedThread) return;
+
+  const loadMessages = async () => {
+    try {
+    const rawMessages = await fetchThreadMessages(selectedThread.id); // from `api.ts`
+    console.log("Fetched messages for thread:", rawMessages);
+    const formattedMessages = formatMessages(rawMessages);
+    console.log("Formatted messages before nesting:", formattedMessages);
+    setThreadMessages(buildNestedMessages(formattedMessages));
+    } catch (err) {
+      console.error("Failed to load thread messages", err);
+    }
+  };
+
+  loadMessages();
+}, [selectedThread]);
+
+function formatFileSize(bytes: number): string {
+  if (bytes === undefined || bytes === null) return "0 MB";
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+const handleSendMessage = async (overrideText?: string) => {
+  const text = overrideText ?? newMessage;
+  if (!text.trim() || !selectedThread) return;
+
+  try {
+    if (user.id !== selectedThread.createdBy) {
+      try {
+        await addThreadParticipant(selectedThread.id, user.id);
+        const participants = await fetchThreadParticipants(selectedThread.id);
+        setAnnotationThreads(prev =>
+          prev.map(thread =>
+            thread.id === selectedThread.id
+              ? { ...thread, participantCount: participants.length }
+              : thread
+          )
+        );
+      } catch (err) {
+        console.warn("Participant already exists or failed:", err);
+      }
+    }
+
+    await sendThreadMessage(selectedThread.id, {
+      user_id: user.id,
+      message: text,
+      parent_message_id: replyingToMessageId || null,
+      mentions: []
+    });
+
+    const updatedMessages = await fetchThreadMessages(selectedThread.id);
+    const formatted = formatMessages(updatedMessages);
+    setThreadMessages(buildNestedMessages(formatted));
+
+    // Update messageCount in annotationThreads
+    setAnnotationThreads(prev =>
+      prev.map(thread =>
+        thread.id === selectedThread.id
+          ? { ...thread, messageCount: formatted.length }
+          : thread
+      )
+    );
+
+    setNewMessage('');
+    setReplyText('');
+    setReplyingToMessageId(null);
+
+    
+
+    setAnnotationThreads(prev =>
+      prev.map(thread =>
+        thread.id === selectedThread.id
+          ? { ...thread, messageCount: formatted.length }
+          : thread
+      )
+    );
+
+
+    const messageCount = formatted.length;
+    setAnnotationThreads(prev =>
+      prev.map(thread =>
+        thread.id === selectedThread.id
+          ? { ...thread, messageCount }
+          : thread
+      )
+    );
+
+    setSelectedThread(prev => prev ? { ...prev, messageCount } : null);
+  } catch (err) {
+    console.error("Failed to send message:", err);
+  }
 };
 
-  const [profile, setProfile] = useState({
+const [profile] = useState({
     name: user?.name || "User",
     email: user?.email || "user@aegis.com",
     role: user?.role || "Admin",
@@ -330,83 +559,132 @@ useEffect(() => {
     }
   };
 
-  const filteredThreads = annotationThreads.filter(thread => 
-    selectedFile ? thread.fileId === selectedFile.id : true
-  );
+  // const filteredThreads = annotationThreads.filter(thread => 
+  //   selectedFile ? thread.fileId === selectedFile.id : true
+  // );
 
+  const filteredThreads = annotationThreads;
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [timeFilter, setTimeFilter] = useState<'recent' | 'oldest' | null>(null);
 
   let filteredFiles = [...files];
 
-  if (typeFilter) {
-    filteredFiles = filteredFiles.filter(file => file.type === typeFilter);
+  // Filter by type
+  if (typeFilter && typeFilter !== "all") {
+    filteredFiles = filteredFiles.filter(file => file.file_type === typeFilter);
   }
 
+  // Filter by search term
+  if (searchTerm && searchTerm.trim() !== "") {
+    const term = searchTerm.trim().toLowerCase();
+    filteredFiles = filteredFiles.filter(file =>
+      file.filename.toLowerCase().includes(term) ||
+      (file.description && file.description.toLowerCase().includes(term))
+    );
+  }
+
+  // Sort by time
   if (timeFilter === 'recent') {
-    filteredFiles.sort((a, b) => new Date(b.created || '').getTime() - new Date(a.created || '').getTime());
+    filteredFiles.sort((a, b) => new Date(b.uploaded_at || '').getTime() - new Date(a.uploaded_at || '').getTime());
   } else if (timeFilter === 'oldest') {
-    filteredFiles.sort((a, b) => new Date(a.created || '').getTime() - new Date(b.created || '').getTime());
+    filteredFiles.sort((a, b) => new Date(a.uploaded_at || '').getTime() - new Date(b.uploaded_at || '').getTime());
   }
 
-  function addNestedReply(messages: ThreadMessage[], parentId: string, reply: ThreadMessage): ThreadMessage[] {
-    return messages.map(msg => {
-      if (msg.id === parentId) {
-        return {
-          ...msg,
-          replies: [...(msg.replies || []), reply]
-        };
-      } else if (msg.replies) {
-        return {
-          ...msg,
-          replies: addNestedReply(msg.replies, parentId, reply)
-        };
-      }
-      return msg;
-    });
-  }
 
-  function updateReplyReaction(replies: ThreadMessage[], replyId: string, user: string): ThreadMessage[] {
-  return replies.map(reply => {
-    if (reply.id === replyId) {
-      const existing = reply.reactions.find(r => r.type === '👍');
-      if (existing) {
-        if (existing.users.includes(user)) return reply;
-        return {
-          ...reply,
-          reactions: reply.reactions.map(r =>
-            r.type === '👍' ? { ...r, count: r.count + 1, users: [...r.users, user] } : r
+
+// Add these helper functions inside the EvidenceViewer component (after existing functions)
+const handleAddReaction = async () => {
+  try {
+    // Call the backend and get the updated message with reactions
+
+    // Update the threadMessages state: replace the old message with updatedMessage
+    if (!selectedThread) return;
+    const updatedMessages = await fetchThreadMessages(selectedThread.id);
+    const formattedMessages = formatMessages(updatedMessages);
+    setThreadMessages(buildNestedMessages(formattedMessages));
+
+    setShowReactionPicker(null); // Close reaction picker
+  } catch (err) {
+    console.error("Failed to add reaction:", err);
+  }
+};
+
+
+const handleApproveMessage = async (messageId: string) => {
+  try {
+    await approveMessage(messageId);
+    const updatedMessages = await fetchThreadMessages(selectedThread!.id);
+    const formatted = formatMessages(updatedMessages);
+    setThreadMessages(buildNestedMessages(formatted));
+  } catch (err) {
+    console.error("Failed to approve message:", err);
+  }
+};
+
+const handleSendMessageWithParent = async (text: string, parentId?: string) => {
+  if (!text.trim() || !selectedThread) return;
+
+  try {
+    if (user.id !== selectedThread.createdBy) {
+      try {
+        await addThreadParticipant(selectedThread.id, user.id);
+        const participants = await fetchThreadParticipants(selectedThread.id);
+        setAnnotationThreads(prev =>
+          prev.map(thread =>
+            thread.id === selectedThread.id
+              ? { ...thread, participantCount: participants.length }
+              : thread
           )
-        };
-      } else {
-        return {
-          ...reply,
-          reactions: [...reply.reactions, { type: '👍', count: 1, users: [user] }]
-        };
+        );
+      } catch (err) {
+        console.warn("Participant already exists or failed:", err);
       }
-    } else if (reply.replies) {
-      return {
-        ...reply,
-        replies: updateReplyReaction(reply.replies, replyId, user)
-      };
     }
-    return reply;
-  });
-}
 
-function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadMessage[] {
-  return replies.map(reply => {
-    if (reply.id === replyId) {
-      return { ...reply, isApproved: true };
-    } else if (reply.replies) {
-      return {
-        ...reply,
-        replies: updateReplyApproval(reply.replies, replyId)
-      };
-    }
-    return reply;
-  });
-}
+    await sendThreadMessage(selectedThread.id, {
+      user_id: user.id,
+      message: text,
+      parent_message_id: parentId || null,
+      mentions: []
+    });
+
+    const updatedMessages = await fetchThreadMessages(selectedThread.id);
+    const formatted = formatMessages(updatedMessages);
+    const nestedMessages = buildNestedMessages(formatted);
+    setThreadMessages(nestedMessages);
+
+    // Update message count in both thread list and selected thread
+    const messageCount = formatted.length;
+    setAnnotationThreads(prev =>
+      prev.map(thread =>
+        thread.id === selectedThread.id
+          ? { ...thread, messageCount }
+          : thread
+      )
+    );
+    
+    setSelectedThread(prev => prev ? { ...prev, messageCount } : null);
+
+  } catch (err) {
+    console.error("Failed to send message:", err);
+  }
+};
+
+
+//TO BE DELETED
+// function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadMessage[] {
+//   return replies.map(reply => {
+//     if (reply.id === replyId) {
+//       return { ...reply, isApproved: true };
+//     } else if (reply.replies) {
+//       return {
+//         ...reply,
+//         replies: updateReplyApproval(reply.replies, replyId)
+//       };
+//     }
+//     return reply;
+//   });
+// }
 
 function timeAgo(dateString: string): string {
   const date = new Date(dateString);
@@ -428,7 +706,167 @@ function timeAgo(dateString: string): string {
   return "just now";
 }
 
+// Show loading only when we actually have a caseId and are loading
+if (loading && caseId && caseId !== "undefined") {
+  return <div className="p-4">Loading evidence files...</div>;
+}
 
+// Show error only for actual errors (not missing caseId)  
+if (error) {
+  return <div className="p-4 text-red-500">Error: {error}</div>;
+}
+
+// Handle no case scenario early
+if (!caseId || caseId === "undefined") {
+  return (
+    <div className="min-h-screen bg-background text-foreground flex">
+      {/* Sidebar */}
+      <aside className="fixed left-0 top-0 h-screen w-64 bg-background border-r border-border p-6 flex flex-col sidebar-toggle-target">        <div>
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-lg overflow-hidden">
+              <img
+                src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
+                alt="AEGIS Logo"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <span className="font-bold text-foreground text-xl">AEGIS</span>
+          </div>
+
+          {/* Navigation */}
+          <nav className="space-y-1">
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <Home className="w-5 h-5" />
+              <Link to="/dashboard"><span className="text-sm">Dashboard</span></Link>
+            </div>
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <Folder className="w-5 h-5" />
+              <Link to="/case-management"><span className="text-sm">Case management</span></Link>
+            </div>
+            <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
+              <File className="w-5 h-5" />
+              <span className="text-sm font-medium">Evidence Viewer</span>
+            </div>
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <MessageSquare className="w-5 h-5" />
+              <Link to="/secure-chat"><span className="text-sm">Secure chat</span></Link>
+            </div>
+                 {isDFIRAdmin && (
+               <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <ClipboardList className="w-5 h-5" />
+              <Link to="/report-dashboard"><span className="text-sm">Case Reports</span></Link>
+            </div>
+          )}
+          </nav>
+        </div>
+
+        {/* User Profile */}
+        <div className="border-t border-bg-accent pt-4">
+          <div className="flex items-center gap-3">
+            <Link to="/profile">
+              {user?.image_url ? (
+                <img
+                  src={
+                    user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                      ? user.image_url
+                      : `http://localhost:8080${user.image_url}`
+                  }
+                  alt="Profile"
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                  <span className="text-foreground font-medium">{initials}</span>
+                </div>
+              )}
+            </Link>
+            <div>
+              <p className="font-semibold text-foreground">{displayName}</p>
+              <p className="text-muted-foreground text-xs">{user?.email || "user@dfir.com"}</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="ml-64 flex-grow bg-background flex">
+        {/* Header */}
+        <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border-border p-4 header-toggle-target">            <div className="flex items-center justify-between">
+            {/* Case Number and Tabs */}
+            <div className="flex items-center gap-4">
+              <div className="bg-gray-600 text-white px-3 py-1 rounded text-sm font-medium">
+                No Case Selected
+              </div>
+              <div className="flex items-center gap-6">
+                
+                <Link to="/dashboard">
+                  <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                    Dashboard
+                  </button>
+                </Link>
+                <Link to="/case-management">
+                  <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                    Case Management
+                  </button>
+                </Link>
+                <Link to="/evidence-viewer">
+                  <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">
+                    Evidence Viewer
+                  </button>
+                </Link>
+                <Link to="/secure-chat">
+                  <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
+                    Secure Chat
+                  </button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Right actions */}
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  className="w-64 h-10 bg-card border border-muted rounded-lg pl-10 pr-4 text-foreground placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500"
+                  placeholder="Search cases, evidence, users"
+                />
+              </div>
+              <Link to="/notifications">
+                <Bell className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
+              </Link>
+              <Link to="/settings">
+                <Settings className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
+              </Link>
+              <Link to="/profile">
+                {user?.image_url ? (
+                  <img
+                    src={
+                      user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                        ? user.image_url
+                        : `http://localhost:8080${user.image_url}`
+                    }
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                    <span className="text-foreground font-medium text-sm">{initials}</span>
+                  </div>
+                )}
+              </Link>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex flex-col items-center justify-center w-full h-[60vh] text-center text-muted-foreground pt-20">
+          <h2 className="text-2xl font-semibold mb-4">No case, no load</h2>
+          <p>Go to case management and pick a case to view details.</p>
+        </div>
+      </main>
+    </div>
+  );
+}
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -465,17 +903,33 @@ function timeAgo(dateString: string): string {
               <MessageSquare className="w-5 h-5" />
               <Link to="/secure-chat"><span className="text-sm">Secure chat</span></Link>
             </div>
+                  <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
+              <ClipboardList className="w-5 h-5" />
+              <Link to="/report-dashboard"><span className="text-sm">Case Reports</span></Link>
+            </div>
           </nav>
         </div>
 
         {/* User Profile */}
         <div className="border-t border-bg-accent pt-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
-              <Link to="/profile">
-                <span className="text-foreground font-small">{initials}</span>
-              </Link>
-            </div>
+            <Link to="/profile">
+              {user?.image_url ? (
+                <img
+                  src={
+                    user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                      ? user.image_url
+                      : `http://localhost:8080${user.image_url}`
+                  }
+                  alt="Profile"
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                  <span className="text-foreground font-medium">{initials}</span>
+                </div>
+              )}
+            </Link>
             <div>
               <p className="font-semibold text-foreground">{displayName}</p>
               <p className="text-muted-foreground text-xs">{user?.email || "user@dfir.com"}</p>
@@ -485,14 +939,16 @@ function timeAgo(dateString: string): string {
       </aside>
 
       {/* Main Content */}
-      <main className="ml-64 flex-grow bg-background flex">
+      <main className="ml-80 min-h-screen bg-background">
+        
         {/* Header */}
         <div className="fixed top-0 left-64 right-0 z-20 bg-background border-b border-border p-4">
+          
           <div className="flex items-center justify-between">
             {/* Case Number and Tabs */}
             <div className="flex items-center gap-4">
               <div className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium">
-                #CS-00579
+                 #{`CS-${caseId.slice(0, 7)}...`}
               </div>
             <div className="flex items-center gap-6">
               <SidebarToggleButton/>
@@ -522,17 +978,35 @@ function timeAgo(dateString: string): string {
                   placeholder="Search cases, evidence, users"
                 />
               </div>
+              <Link to="/notifications">
               <Bell className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
+              </Link>
               <Link to="/settings"><Settings className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" /></Link>
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                <Link to="/profile" ><span className="text-foreground font-medium text-xs">{initials}</span></ Link>
-              </div>
+              <Link to="/profile">
+                {user?.image_url ? (
+                  <img
+                    src={
+                      user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                        ? user.image_url
+                        : `http://localhost:8080${user.image_url}`
+                    }
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                    <span className="text-foreground font-medium text-sm">{initials}</span>
+                  </div>
+                )}
+              </Link>
             </div>
           </div>
         </div>
 
         {/* Content Area */}
         <div className="flex-1 flex pt-20">
+          
+            <>
           {/* Evidence Files Panel */}
           <div className="w-80 border-r border-border p-4">
             <div className="flex items-center justify-between mb-4">
@@ -559,6 +1033,7 @@ function timeAgo(dateString: string): string {
                   <SelectValue placeholder="Filter by type" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 text-popover-foreground text-sm">
+                  <SelectItem value="all">All files</SelectItem>
                   <SelectItem value="memory_dump">Memory Dump</SelectItem>
                   <SelectItem value="executable">Executable</SelectItem>
                   <SelectItem value="network_capture">Network Capture</SelectItem>
@@ -584,7 +1059,7 @@ function timeAgo(dateString: string): string {
 
             {/* File List */}
             <div className="space-y-2">
-              {files.map((file) => (
+              {filteredFiles.map((file) => (
                 <button
                   key={file.id}
                   onClick={() => setSelectedFile(file)}
@@ -596,19 +1071,19 @@ function timeAgo(dateString: string): string {
                 >
                   <div className="flex items-start gap-3">
                     <File className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 text-left">
-                      <div className="font-medium text-sm truncate mb-1">{file.name}</div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="font-medium text-sm truncate mb-1">{file.filename}</div>
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`inline-flex items-center gap-1 text-xs ${getStatusColor(file.status)}`}>
-                          {getStatusIcon(file.status)}
-                          {file.status}
+                        <span className={`inline-flex items-center gap-1 text-xs ${getStatusColor(file.status || "pending")}`}>
+                          {getStatusIcon(file.status || "pending")}
+                          {file.status || "pending"}
                         </span>
-                        <span className={`px-2 py-0.5 rounded text-xs ${getPriorityColor(file.priority)}`}>
-                          {file.priority}
+                        <span className={`px-2 py-0.5 rounded text-xs ${getPriorityColor(file.priority || "low")}`}>
+                          {file.priority || "low"}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{file.size}</span>
+                        <span>{formatFileSize(file.file_size)}</span>
                         <div className="flex items-center gap-1">
                           <MessageCircle className="w-3 h-3" />
                           <span>{file.threadCount}</span>
@@ -629,10 +1104,10 @@ function timeAgo(dateString: string): string {
                 <div className="border-b border-border p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <h1 className="text-2xl font-semibold">{selectedFile.name}</h1>
-                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-sm ${getStatusColor(selectedFile.status)}`}>
-                        {getStatusIcon(selectedFile.status)}
-                        {selectedFile.status}
+                      <h1 className="text-2xl font-semibold">{selectedFile.filename}</h1>
+                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-sm ${getStatusColor(selectedFile.status || "pending")}`}>
+                        {getStatusIcon(selectedFile.status || "pending")}
+                        {selectedFile.status || "pending"}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -653,6 +1128,17 @@ function timeAgo(dateString: string): string {
 
                   {/* Tabs */}
                   <div className="flex items-center gap-6 border-b border-muted">
+                    <button
+                    onClick={() => setActiveTab('chain')}
+                    className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'chain'
+                        ? 'text-blue-400 border-blue-400'
+                        : 'text-muted-foreground border-transparent hover:text-foreground hover:border-gray-600'
+                    }`}
+                  >
+                    Chain of Custody
+                  </button>
+
                     <button
                       onClick={() => setActiveTab('overview')}
                       className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
@@ -688,6 +1174,50 @@ function timeAgo(dateString: string): string {
 
                 {/* Tab Content */}
                 <div className="flex-1 overflow-y-auto p-6">
+                  {activeTab === 'chain' && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold">Chain of Custody Records</h3>
+                        <button
+                          className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"
+                          onClick={() => {
+                            if (selectedFile && selectedFile.id) {
+                              window.location.assign(`/chain-of-custody/${caseId}?evidenceId=${selectedFile.id}`);
+                            }
+                          }}
+                        >
+                          <span className="text-sm font-medium">+ Add Entry</span>
+                        </button>
+                      </div>
+                      <div className="bg-card p-4 rounded-lg">
+                        {chainLoading ? (
+                          <p className="text-muted-foreground text-sm">Loading chain of custody...</p>
+                        ) : chainError ? (
+                          <p className="text-red-500 text-sm">{chainError}</p>
+                        ) : chainOfCustody.length > 0 ? (
+                          chainOfCustody.map((entry, idx) => (
+                            <div key={entry.id || idx} className="flex items-center gap-3 mb-2">
+                              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{entry.custodian_name || entry.custodian || entry.user_name || "Unknown"}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {idx === 0
+                                    ? "Original Collector"
+                                    : (idx === chainOfCustody.length - 1
+                                        ? "Current Custodian"
+                                        : "Transferred")}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : ""}</p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-muted-foreground text-sm">No chain of custody entries yet.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {activeTab === 'overview' && (
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                       {/* Evidence Information */}
@@ -699,22 +1229,22 @@ function timeAgo(dateString: string): string {
                         <div className="space-y-3 text-sm">
                           <div>
                             <span className="text-muted-foreground">Description:</span>
-                            <p className="text-muted-foreground mt-1">{selectedFile.description}</p>
+                            <p className="text-muted-foreground mt-1">{custodyDetails.notes || "No description available"}</p>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-muted-foreground">Size:</span>
-                              <p className="text-muted-foreground">{selectedFile.size}</p>
+                              <p className="text-muted-foreground">{formatFileSize(selectedFile.file_size)}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Type:</span>
-                              <p className="text-muted-foreground capitalize">{selectedFile.type.replace('_', ' ')}</p>
+                              <p className="text-muted-foreground capitalize">{selectedFile.file_type.replace('_', ' ')}</p>
                             </div>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Integrity Check:</span>
-                            <div className={`inline-flex items-center gap-1 ml-2 ${getStatusColor(selectedFile.integrityCheck)}`}>
-                              {getStatusIcon(selectedFile.integrityCheck)}
+                            <div className={`inline-flex items-center gap-1 ml-2 ${getStatusColor(selectedFile.integrityCheck || "pending")}`}>
+                              {getStatusIcon(selectedFile.integrityCheck  || "pending")}
                               <span className="capitalize">{selectedFile.integrityCheck}</span>
                             </div>
                           </div>
@@ -728,19 +1258,28 @@ function timeAgo(dateString: string): string {
                           Chain of Custody
                         </h3>
                         <div className="space-y-3">
-                          {selectedFile.chainOfCustody.map((person, index) => (
-                            <div key={index} className="flex items-center gap-3">
-                              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                              <div className="flex-1">
-                                <div className="text-sm font-medium">{person}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {index === 0 ? 'Original Collector' : 
-                                   index === selectedFile.chainOfCustody.length - 1 ? 'Current Custodian' : 'Transferred'}
+                          {chainLoading ? (
+                            <p className="text-muted-foreground text-sm">Loading chain of custody...</p>
+                          ) : chainError ? (
+                            <p className="text-red-500 text-sm">{chainError}</p>
+                          ) : chainOfCustody.length > 0 ? (
+                            chainOfCustody.map((entry, index) => (
+                              <div key={entry.id || index} className="flex items-center gap-3">
+                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                <div className="flex-1">
+                                  <div className="text-sm font-medium">{entry.custodian_name || entry.custodian || entry.user_name || "Unknown"}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {index === 0 ? 'Original Collector' : 
+                                     (index === chainOfCustody.length - 1) ? 'Current Custodian' : 'Transferred'}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : ""}</div>
                                 </div>
+                                <CheckCircle className="w-4 h-4 text-green-400" />
                               </div>
-                              <CheckCircle className="w-4 h-4 text-green-400" />
-                            </div>
-                          ))}
+                            ))
+                          ) : (
+                            <p className="text-muted-foreground text-sm">No chain of custody entries yet.</p>
+                          )}
                         </div>
                       </div>
 
@@ -753,15 +1292,15 @@ function timeAgo(dateString: string): string {
                         <div className="space-y-3 text-sm">
                           <div>
                             <span className="text-muted-foreground">Acquisition Date:</span>
-                            <p className="text-muted-foreground">{new Date(selectedFile.acquisitionDate).toLocaleString()}</p>
+                            <p className="text-muted-foreground">{custodyDetails.acquisitionDate ? new Date(custodyDetails.acquisitionDate).toLocaleString() : "N/A"}</p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Tool Used:</span>
-                            <p className="text-muted-foreground">{selectedFile.acquisitionTool}</p>
+                            <p className="text-muted-foreground">{custodyDetails.acquisitionTool || "N/A"}</p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Hash:</span>
-                            <p className="text-muted-foreground font-mono text-xs break-all">{selectedFile.hash}</p>
+                            <p className="text-muted-foreground font-mono text-xs break-all">{custodyDetails.hash || "N/A"}</p>
                           </div>
                         </div>
                       </div>
@@ -813,25 +1352,36 @@ function timeAgo(dateString: string): string {
                               />
                               <button
                                 className="w-full px-4 py-2 bg-blue-600 text-foreground rounded hover:bg-blue-700 text-sm"
-                                onClick={() => {
+                                onClick={async () => {
                                   if (!newThreadTitle.trim()) return;
-                                  const newThread: AnnotationThread = {
-                                    id: Date.now().toString(),
-                                    title: newThreadTitle,
+                                  try {
+                                    const createdThread = await createAnnotationThread({
+                                      case_id: caseId,
+                                      file_id: selectedFile?.id || '',
+                                      user_id: user.id,
+                                      title: newThreadTitle,
+                                      tags: [],
+                                      priority: "medium"
+                                    });
+
+                                    const adaptedThread = {
+                                    ...createdThread,
                                     user: profile.name,
                                     avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
-                                    time: 'Just now',
+                                    time: "Just now",
                                     messageCount: 0,
-                                    participantCount: 1,
-                                    status: 'open',
-                                    priority: 'low',
-                                    tags: [] as string[],
-                                    fileId: selectedFile?.id || '1'
+                                    participantCount: createdThread.Participants?.length || 1,
+                                   tags: createdThread.Tags || [],
                                   };
-                                  setAnnotationThreads(prev => [...prev, newThread]);
-                                  setSelectedThread(newThread);
-                                  setAllThreadMessages(prev => ({ ...prev, [newThread.id]: [] }));
-                                  setNewThreadTitle('');
+
+                                    console.log("Created thread:", createdThread);
+                                    setAnnotationThreads(prev => [...prev, adaptedThread]);
+                                    setSelectedThread(adaptedThread);                                    
+                                    setNewThreadTitle('');
+                                  } catch (err) {
+                                    console.error("Failed to create thread:", err);
+                                  }
+
                                 }}
                               >
                                 Create Thread
@@ -839,6 +1389,7 @@ function timeAgo(dateString: string): string {
                             </div>
                           </div>
                       </div> 
+                      
                       {filteredThreads.map((thread) => (
                         <div
                           key={thread.id}
@@ -884,11 +1435,11 @@ function timeAgo(dateString: string): string {
                             </div>
                           </div>
                           
-                          {thread.tags.length > 0 && (
+                          {Array.isArray(thread.tags) && thread.tags.length > 0 && (
                             <div className="flex items-center gap-2 mt-2">
                               {thread.tags.map((tag, index) => (
                                 <span key={index} className="px-2 py-1 b-muted text-muted-foreground rounded text-xs">
-                                  {tag}
+                                  {tag.tag_name}
                                 </span>
                               ))}
                             </div>
@@ -910,40 +1461,43 @@ function timeAgo(dateString: string): string {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-muted-foreground">File Name:</span>
-                              <p className="text-muted-foreground font-mono">{selectedFile.name}</p>
+                              <p className="text-muted-foreground font-mono">{selectedFile.filename}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">File Size:</span>
-                              <p className="text-muted-foreground">{selectedFile.size}</p>
+                              <p className="text-muted-foreground">{formatFileSize(selectedFile.file_size)}</p>
                             </div>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Hash Values:</span>
                             <div className="mt-2 space-y-2">
-                              <div className="bg-muted p-2 rounded">
-                                <div className="text-xs text-muted-foreground mb-1">SHA256:</div>
-                                <div className="text-muted-foreground font-mono text-xs break-all">
-                                  a1b2c3d4e5f6789abcdef1234567890abcdef1234567890abcdef1234567890ab
-                                </div>
-                              </div>
-                              <div className="bg-muted p-2 rounded">
-                                <div className="text-xs text-muted-foreground mb-1">MD5:</div>
-                                <div className="text-muted-foreground font-mono text-xs">
-                                  x1y2z3a4b5c6def7890abcdef123456
-                                </div>
-                              </div>
+                              {(() => {
+                                const hashes = getHashesFromMetadata(selectedFile.metadata);
+                                return (
+                                  <>
+                                    <div className="bg-muted p-2 rounded">
+                                      <div className="text-xs text-muted-foreground mb-1">SHA256:</div>
+                                      <div className="text-muted-foreground font-mono text-xs break-all">{hashes.sha256}</div>
+                                    </div>
+                                    <div className="bg-muted p-2 rounded">
+                                      <div className="text-xs text-muted-foreground mb-1">MD5:</div>
+                                      <div className="text-muted-foreground font-mono text-xs">{hashes.md5}</div>
+                                    </div>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
 
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-muted-foreground">Created:</span>
-                              <p className="text-muted-foreground">{new Date(selectedFile.created || '').toLocaleString()}</p>
+                              <p className="text-muted-foreground">{new Date(selectedFile.uploaded_at || '').toLocaleString()}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Modified:</span>
-                              <p className="text-muted-foreground">{new Date(selectedFile.acquisitionDate).toLocaleString()}</p>
+                              <p className="text-muted-foreground">{custodyDetails.acquisitionDate ? new Date(custodyDetails.acquisitionDate).toLocaleString() : "N/A"}</p>
                             </div>
                           </div>
                         </div>
@@ -963,29 +1517,29 @@ function timeAgo(dateString: string): string {
                           
                           <div>
                             <span className="text-muted-foreground">Acquisition Method:</span>
-                            <p className="text-muted-foreground">Physical Image</p>
+                            <p className="text-muted-foreground">{custodyDetails.method || "N/A"}</p>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Source Device:</span>
-                            <p className="text-muted-foreground">Workstation WS-0234</p>
+                            <p className="text-muted-foreground">{custodyDetails.computerName || "N/A"}</p>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Examiner:</span>
-                            <p className="text-muted-foreground">{selectedFile.chainOfCustody[0]}</p>
+                            <p className="text-muted-foreground">{custodyDetails.examiner || "N/A"}</p>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Case Reference:</span>
-                            <p className="text-muted-foreground">#CS-00579</p>
+                            <p className="text-muted-foreground"> #{`CS-${caseId.slice(0, 7)}...`}</p>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Legal Status:</span>
                             <div className="flex items-center gap-2 mt-1">
                               <CheckCircle className="w-4 h-4 text-green-400" />
-                              <span className="text-green-400">Admissible</span>
+                              <span className="text-green-400">{custodyDetails.legalStatus || "N/A"}</span>
                             </div>
                           </div>
                         </div>
@@ -1001,27 +1555,27 @@ function timeAgo(dateString: string): string {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-muted-foreground">OS Version:</span>
-                              <p className="text-muted-foreground">Windows 11 Pro</p>
+                              <p className="text-muted-foreground">{custodyDetails.osVersion || "N/A"}</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Architecture:</span>
-                              <p className="text-muted-foreground">x64</p>
+                              <p className="text-muted-foreground">{custodyDetails.architecture || "N/A"}</p>
                             </div>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Computer Name:</span>
-                            <p className="text-muted-foreground">DESKTOP-WS0234</p>
+                            <p className="text-muted-foreground">{custodyDetails.computerName || "N/A"}</p>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Domain:</span>
-                            <p className="text-muted-foreground">CORPORATE.LOCAL</p>
+                            <p className="text-muted-foreground">{custodyDetails.domain || "N/A"}</p>
                           </div>
                           
                           <div>
                             <span className="text-muted-foreground">Last Boot:</span>
-                            <p className="text-muted-foreground">2024-03-15 08:30:15 UTC</p>
+                            <p className="text-muted-foreground">{custodyDetails.lastBoot || "N/A"}</p>
                           </div>
                         </div>
                       </div>
@@ -1093,289 +1647,32 @@ function timeAgo(dateString: string): string {
                   <div className="flex flex-wrap gap-1 mt-2">
                     {selectedThread.tags.map((tag, index) => (
                       <span key={index} className="px-2 py-1 b-muted text-muted-foreground rounded text-xs">
-                        {tag}
+                        {tag.tag_name}
                       </span>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Messages */}
+             {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {(allThreadMessages[selectedThread?.id || ""] || []).map((message) => (
-                  <div key={message.id} className="space-y-2">
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
-                        {message.avatar}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{message.user}</span>
-                          <span className="text-xs text-muted-foreground">{message.time}</span>
-                          {message.isApproved === false && (
-                            <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded">
-                              Pending Approval
-                            </span>
-                          )}
-                          {message.isApproved === true && (
-                            <CheckCircle className="w-3 h-3 text-green-400" />
-                          )}
-                        </div>
-                        <div className="text-sm text-muted-foreground mb-2">{message.message}</div>
-                        
-                        {/* Reactions */}
-                        {message.reactions.length > 0 && (
-                          <div className="flex items-center gap-2 mb-2">
-                            {message.reactions.map((reaction, index) => (
-                              <button
-                                key={index}
-                                className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs hover:b-muted"
-                              >
-                                <span>{reaction.type}</span>
-                                <span className="text-muted-foreground">{reaction.count}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-3 text-xs">
-                        <button
-                          className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                          onClick={() => setReplyingToMessageId(message.id)} 
-                        >
-                          <Reply className="w-3 h-3" />
-                          Reply
-                        </button>
-                            {replyingToMessageId === message.id && (
-                            <div className="mt-2 ml-1">
-                              <input
-                                type="text"
-                                value={replyText}
-                                onChange={(e) => setReplyText(e.target.value)}
-                                placeholder="Type your reply..."
-                                className="w-full bg-muted text-foreground text-sm px-3 py-2 rounded border border-gray-600 focus:outline-none"
-                              />
-                              <button
-                                className="mt-1 px-3 py-1 bg-blue-600 text-foreground text-xs rounded hover:bg-blue-700"
-                                onClick={() => {
-                                  if (!replyText.trim() || !selectedThread) return;
-
-                                  const reply: ThreadMessage = {
-                                    id: `${replyingToMessageId}-reply-${Date.now()}`,
-                                    user: profile.name,
-                                    avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
-                                    time: 'Just now',
-                                    message: replyText,
-                                    isApproved: true,
-                                    reactions: [],
-                                    replies: []
-                                  };
-
-                                  setAllThreadMessages(prev => ({
-                                    ...prev,
-                                    [selectedThread.id]: addNestedReply(prev[selectedThread.id], replyingToMessageId!, reply)
-                                  }));
-
-                                  setReplyText('');
-                                  setReplyingToMessageId(null);
-                                }}
-                              >
-                                Send Reply
-                              </button>
-                            </div>
-                          )}
-
-                          <button
-                            className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                            onClick={() => {
-                              const currentUser = 'Agent.User';
-                              setAllThreadMessages(prev => ({
-                                ...prev,
-                                [selectedThread.id]: prev[selectedThread.id].map(msg => {
-                                  if (msg.id !== message.id) return msg;
-                                  const existing = msg.reactions.find(r => r.type === '👍');
-                                  if (existing) {
-                                    if (existing.users.includes(currentUser)) return msg; // Already reacted
-                                    return {
-                                      ...msg,
-                                      reactions: msg.reactions.map(r =>
-                                        r.type === '👍'
-                                          ? { ...r, count: r.count + 1, users: [...r.users, currentUser] }
-                                          : r
-                                      )
-                                    };
-                                  } else {
-                                    return {
-                                      ...msg,
-                                      reactions: [...msg.reactions, { type: '👍', count: 1, users: [currentUser] }]
-                                    };
-                                  }
-                                })
-                              }));
-                            }}
-                          >
-                          <ThumbsUp className="w-3 h-3" />
-                            React
-                          </button>
-                          {message.isApproved === false && (
-                          <button
-                            className="text-green-400 hover:text-green-300"
-                            onClick={() => {
-                              setAllThreadMessages(prev => ({
-                                ...prev,
-                                [selectedThread.id]: prev[selectedThread.id].map(msg =>
-                                  msg.id === message.id ? { ...msg, isApproved: true } : msg
-                                )
-                              }));
-                            }}
-                          >
-                            Approve
-                          </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-{/* Replies - Recursive Component */}
-                    {message.replies && message.replies.map((reply) => {
-                      const renderReply = (replyItem: ThreadMessage, depth: number = 0) => {
-                        return (
-                          <div key={replyItem.id} className={`${depth === 0 ? 'ml-8' : 'ml-6'} pl-4 border-l-2 border-muted space-y-2`}>
-                            <div className="flex gap-3">
-                              <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
-                                {replyItem.avatar}
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-sm">{replyItem.user}</span>
-                                  <span className="text-xs text-muted-foreground">{replyItem.time}</span>
-                                  {replyItem.isApproved === false && (
-                                    <span className="px-2 py-0.5 bg-yellow-600/20 text-yellow-400 text-xs rounded">
-                                      Pending Approval
-                                    </span>
-                                  )}
-                                  {replyItem.isApproved === true && (
-                                    <CheckCircle className="w-3 h-3 text-green-400" />
-                                  )}
-                                </div>
-                                <div className="text-sm text-muted-foreground mb-2">{replyItem.message}</div>
-
-                                {/* Reactions */}
-                                {replyItem.reactions.length > 0 && (
-                                  <div className="flex items-center gap-2 mb-2">
-                                    {replyItem.reactions.map((reaction, index) => (
-                                      <button
-                                        key={index}
-                                        className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full text-xs hover:b-muted"
-                                      >
-                                        <span>{reaction.type}</span>
-                                        <span className="text-muted-foreground">{reaction.count}</span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {/* Action Buttons */}
-                                <div className="flex items-center gap-3 text-xs">
-                                  <button
-                                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                                    onClick={() => setReplyingToMessageId(replyItem.id)}
-                                  >
-                                    <Reply className="w-3 h-3" />
-                                    Reply
-                                  </button>
-                                  <button
-                                    className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                                    onClick={() => {
-                                      const currentUser = 'Agent.User';
-                                      setAllThreadMessages(prev => ({
-                                        ...prev,
-                                        [selectedThread.id]: prev[selectedThread.id].map(msg => ({
-                                          ...msg,
-                                          replies: updateReplyReaction(msg.replies || [], replyItem.id, currentUser)
-                                        }))
-                                      }));
-                                    }}
-                                  >
-                                    <ThumbsUp className="w-3 h-3" />
-                                    React
-                                  </button>
-                                  {replyItem.isApproved === false && (
-                                    <button
-                                      className="text-green-400 hover:text-green-300"
-                                      onClick={() => {
-                                        setAllThreadMessages(prev => ({
-                                          ...prev,
-                                          [selectedThread.id]: prev[selectedThread.id].map(msg => ({
-                                            ...msg,
-                                            replies: updateReplyApproval(msg.replies || [], replyItem.id)
-                                          }))
-                                        }));
-                                      }}
-                                    >
-                                      Approve
-                                    </button>
-                                  )}
-                                </div>
-
-                                {/* Reply box for replying to this reply */}
-                                {replyingToMessageId === replyItem.id && (
-                                  <div className="mt-2 ml-1">
-                                    <input
-                                      type="text"
-                                      value={replyText}
-                                      onChange={(e) => setReplyText(e.target.value)}
-                                      placeholder="Type your reply..."
-                                      className="w-full bg-muted text-foreground text-sm px-3 py-2 rounded border border-gray-600 focus:outline-none"
-                                    />
-                                    <button
-                                      className="mt-1 px-3 py-1 bg-blue-600 text-foreground text-xs rounded hover:bg-blue-700"
-                                      onClick={() => {
-                                        if (!replyText.trim() || !selectedThread) return;
-
-                                        const nestedReply: ThreadMessage = {
-                                          id: `${replyItem.id}-reply-${Date.now()}`,
-                                          user: profile.name,
-                                          avatar: profile.name.split(" ").map((n: string) => n[0]).join("").toUpperCase(),
-                                          time: 'Just now',
-                                          message: replyText,
-                                          isApproved: true,
-                                          reactions: [],
-                                          replies: []
-                                        };
-
-                                        setAllThreadMessages(prev => ({
-                                          ...prev,
-                                          [selectedThread.id]: addNestedReply(prev[selectedThread.id], replyItem.id, nestedReply)
-                                        }));
-
-                                        setReplyText('');
-                                        setReplyingToMessageId(null);
-                                      }}
-                                    >
-                                      Send Reply
-                                    </button>
-                                  </div>
-                                )}
-
-                                {/* Nested Replies - Recursive Call */}
-                                {replyItem.replies && replyItem.replies.length > 0 && (
-                                  <div className="mt-2">
-                                    {replyItem.replies.map((nestedReply) => 
-                                      renderReply(nestedReply, depth + 1)
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      };
-
-                      return renderReply(reply);
-                    })}
-                  </div>
+                {threadMessages.map(message => (
+                  <MessageCard
+                    key={message.id}
+                    message={message}
+                    user={user}
+                    replyingToMessageId={replyingToMessageId}
+                    setReplyingToMessageId={setReplyingToMessageId}
+                    replyText={replyText}
+                    setReplyText={setReplyText}
+                    showReactionPicker={showReactionPicker}
+                    setShowReactionPicker={setShowReactionPicker}
+                    selectedThread={selectedThread}
+                    onSendMessage={handleSendMessageWithParent}
+                    onAddReaction={handleAddReaction}
+                    onApproveMessage={handleApproveMessage}
+                    profile={profile}
+                  />
                 ))}
               </div>
 
@@ -1402,7 +1699,7 @@ function timeAgo(dateString: string): string {
                       <span>Shift+Enter for new line</span>
                     </div>
                     <button
-                      onClick={handleSendMessage}
+                      onClick={() => handleSendMessage()}
                       className="p-1.5 bg-blue-600 text-foreground rounded hover:bg-blue-700"
                     >
                       <Send className="w-4 h-4" />
@@ -1412,6 +1709,8 @@ function timeAgo(dateString: string): string {
               </div>
             </div>
           )}
+          </>
+        
         </div>
       </main>
     </div>

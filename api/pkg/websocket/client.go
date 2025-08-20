@@ -1,6 +1,10 @@
 package websocket
 
 import (
+	"aegis-api/pkg/sharedws"
+	"aegis-api/services_/chat"
+	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -14,11 +18,9 @@ const (
 )
 
 type Client struct {
-	Hub    *Hub
-	Conn   *websocket.Conn
-	Send   chan []byte
-	UserID string
-	CaseID string
+	*sharedws.Client // embeds shared fields
+	Hub              *Hub
+	Send             chan []byte
 }
 
 func (c *Client) ReadPump() {
@@ -26,14 +28,59 @@ func (c *Client) ReadPump() {
 		c.Hub.unregister <- c
 		c.Conn.Close()
 	}()
+
 	c.Conn.SetReadLimit(512)
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.Conn.SetPongHandler(func(string) error { c.Conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	c.Conn.SetPongHandler(func(string) error {
+		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+	c.Conn.SetCloseHandler(func(code int, text string) error {
+		log.Printf("🔌 Client %s closed connection: %d - %s", c.UserID, code, text)
+		return nil
+	})
 
 	for {
-		_, _, err := c.Conn.ReadMessage()
+		_, rawMsg, err := c.Conn.ReadMessage()
 		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("⚠️ Client %s disconnected unexpectedly: %v", c.UserID, err)
+			}
 			break
+		}
+
+		var msg chat.WebSocketEvent
+		if err := json.Unmarshal(rawMsg, &msg); err != nil {
+			log.Printf("❌ Invalid WebSocket message: %v", err)
+			continue
+		}
+
+		switch msg.Type {
+		case chat.EventNewMessage:
+			data, err := json.Marshal(msg.Payload)
+			if err != nil {
+				log.Printf("❌ Failed to re-marshal payload: %v", err)
+				continue
+			}
+
+			var payload chat.NewMessagePayload
+			if err := json.Unmarshal(data, &payload); err != nil {
+				log.Printf("❌ Failed to unmarshal NEW_MESSAGE payload: %v", err)
+				continue
+			}
+
+			if err := chat.SaveMessageToDB(payload); err != nil {
+				log.Printf("❌ Failed to save message to DB: %v", err)
+				continue
+			}
+
+			c.Hub.broadcast <- MessageEnvelope{
+				CaseID: c.CaseID,
+				Data:   rawMsg, // original message
+			}
+
+		default:
+			log.Printf("⚠️ Unsupported WebSocket event type: %s", msg.Type)
 		}
 	}
 }
@@ -71,28 +118,49 @@ func (c *Client) WritePump() {
 	}
 }
 
+// TypingPayload represents the data associated with a typing event
+type TypingPayload struct {
+	UserEmail string `json:"userEmail"`
+	CaseID    string `json:"caseId"`
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		//origin := r.Header.Get("Origin")
+		// Example: only allow your frontend
+		return true //origin == "http://localhost:5173" || origin == "https://yourdomain.com" || origin == "http://127.0.1:5173"
+	},
 }
 
-func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request, userID, caseID string) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+func ServeWS(hub *Hub, upgrader websocket.Upgrader, w http.ResponseWriter, r *http.Request, userID, caseID string) {
+	var conn *websocket.Conn
+	var err error
+
+	// Attempt connection upgrade
+	conn, err = upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		log.Printf("❌ Failed to upgrade WebSocket connection: %v", err)
+		http.Error(w, "Failed to upgrade to WebSocket", http.StatusInternalServerError)
 		return
 	}
 
+	// Create client
 	client := &Client{
-		Hub:    hub,
-		Conn:   conn,
-		Send:   make(chan []byte, 256),
-		UserID: userID,
-		CaseID: caseID,
+		Client: &sharedws.Client{
+			UserID: userID,
+			CaseID: caseID,
+			Conn:   conn,
+		},
+		Hub:  hub,
+		Send: make(chan []byte, 256),
 	}
 
+	// Register client
 	client.Hub.register <- client
 
+	// Launch read/write pumps
 	go client.WritePump()
 	go client.ReadPump()
 }

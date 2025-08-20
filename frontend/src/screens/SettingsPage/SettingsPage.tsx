@@ -8,6 +8,7 @@ import {
   Bell,
   Sun,
   Moon,
+  User,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext";
@@ -153,8 +154,6 @@ export const SettingsPage = () => {
         </button>
       </div>
 
-
-
       {/* Logout */}
       <div className="bg-card text-card-foreground rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-4">Logout</h2>
@@ -164,6 +163,17 @@ export const SettingsPage = () => {
         >
           <LogOut className="w-5 h-5" />
           Logout
+        </Link>
+      </div>
+      {/* Register User */}
+      <div className="bg-card text-card-foreground rounded-lg p-6">
+        <h2 className="text-xl font-semibold mb-4">Register User</h2>
+        <Link
+          to="/register"
+          className="inline-flex items-center gap-2 bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-500 transition-colors"
+        >
+          <User className="w-5 h-5" />
+          Register User
         </Link>
       </div>
 

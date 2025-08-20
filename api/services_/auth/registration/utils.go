@@ -2,8 +2,10 @@ package registration
 
 import (
 	"errors"
+	"math/rand"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +35,13 @@ func HashPassword(password string) (string, error) {
 	return string(hashed), err
 }
 
+// Auto-generate password from first name and random number
+func GenerateAutoPassword(fullName string) string {
+	rand.Seed(time.Now().UnixNano())
+	parts := strings.Split(fullName, " ")
+	firstName := strings.Title(parts[0])
+	return firstName + "#" + strconv.Itoa(rand.Intn(9999))
+}
 func GenerateJWT(userID, email, role string) (string, error) {
 	claims := &Claims{
 		UserID: userID,

@@ -16,13 +16,14 @@ import {
   X,
   Reply,
   Download,
-  Eye
+  Eye,
+  Trash
 } from "lucide-react";
 import {Link} from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
-
-
-
+import { toast } from 'react-hot-toast';
+import { MutableRefObject } from "react";
+import { ClipboardList } from "lucide-react";
 // Type definitions
 interface Message {
   id: number;
@@ -32,13 +33,14 @@ interface Message {
   time: string;
   status: string;
   self?: boolean;
-  attachment?: {
-    name: string;
-    type: string;
-    size: string;
+  attachments?: {
+    file_name: string;
+    file_type: string;
+    file_size: number;
     url?: string;
+    hash?: string;
     isImage?: boolean;
-  };
+  }[];
   replyTo?: {
     id: number;
     user: string;
@@ -50,20 +52,170 @@ interface Message {
   };
 }
 
+interface JwtPayload {
+  user_id: string;
+  email: string;
+  role?: string;
+  exp: number;
+  iat: number;
+}
 
 interface Group {
   id: number;
+  caseID?: string;
+  case_id?: string;
   name: string;
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
   members: string[];
-  avatar: string;
+  group_url: string;
   hasStarted?: boolean;
-
+  caseId?: string;
 }
 
+interface Thread {
+  thread_id: string;
+  title: string;
+  case_id: string;
+  file_id: string;
+  created_by: string;
+  created_at: string;
+  priority: string;
+  new_status?: string;
+}
+
+// --- WebSocket Types ---
+
+type WebSocketMessage = {
+  type: WebSocketMessageType;
+  payload: any;
+  groupId?: string;
+  userEmail?: string;
+  timestamp?: string;
+};
+
+
+type WebSocketMessageType =
+  | "new_message"
+  | "typing_start"
+  | "read_receipt"
+  | "message_reaction"
+  | "message_reply"
+  | "user_joined"
+  | "user_left"
+  | "file_attachment"
+  | "system_alert"
+  |"typing_stop"
+  | "typing_start";
+
+type NewMessagePayload = {
+  messageId: string;
+  text: string;
+  senderId: string;
+  senderName: string;
+  groupId: string;
+  timestamp: string;
+  attachments?: Attachment[];
+  replyingTo?: string;
+};
+
+type Attachment = {
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  url: string;
+  hash?: string;
+  isImage?: boolean;
+};
+
 type ChatMessages = Record<number, Message[]>;
+
+
+export const connectWebSocket = (
+  caseId: string,
+  token: string,
+  socketRef: MutableRefObject<WebSocket | null>,
+  reconnectTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>,
+  onMessage: (msg: WebSocketMessage) => void,
+  onOpen?: () => void,
+  onClose?: () => void,
+  onTypingStatus?: (msg: WebSocketMessage) => void
+) => {
+  if (!caseId || !token) return;
+
+  // Prevent reconnect if already open
+  if (socketRef.current?.readyState === WebSocket.OPEN) {
+    console.log("📡 WebSocket already connected.");
+    return;
+  }
+
+  const ws = new WebSocket(`ws://localhost:8080/ws/cases/${caseId}?token=${token}`);
+
+  ws.onopen = () => {
+    console.log("✅ WebSocket connected");
+    onOpen?.(); // Optional callback
+  };
+
+  ws.onmessage = (event) => {
+  try {
+    const parsed: WebSocketMessage = JSON.parse(event.data);
+
+    if (!parsed?.type || !parsed?.payload) {
+      throw new Error("Malformed WebSocket message");
+    }
+
+    // Latency tracking
+    const receivedAt = Date.now();
+    const sentAt = Date.parse(parsed.payload.timestamp || "");
+    if (!isNaN(sentAt)) {
+      console.log("📥 WS message latency:", receivedAt - sentAt, "ms");
+    } else {
+      console.warn("⏱️ Could not parse message timestamp.");
+    }
+
+    // ✅ Handle typing events separately
+    if (parsed.type === "typing_start") {
+      console.log(`✍️ Typing started by ${parsed.payload.userEmail} in group ${parsed.groupId}`);
+      onTypingStatus?.(parsed);
+      return;
+    }
+
+    if (parsed.type === "typing_stop") {
+      console.log(`🛑 Typing stopped by ${parsed.payload.userEmail} in group ${parsed.groupId}`);
+      onTypingStatus?.(parsed);
+      return;
+    }
+
+    // ✅ Default to message handler
+    onMessage(parsed);
+
+  } catch (err) {
+    console.error("❌ Error handling WebSocket message:", err);
+  }
+};
+
+
+
+  ws.onclose = () => {
+    if (reconnectTimeoutRef.current) return;
+
+    console.warn("⚠️ WebSocket closed. Retrying in 3s...");
+    onClose?.();
+
+    reconnectTimeoutRef.current = setTimeout(() => {
+      reconnectTimeoutRef.current = null;
+      connectWebSocket(caseId, token, socketRef, reconnectTimeoutRef, onMessage, onOpen, onClose);
+    }, 3000);
+  };
+
+  ws.onerror = (err) => {
+    console.error("❌ WebSocket error:", err);
+    ws.close(); // Triggers onclose
+  };
+
+  socketRef.current = ws;
+};
 
 export const SecureChatPage = (): JSX.Element => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -82,9 +234,117 @@ export const SecureChatPage = (): JSX.Element => {
   const [attachmentMessage, setAttachmentMessage] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState("");
-  const [previewFileData, setPreviewFileData] = useState<string>("");
+  const [, setPreviewFileData] = useState<string>("");
   const [typingUsers, setTypingUsers] = useState<Record<number, string[]>>({});
   const [hasMounted, setHasMounted] = useState(false);
+  const [] = useState<Thread[]>([]);
+  const socketRef = useRef<WebSocket | null>(null);
+  const [, setSocketConnected] = useState(false);
+  const previousUrlRef = useRef<string | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const storedUser = sessionStorage.getItem("user");
+    const user = storedUser ? JSON.parse(storedUser) : null;
+const [role, setRole] = useState<string>(user?.role || "");
+const isDFIRAdmin = role === "DFIR Admin";
+  interface Case {
+    id: string;
+    title?: string;
+    // Add other properties if needed
+  }
+  const [activeCases, setActiveCases] = useState<Case[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState("");
+  // Removed unused setRetryCount state
+
+
+  const handleTypingStatus = (msg: WebSocketMessage) => {
+  const { type, payload } = msg;
+  const groupId = activeChat?.id;
+  if (!groupId || payload.userEmail === userEmail) return;
+
+  if (type === "typing_start") {
+    // Add user to typing list (without duplicates)
+    setTypingUsers(prev => {
+      const users = new Set([...(prev[groupId] || []), payload.userEmail]);
+      return { ...prev, [groupId]: Array.from(users) };
+    });
+
+    // Clear existing timeout
+    if (typingTimeoutsRef.current[groupId]?.[payload.userEmail]) {
+      clearTimeout(typingTimeoutsRef.current[groupId][payload.userEmail]);
+    }
+
+    // Set new timeout to remove user
+    const timeout = setTimeout(() => {
+      setTypingUsers(prev => ({
+        ...prev,
+        [groupId]: (prev[groupId] || []).filter(u => u !== payload.userEmail),
+      }));
+    }, 3000);
+
+    // Store the timeout
+    typingTimeoutsRef.current[groupId] = {
+      ...(typingTimeoutsRef.current[groupId] || {}),
+      [payload.userEmail]: timeout,
+    };
+  }
+};
+const handleSelectGroup = (group: any) => {
+  const id = group.id || group._id;
+  if (!id) {
+    console.warn("Invalid group object: missing id");
+    return;
+  }
+
+  setActiveChat({
+    ...group,
+    caseId: group.caseId || group.case_id || "",
+    id, // ✅ now always a number
+  });
+  localStorage.setItem("activeChat", JSON.stringify({
+    ...group,
+    caseId: group.caseId || group.case_id || "",
+    id,
+  }));
+};
+useEffect(() => {
+  if (!role) {
+    const token = sessionStorage.getItem("authToken");
+    if (token) {
+      try {
+        const [, payloadB64] = token.split(".");
+        const json = JSON.parse(
+          decodeURIComponent(
+            atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+              .split("")
+              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          )
+        );
+        if (json?.role) setRole(json.role);
+      } catch { /* ignore */ }
+    }
+  }
+}, [role]);
+
+
+  useEffect(() => {
+    const fetchActiveCases = async () => {
+      try {
+        const res = await fetch("http://localhost:8080/api/v1/cases/filter?status=open", {
+          headers: {
+            Authorization: `Bearer ${sessionStorage.getItem("authToken") || ""}`,
+          },
+        });
+        const data = await res.json();
+        setActiveCases(data.cases || []);
+      } catch (err) {
+        console.error("Error fetching cases:", err);
+      }
+    };
+
+    fetchActiveCases();
+  }, []);
+
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,118 +352,48 @@ export const SecureChatPage = (): JSX.Element => {
   //for adding member
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
-  const [availableUsers] = useState([
-  "alex.morgan@company.com"
-]);
+//   const [availableUsers] = useState([
+//   "alex.morgan@company.com"
+// ]);
+const [availableUsers, setAvailableUsers] = useState<{ user_email: string, role: string }[]>([]);
+
+
+const [token] = useState(sessionStorage.getItem("authToken"));
+const [userEmail] = useState(() => {
+  try {
+    const token = sessionStorage.getItem("authToken");
+    if (!token) return null;
+
+    const base64Payload = token.split(".")[1];
+    const decodedPayload = JSON.parse(atob(base64Payload)) as JwtPayload;
+    return decodedPayload?.email || null;
+  } catch {
+    return null;
+  }
+});
+
+
+
+const [editGroupName, setEditGroupName] = useState("");
+const [editDescription, setEditDescription] = useState("");
+const [editIsPublic, setEditIsPublic] = useState(false);
+const [showEditGroupModal, setShowEditGroupModal] = useState(false);
+
   // Mock data for groups and messages
   const [groups, setGroups] = useState<Group[]>([]);
 
   const [chatMessages, setChatMessages] = useState<ChatMessages>({});
+  const [] = useState([
+  { name: "Alex Morgan", role: "Forensics Analyst", color: "text-blue-400" },
+  { name: "Jamie Lee", role: "Incident Responder", color: "text-red-400" },
+  { name: "Riley Smith", role: "Malware Analyst", color: "text-green-400" }
+  ]);
 
   // Add this function to simulate incoming messages
-// Add this enhanced function to simulate realistic flowing conversations
-const simulateIncomingMessage = (chatId: number, delay: number = 1500) => {
-const teamMembers = [
-  { name: "Alex Morgan", role: "Forensics Analyst", color: "text-blue-400" }
-];
+  // Add this enhanced function to simulate realistic flowing conversations
 
-  // Get current conversation context
-  const currentMessages = chatMessages[chatId] || [];
-  const lastMessage = currentMessages[currentMessages.length - 1];
-  
-  // Conversation flow patterns based on last message content
-  const getContextualResponse = (lastMsg: string, sender: string) => {
-  const lowerMsg = lastMsg.toLowerCase();
-  
-  if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
-    return ["Hey! Ready to review that evidence file?", "Hi there! Got the forensic data ready."];
-  }
-  
-  if (lowerMsg.includes('evidence') || lowerMsg.includes('file') || lowerMsg.includes('case')) {
-    return [
-      "Hash verified. Clean sample.",
-      "Metadata extracted successfully.", 
-      "Found deleted files in slack space.",
-      "Timeline established. 3 access points.",
-      "Registry analysis complete.",
-      "Network logs show suspicious activity."
-    ];
-  }
-  
-  // Default short responses
-  return [
-    "Got it.",
-    "Confirmed.", 
-    "Checking now.",
-    "Analysis complete.",
-    "Roger that.",
-    "On it."
-  ];
-};
 
-  setTimeout(() => {
-    // Choose appropriate team member based on context
-    let availableMembers = teamMembers;
-    const lastSender = lastMessage?.user;
-    
-    // Don't let the same person respond twice in a row
-    if (lastSender && lastSender !== "You") {
-      availableMembers = teamMembers.filter(member => 
-        `${member.name} (${member.role})` !== lastSender
-      );
-    }
-    
-    const selectedMember = availableMembers[Math.floor(Math.random() * availableMembers.length)];
-    const responses = getContextualResponse(lastMessage?.content || "", lastMessage?.user || "");
-    const selectedResponse = responses[Math.floor(Math.random() * responses.length)];
-    
-    const newMessage: Message = {
-      id: Date.now() + Math.random(),
-      user: `${selectedMember.name} (${selectedMember.role})`,
-      color: selectedMember.color,
-      content: selectedResponse,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: "read"
-    };
 
-    setChatMessages(prev => ({
-      ...prev,
-      [chatId]: [...(prev[chatId] || []), newMessage]
-    }));
-
-    // Update group's last message
-    setGroups(prev => prev.map(group =>
-      group.id === chatId
-        ? { 
-            ...group, 
-            lastMessage: selectedResponse, 
-            lastMessageTime: "now", 
-            unreadCount: group.id === activeChat?.id ? 0 : group.unreadCount + 1,
-            hasStarted: true
-
-          }
-        : group
-    ));
-  }, delay);
-};
-const simulateTyping = (chatId: number, userName?: string) => {
-  const user = "Alex Morgan (Forensics Analyst)";
-
-  
-  
-   setTypingUsers(prev => ({
-    ...prev,
-    [chatId]: [user]
-  }));
-
-  setTimeout(() => {
-    setTypingUsers(prev => ({
-      ...prev,
-      [chatId]: (prev[chatId] || []).filter(u => u !== user)
-    }));
-  },  15000 + Math.random() * 25000);
-
-};
 
 
   const filteredGroups = groups.filter(group =>
@@ -257,146 +447,400 @@ const simulateTyping = (chatId: number, userName?: string) => {
 }, []);
 
   // Clean up preview URL when component unmounts or preview changes
-  useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
 
-// Simulate random chat activity with better conversation flow
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (groups.length === 0) return;
-      
-      // Randomly pick a chat to add activity to
-      const randomChat = groups[Math.floor(Math.random() * groups.length)];
-      const teamMembers = [
-    { name: "Alex Morgan", role: "Forensics Analyst", color: "text-blue-400" }
-  ];
-  const randomUser = `${teamMembers[0].name} (${teamMembers[0].role})`;    
-    // 30% chance of just typing, 70% chance of sending message
-    if (Math.random() > 0.7) {
-      simulateTyping(randomChat.id, randomUser);
-    } else {
-      simulateIncomingMessage(randomChat.id, 1000);
+useEffect(() => {
+  return () => {
+    if (previousUrlRef.current) {
+      URL.revokeObjectURL(previousUrlRef.current);
     }
-  }, 15000 + Math.random() * 25000); // Every 15-40 seconds
+  };
+}, []);
 
-  return () => clearInterval(interval);
-}, [groups, chatMessages]);
+
+
+
+const fileInputGroupRef = useRef<HTMLInputElement>(null);
+
+const handleGroupImageClick = () => {
+  if (activeChat?.id) {
+    fileInputGroupRef.current?.click();
+  }
+};
+
+const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const typingTimeoutsRef = useRef<{
+  [groupId: string]: { [email: string]: ReturnType<typeof setTimeout> };
+}>({});
+
+const sendTypingNotification = (type: "typing_start" | "typing_stop") => {
+  if (!activeChat?.id || !socketRef.current) return;
+
+  const message = {
+    type,
+    payload: { userEmail },
+    groupId: String(activeChat.id),
+    userEmail,
+  };
+
+  socketRef.current.send(JSON.stringify(message));
+
+  if (type === "typing_start") {
+    // Debounce sending "typing_stop"
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      const stopMessage = {
+        type: "typing_stop",
+        payload: { userEmail },
+        groupId: String(activeChat.id),
+        userEmail,
+      };
+      socketRef.current?.send(JSON.stringify(stopMessage));
+    }, 3000); // 3s of inactivity
+  }
+};
+
+
+
+
+
+
+//  useEffect(() => {
+//     if (!activeChat?.caseId) return;
+
+//      // Replace with actual token retrieval logic
+//     const socket = new WebSocket(`ws://localhost:8080/ws/cases/${activeChat.caseId}?token=${token}`);
+//     socketRef.current = socket;
+
+//     socket.onmessage = (event) => {
+//       try {
+//         const parsed: WebSocketMessage = JSON.parse(event.data);
+//         if (!parsed?.type || !parsed?.payload) throw new Error("Malformed WS message");
+
+//         handleTypingStatus(parsed);
+//       } catch (err) {
+//         console.error("Error parsing WebSocket message:", err);
+//       }
+//     };
+
+//     socket.onopen = () => {
+//       console.log("WebSocket connected.");
+//     };
+
+//     socket.onclose = () => {
+//       console.warn("WebSocket closed. Retrying...");
+//     };
+
+//     socket.onerror = (err) => {
+//       console.error("WebSocket error:", err);
+//     };
+
+//     return () => {
+//       socket.close();
+//     };
+//   }, [activeChat?.caseId]);
+
+useEffect(() => {
+  return () => {
+    Object.values(typingTimeoutsRef.current).forEach(group =>
+      Object.values(group).forEach(timeout => clearTimeout(timeout))
+    );
+  };
+}, []);
+
+
+
+const handleGroupImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file || !activeChat) return;
+
+  const formData = new FormData();
+  formData.append('group_url', file);
+
+  try {
+    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/image`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData
+    });
+
+    if (!res.ok) throw new Error("Upload failed");
+
+    const data = await res.json();
+    const newImageUrl = data.group_url;
+
+    setActiveChat(prev =>
+      prev ? { ...prev, group_url: newImageUrl } : prev
+    );
+
+    setGroups(prev =>
+      prev.map(group =>
+        group.id === activeChat.id
+          ? { ...group, group_url: newImageUrl }
+          : group
+      )
+    );
+
+  } catch (err) {
+    console.error("Failed to upload group image", err);
+  }
+};
+
+
 // Save to localStorage
   useEffect(() => {
-    const hasRealMessages = Object.values(chatMessages).some(msgs => msgs.length > 0);
+    const hasRealMessages = Object.values(chatMessages).some(msgs => (msgs || []).length > 0);
+
     const activeGroups = groups.filter(g => g.hasStarted);
 
     if (activeGroups.length > 0 || hasRealMessages) {
       localStorage.setItem('chatGroups', JSON.stringify(activeGroups));
-      localStorage.setItem('chatMessages', JSON.stringify(chatMessages));
+    //  localStorage.setItem('chatMessages', JSON.stringify(chatMessages));
     }
   }, [groups, chatMessages]);
 
+
+useEffect(() => {
+  const meaningfulGroups = groups.filter(g => g.hasStarted);
+  if (meaningfulGroups.length > 0) {
+    localStorage.setItem('chatGroups', JSON.stringify(meaningfulGroups));
+  }
+}, [groups]);
+
   useEffect(() => {
     const savedGroups = localStorage.getItem('chatGroups');
-    const savedMessages = localStorage.getItem('chatMessages');
+   // const savedMessages = localStorage.getItem('chatMessages');
     
     if (savedGroups) setGroups(JSON.parse(savedGroups));
-    if (savedMessages) setChatMessages(JSON.parse(savedMessages));
+   // if (savedMessages) setChatMessages(JSON.parse(savedMessages));
   }, []);
 
+const fetchGroups = async () => {
+  console.log("Calling fetchGroups with:", userEmail, token);
+  if (token && userEmail) {
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/chat/groups/user/${userEmail}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log("Response status:", res.status);
+      if (!res.ok) {
+      console.error("Fetch failed:", await res.text());
+      return;
+    }
 
-  const handleSendMessage = (e?: React.MouseEvent | React.KeyboardEvent) => {
-  e?.preventDefault();
-  if (!message.trim() || !activeChat) return;
 
-  const newMessage: Message = {
-    id: Date.now(),
-    user: "You",
-    color: "text-green-400",
-    self: true,
-    content: message,
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    status: "sent",
-    ...(replyingTo && {
-      replyTo: {
-        id: replyingTo.id,
-        user: replyingTo.user,
-        content: replyingTo.content,
-        ...(replyingTo.attachment && {
-          attachment: {
-            name: replyingTo.attachment.name,
-            type: replyingTo.attachment.type
-          }
-        })
+      const data = await res.json();
+      console.log("Fetched groups data:", data);
+      const groupsWithAvatars = data.map((group: Group) => ({
+        ...group,
+        caseId: group.case_id || group.caseId,
+        group_url: group.group_url || getAvatar(group.id.toString()) //  use DB image if present
+      }));
+
+
+
+      if (Array.isArray(data)) {
+        setGroups(groupsWithAvatars);
+      } else if (Array.isArray(data.groups)) {
+        setGroups(data.groups);
+      } else {
+        console.error("Unexpected group data format:", data);
+        setGroups([]);
       }
-    })
-  };
-
-  setChatMessages(prev => ({
-    ...prev,
-    [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
-  }));
-
-  setGroups(prev => prev.map(group =>
-    group.id === activeChat.id
-      ? { ...group, lastMessage: message, lastMessageTime: "now", hasStarted: true }
-      : group
-  ));
-
-  setMessage("");
-  setReplyingTo(null);
-
-  // Simulate status updates
-  setTimeout(() => {
-    setChatMessages(prev => ({
-      ...prev,
-      [activeChat.id]: prev[activeChat.id].map(msg =>
-        msg.id === newMessage.id ? { ...msg, status: "delivered" } : msg
-      )
-    }));
-  }, 1000);
-
-  setTimeout(() => {
-    setChatMessages(prev => ({
-      ...prev,
-      [activeChat.id]: prev[activeChat.id].map(msg =>
-        msg.id === newMessage.id ? { ...msg, status: "read" } : msg
-      )
-    }));
-  }, 2000);
-
-  // Trigger auto-reply simulation
-  simulateIncomingMessage(activeChat.id, 3000 + Math.random() * 5000);
+    } catch (err) {
+      console.error("Failed to fetch groups:", err);
+    }
+  } else {
+    console.warn("No token or userEmail, cannot fetch groups.");
+  }
 };
+
+
+useEffect(() => {
+  if (!userEmail || !token) return;
+
+  const normalizedEmail = userEmail.trim().toLowerCase();
+  if (normalizedEmail) {
+    fetchGroups();
+  }
+}, [userEmail, token]);
+
+const sendMessage = async () => {
+  if (!activeChat || !message.trim()) return;
+
+  try {
+    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender_email: userEmail,
+        sender_name: "You",
+        content: message,
+        message_type: "text"
+      })
+    });
+
+
+
+    const newMessage = await res.json();
+    
+    // Post-process
+    const processedMessage: Message = {
+      id: newMessage.id,
+      user: newMessage.sender_name || newMessage.sender_email,
+      color: newMessage.sender_email === userEmail ? "text-green-400" : "text-blue-400",
+      content: newMessage.content,
+      time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: "read",
+      self: newMessage.sender_email === userEmail,
+      attachments: (newMessage.attachments && newMessage.attachments.length > 0)
+        ? newMessage.attachments.map((attachment: any) => ({
+            file_name: attachment.file_name,
+            file_type: attachment.file_type,
+            file_size: Number(attachment.file_size?.$numberLong || attachment.file_size || 0),
+            url: attachment.url,
+            hash: attachment.hash,
+            isImage: attachment.file_type.startsWith("image/") ||
+              attachment.url?.match(/\.(png|jpe?g|gif|bmp|webp)$/i)
+          }))
+        : []
+    };
+
+    setChatMessages(prev => ({
+      ...prev,
+      [activeChat.id]: [...(prev[activeChat.id] || []), processedMessage]
+    }));
+    setMessage("");
+    setReplyingTo(null);
+
+  } catch (err) {
+    console.error("Failed to send message:", err);
+  }
+};
+const [userId] = useState(() => {
+  try {
+    const token = sessionStorage.getItem("authToken");
+    if (!token) return null;
+
+    const base64Payload = token.split(".")[1];
+    const decodedPayload = JSON.parse(atob(base64Payload)) as JwtPayload;
+    return decodedPayload?.user_id || null;
+  } catch (err) {
+    console.error("❌ Failed to decode token:", err);
+    return null;
+  }
+});
+
+
+const sendWebSocketMessage = async () => {
+  if (!activeChat || !message.trim() || !userId || !userEmail) return;
+
+  // persist to database first regardless
+  try {
+    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender_email: userEmail,
+        sender_name: "You",
+        content: message,
+        message_type: "text"
+      })
+    });
+
+    const newMessage = await res.json();
+    
+    // Post-process the message from the database response
+    const processedMessage: Message = {
+      id: newMessage.id,
+      user: newMessage.sender_name || newMessage.sender_email,
+      color: newMessage.sender_email === userEmail ? "text-green-400" : "text-blue-400",
+      content: newMessage.content,
+      time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: "read",
+      self: newMessage.sender_email === userEmail,
+      attachments: (newMessage.attachments && newMessage.attachments.length > 0)
+        ? newMessage.attachments.map((attachment: any) => ({
+            file_name: attachment.file_name,
+            file_type: attachment.file_type,
+            file_size: Number(attachment.file_size?.$numberLong || attachment.file_size || 0),
+            url: attachment.url,
+            hash: attachment.hash,
+            isImage: attachment.file_type.startsWith("image/") ||
+              attachment.url?.match(/\.(png|jpe?g|gif|bmp|webp)$/i)
+          }))
+        : []
+    };
+
+    // Add to UI
+    setChatMessages(prev => ({
+      ...prev,
+      [activeChat.id]: [...(prev[activeChat.id] || []), processedMessage]
+    }));
+
+    // send via WebSocket for real-time delivery to others only AFTER persisting
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      const wsMessage: WebSocketMessage = {
+        type: "new_message",
+        payload: {
+          messageId: newMessage.id,
+          text: message.trim(),
+          senderId: userId,
+          senderName: userEmail,
+          groupId: String(activeChat.id), 
+          timestamp: newMessage.created_at,
+        },
+        timestamp: newMessage.created_at,
+        groupId: String(activeChat.id), 
+        userEmail,
+      };
+      
+      socketRef.current.send(JSON.stringify(wsMessage));
+    }
+
+  } catch (err) {
+    console.error("Failed to send message:", err);
+    toast.error("Failed to send message");
+  }
+
+  setMessage(""); // clear input
+  setReplyingTo(null);
+};
+
+const handleSendMessage = async (e?: React.MouseEvent | React.KeyboardEvent) => {
+  e?.preventDefault();
+  await sendWebSocketMessage();
+};
+
 
   const handleFileSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
   const files = event.target.files;
   if (!files || files.length === 0) return;
 
   const file = files[0];
-  
-  // Convert file to base64 for persistent storage
-  const fileData = await new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target?.result as string);
-    reader.readAsDataURL(file);
-  });
-  
+
   const url = URL.createObjectURL(file);
-  
   setPreviewFile(file);
   setPreviewUrl(url);
   setShowAttachmentPreview(true);
   setAttachmentMessage("");
 
-  // Store the base64 data for later use
-  setPreviewFileData(fileData);
+  // Store base64 
+  const fileData = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.readAsDataURL(file);
+  });
 
-  // Reset file input
-  if (fileInputRef.current) {
-    fileInputRef.current.value = '';
-  }
+  setPreviewFileData(fileData);
 };
   const meaningfulGroups = groups.filter(g => g.hasStarted);
 if (meaningfulGroups.length > 0) {
@@ -404,106 +848,187 @@ if (meaningfulGroups.length > 0) {
 }
 
 
-  const handleSendAttachment = () => {
-  if (!previewFile || !activeChat || !previewFileData) return;
 
-  const isImage = previewFile.type.startsWith('image/');
-  
-  const newMessage: Message = {
-    id: Date.now(),
-    user: "You",
-    color: "text-green-400",
-    self: true,
-    content: attachmentMessage || `Shared ${isImage ? 'an image' : 'a file'}: ${previewFile.name}`,
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    status: "sent",
-    attachment: {
-      name: previewFile.name,
-      type: previewFile.type,
-      size: (previewFile.size / 1024).toFixed(1) + " KB",
-      url: previewFileData, // Use base64 data instead of blob URL
-      isImage
-    },
-      ...(replyingTo && {
-        replyTo: {
-          id: replyingTo.id,
-          user: replyingTo.user,
-          content: replyingTo.content,
-          ...(replyingTo.attachment && {
-            attachment: {
-              name: replyingTo.attachment.name,
-              type: replyingTo.attachment.type
-            }
-          })
-        }
-      })
-    };
+ const handleCancelAttachment = () => {
+  setShowAttachmentPreview(false);
+  setPreviewFile(null);
+  setAttachmentMessage("");
 
-    setChatMessages(prev => ({
-      ...prev,
-      [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
-    }));
-      // Update last message in group
-    const lastMessageText = attachmentMessage ? attachmentMessage : `📎 ${previewFile.name}`;
-    setGroups(prev => prev.map(group =>
-      group.id === activeChat.id
-        ? { ...group, lastMessage: lastMessageText, lastMessageTime: "now" }
-        : group
-    ));
-    // Reset states
-    setShowAttachmentPreview(false);
-    setPreviewFile(null);
-    setPreviewUrl("");
-    setAttachmentMessage("");
-    setReplyingTo(null);
-  };
+  if (previewUrl) {
+    URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(""); // <-- only after revoking
+  }
+};
 
-  const handleCancelAttachment = () => {
-    setShowAttachmentPreview(false);
-    setPreviewFile(null);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
+const sendAttachment = async () => {
+  if (!activeChat || !previewFile) return;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    let base64 = "";
+    if (typeof e.target?.result === "string") {
+      base64 = e.target.result.split(",")[1];
+    } else if (e.target?.result instanceof ArrayBuffer) {
+      base64 = btoa(String.fromCharCode(...new Uint8Array(e.target.result)));
     }
-    setPreviewUrl("");
-    setAttachmentMessage("");
+
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          sender_email: userEmail,
+          sender_name: "You",
+          content: attachmentMessage,
+          file: base64,
+          fileName: previewFile.name,
+          message_type: "attachment"
+        })
+      });
+
+      const newMessageData = await res.json();
+
+      // Build local consistent message
+      const newMessage: Message = {
+        id: newMessageData.id || Date.now(),
+        user: "You",
+        self: true,
+        color: "text-blue-400",
+        content: newMessageData.content || (attachmentMessage || `Shared file: ${previewFile.name}`),
+        time: new Date(newMessageData.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: "sent",
+        attachments: [{
+          file_name: previewFile.name,
+          file_type: previewFile.type,
+          file_size: previewFile.size,
+          url: previewUrl,
+          isImage: previewFile.type.startsWith("image/")
+        }],
+        ...(replyingTo && {
+          replyTo: {
+            id: replyingTo.id,
+            user: replyingTo.user,
+            content: replyingTo.content,
+            ...(replyingTo.attachments?.[0] && {
+              attachment: {
+                name: replyingTo.attachments[0].file_name,
+                type: replyingTo.attachments[0].file_type
+              }
+            })
+          }
+        })
+      };
+
+      setChatMessages(prev => ({
+        ...prev,
+        [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
+      }));
+
+      setGroups(prev => prev.map(group =>
+        group.id === activeChat.id
+          ? { ...group, lastMessage: newMessage.content, lastMessageTime: "now" }
+          : group
+      ));
+
+    } catch (err) {
+      console.error("Failed to send attachment:", err);
+    } finally {
+      // Cleanup safely
+      setShowAttachmentPreview(false);
+      setPreviewFile(null);
+      setAttachmentMessage("");
+
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(""); // only after revoking
+      }
+
+      setReplyingTo(null);
+    }
   };
+  reader.readAsDataURL(previewFile);
+};
 
-  const handleCreateGroup = (e?: React.MouseEvent | React.KeyboardEvent) => {
-    e?.preventDefault();
-    if (!newGroupName.trim()) return;
+  function getAvatar(_groupId: string): string {
+    return ""; // Let the fallback image handle it
+  }
 
-    const newGroup: Group = {
-      id: Date.now(),
-      name: newGroupName,
+const handleCreateGroup = async (e?: React.MouseEvent | React.KeyboardEvent) => {
+  e?.preventDefault();
+
+  if (!newGroupName.trim() || !selectedCaseId) return;
+
+  try {
+    const res = await fetch('http://localhost:8080/api/v1/chat/groups', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: newGroupName,
+        description: "Group created from frontend",
+        type: "group",
+        case_id: selectedCaseId,
+        created_by: userEmail,
+        members: [{ user_email: userEmail, role: "admin" }],
+        settings: { is_public: false, allow_invites: true },
+        group_url: ""
+      })
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error("Failed to create group:", errorData);
+      return;
+    }
+
+    const createdGroup = await res.json();
+
+    // Assign group_url using getAvatar (based on UUID string)
+    const groupWithAvatar = {
+      ...createdGroup,
+      group_url: createdGroup.group_url || "/default-group-avatar.png",
+      unreadCount: 0,
       lastMessage: "Group created",
       lastMessageTime: "now",
-      unreadCount: 0,
-      members: ["You"],
-      avatar: "🔒"
     };
 
-    setGroups(prev => [...prev, newGroup]);
+setGroups(prev => {
+  const updated = [...prev, groupWithAvatar];
+  return updated.sort((a, b) => a.name.localeCompare(b.name));
+});
+
     setChatMessages(prev => ({
       ...prev,
-      [newGroup.id]: []
+      [createdGroup.id]: []
     }));
 
     setNewGroupName("");
+    setSelectedCaseId("");
     setShowNewGroupModal(false);
-  };
 
-  const handleExitGroup = () => {
-    if (!activeChat) return;
+  } catch (error) {
+    console.error("Error creating group:", error);
+  }
+};
+
+
+  // const handleExitGroup = () => {
+  //   if (!activeChat) return;
     
-    setGroups(prev => prev.filter(group => group.id !== activeChat.id));
-    setChatMessages(prev => {
-      const newMessages = { ...prev };
-      delete newMessages[activeChat.id];
-      return newMessages;
-    });
-    setActiveChat(null);
-    setShowMoreMenu(false);
-  };
+  //   setGroups(prev => prev.filter(group => group.id !== activeChat.id));
+  //   setChatMessages(prev => {
+  //     const newMessages = { ...prev };
+  //     delete newMessages[activeChat.id];
+  //     return newMessages;
+  //   });
+  //   setActiveChat(null);
+  //   setShowMoreMenu(false);
+  // };
   const handleReplyToMessage = (message: Message) => {
     setReplyingTo(message);
   };
@@ -525,51 +1050,361 @@ if (meaningfulGroups.length > 0) {
         return null;
     }
   };
-  const handleAddMember = (e?: React.MouseEvent | React.KeyboardEvent) => {
+
+const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
   e?.preventDefault();
   if (!newMemberEmail.trim() || !activeChat) return;
 
-  // Check if user is already in the group
   if (activeChat.members.includes(newMemberEmail)) {
-    alert("User is already in this group");
+    toast.error("User is already a group member");
     return;
   }
 
-  // Update the active chat members
-  const updatedChat = {
-    ...activeChat,
-    members: [...activeChat.members, newMemberEmail]
-  };
+  try {
+    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/members`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        user_email: newMemberEmail,
+        role: "member"
+      })
+    });
 
-  // Update groups state
-  setGroups(prev => prev.map(group =>
-    group.id === activeChat.id ? updatedChat : group
-  ));
+    if (!res.ok) {
+      let message = "Failed to add member";
+      try {
+        const err = await res.json();
+        message = err?.message || message;
+      } catch {}
+      toast.error(message);
+      return;
+    }
 
-  // Update active chat
-  setActiveChat(updatedChat);
+    const updatedGroup = await res.json();
 
-  // Add a system message about the new member
-  const systemMessage: Message = {
-    id: Date.now(),
-    user: "System",
-    color: "text-gray-400",
-    content: `${newMemberEmail} was added to the group`,
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    status: "read"
-  };
+    setGroups(prev =>
+      prev.map(group =>
+        group.id === updatedGroup.id ? updatedGroup : group
+      )
+    );
 
-  setChatMessages(prev => ({
-    ...prev,
-    [activeChat.id]: [...(prev[activeChat.id] || []), systemMessage]
-  }));
+    setActiveChat(prev => prev ? {
+      ...prev,
+      members: [...(Array.isArray(prev.members) ? prev.members : []), newMemberEmail]
+    } : null);
 
-  setNewMemberEmail("");
-  setShowAddMembersModal(false);
-  setShowMoreMenu(false);
-  
+    setAvailableUsers(prev =>
+      prev.filter(u => u.user_email !== newMemberEmail)
+    );
 
+    const systemMessage: Message = {
+      id: Date.now(),
+      user: "System",
+      color: "text-gray-400",
+      content: `${newMemberEmail} was added to the group`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: "read"
+    };
+
+    setChatMessages(prev => ({
+      ...prev,
+      [activeChat.id]: [...(prev[activeChat.id] || []), systemMessage]
+    }));
+
+    toast.success(`${newMemberEmail} successfully added to the group`);
+    setNewMemberEmail("");
+
+  } catch (err) {
+    console.error("Failed to add member:", err);
+    toast.error("Something went wrong while adding the member");
+  }
 };
+
+
+const loadMessages = async (groupId: number) => {
+    if (!activeChat?.id) {
+    console.warn("❌  ID available, skipping message load.");
+    return;
+  }
+  try {
+    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${groupId}/messages`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!res.ok) {
+      console.error("Failed to load messages:", await res.text());
+      return;
+    }
+
+    const data = await res.json();
+    console.log("Loaded raw messages:", data);
+      if (!Array.isArray(data)) {
+        console.warn("📭 No messages for this group, initializing with empty array.");
+        setChatMessages(prev => ({
+          ...prev,
+          [groupId]: []
+        }));
+        return;
+      }
+
+    // Map backend data to your expected frontend Message shape
+const mappedMessages = data.map((msg: any) => {
+  const attachmentData = msg.attachments && msg.attachments[0];
+  return {
+    id: msg.id,
+    user: msg.sender_name || msg.sender_email,
+    color: msg.sender_email === userEmail ? "text-green-400" : "text-blue-400",
+    content: msg.content,
+    time: new Date(msg.created_at.$date || msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: "read",
+    self: msg.sender_email === userEmail,
+    attachments: attachmentData ? [{
+      file_name: attachmentData.file_name,
+      file_type: attachmentData.file_type || "image/png", // fallback
+      file_size: Number(attachmentData.file_size?.$numberLong || attachmentData.file_size || 0),
+      url: attachmentData.url,
+      hash: attachmentData.hash,
+      isImage: attachmentData.file_type.startsWith("image/") || 
+        attachmentData.url?.match(/\.(png|jpe?g|gif|bmp|webp)$/i)
+    }] : []
+  };
+});
+
+
+    setChatMessages(prev => ({
+      ...prev,
+      [groupId]: mappedMessages
+    }));
+  } catch (err) {
+    console.error("Failed to load messages:", err);
+  }
+};
+
+
+useEffect(() => {
+if (!activeChat?.id) {
+  console.warn("❌ Cannot load messages, no group ID");
+} else {
+  console.log("🔄 Loading messages for group ID:", activeChat.id);
+  loadMessages(activeChat.id);
+}
+}, [activeChat, showAddMembersModal]);
+
+useEffect(() => {
+  if (!previewFile) {
+    setPreviewUrl(""); // ensure consistency
+  }
+}, [previewFile]);
+
+// useEffect(() => {
+//   if (!activeChat?.caseId) return;
+
+//   connectWebSocket(activeChat.caseId); // only once per case
+
+//   return () => {
+//     if (socketRef.current) {
+//       socketRef.current.close();
+//       socketRef.current = null;
+//     }
+//   };
+// }, [activeChat?.caseId]);
+useEffect(() => {
+  if (!activeChat?.caseId || !token) return;
+
+  connectWebSocket(
+    activeChat.caseId,
+    token,
+    socketRef,
+    reconnectTimeoutRef,
+    (msg) => {
+      if (msg.type === "new_message" && msg.payload.groupId === String(activeChat.id)) {
+        const incoming = msg.payload;
+
+        const mappedMessage: Message = {
+          id: incoming.messageId,
+          user: incoming.senderName || incoming.senderId,
+          color: incoming.senderId === userId ? "text-green-400" : "text-blue-400",
+          content: incoming.text,
+          time: new Date(incoming.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: "read",
+          self: incoming.senderId === userId,
+          attachments: incoming.attachments || []
+        };
+
+        setChatMessages(prev => {
+          const existing = prev[activeChat.id] || [];
+          const alreadyExists = existing.some(m => m.id === mappedMessage.id);
+          if (alreadyExists) return prev;
+
+          return {
+            ...prev,
+            [activeChat.id]: [...existing, mappedMessage]
+          };
+        });
+      }
+    },
+    () => setSocketConnected(true),
+    () => setSocketConnected(false),
+    handleTypingStatus // ✅ pass handler here
+  );
+}, [activeChat?.caseId, token]);
+
+
+const updateGroup = async () => {
+  if (!activeChat) {
+    console.error("No active chat selected for update.");
+    return;
+  }
+  try {
+    await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: editGroupName,
+        description: editDescription,
+        settings: { is_public: editIsPublic }
+      })
+    });
+
+    await fetchGroups(); // refresh your groups list
+    setShowEditGroupModal(false);
+  } catch (err) {
+    console.error("Failed to update group:", err);
+  }
+};
+
+
+const removeGroupLocally = (groupId: number) => {
+  setGroups(prev => prev.filter(group => group.id !== groupId));
+  setChatMessages(prev => {
+    const updated = { ...prev };
+    delete updated[groupId];
+    return updated;
+  });
+  setActiveChat(null);
+  setShowMoreMenu(false);
+};
+
+
+const handleLeaveGroup = async () => {
+  if (!activeChat) return;
+  try {
+    await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/members/${userEmail}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    removeGroupLocally(activeChat.id);
+    console.log("You left the group successfully!"); 
+  } catch (err) {
+    console.error("Failed to leave group:", err);
+  }
+};
+useEffect(() => {
+  if (!activeChat || !activeChat.caseId) return;
+
+  const fetchCollaborators = async () => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/cases/${activeChat.caseId}/collaborators`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        console.error("Failed to fetch collaborators:", await res.text());
+        return;
+      }
+
+      const data = await res.json();
+      console.log("Fetched collaborators:", data);
+
+      // Ensure collaborators match the structure: { user_email: string, role: string }
+      const formatted = (data.data || []).map((collab: any) => ({
+        user_email: collab.email,
+        role: collab.role || "member"
+      }));
+      console.log("✅ availableUsers after fetch:", formatted);
+
+      setAvailableUsers(formatted);
+    } catch (err) {
+      console.error("Failed to fetch collaborators:", err);
+    }
+  };
+
+  fetchCollaborators();
+}, [activeChat, token]);
+
+useEffect(() => {
+  const storedChat = localStorage.getItem("activeChat");
+  if (storedChat) {
+    const parsed = JSON.parse(storedChat);
+    // Ensure it matches current group IDs
+    const match = groups.find(g => g.id === parsed.id);
+    if (match) {
+      setActiveChat(parsed);
+    }
+  }
+}, [groups]);
+
+const handleOpenAddMembersModal = async () => {
+  if (!activeChat?.caseId) {
+    console.warn("❌ No caseId available in activeChat");
+    return;
+  }
+
+  try {
+    const res = await fetch(`http://localhost:8080/api/v1/cases/${activeChat.caseId}/collaborators`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!res.ok) {
+      console.error("❌ Failed to fetch collaborators:", await res.text());
+      return;
+    }
+
+    const data = await res.json();
+    console.log("✅ Fetched collaborators:", data);
+
+    const formatted = (data.data || []).map((collab: any) => ({
+      user_email: collab.email,
+      role: collab.role || "member"
+    }));
+
+    setAvailableUsers(formatted);
+    setShowAddMembersModal(true);
+    setShowMoreMenu(false);
+  } catch (err) {
+    console.error("❌ Error fetching collaborators:", err);
+  }
+};
+
+
+
+
+
+
+const handleDeleteGroup = async () => {
+  if (!activeChat) return;
+  try {
+    await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    removeGroupLocally(activeChat.id);
+    console.log("Group deleted successfully!"); 
+  } catch (err) {
+    console.error("Failed to delete group:", err);
+  }
+};
+
+
+
   const MessageComponent = ({ msg }: { msg: Message }) => (
     <div className={`flex ${msg.self ? "justify-end" : "justify-start"} group`}>
       <div
@@ -603,39 +1438,40 @@ if (meaningfulGroups.length > 0) {
         )}
 
         {/* Attachment preview */}
-        {msg.attachment && (
-          <div className="mb-2">
-            {msg.attachment.isImage ? (
-              <div className="relative">
-                <img
-                  src={msg.attachment.url}
-                  alt={msg.attachment.name}
-                  className="max-w-full h-auto rounded cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => handleImageClick(msg.attachment!.url!)}
-                />
-                <button
-                  onClick={() => handleImageClick(msg.attachment!.url!)}
-                  className="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-1 rounded-full hover:bg-opacity-70 transition-all"
-                >
-                  <Eye className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className={`p-3 rounded border ${msg.self ? 'bg-black/20 border-white/20' : 'bg-accent border-border'}`}>
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate text-sm">{msg.attachment.name}</p>
-                    <p className="text-xs opacity-70">{msg.attachment.size}</p>
-                  </div>
-                  <button className="p-1 hover:bg-black/20 rounded">
-                    <Download className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+        {msg.attachments?.map((attachment, idx) => (
+  <div key={idx} className="mb-2">
+    {attachment.file_type.startsWith("image/") ? (
+      <div className="relative">
+        <img
+          src={attachment.url}
+          alt={attachment.file_name}
+          className="max-w-full h-auto rounded cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => attachment.url && handleImageClick(attachment.url)}
+        />
+        <button
+          onClick={() => attachment.url && handleImageClick(attachment.url)}
+          className="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-1 rounded-full hover:bg-opacity-70 transition-all"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+      </div>
+    ) : (
+      <div className={`p-3 rounded border ${msg.self ? 'bg-black/20 border-white/20' : 'bg-accent border-border'}`}>
+        <div className="flex items-center gap-2">
+          <FileText className="w-5 h-5" />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate text-sm">{attachment.file_name}</p>
+            <p className="text-xs opacity-70">{(attachment.file_size / 1024).toFixed(1)} KB</p>
           </div>
-        )}
+          <a href={attachment.url} download className="p-1 hover:bg-black/20 rounded">
+            <Download className="w-4 h-4" />
+          </a>
+        </div>
+      </div>
+    )}
+  </div>
+))}
+
 
         <p className="text-sm">{msg.content}</p>
         
@@ -695,6 +1531,12 @@ if (meaningfulGroups.length > 0) {
               <MessageSquare className="w-5 h-5" />
               Secure Chat
             </button>
+                          {isDFIRAdmin && (
+              <Link to="/report-dashboard"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
+              <ClipboardList className="w-5 h-5" />
+              Case Reports
+            </button></Link>
+            )}
           </nav>
         </div>
       </div>)}
@@ -747,7 +1589,7 @@ if (meaningfulGroups.length > 0) {
               <div
                 key={group.id}
                 onClick={() => {
-                  setActiveChat(group);
+                  handleSelectGroup(group);
                   setGroups(prev =>
                     prev.map(g => g.id === group.id ? { ...g, unreadCount: 0 } : g)
                   );
@@ -760,9 +1602,14 @@ if (meaningfulGroups.length > 0) {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-accent rounded-full flex items-center justify-center text-xl">
-                    {group.avatar}
+                  <div className="w-12 h-12 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition" onClick={handleGroupImageClick}>
+                    <img
+                      src={group.group_url || "/default-group-avatar.png"}  // fallback image
+                      alt="Group Avatar"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-foreground truncate">{group.name}</h3>
@@ -815,16 +1662,52 @@ if (meaningfulGroups.length > 0) {
                 ) : (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-accent rounded-full flex items-center justify-center text-lg">
-                        {activeChat.avatar}
+                      <div className="relative">
+                        {/* Group Avatar (clickable) */}
+                        <div
+                          className="w-10 h-10 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition"
+                          onClick={handleGroupImageClick}
+                        >
+                          <img
+                            src={activeChat.group_url || "/default-group-avatar.png"}
+                            alt="Group Avatar"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+
+                        {/* Hidden File Input */}
+                        <input
+                          ref={fileInputGroupRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleGroupImageUpload}
+                        />
                       </div>
+
                       <div>
                         <h3 className="font-semibold text-foreground">{activeChat.name}</h3>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <p
+                          className="text-sm text-muted-foreground flex items-center gap-1 cursor-pointer hover:underline"
+                          onClick={() => setShowAddMembersModal(true)}
+                        >
                           <Users className="w-4 h-4" />
-                          {activeChat.members.length} members
+                          {activeChat?.members?.length ?? 0} members
                         </p>
+
+                        {activeChat.caseId && (
+                          <p className="text-xs text-muted-foreground">
+                            Linked Case:{" "}
+                            <Link
+                              to={`/case-management/${activeChat.caseId}`}
+                              className="text-blue-500 hover:underline"
+                            >
+                              {activeChat.caseId.slice(0, 8)}...
+                            </Link>
+                          </p>
+                        )}
                       </div>
+
                     </div>
                     <div className="relative" ref={moreMenuRef}>
                       <button 
@@ -848,23 +1731,38 @@ if (meaningfulGroups.length > 0) {
                             Search
                           </button>
                           <button
-                            onClick={() => {
-                              setShowAddMembersModal(true);
-                              setShowMoreMenu(false);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted"
-                          >
-                            <Users className="w-4 h-4" />
-                            Add Members
-                          </button>
+                          onClick={handleOpenAddMembersModal}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted"
+                        >
+                          <Users className="w-4 h-4" />
+                          Add Members
+                        </button>
+
                           <button
-                            onClick={handleExitGroup}
+                                onClick={() => {
+                                if (window.confirm("Are you sure you want to leave this group?")) {
+                                  handleLeaveGroup();
+                                }
+                              }}
                             className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted text-red-400"
                           >
                             <LogOut className="w-4 h-4" />
                             Exit Group
                           </button>
+                              <button
+                            onClick={() => {
+                              if (window.confirm("Are you sure you want to delete this group for everyone?")) {
+                                handleDeleteGroup();
+                              }
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted text-red-400"
+                          >
+                            <Trash className="w-4 h-4" />
+                            Delete Group
+                          </button>
+
                         </div>
+
                       )}
                     </div>
                   </div>
@@ -888,8 +1786,8 @@ if (meaningfulGroups.length > 0) {
                         Replying to {replyingTo.user}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {replyingTo.attachment 
-                          ? `📎 ${replyingTo.attachment.name}`
+                        {replyingTo.attachments?.[0]
+                          ? `📎 ${replyingTo.attachments[0].file_name}`
                           : replyingTo.content
                         }
                       </p>
@@ -904,45 +1802,56 @@ if (meaningfulGroups.length > 0) {
                 </div>
               )}
 
-            {/* Typing Indicator */}
-            {typingUsers[activeChat.id]?.length > 0 && (
-              <div className="px-4 py-2 text-sm text-muted-foreground">
-                {typingUsers[activeChat.id].join(", ")} {typingUsers[activeChat.id].length === 1 ? "is" : "are"} typing...
-              </div>
-            )}
-              {/* Message Input */}
-              <div className="p-4 border-t border-border bg-card">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-3 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                    title="Attach file"
-                  >
-                    <Paperclip className="w-5 h-5" />
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    onChange={handleFileSelection}
-                    className="hidden"
-                    accept="*/*"
-                  />
-                  <input
-                    type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(e)}
-                    placeholder="Type a secure message..."
-                    className="flex-1 p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    className="px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center justify-center transition-colors"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
+         {/* ✅ Message Input + Typing Indicator */}
+<div className="p-4 border-t border-border bg-card">
+  {/* Typing Indicator for other users */}
+  {typingUsers[activeChat?.id]?.filter((email) => email !== userEmail).length > 0 && (
+    <div className="text-sm text-muted-foreground mb-1 ml-2">
+      {typingUsers[activeChat.id]
+        .filter((email) => email !== userEmail)
+        .join(", ")}{" "}
+      {typingUsers[activeChat.id].length > 2 ? "are" : "is"} typing...
+    </div>
+  )}
+
+  {/* Input Row */}
+  <div className="flex items-center gap-2">
+    <button
+      onClick={() => fileInputRef.current?.click()}
+      className="p-3 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+      title="Attach file"
+    >
+      <Paperclip className="w-5 h-5" />
+    </button>
+    <input
+      ref={fileInputRef}
+      type="file"
+      onChange={handleFileSelection}
+      className="hidden"
+      accept="*/*"
+    />
+    <input
+      type="text"
+      value={message}
+      onChange={(e) => {
+        setMessage(e.target.value);
+        sendTypingNotification("typing_start");
+      }}
+      onBlur={() => sendTypingNotification("typing_stop")}
+      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(e)}
+      placeholder="Type a secure message..."
+      className="flex-1 p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
+    />
+    <button
+      onClick={handleSendMessage}
+      className="px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center justify-center transition-colors"
+    >
+      <Send className="w-5 h-5" />
+    </button>
+  </div>
+</div>
+{/* ✅ Old Message Input (Preserved) */}
+
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
@@ -1005,8 +1914,8 @@ if (meaningfulGroups.length > 0) {
                       Replying to {replyingTo.user}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {replyingTo.attachment 
-                        ? `📎 ${replyingTo.attachment.name}`
+                      {replyingTo.attachments?.[0]
+                        ? `📎 ${replyingTo.attachments[0].file_name}`
                         : replyingTo.content
                       }
                     </p>
@@ -1027,7 +1936,7 @@ if (meaningfulGroups.length > 0) {
                 type="text"
                 value={attachmentMessage}
                 onChange={(e) => setAttachmentMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendAttachment()}
+                onKeyPress={(e) => e.key === 'Enter' && sendAttachment()}
                 placeholder="Add a message..."
                 className="w-full p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
                 autoFocus
@@ -1043,7 +1952,7 @@ if (meaningfulGroups.length > 0) {
                 Cancel
               </button>
               <button
-                onClick={handleSendAttachment}
+                onClick={sendAttachment}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white flex items-center gap-2"
               >
                 <Send className="w-4 h-4" />
@@ -1078,34 +1987,52 @@ if (meaningfulGroups.length > 0) {
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border-[3px] border-border bg-background shadow-xl">
             <h3 className="text-xl font-bold mb-4">Create New Group</h3>
-            <div>
-              <input
-                type="text"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleCreateGroup(e)}
-                placeholder="Enter group name..."
-                className="w-full p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground mb-4"
-                autoFocus
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setShowNewGroupModal(false)}
-                  className="px-4 py-2 text-muted-foreground hover:text-foreground"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreateGroup}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white"
-                >
-                  Create
-                </button>
-              </div>
+
+            {/* Case Selector */}
+            <label className="block text-sm text-muted-foreground mb-1">Case associated with group chat</label>
+            <select
+              className="w-full p-3 rounded-lg bg-muted text-foreground border border-border mb-4"
+              value={selectedCaseId}
+              onChange={(e) => setSelectedCaseId(e.target.value)}
+            >
+              <option value="">-- Select an active case --</option>
+              {activeCases.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title || "Untitled Case"} ({c.id})
+                </option>
+              ))}
+            </select>
+
+            {/* Group name input */}
+            <input
+              type="text"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleCreateGroup(e)}
+              placeholder="Enter group name..."
+              className="w-full p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground mb-4"
+              autoFocus
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowNewGroupModal(false)}
+                className="px-4 py-2 text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={(e) => handleCreateGroup(e)}
+                disabled={!selectedCaseId}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white disabled:opacity-50"
+              >
+                Create
+              </button>
             </div>
           </div>
         </div>
       )}
+
       {/* Add Members Modal */}
       {showAddMembersModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -1124,47 +2051,79 @@ if (meaningfulGroups.length > 0) {
             <div className="mb-4">
               <h4 className="text-sm font-semibold text-muted-foreground mb-2">Current Members</h4>
               <div className="space-y-1 max-h-32 overflow-y-auto">
-                {activeChat?.members.map((member, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded text-sm">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    <span>{member}</span>
-                    {member === "You" && (
-                      <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">You</span>
-                    )}
-                  </div>
-                ))}
+             {activeChat?.members.map((member: string | { user_email: string; role: string }, index: number) => {
+              const email = typeof member === "string" ? member : member.user_email;
+
+              return (
+                <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded text-sm">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span>{email}</span>
+                  {email === userEmail && (
+                    <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">You</span>
+                  )}
+                </div>
+              );
+            })}
+
+
               </div>
             </div>
 
-            {/* Add New Member */}
-            <div className="mb-4">
-              <h4 className="text-sm font-semibold text-muted-foreground mb-2">Add New Member</h4>
-              <div className="space-y-3">
-                <input
-                  type="email"
-                  value={newMemberEmail}
-                  onChange={(e) => setNewMemberEmail(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddMember(e)}
-                  placeholder="Enter email address..."
-                  className="w-full p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
-                  autoFocus
-                />
+           {/* Add New Member */}
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-muted-foreground mb-2">Add New Member</h4>
+
+            <div className="space-y-3">
+              <select
+                value={newMemberEmail}
+                onChange={(e) => setNewMemberEmail(e.target.value)}
+                className="w-full p-3 rounded-lg bg-muted text-foreground border border-border"
+              >
+                <option value="">-- Select a collaborator --</option>
+
+                {availableUsers &&
+                  activeChat?.members &&
+                  availableUsers.filter(userObj =>
+                    !activeChat.members.includes(userObj.user_email)
+                  ).length === 0 && (
+                    <option disabled value="">
+                      No available collaborators
+                    </option>
+                  )}
+
+                {availableUsers &&
+                  activeChat?.members &&
+                  availableUsers
+                    .filter(userObj =>
+                      !activeChat.members.includes(userObj.user_email)
+                    )
+                    .map(userObj => (
+                      <option key={userObj.user_email} value={userObj.user_email}>
+                        {userObj.user_email} ({userObj.role})
+                      </option>
+                    ))}
+              </select>
+
+
+        
+
                 
                 {/* Quick Add Suggestions */}
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">Quick Add:</p>
                   <div className="grid grid-cols-1 gap-1 max-h-32 overflow-y-auto">
                     {availableUsers
-                      .filter(user => !activeChat?.members.includes(user))
-                      .map((user) => (
-                      <button
-                        key={user}
-                        onClick={() => setNewMemberEmail(user)}
-                        className="text-left p-2 hover:bg-muted rounded text-sm border border-border"
-                      >
-                        {user}
-                      </button>
+                      .filter(userObj => !activeChat?.members.includes(userObj.user_email))
+                      .map(userObj => (
+                        <button
+                          key={userObj.user_email}
+                          onClick={() => setNewMemberEmail(userObj.user_email)}
+                          className="..."
+                        >
+                          {userObj.user_email} ({userObj.role})
+                        </button>
                     ))}
+
                   </div>
                 </div>
               </div>
@@ -1190,6 +2149,50 @@ if (meaningfulGroups.length > 0) {
           </div>
         </div>
       )}
+      {/* Edit Group Modal */}
+      {showEditGroupModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="rounded-lg p-6 w-full max-w-md bg-background shadow-xl border-[3px] border-border">
+      <h3 className="text-xl font-bold mb-4">Edit Group</h3>
+      <input
+        type="text"
+        value={editGroupName}
+        onChange={(e) => setEditGroupName(e.target.value)}
+        placeholder="Group name"
+        className="w-full mb-3 p-3 rounded bg-muted border border-border"
+      />
+      <textarea
+        value={editDescription}
+        onChange={(e) => setEditDescription(e.target.value)}
+        placeholder="Description"
+        className="w-full mb-3 p-3 rounded bg-muted border border-border"
+      />
+      <label className="flex items-center gap-2 mb-4">
+        <input
+          type="checkbox"
+          checked={editIsPublic}
+          onChange={() => setEditIsPublic(!editIsPublic)}
+        />
+        Public group
+      </label>
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setShowEditGroupModal(false)}
+          className="px-4 py-2 text-muted-foreground hover:text-foreground"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={updateGroup}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
     </div>
   );

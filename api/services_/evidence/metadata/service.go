@@ -2,11 +2,12 @@ package metadata
 
 import (
 	upload "aegis-api/services_/evidence/upload"
+	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
-	"os"
 
 	"github.com/google/uuid"
 )
@@ -23,59 +24,59 @@ func NewService(repo Repository, ipfs upload.IPFSClientImp) *Service {
 }
 
 // UploadEvidence uploads a file to IPFS and saves evidence data, including metadata.
+// UploadEvidence streams the file to IPFS and computes checksum on-the-fly.
+// UploadEvidence uploads evidence to IPFS and saves metadata into the database.
+// Supports multi-tenancy (tenant & team).
 func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
-	// Upload the file to IPFS and get its CID
-	cid, err := s.ipfs.UploadFile(data.FilePath)
+	//  Compute SHA256 checksum while streaming to IPFS
+	sha256Hasher := sha256.New()
+	md5Hasher := md5.New()
+
+	tee := io.TeeReader(data.FileData, io.MultiWriter(sha256Hasher, md5Hasher))
+
+	// Upload to IPFS
+	cid, err := s.ipfs.UploadFile(tee)
 	if err != nil {
-		return err
+		return fmt.Errorf("IPFS upload failed: %w", err)
 	}
-	// Compute SHA-256 checksum
-	checksum, err := computeChecksum(data.FilePath)
-	if err != nil {
-		return err
+	sha256Sum := hex.EncodeToString(sha256Hasher.Sum(nil))
+	md5Sum := hex.EncodeToString(md5Hasher.Sum(nil))
+	//  Merge into metadata JSON
+	if data.Metadata == nil {
+		data.Metadata = make(map[string]string)
 	}
+	data.Metadata["sha256"] = sha256Sum
+	data.Metadata["md5"] = md5Sum
+
 	metadataJSON, err := json.Marshal(data.Metadata)
 	if err != nil {
-		return err
+		return fmt.Errorf("metadata JSON marshal failed: %w", err)
 	}
-	// Construct the evidence record
+
+	// Build Evidence record with multi-tenancy
 	e := &Evidence{
 		ID:         uuid.New(),
 		CaseID:     data.CaseID,
 		UploadedBy: data.UploadedBy,
+		TenantID:   data.TenantID,
+		TeamID:     data.TeamID,
 		Filename:   data.Filename,
 		FileType:   data.FileType,
 		IpfsCID:    cid,
 		FileSize:   data.FileSize,
-		Checksum:   checksum,
-		Metadata:   string(metadataJSON), // Convert map[string]string to datatypes.JSONMap
+		Checksum:   sha256Sum,
+		Metadata:   string(metadataJSON),
 	}
 
-	// Save the record
 	return s.repo.SaveEvidence(e)
 }
 
-// convertToJSONMap converts a map[string]string to map[string]interface{} for use with datatypes.JSONMap.
-func convertToJSONMap(m map[string]string) map[string]interface{} {
-	result := make(map[string]interface{}, len(m))
-	for k, v := range m {
-		result[k] = v
-	}
-	return result
+// GetEvidenceByCaseID returns all evidence records for a given case.
+func (s *Service) GetEvidenceByCaseID(caseID uuid.UUID) ([]Evidence, error) {
+	return s.repo.FindEvidenceByCaseID(caseID)
 }
 
-// computeChecksum reads the file at the given path and returns a SHA-256 checksum.
-func computeChecksum(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(hasher.Sum(nil)), nil
+// FindEvidenceByID retrieves an evidence record by its ID.
+func (s *Service) FindEvidenceByID(id uuid.UUID) (*Evidence, error) {
+	return s.repo.FindEvidenceByID(id)
 }

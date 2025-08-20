@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"net/http"
 
+	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -20,6 +21,8 @@ type ChatRepository interface {
 	RemoveMemberFromGroup(ctx context.Context, groupID primitive.ObjectID, userEmail string) error
 	IsUserInGroup(ctx context.Context, groupID primitive.ObjectID, userEmail string) (bool, error)
 	UpdateLastMessage(ctx context.Context, groupID primitive.ObjectID, lastMessage *LastMessage) error
+	GetGroupsByCaseID(ctx context.Context, caseID primitive.ObjectID) ([]*ChatGroup, error)
+	UpdateGroupImage(ctx context.Context, groupID primitive.ObjectID, imageURL string) error
 
 	// Message operations
 	CreateMessage(ctx context.Context, message *Message) error
@@ -35,10 +38,8 @@ type ChatRepository interface {
 	GetGroupMembers(ctx context.Context, groupID primitive.ObjectID) ([]*Member, error)
 	IsGroupAdmin(ctx context.Context, groupID primitive.ObjectID, userEmail string) (bool, error)
 
-
-	GetUndeliveredMessages(ctx context.Context, userEmail string, limit int, before *primitive.ObjectID) ([]*Message, error) 
+	GetUndeliveredMessages(ctx context.Context, userEmail string, limit int, before *primitive.ObjectID) ([]*Message, error)
 	MarkMessagesAsDelivered(ctx context.Context, groupID primitive.ObjectID, messageIDs []primitive.ObjectID, userEmail string) error
-
 }
 
 // IPFSUploader defines the interface for IPFS file operations
@@ -58,10 +59,12 @@ type UserService interface {
 
 // WebSocketManager defines the interface for real-time communication
 type WebSocketManager interface {
-	BroadcastToGroup(groupID string, message interface{}) error
+	BroadcastToGroup(groupID string, message WebSocketMessage) error
 	SendToUser(userEmail string, message interface{}) error
-	AddUserToGroup(userEmail, groupID string) error
+	AddUserToGroup(userEmail string, groupID, caseID string, conn *websocket.Conn) error
 	RemoveUserFromGroup(userEmail, groupID string) error
 	GetActiveUsers(groupID string) []string
-	HandleConnection(userEmail string, w http.ResponseWriter, r *http.Request) error
+	HandleConnection(wr http.ResponseWriter, r *http.Request) error
+	BroadcastToCase(caseID string, message WebSocketMessage) error
+	AddConnection(userID, caseID string, conn *websocket.Conn)
 }

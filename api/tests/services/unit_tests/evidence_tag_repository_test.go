@@ -5,13 +5,13 @@ import (
 	"regexp"
 	"testing"
 
+	repositories "aegis-api/services_/evidence/evidence_tag"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-
-	"aegis-api/repositories"
 )
 
 func setupEvidenceTestDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, func()) {
@@ -42,7 +42,7 @@ func TestAddTagsToEvidence(t *testing.T) {
 
 	// Tag not found
 	mock.ExpectQuery(regexp.QuoteMeta(
-		`SELECT * FROM "tags" WHERE "tags"."name" = $1 ORDER BY "tags"."id" LIMIT $2`,
+		`SELECT * FROM "tags" WHERE name = $1 ORDER BY "tags"."id" LIMIT $2`,
 	)).
 		WithArgs("urgent", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name"})) // simulate not found
@@ -80,17 +80,19 @@ func TestRemoveTagsFromEvidence(t *testing.T) {
 
 	// Expect lookup
 	mock.ExpectQuery(regexp.QuoteMeta(
-		`SELECT * FROM "tags" WHERE "tags"."name" = $1 ORDER BY "tags"."id" LIMIT $2`,
-	)).
-		WithArgs("duplicate", 1).
+		`SELECT * FROM "tags" WHERE name = $1 ORDER BY "tags"."id" LIMIT $2`,
+	)).WithArgs("duplicate", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(3, "duplicate"))
 
+	// Expect transaction
+	mock.ExpectBegin()
 	// Expect delete
 	mock.ExpectExec(regexp.QuoteMeta(
 		`DELETE FROM "evidence_tags" WHERE evidence_id = $1 AND tag_id = $2`,
 	)).
-		WithArgs(evidenceID, 3).
-		WillReturnResult(sqlmock.NewResult(1, 1))
+		WithArgs(evidenceID.String(), 3).
+		WillReturnResult(sqlmock.NewResult(-1, 1))
+	mock.ExpectCommit()
 
 	err := repo.RemoveTagsFromEvidence(context.Background(), userID, evidenceID, []string{tagName})
 	assert.NoError(t, err)
@@ -105,7 +107,7 @@ func TestGetTagsForEvidence(t *testing.T) {
 	evidenceID := uuid.New()
 
 	mock.ExpectQuery(regexp.QuoteMeta(
-		`SELECT tags.name FROM tags JOIN evidence_tags ON tags.id = evidence_tags.tag_id WHERE evidence_tags.evidence_id = $1`,
+		`SELECT tags.name FROM "tags" JOIN evidence_tags ON tags.id = evidence_tags.tag_id WHERE evidence_tags.evidence_id = $1`,
 	)).
 		WithArgs(evidenceID).
 		WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow("urgent").AddRow("legal"))

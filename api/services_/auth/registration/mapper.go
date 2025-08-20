@@ -24,6 +24,8 @@ func ModelToEntity(model UserModel, id uuid.UUID) User {
 		Email:               model.Email,
 		PasswordHash:        model.PasswordHash,
 		Role:                model.Role,
+		TenantID:            model.TenantID,
+		TeamID:              model.TeamID,
 		CreatedAt:           time.Now(),
 		IsVerified:          false,
 		TokenVersion:        1, // default for all users
@@ -55,5 +57,7 @@ func NewUserModel(req RegistrationRequest, hash string) UserModel {
 		Email:        req.Email,
 		PasswordHash: hash,
 		Role:         req.Role,
+		TenantID:     req.TenantID,
+		TeamID:       req.TeamID,
 	}
 }
