@@ -9,11 +9,12 @@ import {
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Link } from "react-router-dom";
+import Confetti from "react-confetti";
 // @ts-ignore
 import useRegistrationForm from "./team_register";
 
 export const TeamRegistrationPage = (): JSX.Element => {
-  const { formData, errors, handleChange, handleSubmit } = useRegistrationForm();
+  const { formData, errors, handleChange, handleSubmit,showPopup } = useRegistrationForm();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] flex items-center justify-center px-4">
@@ -144,6 +145,24 @@ export const TeamRegistrationPage = (): JSX.Element => {
           </CardContent>
         </Card>
       </div>
+        {/* 🎉 AEGIS Popup */}
+        {showPopup && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+            <Confetti
+              colors={["#1E3A8A", "#FFFFFF", "#000000"]}
+              numberOfPieces={300}
+              recycle={false}
+            />
+            <div className="bg-black text-white shadow-2xl rounded-3xl p-10 text-center max-w-lg border border-blue-500 animate-float-drift animate-fade-out">
+              <h2 className="text-3xl font-extrabold text-blue-400 mb-4">🎉 You’ve been registered!</h2>
+              <p className="text-gray-200 text-lg">
+                An email has been sent to verify your email.
+                <br />
+                Welcome to the <span className="font-semibold">AEGIS</span> family, may your logs be clear and your cases epic, fellow <em>Aegy</em>!
+              </p>
+            </div>
+          </div>
+        )}
     </div>
   );
 };

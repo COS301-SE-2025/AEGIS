@@ -127,7 +127,7 @@ func (s *RegistrationService) Register(req RegistrationRequest) (User, error) {
 	model := NewUserModel(req, string(hash))
 	id := generateID()
 	entity := ModelToEntity(model, id)
-	entity.IsVerified = true
+	entity.IsVerified = false // Default to false until verified
 
 	err = s.repo.CreateUser(&entity)
 	if err != nil {
