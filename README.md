@@ -55,6 +55,7 @@
 |------|--------|------|
 | Demo 1 | [Slides 1](https://www.canva.com/design/DAGokHxWRMc/CcAMEt2TOs7UyCsaF5az5Q/edit?utm_content=DAGokHxWRMc&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton) | [Video 1](https://www.canva.com/design/DAGovaFWF1A/9p8YYCu-lPYkveH85GLx3Q/edit?utm_content=DAGovaFWF1A&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton) |
 | Demo 2 | [Slides 2](https://www.canva.com/design/DAGriVcVSVU/c-BVMfflQsWLy4KdUPE4Iw/edit) | [Video 2]() |
+| Demo 3 | [Slides 3](https://www.canva.com/design/DAGwnL6taso/XXWV_-clkquLt6cd08SZuA/edit?utm_content=DAGwnL6taso&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton) | [Video 3]() |
 
 
 # Project Management:
