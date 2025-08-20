@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 const useRegistrationForm = () => {
@@ -11,6 +11,7 @@ const useRegistrationForm = () => {
   });
 
   const [errors, setErrors] = useState({});
+  const [showPopup, setShowPopup] = useState(false); 
   const navigate = useNavigate();
 
   const validate = () => {
@@ -79,7 +80,7 @@ const handleChange = (e) => {
       const payload = await res.json();
 
       if (res.ok && payload.success) {
-        navigate("/teams");
+        setShowPopup(true);
       } else {
         setErrors({ general: payload.message || "Registration failed" });
       }
@@ -87,8 +88,19 @@ const handleChange = (e) => {
       setErrors({ general: err.message || "Network error" });
     }
   };
+  
+    // auto-close popup after 3s with fade out
+  useEffect(() => {
+    if (showPopup) {
+      const timer = setTimeout(() => {
+        setShowPopup(false);
+        navigate("/teams");
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showPopup, navigate]);
 
-  return { formData, handleChange, handleSubmit, errors };
+  return { formData, handleChange, handleSubmit, errors,showPopup };
 };
 
 export default useRegistrationForm;

@@ -89,3 +89,31 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+@layer utilities {
+  /* Float up-down + side-to-side + slight rotation */
+  @keyframes float-drift {
+    0%   { transform: translate(0, 0) rotate(0deg); }
+    20%  { transform: translate(5px, -10px) rotate(-1deg); }
+    40%  { transform: translate(-5px, -15px) rotate(1deg); }
+    60%  { transform: translate(5px, -10px) rotate(-1deg); }
+    80%  { transform: translate(-5px, -5px) rotate(1deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
+  }
+
+  /* Fade out */
+  @keyframes fade-out {
+    0%   { opacity: 1; }
+    80%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  .animate-float-drift {
+    animation: float-drift 4s ease-in-out infinite;
+  }
+
+  .animate-fade-out {
+    animation: fade-out 5s forwards;
+  }
+}
+
