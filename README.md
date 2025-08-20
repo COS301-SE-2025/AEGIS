@@ -19,10 +19,36 @@
   <p>AEGIS (Advanced Evidence Gathering and Investigation System) is a secure, on-premise Digital Forensics and Incident Response (DFIR) platform designed to help cybersecurity teams investigate, collaborate, and manage cases involving digital evidence.</p>
 </div>
 
-# Documentation Links:
-| Document | Description | 
-|----------|-------------|
-| [SRS](https://drive.google.com/drive/folders/1a484FLVYnxHlSkHjc4Zql1wG46k02IG6) | Demo 2 Documents | 
+# Documentation Links
+
+<details>
+  <summary>Demo 2</summary>
+
+  | Document | Description |
+  |----------|-------------|
+  | [SRS](https://drive.google.com/drive/folders/1a484FLVYnxHlSkHjc4Zql1wG46k02IG6) | Demo 2 Documents |
+
+</details>
+
+<details>
+  <summary>Demo 3</summary>
+
+  | Document | Description |
+  |----------|-------------|
+  | [SRS](https://drive.google.com/file/d/1lCT50PbuHdsouuJmu9K0-wVSYiKskYut/view?usp=sharing) | Demo 3 Documents |
+  | [Architectural diagram](https://drive.google.com/file/d/10I5IYFkeHBX6L_WePDfX8Q5JswM1XnTc/view?usp=sharing) | Demo 3 Documents |
+  | [Quality requirements](https://drive.google.com/file/d/1bEngPS-4aBUXjf5EynU4K1AATxPUpN_I/view?usp=sharing) |Demo 3 Documents |
+  | [Deployment model](https://drive.google.com/file/d/1IORpxldCfHO4uxPluXhhs3yAHGH2b4Cr/view?usp=sharing) | Demo 3 Documents |
+  | [Service contract](https://drive.google.com/drive/folders/1ypSboV9YTmVP0C6rjvPB-r5kd4u3oYjd?usp=sharing) | Demo 3 Documents |
+  | [Coding standards](https://drive.google.com/file/d/1N63lDs5rWEVKWpBTXT2dibA0oVt74EoZ/view?usp=sharing) | Demo 3 Documents |
+  | [User manual](https://drive.google.com/file/d/1gd_DFTVll9bDsyA8CVKC4sTIi-e_QJJR/view?usp=sharing) | Demo 3 Documents |
+  | [Technical installation manual](https://drive.google.com/file/d/1k_1-4pNVTelEN1vtCNoU_zVSOenJAYFg/view?usp=sharing) |Demo 3 Documents|
+  | [Technical requirements](https://drive.google.com/file/d/10yI44f_3lV42OwnvUVhe7tlSZMgeyAfP/view?usp=sharing) | Demo 3 Documents |
+  
+  
+
+</details>
+
 
 # Demos:
 | Demo | Demo Slides | Demo Video |
