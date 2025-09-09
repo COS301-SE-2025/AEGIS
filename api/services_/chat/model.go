@@ -146,6 +146,8 @@ const (
 	EventMarkNotificationRead EventType = "mark_notification_read"
 	EventArchiveNotification  EventType = "archive_notification"
 	EventDeleteNotification   EventType = "delete_notification"
+	EventNotificationSync     EventType = "notification_sync"
+	EventUnreadCount          EventType = "unread_count"
 )
 
 type MarkReadPayload struct {

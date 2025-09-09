@@ -21,6 +21,7 @@ type CaseUserRole struct {
 	Role       string // One of your user_role ENUM values
 	AssignedAt time.Time
 	TenantID   uuid.UUID
+	TeamID     uuid.UUID
 }
 type User struct {
 	ID        uuid.UUID

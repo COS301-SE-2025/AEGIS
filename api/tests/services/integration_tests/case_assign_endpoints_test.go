@@ -30,6 +30,20 @@ func countMapping(t *testing.T, userID, caseID uuid.UUID) int {
 	return n
 }
 
+// helper: fetch the persisted team_id for a mapping
+func getMappingTeamID(t *testing.T, userID, caseID uuid.UUID) uuid.UUID {
+	t.Helper()
+	var teamIDStr string
+	err := pgSQL.QueryRow(
+		`SELECT team_id::text FROM case_user_roles WHERE user_id=$1 AND case_id=$2`,
+		userID, caseID,
+	).Scan(&teamIDStr)
+	require.NoError(t, err)
+	got, err := uuid.Parse(teamIDStr)
+	require.NoError(t, err)
+	return got
+}
+
 func Test_CaseAssign_Then_Unassign(t *testing.T) {
 	caseID := uuid.New()
 	insertCaseRow(t, caseID)
@@ -49,6 +63,10 @@ func Test_CaseAssign_Then_Unassign(t *testing.T) {
 
 	// verify in DB
 	require.Equal(t, 1, countMapping(t, FixedUserID, caseID))
+
+	// NEW: verify team_id persisted correctly
+	gotTeam := getMappingTeamID(t, FixedUserID, caseID)
+	require.Equal(t, FixedTeamID, gotTeam, "team_id should match FixedTeamID")
 
 	// --- Duplicate assign -> 409
 	w = doRequest("POST", "/cases/assign", body)

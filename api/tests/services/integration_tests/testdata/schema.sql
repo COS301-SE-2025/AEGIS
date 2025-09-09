@@ -294,6 +294,7 @@ CREATE TABLE IF NOT EXISTS case_user_roles (
   role user_role NOT NULL,
   assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL,
+  team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
   PRIMARY KEY (user_id, case_id)
 );
 CREATE INDEX IF NOT EXISTS idx_case_user_roles_case_id ON case_user_roles(case_id);

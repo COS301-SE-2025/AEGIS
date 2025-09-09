@@ -511,7 +511,9 @@ CREATE TABLE case_user_roles (
     PRIMARY KEY (user_id, case_id),
     -- New Fields
     tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
+    team_id UUID REFERENCES tenants(id) ON DELETE SET NULL 
 );
+CREATE INDEX IF NOT EXISTS idx_case_user_roles_team_id ON case_user_roles(team_id);
 
 -- Indexes to support performance (optional but recommended)
 CREATE INDEX idx_case_user_roles_case_id ON case_user_roles(case_id);

@@ -65,7 +65,7 @@ const handleSubmit = async (e) => {
       sessionStorage.setItem("tenantId", userData.tenantId);
       sessionStorage.setItem("teamId", userData.teamId);
       sessionStorage.setItem("user", JSON.stringify(userData));
-
+      window.dispatchEvent(new Event("auth:updated"));
       // Audit log
       const loginAuditEntry = {
         timestamp: new Date().toISOString(),

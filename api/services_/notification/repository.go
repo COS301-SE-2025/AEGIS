@@ -34,7 +34,7 @@ func (s *NotificationService) SaveNotification(n *Notification) error {
 func (s *NotificationService) GetNotificationsForUser(tenantID, teamID, userID string) ([]Notification, error) {
 	var notifications []Notification
 	err := s.DB.
-		Where("tenant_id = ? AND team_id = ? AND user_id = ?", tenantID, teamID, userID).
+		Where("tenant_id = ? AND user_id = ?", tenantID, userID).
 		Order("timestamp DESC").
 		Find(&notifications).Error
 	return notifications, err

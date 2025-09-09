@@ -38,6 +38,7 @@
     "quill": "^2.0.3",
     "react": "^18.2.0",
     "react-beautiful-dnd": "^13.1.1",
+    "react-confetti": "^6.4.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.5.2",
     "react-quill": "^2.0.0",

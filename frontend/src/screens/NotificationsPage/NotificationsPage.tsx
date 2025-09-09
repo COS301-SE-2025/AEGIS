@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-
+import { setUnreadCount } from "../../lib/unreadCount";
 import { cn } from "../../lib/utils"; // Utility for conditional styling
 
 type Notification = {
@@ -32,7 +32,13 @@ const tenantID = sessionStorage.getItem("tenantId"); // store on login
 
 // Compute unread notifications
 const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
+// After your `useState` for notifications, add a helper:
+function recalcAndPersist(next: Notification[]) { // NEW
+  const unread = next.filter(n => !n.read && !n.archived).length;
+  setUnreadCount(unread);
+}
 
+// NE
 // 1️⃣ Fetch initial notifications from backend REST API
 useEffect(() => {
   async function fetchNotifications() {
@@ -49,7 +55,9 @@ useEffect(() => {
         ...n,
         timestamp: new Date(n.timestamp).toLocaleString(),
       }));
-      setNotifications(formatted);
+      // In your initial fetch, after setNotifications(formatted):
+setNotifications(formatted);
+//recalcAndPersist(formatted); 
     } catch (err) {
       console.error("Error fetching notifications:", err);
     }
@@ -69,36 +77,45 @@ useEffect(() => {
 
   ws.onopen = () => console.log("🔗 Connected to notifications WebSocket");
 
-  ws.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data);
+ ws.onmessage = (event) => {
+  try {
+    const msg = JSON.parse(event.data);
 
-      switch (msg.type) {
-        case "notification":
-        case "EventNotification":
-          setNotifications((prev) => [
+    switch (msg.type) {
+      case "notification":
+      case "EventNotification":
+        setNotifications((prev) => {
+          const next = [
             {
               ...msg.payload,
               timestamp: new Date(msg.payload.timestamp).toLocaleString(),
             },
             ...prev,
-          ]);
-          break;
+          ];
+         // recalcAndPersist(next);
+          return next;
+        });
+        break;
 
-        case "mark_notification_read":
-          const ids: string[] = msg.payload.notificationIds || [];
-          setNotifications((prev) =>
-            prev.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n))
+      case "mark_notification_read": {
+        const ids: string[] = msg.payload.notificationIds || [];
+        setNotifications((prev) => {
+          const next = prev.map((n) =>
+            ids.includes(n.id) ? { ...n, read: true } : n
           );
-          break;
-
-        default:
-          console.warn("⚠️ Unhandled WS message type:", msg.type);
+          recalcAndPersist(next);
+          return next;
+        });
+        break;
       }
-    } catch (err) {
-      console.error("Failed to parse WS message", err);
+
+      default:
+        console.warn("⚠️ Unhandled WS message type:", msg.type);
     }
-  };
+  } catch (err) {
+    console.error("Failed to parse WS message", err);
+  }
+};
 
   ws.onclose = () => console.log("❌ Notifications WebSocket closed");
 
@@ -108,15 +125,16 @@ useEffect(() => {
 // 3️⃣ Mark as Read (local + WebSocket + optional REST call)
 const markAsRead = async () => {
   if (selected.length === 0) return;
-
-  // Update locally
-  setNotifications((prev) =>
-    prev.map((n) => (selected.includes(n.id) ? { ...n, read: true } : n))
-  );
-
-  // Clear selection
   const idsToMark = [...selected];
   setSelected([]);
+
+  setNotifications((prev) => {
+    const next = prev.map((n) =>
+      idsToMark.includes(n.id) ? { ...n, read: true } : n
+    );
+    //recalcAndPersist(next);
+    return next;
+  });
 
   // Send WebSocket event
   const ws = wsRef.current;
@@ -148,16 +166,16 @@ const markAsRead = async () => {
 // Archive selected notifications
 const archiveSelected = async () => {
   if (selected.length === 0) return;
-
-  // 1. Update local state immediately
-  setNotifications((prev) =>
-    prev.map((n) =>
-      selected.includes(n.id) ? { ...n, archived: true } : n
-    )
-  );
-
   const idsToArchive = [...selected];
   setSelected([]);
+
+  setNotifications((prev) => {
+    const next = prev.map((n) =>
+      idsToArchive.includes(n.id) ? { ...n, archived: true } : n
+    );
+   // recalcAndPersist(next);
+    return next;
+  });
 
   // 2. Send WebSocket event
   const ws = wsRef.current;
@@ -188,14 +206,14 @@ const archiveSelected = async () => {
 // Delete selected notifications
 const deleteSelected = async () => {
   if (selected.length === 0) return;
-
-  // 1. Update local state immediately
   const idsToDelete = [...selected];
-  setNotifications((prev) =>
-    prev.filter((n) => !idsToDelete.includes(n.id))
-  );
-
   setSelected([]);
+
+  setNotifications((prev) => {
+    const next = prev.filter((n) => !idsToDelete.includes(n.id));
+   // recalcAndPersist(next);
+    return next;
+  });
 
   // 2. Send WebSocket event
   const ws = wsRef.current;
@@ -223,6 +241,9 @@ const deleteSelected = async () => {
   }
 };
 
+useEffect(() => {
+  recalcAndPersist(notifications);
+}, [notifications]);
 
 
   const filteredNotifications = notifications
@@ -280,15 +301,26 @@ const deleteSelected = async () => {
         {/* <h1 className="text-2xl font-semibold flex items-center gap-2">
           <Bell className="w-6 h-6" /> Notifications
         </h1> */}
-        <h1 className="text-2xl font-semibold flex items-center gap-2 relative">
-          <Bell className="w-6 h-6" />
-          Notifications
-          {unreadCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">
-              {unreadCount}
-            </span>
-          )}
-        </h1>
+        <h1 className="text-2xl font-semibold flex items-center gap-2">
+  <span className="relative inline-block">
+    <Bell className="w-6 h-6" />
+    {unreadCount > 0 && (
+      <span
+        className="
+          absolute -top-1 -right-1 translate-x-1/2 -translate-y-1/2
+          bg-red-600 text-white text-[10px] leading-none
+          min-w-4 h-4 px-1 flex items-center justify-center
+          rounded-full pointer-events-none
+        "
+      >
+        {unreadCount > 99 ? '99+' : unreadCount}
+      </span>
+    )}
+  </span>
+
+  <span>Notifications</span>
+</h1>
+
 
         <div className="flex items-center gap-4">
           <Link to="/dashboard">

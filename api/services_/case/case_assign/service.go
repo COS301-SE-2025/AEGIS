@@ -4,6 +4,7 @@ import (
 	"aegis-api/pkg/websocket"
 	"aegis-api/services_/notification"
 	"errors"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -25,7 +26,7 @@ func NewCaseAssignmentService(
 	}
 }
 
-// This method now takes the assigner's role directly
+// AFTER
 func (s *CaseAssignmentService) AssignUserToCase(
 	assignerRole string,
 	assigneeID uuid.UUID,
@@ -33,28 +34,59 @@ func (s *CaseAssignmentService) AssignUserToCase(
 	assignerID uuid.UUID,
 	role string,
 	tenantID uuid.UUID,
+	teamID uuid.UUID,
 ) error {
 	if assignerRole != "DFIR Admin" {
 		return errors.New("forbidden: admin privileges required")
 	}
+	if s.notificationService == nil {
+		return errors.New("notification service not initialized")
+	}
+	if s.hub == nil {
+		return errors.New("websocket hub not initialized")
+	}
 
-	// // Fetch both users
-	// assigner, err := s.userRepo.GetUserByID(assignerID)
-	// if err != nil {
-	// 	return err
-	// }
-	// assignee, err := s.userRepo.GetUserByID(assigneeID)
-	// if err != nil {
-	// 	return err
-	// }
+	assignee, err := s.userRepo.GetUserByID(assigneeID)
+	if err != nil {
+		return fmt.Errorf("get assignee: %w", err)
+	}
 
-	// // Ensure both belong to the same tenant
-	// if assigner.TenantID != assignee.TenantID {
-	// 	return errors.New("cannot assign users from a different tenant")
-	// }
+	// Resolve final IDs
+	tID := tenantID
+	if tID == uuid.Nil && assignee.TenantID != uuid.Nil {
+		tID = assignee.TenantID
+	}
+	tmID := teamID
+	if tmID == uuid.Nil && assignee.TeamID != uuid.Nil {
+		tmID = assignee.TeamID
+	}
 
-	return s.repo.AssignRole(assigneeID, caseID, role, tenantID)
+	// Persist notification
+	n := &notification.Notification{
+		UserID:   assigneeID.String(),
+		TenantID: tID.String(),
+		TeamID:   tmID.String(),
+		Title:    "Assigned to Case",
+		Message:  "You have been assigned to a case: " + caseID.String(),
+	}
+	if err := s.notificationService.SaveNotification(n); err != nil {
+		return fmt.Errorf("save notification: %w", err)
+	}
 
+	// Best-effort WS push
+	if err := websocket.NotifyUser(
+		s.hub, s.notificationService,
+		assigneeID.String(), tID.String(), tmID.String(),
+		n.Title, n.Message,
+	); err != nil {
+		fmt.Printf("websocket.NotifyUser failed (notification_id=%s): %v\n", n.ID, err)
+	}
+
+	// Now pass teamID as well (5 args)
+	if err := s.repo.AssignRole(assigneeID, caseID, role, tID, tmID); err != nil {
+		return fmt.Errorf("assign role: %w", err)
+	}
+	return nil
 }
 
 func (s *CaseAssignmentService) UnassignUserFromCase(ctx *gin.Context, assigneeID, caseID uuid.UUID) error {

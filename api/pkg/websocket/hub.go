@@ -5,6 +5,7 @@ import (
 	"aegis-api/services_/chat"
 	"aegis-api/services_/notification"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -31,12 +32,16 @@ type Claims struct {
 	UserID       string `json:"user_id"`
 	Role         string `json:"role"`
 	FullName     string `json:"fullName"`
+	TeamID       string `json:"team_id"`
+	TenantID     string `json:"tenant_id"`
 	TokenVersion int    `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
 // Ensure Hub implements the chat.WebSocketManager interface
 var _ chat.WebSocketManager = (*Hub)(nil)
+
+var ErrNoActiveConnection = errors.New("no active connection found for user")
 
 func NewHub(notificationService *notification.NotificationService) *Hub {
 	return &Hub{
@@ -150,11 +155,10 @@ func (h *Hub) AddUserToGroup(userID, userEmail, caseID string, conn *websocket.C
 	}
 
 	// Close existing connection if any
-	if oldConn, exists := h.connections[caseID][userEmail]; exists && oldConn != conn {
+	if oldConn, exists := h.connections[caseID][userID]; exists && oldConn != conn {
 		_ = oldConn.Close()
 	}
-
-	h.connections[caseID][userEmail] = conn
+	h.connections[caseID][userID] = conn
 
 	log.Printf("✅ Added user %s (ID: %s) to group %s\n", userEmail, userID, caseID)
 	return nil
@@ -325,6 +329,7 @@ func (h *Hub) HandleConnection(w http.ResponseWriter, r *http.Request) error {
 	h.AddUserToGroup(userID, claims.Email, caseID, conn)
 	log.Printf("✅ WebSocket upgraded for user %s in case %s\n", userID, caseID)
 
+	h.syncNotificationsOnConnect(userID, claims.TenantID, claims.TeamID) // Sync notifications upon being online
 	// Start pumps
 	go client.writePump()
 	go client.readPump()
@@ -575,5 +580,5 @@ func (h *Hub) SendToUser(userID string, message interface{}) error {
 		}
 	}
 
-	return fmt.Errorf("no active connection found for user %s", userID)
+	return ErrNoActiveConnection
 }

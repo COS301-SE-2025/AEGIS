@@ -3,7 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 
 export default function NextStepsPage() {
-  const { id: caseId } = useParams();
+  //const { id: caseId } = useParams();
+  const caseId = useParams().id || JSON.parse(localStorage.getItem("currentCase") || "{}").id;
+  console.log("Case ID from params of next-page:", caseId);
+
   const navigate = useNavigate();
 
   return (

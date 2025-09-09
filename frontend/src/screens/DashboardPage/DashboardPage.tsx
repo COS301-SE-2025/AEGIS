@@ -25,8 +25,7 @@ import { ClipboardList } from "lucide-react";
 import { ThreatLandscape } from "../../components/ui/ThreatLandscape";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import React from "react";
-
-
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 
 interface CaseCard {
   id: string;
@@ -60,24 +59,20 @@ export const DashBoardPage = () => {
 const [editingCase, setEditingCase] = useState<CaseCard | null>(null);
 const [updatedStatus, setUpdatedStatus] = useState("");
 const [updatedStage, setUpdatedStage] = useState("");
-const [] = useState<File | null>(null);
+//const [] = useState<File | null>(null);
 const [updatedTitle, setUpdatedTitle] = useState("");
 const [updatedDescription, setUpdatedDescription] = useState("");
-interface Notification {
-  id: string;
-  message: string;
-  read: boolean;
-  archived: boolean;
-  // Add other properties as needed
-}
+
 
 const [openCases, setOpenCases] = useState([]);
 const [closedCases, setClosedCases] = useState([]);
 const [archivedCases] = useState([]); // <-- Add this line
 const [evidenceCount, setEvidenceCount] = useState(0);
 const [evidenceError, setEvidenceError] = useState<string | null>(null);
-const [notifications] = useState<Notification[]>([]);
 const [searchQuery, setSearchQuery] = useState("");
+  const unread = useUnreadCount();
+
+
   interface DashboardTile {
   id: string;
   value: string;
@@ -159,7 +154,7 @@ useEffect(() => {
 
 
 // ✅ these are outside of the array
-const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
+
 const [role, setRole] = useState<string>(user?.role || "");
 const isDFIRAdmin = role === "DFIR Admin";
 const [showTileCustomizer, setShowTileCustomizer] = useState(false);
@@ -642,15 +637,23 @@ useEffect(() => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-              <Link to="/notifications">
-                <button className="relative p-2 text-muted-foreground hover:text-white transition-colors">
-                  <Bell className="w-6 h-6" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
+              <Link
+                to="/notifications"
+                className="relative inline-block"
+                aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+                title={unread > 0 ? `${unread} unread` : "Notifications"}
+              >
+                <Bell className="w-6 h-6" />
+                {unread > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 translate-x-1/2 -translate-y-1/2
+                              bg-red-600 text-white text-[10px] leading-none
+                              min-w-4 h-4 px-1 flex items-center justify-center
+                              rounded-full pointer-events-none"
+                  >
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
               </Link>
 
               <Link to="/settings">

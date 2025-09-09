@@ -43,6 +43,9 @@ import { SidebarProvider } from './context/SidebarToggleContext';
 import { Toaster } from 'react-hot-toast';
 import { useEffect, useState } from "react"; // make sure this import exists
 
+//Notification WS
+import NotificationsWSProvider from "./components/NotificationWSProvider";
+
 function decodeRoleFromToken(): string {
   try {
     const token = sessionStorage.getItem("authToken");
@@ -92,6 +95,8 @@ export default function App() {
   return (
   <SidebarProvider>
   <ThemeProvider>
+        {/* Mount globally so WS is active across all routes */}
+    <NotificationsWSProvider />
   <Toaster position="top-right" reverseOrder={false} />
     <Routes>
       <Route path="/" element={<LandingPage />} />
