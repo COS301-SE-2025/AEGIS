@@ -35,6 +35,7 @@ import { sendThreadMessage } from "./api";
 import { createAnnotationThread } from "./api";
 import { addThreadParticipant } from "./api";
 import { fetchThreadParticipants } from "./api";
+import { addReaction } from "./api";
 import { approveMessage } from "./api";
 import{MessageCard} from "../../components/ui/MessageCard";
 import { ClipboardList } from "lucide-react";
@@ -593,11 +594,27 @@ const [profile] = useState({
 
 
 // Add these helper functions inside the EvidenceViewer component (after existing functions)
-const handleAddReaction = async () => {
-  try {
-    // Call the backend and get the updated message with reactions
+// const handleAddReaction = async () => {
+//   try {
+//     // Call the backend and get the updated message with reactions
 
-    // Update the threadMessages state: replace the old message with updatedMessage
+//     // Update the threadMessages state: replace the old message with updatedMessage
+//     if (!selectedThread) return;
+//     const updatedMessages = await fetchThreadMessages(selectedThread.id);
+//     const formattedMessages = formatMessages(updatedMessages);
+//     setThreadMessages(buildNestedMessages(formattedMessages));
+
+//     setShowReactionPicker(null); // Close reaction picker
+//   } catch (err) {
+//     console.error("Failed to add reaction:", err);
+//   }
+// };
+
+const handleAddReaction = async (messageId: string, reaction: string) => {
+  try {
+    await addReaction(messageId, user.id, reaction);
+
+    // Refresh the messages to get the updated reactions
     if (!selectedThread) return;
     const updatedMessages = await fetchThreadMessages(selectedThread.id);
     const formattedMessages = formatMessages(updatedMessages);
@@ -608,7 +625,6 @@ const handleAddReaction = async () => {
     console.error("Failed to add reaction:", err);
   }
 };
-
 
 const handleApproveMessage = async (messageId: string) => {
   try {
