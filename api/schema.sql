@@ -60,6 +60,10 @@ CREATE TYPE user_role AS ENUM (
     'Audit Reviewer',                   -- Reviews logs and user actions for audit and compliance
     'Threat Hunter'                     -- Proactively searches for hidden or advanced threats
 );
+ALTER TYPE user_role ADD VALUE 'Full Collaborator';
+
+INSERT INTO enum_roles (role_name) VALUES 
+('Full Collaborator');
 
 CREATE TYPE case_status AS ENUM ('open','Open', 'under_review','Under Review', 'closed','Ongoing','Archived');
 CREATE TYPE case_priority AS ENUM ('low', 'medium', 'high', 'critical','time-sensitive');
@@ -138,10 +142,20 @@ CREATE TABLE notifications (
     archived BOOLEAN DEFAULT FALSE
 );
 
+--- Case Collaborators table
+CREATE TABLE case_collaborators (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    case_id         UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role_id         UUID NOT NULL REFERENCES enum_roles(id),
+    invited_by      UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+    invited_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    expires_at      TIMESTAMP WITH TIME ZONE,
+    status          VARCHAR(20) NOT NULL DEFAULT 'active', -- active, expired, revoked
+    UNIQUE (case_id, user_id)
+);
 
-
-
-
+-- Tokens table for email verification, password resets, etc.
 CREATE TABLE tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -387,106 +401,127 @@ CREATE TABLE IF NOT EXISTS permissions (
 );
 
 -- Insert: User Management
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'user:create', 'Create/register a new user'),
--- (gen_random_uuid(), 'user:view', 'View user details'),
--- (gen_random_uuid(), 'user:update', 'Edit user details'),
--- (gen_random_uuid(), 'user:delete', 'Remove a user from the system'),
--- (gen_random_uuid(), 'user:assign_role', 'Assign roles to users'),
--- (gen_random_uuid(), 'user:verify', 'Manually verify a user''s account'),
--- (gen_random_uuid(), 'user:reset_password', 'Initiate password reset for a user');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'user:create', 'Create/register a new user'),
+(gen_random_uuid(), 'user:view', 'View user details'),
+(gen_random_uuid(), 'user:update', 'Edit user details'),
+(gen_random_uuid(), 'user:delete', 'Remove a user from the system'),
+(gen_random_uuid(), 'user:assign_role', 'Assign roles to users'),
+(gen_random_uuid(), 'user:verify', 'Manually verify a user''s account'),
+(gen_random_uuid(), 'user:reset_password', 'Initiate password reset for a user');
 
 -- Insert: Evidence Management
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'evidence:upload', 'Upload new evidence file'),
--- (gen_random_uuid(), 'evidence:view', 'View/download evidence'),
--- (gen_random_uuid(), 'evidence:delete', 'Delete evidence (soft/hard delete)'),
--- (gen_random_uuid(), 'evidence:update_metadata', 'Edit metadata fields for evidence'),
--- (gen_random_uuid(), 'evidence:tag', 'Assign tags to evidence'),
--- (gen_random_uuid(), 'evidence:assign_analyst', 'Assign an analyst to a specific evidence item'),
--- (gen_random_uuid(), 'evidence:verify_checksum', 'Validate integrity of uploaded file'),
--- (gen_random_uuid(), 'evidence:view_logs', 'View audit logs related to evidence actions');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'evidence:upload', 'Upload new evidence file'),
+(gen_random_uuid(), 'evidence:view', 'View/download evidence'),
+(gen_random_uuid(), 'evidence:delete', 'Delete evidence (soft/hard delete)'),
+(gen_random_uuid(), 'evidence:update_metadata', 'Edit metadata fields for evidence'),
+(gen_random_uuid(), 'evidence:tag', 'Assign tags to evidence'),
+(gen_random_uuid(), 'evidence:assign_analyst', 'Assign an analyst to a specific evidence item'),
+(gen_random_uuid(), 'evidence:verify_checksum', 'Validate integrity of uploaded file'),
+(gen_random_uuid(), 'evidence:view_logs', 'View audit logs related to evidence actions');
 
 -- Extend Evidence Tagging
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'evidence:create_tag', 'Create new tags for evidence'),
--- (gen_random_uuid(), 'evidence:remove_tag', 'Remove existing tags from evidence');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'evidence:create_tag', 'Create new tags for evidence'),
+(gen_random_uuid(), 'evidence:remove_tag', 'Remove existing tags from evidence');
 
 -- Insert: Specialized Evidence Analysis
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'analysis:network', 'Perform network traffic analysis'),
--- (gen_random_uuid(), 'analysis:image', 'Analyze digital images for forensics'),
--- (gen_random_uuid(), 'analysis:disk', 'Perform disk image analysis'),
--- (gen_random_uuid(), 'analysis:logs', 'Analyze logs and detect anomalies'),
--- (gen_random_uuid(), 'analysis:mobile', 'Analyze data from mobile devices'),
--- (gen_random_uuid(), 'analysis:memory', 'Conduct memory dump analysis'),
--- (gen_random_uuid(), 'analysis:cloud', 'Review cloud-stored forensic data'),
--- (gen_random_uuid(), 'analysis:endpoint', 'Investigate endpoint artifacts'),
--- (gen_random_uuid(), 'analysis:reverse_engineer', 'Reverse engineer a binary/malware sample');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'analysis:network', 'Perform network traffic analysis'),
+(gen_random_uuid(), 'analysis:image', 'Analyze digital images for forensics'),
+(gen_random_uuid(), 'analysis:disk', 'Perform disk image analysis'),
+(gen_random_uuid(), 'analysis:logs', 'Analyze logs and detect anomalies'),
+(gen_random_uuid(), 'analysis:mobile', 'Analyze data from mobile devices'),
+(gen_random_uuid(), 'analysis:memory', 'Conduct memory dump analysis'),
+(gen_random_uuid(), 'analysis:cloud', 'Review cloud-stored forensic data'),
+(gen_random_uuid(), 'analysis:endpoint', 'Investigate endpoint artifacts'),
+(gen_random_uuid(), 'analysis:reverse_engineer', 'Reverse engineer a binary/malware sample');
 
 -- Insert: Case Management
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'case:create', 'Create a new case'),
--- (gen_random_uuid(), 'case:view', 'View case details'),
--- (gen_random_uuid(), 'case:update', 'Update case information'),
--- (gen_random_uuid(), 'case:assign_user', 'Assign user to case'),
--- (gen_random_uuid(), 'case:change_status', 'Change case status (open, review, closed)'),
--- (gen_random_uuid(), 'case:set_priority', 'Set or modify case priority'),
--- (gen_random_uuid(), 'case:archive', 'Archive or lock case for compliance purposes');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'case:create', 'Create a new case'),
+(gen_random_uuid(), 'case:view', 'View case details'),
+(gen_random_uuid(), 'case:update', 'Update case information'),
+(gen_random_uuid(), 'case:assign_user', 'Assign user to case'),
+(gen_random_uuid(), 'case:change_status', 'Change case status (open, review, closed)'),
+(gen_random_uuid(), 'case:set_priority', 'Set or modify case priority'),
+(gen_random_uuid(), 'case:archive', 'Archive or lock case for compliance purposes');
 
 -- Case Tagging
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'case:tag', 'Assign tags to cases'),
--- (gen_random_uuid(), 'case:create_tag', 'Create new tags for cases'),
--- (gen_random_uuid(), 'case:remove_tag', 'Remove existing tags from cases');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'case:tag', 'Assign tags to cases'),
+(gen_random_uuid(), 'case:create_tag', 'Create new tags for cases'),
+(gen_random_uuid(), 'case:remove_tag', 'Remove existing tags from cases');
 
 
 -- Insert: Dashboard & Audit
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'dashboard:view', 'View dashboards with case/evidence summaries'),
--- (gen_random_uuid(), 'audit:view_all', 'View all system-level audit logs'),
--- (gen_random_uuid(), 'audit:view_case', 'View audit logs related to a specific case'),
--- (gen_random_uuid(), 'audit:view_user', 'View audit actions performed by a user'),
--- (gen_random_uuid(), 'audit:generate_report', 'Export/print audit or investigation report');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'dashboard:view', 'View dashboards with case/evidence summaries'),
+(gen_random_uuid(), 'audit:view_all', 'View all system-level audit logs'),
+(gen_random_uuid(), 'audit:view_case', 'View audit logs related to a specific case'),
+(gen_random_uuid(), 'audit:view_user', 'View audit actions performed by a user'),
+(gen_random_uuid(), 'audit:generate_report', 'Export/print audit or investigation report');
 
 -- Insert: Compliance & Legal
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'compliance:review', 'View compliance indicators for cases'),
--- (gen_random_uuid(), 'compliance:lock_evidence', 'Lock evidence to preserve legal integrity'),
--- (gen_random_uuid(), 'compliance:export_data', 'Export data for legal or regulatory use'),
--- (gen_random_uuid(), 'legal:comment', 'Add legal notes or directives to case/evidence'),
--- (gen_random_uuid(), 'legal:mark_sensitive', 'Mark evidence or case as sensitive/privileged');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'compliance:review', 'View compliance indicators for cases'),
+(gen_random_uuid(), 'compliance:lock_evidence', 'Lock evidence to preserve legal integrity'),
+(gen_random_uuid(), 'compliance:export_data', 'Export data for legal or regulatory use'),
+(gen_random_uuid(), 'legal:comment', 'Add legal notes or directives to case/evidence'),
+(gen_random_uuid(), 'legal:mark_sensitive', 'Mark evidence or case as sensitive/privileged');
 
 
 -- Log Exporting
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'audit:export_case_log', 'Export audit logs for a specific case'),
--- (gen_random_uuid(), 'audit:export_user_log', 'Export audit logs for a specific user');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'audit:export_case_log', 'Export audit logs for a specific case'),
+(gen_random_uuid(), 'audit:export_user_log', 'Export audit logs for a specific user');
 
 -- Annotation and Commenting
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'comment:create', 'Add a comment to a case or evidence'),
--- (gen_random_uuid(), 'comment:reply', 'Reply to an existing comment thread'),
--- (gen_random_uuid(), 'comment:edit', 'Edit your own comment'),
--- (gen_random_uuid(), 'comment:delete', 'Delete a comment you authored'),
--- (gen_random_uuid(), 'comment:moderate', 'Moderate or remove inappropriate comments'),
--- (gen_random_uuid(), 'thread:create', 'Start a new annotation thread on a case or file'),
--- (gen_random_uuid(), 'thread:close', 'Close or archive a thread to prevent new replies');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'comment:create', 'Add a comment to a case or evidence'),
+(gen_random_uuid(), 'comment:reply', 'Reply to an existing comment thread'),
+(gen_random_uuid(), 'comment:edit', 'Edit your own comment'),
+(gen_random_uuid(), 'comment:delete', 'Delete a comment you authored'),
+(gen_random_uuid(), 'comment:moderate', 'Moderate or remove inappropriate comments'),
+(gen_random_uuid(), 'thread:create', 'Start a new annotation thread on a case or file'),
+(gen_random_uuid(), 'thread:close', 'Close or archive a thread to prevent new replies');
 
 -- Case Collaboration
--- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'collaboration:add_member', 'Add member to a case collaboration team'),
--- (gen_random_uuid(), 'collaboration:remove_member', 'Remove member from a case team'),
--- (gen_random_uuid(), 'collaboration:change_role', 'Update user role within a case'),
--- (gen_random_uuid(), 'collaboration:message', 'Send secure messages within a case context');
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'collaboration:add_member', 'Add member to a case collaboration team'),
+(gen_random_uuid(), 'collaboration:remove_member', 'Remove member from a case team'),
+(gen_random_uuid(), 'collaboration:change_role', 'Update user role within a case'),
+(gen_random_uuid(), 'collaboration:message', 'Send secure messages within a case context');
 
--- -- Secure Chat
+-- Secure Chat
 -- INSERT INTO permissions (id, name, description) VALUES
--- (gen_random_uuid(), 'chat:create_room', 'Create a new chat room for a case'),
--- (gen_random_uuid(), 'chat:send_message', 'Send a message in a secure chat'),
--- (gen_random_uuid(), 'chat:view_history', 'View chat history'),
--- (gen_random_uuid(), 'chat:delete_message', 'Delete your message from chat'),
--- (gen_random_uuid(), 'chat:moderate', 'Moderate chat content or users');
+(gen_random_uuid(), 'chat:create_room', 'Create a new chat room for a case'),
+(gen_random_uuid(), 'chat:send_message', 'Send a message in a secure chat'),
+(gen_random_uuid(), 'chat:view_history', 'View chat history'),
+(gen_random_uuid(), 'chat:delete_message', 'Delete your message from chat'),
+(gen_random_uuid(), 'chat:moderate', 'Moderate chat content or users');
+
+--ADDED FOR COLLABORATORS
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'collaboration:view_members', 'View list of case collaborators');
+
+-- Tenant Management
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'tenant:create', 'Create a new tenant'),
+(gen_random_uuid(), 'tenant:view', 'View tenant details'),
+(gen_random_uuid(), 'tenant:update', 'Update tenant details'),
+(gen_random_uuid(), 'tenant:delete', 'Delete a tenant'),
+(gen_random_uuid(), 'tenant:assign_admin', 'Assign a tenant administrator'),
+(gen_random_uuid(), 'tenant:manage_members', 'Add/remove users from tenant'),
+(gen_random_uuid(), 'tenant:view_audit', 'View tenant-level audit logs');
+
+-- IOC Management
+INSERT INTO permissions (id, name, description) VALUES
+(gen_random_uuid(), 'ioc:create', 'Add a new indicator of compromise (IOC) to a case'),
+(gen_random_uuid(), 'ioc:view', 'View indicators of compromise associated with a case'),
+(gen_random_uuid(), 'ioc:delete', 'Delete an indicator of compromise from a case'),
+(gen_random_uuid(), 'ioc:update', 'Update or edit an existing IOC');
 
 -- Maps ENUM roles to permissions directly
 CREATE TABLE enum_role_permissions (
@@ -494,6 +529,176 @@ CREATE TABLE enum_role_permissions (
     permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
     PRIMARY KEY (role, permission_id)
 );
+
+-- Tenant Admin permissions
+INSERT INTO enum_role_permissions (role, permission_id)
+SELECT 'Tenant Admin', id FROM permissions
+WHERE name IN (
+  'user:create', 'user:view', 'user:update', 'user:delete', 'user:assign_role',
+  'user:verify', 'user:reset_password',
+  'dashboard:view',
+  'audit:view_all', 'audit:generate_report',
+  --tenant-specific permissions
+  'tenant:create', 'Create a new tenant',
+  'tenant:view', 'View tenant details',
+  'tenant:update', 'Update tenant details',
+  'tenant:delete', 'Delete a tenant',
+  'tenant:assign_admin', 'Assign a tenant administrator',
+  'tenant:manage_members', 'Add/remove users from tenant',
+  'tenant:view_audit', 'View tenant-level audit logs'
+);
+
+-- DFIR Admin permissions
+INSERT INTO enum_role_permissions (role, permission_id)
+SELECT 'DFIR Admin', id FROM permissions
+WHERE name IN (
+  -- Case
+  'case:create', 'case:view', 'case:update', 'case:assign_user', 'case:change_status',
+  'case:set_priority', 'case:archive', 'case:tag', 'case:create_tag', 'case:remove_tag',
+
+  -- Evidence (full, including upload/delete)
+  'evidence:upload', 'evidence:view', 'evidence:delete', 'evidence:update_metadata',
+  'evidence:tag', 'evidence:create_tag', 'evidence:remove_tag',
+  'evidence:assign_analyst', 'evidence:verify_checksum', 'evidence:view_logs',
+
+  -- IOCs
+  'ioc:create', 'ioc:view', 'ioc:delete', 'ioc:update',
+
+  -- Collaboration
+  'collaboration:add_member', 'collaboration:remove_member', 'collaboration:change_role',
+  'collaboration:message', 'collaboration:view_members',
+
+  -- Threads & Comments
+  'thread:create', 'thread:close',
+  'comment:create', 'comment:reply', 'comment:edit', 'comment:delete', 'comment:moderate',
+
+  -- Compliance & Legal
+  'compliance:review', 'compliance:lock_evidence', 'compliance:export_data',
+  'legal:comment', 'legal:mark_sensitive',
+
+  -- Audit
+  'audit:view_case', 'audit:export_case_log', 'audit:generate_report',
+
+  -- Dashboard
+  'dashboard:view'
+);
+
+-- DFIR Team Roles list
+WITH dfir_roles AS (
+  SELECT unnest(ARRAY[
+    'Incident Responder',
+    'Forensic Analyst',
+    'Malware Analyst',
+    'Threat Intelligent Analyst',
+    'DFIR Manager',
+    'Detection Engineer',
+    'Network Evidence Analyst',
+    'Image Forensics Analyst',
+    'Disk Forensics Analyst',
+    'Log Analyst',
+    'Mobile Device Analyst',
+    'Memory Forensics Analyst',
+    'Cloud Forensics Specialist',
+    'Endpoint Forensics Analyst',
+    'Reverse Engineer',
+    'SIEM Analyst',
+    'Vulnerability Analyst',
+    'Digital Evidence Technician',
+    'Packet Analyst',
+    'SOC Analyst',
+    'Incident Commander',
+    'Crisis Communications Officer',
+    'IT Infrastructure Liaison',
+    'Triage Analyst',
+    'Evidence Archivist',
+    'Training Coordinator',
+    'Audit Reviewer',
+    'Threat Hunter'
+  ])::user_role AS role
+)
+INSERT INTO enum_role_permissions (role, permission_id)
+SELECT role, id
+FROM permissions, dfir_roles
+WHERE name IN (
+  -- Case (no create/delete)
+  'case:view', 'case:update', 'case:change_status', 'case:set_priority',
+  'case:tag', 'case:create_tag', 'case:remove_tag',
+
+  -- Evidence (view only, NO upload/delete)
+  'evidence:view', 'evidence:update_metadata', 'evidence:tag',
+  'evidence:create_tag', 'evidence:remove_tag',
+  'evidence:verify_checksum',
+
+  -- IOCs
+  'ioc:create', 'ioc:view', 'ioc:delete', 'ioc:update',
+
+  -- Threads & Comments
+  'thread:create',
+  'comment:create', 'comment:reply', 'comment:edit', 'comment:delete',
+
+  -- Collaboration
+  'collaboration:message', 'collaboration:view_members',
+
+  -- Audit
+  'audit:view_case',
+
+  -- Dashboard
+  'dashboard:view'
+);
+
+WITH readonly_roles AS (
+  SELECT unnest(ARRAY[
+    'Legal/Compliance Liaison',
+    'Compliance Officer',
+    'Legal Counsel',
+    'Policy Analyst'
+  ])::user_role AS role
+)
+INSERT INTO enum_role_permissions (role, permission_id)
+SELECT role, id
+FROM permissions, readonly_roles
+WHERE name IN (
+  'case:view',
+  'evidence:view',
+  'ioc:view',
+  'thread:create',
+  'comment:reply',
+  'collaboration:view_members',
+  'compliance:review', 'legal:comment', 'legal:mark_sensitive',
+  'audit:view_case',
+  'dashboard:view'
+);
+
+-- Full Collaborator
+INSERT INTO enum_role_permissions (role, permission_id)
+SELECT 'Full Collaborator', id FROM permissions
+WHERE name IN (
+  'case:view', 'case:update',
+  'evidence:view',
+  'ioc:view',
+  'thread:create', 'comment:create', 'comment:reply', 'comment:edit',
+  'collaboration:view_members', 'collaboration:message',
+  'audit:view_case',
+  'dashboard:view'
+);
+
+-- External Collaborator
+INSERT INTO enum_role_permissions (role, permission_id)
+SELECT 'External Collaborator', id FROM permissions
+WHERE name IN (
+  'case:view',
+  'evidence:view',
+  'ioc:view',
+  'comment:reply',
+  'collaboration:view_members',
+  'dashboard:view'
+);
+
+-- System Admin gets everything (shortcut)
+INSERT INTO enum_role_permissions (role, permission_id)
+SELECT 'System Admin', id FROM permissions;
+
+
 
 -- Optional: global user roles if needed alongside enum
 CREATE TABLE user_roles (
