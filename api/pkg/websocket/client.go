@@ -1,8 +1,8 @@
 package websocket
 
 import (
+	"aegis-api/pkg/chatModels"
 	"aegis-api/pkg/sharedws"
-	"aegis-api/services_/chat"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -49,27 +49,27 @@ func (c *Client) ReadPump() {
 			break
 		}
 
-		var msg chat.WebSocketEvent
+		var msg chatModels.WebSocketEvent
 		if err := json.Unmarshal(rawMsg, &msg); err != nil {
 			log.Printf("❌ Invalid WebSocket message: %v", err)
 			continue
 		}
 
 		switch msg.Type {
-		case chat.EventNewMessage:
+		case chatModels.EventNewMessage:
 			data, err := json.Marshal(msg.Payload)
 			if err != nil {
 				log.Printf("❌ Failed to re-marshal payload: %v", err)
 				continue
 			}
 
-			var payload chat.NewMessagePayload
+			var payload chatModels.NewMessagePayload
 			if err := json.Unmarshal(data, &payload); err != nil {
 				log.Printf("❌ Failed to unmarshal NEW_MESSAGE payload: %v", err)
 				continue
 			}
 
-			if err := chat.SaveMessageToDB(payload); err != nil {
+			if err := SaveMessageToDB(payload); err != nil {
 				log.Printf("❌ Failed to save message to DB: %v", err)
 				continue
 			}

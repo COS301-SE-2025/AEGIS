@@ -61,7 +61,7 @@ CREATE TYPE user_role AS ENUM (
     'Threat Hunter'                     -- Proactively searches for hidden or advanced threats
 );
 
-CREATE TYPE case_status AS ENUM ('open','Open', 'under_review','Under Review', 'closed','Ongoing','Archived');
+CREATE TYPE case_status AS ENUM ('Open', 'under_review','Under Review', 'closed','Ongoing','Archived');
 CREATE TYPE case_priority AS ENUM ('low', 'medium', 'high', 'critical','time-sensitive');
 CREATE TYPE investigation_stage AS ENUM (
     'Triage',

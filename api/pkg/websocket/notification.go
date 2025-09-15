@@ -1,7 +1,7 @@
 package websocket
 
 import (
-	"aegis-api/services_/chat"
+	"aegis-api/pkg/chatModels"
 	"aegis-api/services_/notification"
 	"log"
 	"time"
@@ -13,8 +13,8 @@ func (h *Hub) BroadcastNotificationToUser(tenantID, teamID, userID string, notif
 	notif.TenantID = tenantID
 	notif.TeamID = teamID
 
-	msg := chat.WebSocketEvent{
-		Type:      chat.EventNotification,
+	msg := chatModels.WebSocketEvent{
+		Type:      chatModels.EventNotification,
 		Payload:   notif,
 		UserEmail: userID,
 		Timestamp: notif.Timestamp,
@@ -44,8 +44,8 @@ func NotifyUser(
 		return err
 	}
 
-	event := chat.WebSocketEvent{
-		Type:      chat.EventNotification,
+	event := chatModels.WebSocketEvent{
+		Type:      chatModels.EventNotification,
 		Payload:   notif,
 		UserEmail: userID,
 		Timestamp: notif.Timestamp,
@@ -73,9 +73,9 @@ func (h *Hub) syncNotificationsOnConnect(userID, tenantID, teamID string) {
 	}
 
 	// Option A: batch event
-	evt := chat.WebSocketEvent{
-		Type:      chat.EventNotificationSync, // define this in your chat package
-		Payload:   notifs,                     // []notification.Notification
+	evt := chatModels.WebSocketEvent{
+		Type:      chatModels.EventNotificationSync, // define this in your chatModels package
+		Payload:   notifs,                           // []notification.Notification
 		UserEmail: userID,
 		Timestamp: time.Now(),
 	}
@@ -86,5 +86,5 @@ func (h *Hub) syncNotificationsOnConnect(userID, tenantID, teamID string) {
 	// Option B (alternative): send count only
 	// unread := 0
 	// for _, n := range notifs { if !n.Read && !n.Archived { unread++ } }
-	// _ = h.SendToUser(userID, chat.WebSocketEvent{ Type: chat.EventUnreadCount, Payload: unread, ... })
+	// _ = h.SendToUser(userID, chatModels.WebSocketEvent{ Type: chatModels.EventUnreadCount, Payload: unread, ... })
 }
