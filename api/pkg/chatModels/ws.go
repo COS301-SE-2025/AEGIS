@@ -1,5 +1,5 @@
 // models.go
-package chat
+package chatModels
 
 import (
 	"time"
@@ -126,8 +126,6 @@ type User struct {
 	Avatar   string     `bson:"avatar,omitempty" json:"avatar,omitempty"`
 	Status   string     `bson:"status,omitempty" json:"status,omitempty"` // "online", "offline", "away"
 	LastSeen *time.Time `bson:"last_seen,omitempty" json:"last_seen,omitempty"`
-	TenantID string     `bson:"tenant_id,omitempty" json:"tenant_id,omitempty"` // New field
-	TeamID   string     `bson:"team_id,omitempty" json:"team_id,omitempty"`
 }
 
 // EventType represents different types of real-time events

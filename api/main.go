@@ -231,7 +231,7 @@ func main() {
 
 	// ─── Chat Service ───────────────────────────────────────────
 	// Initialize chat repository, user service, IPFS uploader, WebSocket manager, and chat
-	chatRepo := chat.NewChatRepository(mongoDatabase)
+	chatRepo := chat.NewChatRepository(mongoDatabase, db.DB, hub, notificationService)
 	userService := chat.NewUserService(mongoDatabase)
 	ipfsUploader := chat.NewIPFSUploader("http://ipfs:5001", "")
 	wsManager := chat.NewWebSocketManager(userService, chatRepo)

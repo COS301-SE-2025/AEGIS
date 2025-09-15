@@ -1,13 +1,13 @@
 package websocket
 
 import (
-	"aegis-api/services_/chat"
+	chatModels "aegis-api/pkg/chatModels"
 	"log"
 
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterWebSocketRoutes(rg *gin.RouterGroup, manager chat.WebSocketManager) {
+func RegisterWebSocketRoutes(rg *gin.RouterGroup, manager chatModels.WebSocketManager) {
 	rg.GET("/cases/:caseId", func(c *gin.Context) {
 		log.Println("📥 WebSocket route hit")
 

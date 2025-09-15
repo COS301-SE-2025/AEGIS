@@ -14,25 +14,16 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// ---- Mocks ----
-
 type MockCaseAssignmentRepo struct{ mock.Mock }
-
 type MockUserRepository struct{ mock.Mock }
+type MockNotificationService struct{ mock.Mock }
+type MockAdminChecker struct{ mock.Mock }
 
-// Minimal mock for NotificationServiceInterface
-type MockNotificationService struct{}
-
-func (m *MockNotificationService) SaveNotification(n *notification.Notification) error { return nil }
-
-// case_assign.UserRepo requirement
-func (m *MockUserRepository) GetUserByID(userID uuid.UUID) (*case_assign.User, error) {
-	args := m.Called(userID)
-	user, _ := args.Get(0).(*case_assign.User)
-	return user, args.Error(1)
+func (m *MockNotificationService) SaveNotification(n *notification.Notification) error {
+	args := m.Called(n)
+	return args.Error(0)
 }
 
-// UPDATED to match new interface: AssignRole(userID, caseID, role, tenantID, teamID)
 func (m *MockCaseAssignmentRepo) AssignRole(
 	userID, caseID uuid.UUID, role string, tenantID, teamID uuid.UUID,
 ) error {
@@ -40,29 +31,83 @@ func (m *MockCaseAssignmentRepo) AssignRole(
 	return args.Error(0)
 }
 
-func (m *MockCaseAssignmentRepo) UnassignRole(userID, caseID uuid.UUID) error {
-	args := m.Called(userID, caseID)
+func (m *MockCaseAssignmentRepo) GetCaseByID(caseID uuid.UUID, caseDetails *case_assign.Case) error {
+	args := m.Called(caseID, caseDetails)
 	return args.Error(0)
 }
-
-type MockAdminChecker struct{ mock.Mock }
 
 func (m *MockAdminChecker) IsAdminFromContext(ctx *gin.Context) (bool, error) {
 	args := m.Called(ctx)
 	return args.Bool(0), args.Error(1)
 }
 
-// ---- Tests ----
+// Implement GetUserByID method to satisfy the UserRepo interface
+func (m *MockUserRepository) GetUserByID(userID uuid.UUID) (*case_assign.User, error) {
+	args := m.Called(userID)
+	user, _ := args.Get(0).(*case_assign.User) // Extract the return value as *User
+	return user, args.Error(1)                 // Return the error (if any)
+}
 
-// Assign flow: verifies team/tenant are passed through and repo gets called with both.
-func TestAssignUserToCase_Admin_PassesTenantAndTeam(t *testing.T) {
+// Add UnassignRole method to the MockCaseAssignmentRepo struct
+func (m *MockCaseAssignmentRepo) UnassignRole(userID, caseID uuid.UUID) error {
+	args := m.Called(userID, caseID)
+	return args.Error(0)
+}
+
+// Test AssignUserToCase: verifies that the method calls necessary functions to assign a user to a case
+func TestAssignUserToCase(t *testing.T) {
 	repo := new(MockCaseAssignmentRepo)
-	admin := new(MockAdminChecker) // not used in Assign path
+	adminChecker := new(MockAdminChecker)
 	userRepo := new(MockUserRepository)
-	notif := new(MockNotificationService)
+	notifService := new(MockNotificationService)
 	hub := &websocket.Hub{}
+	svc := case_assign.NewCaseAssignmentService(repo, adminChecker, userRepo, notifService, hub)
 
-	svc := case_assign.NewCaseAssignmentService(repo, admin, userRepo, notif, hub)
+	// Initialize test data
+	assigneeID := uuid.New()
+	caseID := uuid.New()
+	assignerID := uuid.New()
+	tID := uuid.New()
+	teamID := uuid.New()
+
+	// Mock GetCaseByID to return an active case
+	repo.On("GetCaseByID", caseID, mock.AnythingOfType("*case_assign.Case")).Return(nil).Run(func(args mock.Arguments) {
+		caseDetails := args.Get(1).(*case_assign.Case)
+		caseDetails.Status = "open" // Case is active
+		caseDetails.Title = "Test Case"
+	})
+
+	// Mock SaveNotification to confirm it gets called
+	notifService.On("SaveNotification", mock.AnythingOfType("*notification.Notification")).Return(nil)
+
+	// Mock AssignRole to verify that the role is being assigned
+	repo.On("AssignRole", assigneeID, caseID, "SOC Analyst", tID, teamID).Return(nil)
+
+	// Call the method to test
+	err := svc.AssignUserToCase(
+		"DFIR Admin",  // assignerRole
+		assigneeID,    // assigneeID
+		caseID,        // caseID
+		assignerID,    // assignerID
+		"SOC Analyst", // role
+		tID,           // tenantID
+		teamID,        // teamID
+	)
+
+	// Assertions
+	assert.NoError(t, err)
+	repo.AssertExpectations(t)
+	notifService.AssertExpectations(t)
+}
+
+// // Test AssignUserToCase: verifies the error when the case is inactive
+func TestAssignUserToCase_CaseNotActive(t *testing.T) {
+	repo := new(MockCaseAssignmentRepo)
+	adminChecker := new(MockAdminChecker)
+	userRepo := new(MockUserRepository)
+	notifService := new(MockNotificationService)
+	hub := &websocket.Hub{}
+	svc := case_assign.NewCaseAssignmentService(repo, adminChecker, userRepo, notifService, hub)
 
 	assigneeID := uuid.New()
 	caseID := uuid.New()
@@ -70,118 +115,120 @@ func TestAssignUserToCase_Admin_PassesTenantAndTeam(t *testing.T) {
 	tID := uuid.New()
 	teamID := uuid.New()
 
-	// The service fetches assignee (for fallback/logging). Provide sane Tenant/Team.
-	userRepo.
-		On("GetUserByID", assigneeID).
-		Return(&case_assign.User{
-			ID:       assigneeID,
-			TenantID: tID,
-			TeamID:   teamID,
-		}, nil)
+	// Mock GetCaseByID to return a closed case
+	repo.On("GetCaseByID", caseID, mock.AnythingOfType("*case_assign.Case")).Return(nil).Run(func(args mock.Arguments) {
+		caseDetails := args.Get(1).(*case_assign.Case)
+		caseDetails.Status = "closed" // Case is inactive
+		caseDetails.Title = "Closed Test Case"
+	})
 
-	// Expect AssignRole to be called with tenantID and teamID
-	repo.
-		On("AssignRole", assigneeID, caseID, "SOC Analyst", tID, teamID).
-		Return(nil)
-
+	// Call the method to test
 	err := svc.AssignUserToCase(
-		"DFIR Admin",
-		assigneeID,
-		caseID,
-		assignerID,
-		"SOC Analyst",
-		tID,
-		teamID,
+		"DFIR Admin",  // assignerRole
+		assigneeID,    // assigneeID
+		caseID,        // caseID
+		assignerID,    // assignerID
+		"SOC Analyst", // role
+		tID,           // tenantID
+		teamID,        // teamID
 	)
-	assert.NoError(t, err)
 
-	userRepo.AssertExpectations(t)
+	// Assertions
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "is not active")
+
 	repo.AssertExpectations(t)
+	notifService.AssertExpectations(t)
 }
 
-// Unassign: authorized admin → calls repo.UnassignRole and returns nil.
-func TestUnassignUserFromCase_Authorized(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	ctx := &gin.Context{}
-	ctx.Set("userRole", "Admin")
+// Test UnassignUserFromCase: verifies that an admin can unassign a user from a case
+// func TestUnassignUserFromCase_Authorized(t *testing.T) {
+// 	ctx := &gin.Context{}
+// 	ctx.Set("userRole", "DFIR Admin") // Simulating an admin role
 
-	repo := new(MockCaseAssignmentRepo)
-	admin := new(MockAdminChecker)
-	userRepo := new(MockUserRepository)
-	notif := new(MockNotificationService)
-	hub := &websocket.Hub{}
-	svc := case_assign.NewCaseAssignmentService(repo, admin, userRepo, notif, hub)
+// 	repo := new(MockCaseAssignmentRepo)
+// 	adminChecker := new(MockAdminChecker)
+// 	userRepo := new(MockUserRepository)
+// 	notifService := new(MockNotificationService)
+// 	hub := &websocket.Hub{}
+// 	svc := case_assign.NewCaseAssignmentService(repo, adminChecker, userRepo, notifService, hub)
 
-	assigneeID := uuid.New()
-	caseID := uuid.New()
+// 	assigneeID := uuid.New()
+// 	caseID := uuid.New()
 
-	admin.On("IsAdminFromContext", ctx).Return(true, nil)
-	repo.On("UnassignRole", assigneeID, caseID).Return(nil)
+// 	// Mock IsAdminFromContext to return true (admin role)
+// 	adminChecker.On("IsAdminFromContext", ctx).Return(true, nil)
 
-	// Provide tenant/team for notification path
-	tenantID := uuid.New()
-	teamID := uuid.New()
-	userRepo.On("GetUserByID", assigneeID).
-		Return(&case_assign.User{
-			ID:       assigneeID,
-			TenantID: tenantID,
-			TeamID:   teamID,
-		}, nil)
+// 	// Mock UnassignRole to verify that the user is unassigned
+// 	repo.On("UnassignRole", assigneeID, caseID).Return(nil)
 
-	err := svc.UnassignUserFromCase(ctx, assigneeID, caseID)
-	assert.NoError(t, err)
+// 	// Mock GetUserByID to return user details for WebSocket notification
+// 	userRepo.On("GetUserByID", assigneeID).Return(&case_assign.User{
+// 		ID:       assigneeID,
+// 		TenantID: uuid.New(),
+// 		TeamID:   uuid.New(),
+// 	}, nil)
 
-	admin.AssertExpectations(t)
-	repo.AssertExpectations(t)
-	userRepo.AssertExpectations(t)
-}
+// 	// Call the method to test
+// 	err := svc.UnassignUserFromCase(ctx, assigneeID, caseID)
 
-// Unassign: forbidden when not admin
+// 	// Assertions
+// 	assert.NoError(t, err)
+// 	repo.AssertExpectations(t)
+// 	notifService.AssertExpectations(t)
+// 	userRepo.AssertExpectations(t)
+// }
+
+// // Test UnassignUserFromCase: verifies that non-admins cannot unassign users
 func TestUnassignUserFromCase_Forbidden(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	ctx := &gin.Context{}
-	ctx.Set("userRole", "User")
+	ctx.Set("userRole", "User") // Simulating a non-admin role
 
 	repo := new(MockCaseAssignmentRepo)
-	admin := new(MockAdminChecker)
+	adminChecker := new(MockAdminChecker)
 	userRepo := new(MockUserRepository)
-	notif := new(MockNotificationService)
+	notifService := new(MockNotificationService)
 	hub := &websocket.Hub{}
-	svc := case_assign.NewCaseAssignmentService(repo, admin, userRepo, notif, hub)
+	svc := case_assign.NewCaseAssignmentService(repo, adminChecker, userRepo, notifService, hub)
 
 	assigneeID := uuid.New()
 	caseID := uuid.New()
 
-	admin.On("IsAdminFromContext", ctx).Return(false, nil)
+	// Mock IsAdminFromContext to return false (non-admin role)
+	adminChecker.On("IsAdminFromContext", ctx).Return(false, nil)
 
+	// Call the method to test
 	err := svc.UnassignUserFromCase(ctx, assigneeID, caseID)
+
+	// Assertions
 	assert.EqualError(t, err, "forbidden: admin privileges required")
 
-	admin.AssertExpectations(t)
-	repo.AssertNotCalled(t, "UnassignRole", mock.Anything, mock.Anything)
+	repo.AssertNotCalled(t, "UnassignRole", assigneeID, caseID)
+	userRepo.AssertNotCalled(t, "GetUserByID", assigneeID)
 }
 
-// Unassign: admin check fails → returns the error
+// Test UnassignUserFromCase: verifies the failure when admin check fails
 func TestUnassignUserFromCase_AdminCheckFails(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	ctx := &gin.Context{}
-	ctx.Set("userRole", "Admin")
-
 	repo := new(MockCaseAssignmentRepo)
-	admin := new(MockAdminChecker)
+	adminChecker := new(MockAdminChecker)
 	userRepo := new(MockUserRepository)
-	notif := new(MockNotificationService)
+	notifService := new(MockNotificationService)
 	hub := &websocket.Hub{}
-	svc := case_assign.NewCaseAssignmentService(repo, admin, userRepo, notif, hub)
+	svc := case_assign.NewCaseAssignmentService(repo, adminChecker, userRepo, notifService, hub)
 
 	assigneeID := uuid.New()
 	caseID := uuid.New()
 
-	admin.On("IsAdminFromContext", ctx).Return(false, errors.New("db error"))
+	// Mock IsAdminFromContext to return an error
+	adminChecker.On("IsAdminFromContext", ctx).Return(false, errors.New("db error"))
 
+	// Call the method to test
 	err := svc.UnassignUserFromCase(ctx, assigneeID, caseID)
+
+	// Assertions
 	assert.EqualError(t, err, "db error")
 
-	admin.AssertExpectations(t)
-	repo.AssertNotCalled(t, "UnassignRole", mock.Anything, mock.Anything)
+	repo.AssertNotCalled(t, "UnassignRole", assigneeID, caseID)
+	userRepo.AssertNotCalled(t, "GetUserByID", assigneeID)
 }

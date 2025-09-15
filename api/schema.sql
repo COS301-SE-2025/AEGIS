@@ -65,7 +65,7 @@ ALTER TYPE user_role ADD VALUE 'Full Collaborator';
 INSERT INTO enum_roles (role_name) VALUES 
 ('Full Collaborator');
 
-CREATE TYPE case_status AS ENUM ('open','Open', 'under_review','Under Review', 'closed','Ongoing','Archived');
+CREATE TYPE case_status AS ENUM ('Open', 'under_review','Under Review', 'closed','Ongoing','Archived');
 CREATE TYPE case_priority AS ENUM ('low', 'medium', 'high', 'critical','time-sensitive');
 CREATE TYPE investigation_stage AS ENUM (
     'Triage',

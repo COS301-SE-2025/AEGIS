@@ -10,7 +10,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"gorm.io/gorm"
+
 	//	"aegis-api/services_/chat/ipfs_uploader"
+	"aegis-api/pkg/websocket"
+	"aegis-api/services_/notification"
 )
 
 const (
@@ -19,14 +23,22 @@ const (
 )
 
 type MongoRepository struct {
-	db *mongo.Database
+	db                  *mongo.Database
+	pgDb                *gorm.DB
+	hub                 *websocket.Hub
+	notificationService *notification.NotificationService
 	//notifier events.GroupNotifier // Optional notifier
 }
 
 // NewChatRepository creates a new MongoDB chat repository
-func NewChatRepository(db *mongo.Database) *MongoRepository {
-	repo := &MongoRepository{db: db}
-	repo.createIndexes()
+func NewChatRepository(db *mongo.Database, pgDb *gorm.DB, hub *websocket.Hub, notificationService *notification.NotificationService) *MongoRepository {
+	repo := &MongoRepository{
+		db:                  db,
+		pgDb:                pgDb,
+		hub:                 hub,
+		notificationService: notificationService,
+	}
+	repo.createIndexes() // if needed for group creation
 	return repo
 }
 
@@ -221,9 +233,28 @@ func (r *MongoRepository) DeleteGroup(ctx context.Context, groupID primitive.Obj
 
 	return nil
 }
-func (r *MongoRepository) AddMemberToGroup(ctx context.Context, groupID primitive.ObjectID, member *Member) error {
-	collection := r.db.Collection(GroupsCollection)
 
+// AddMemberToGroup function using GORM to query PostgreSQL
+func (r *MongoRepository) AddMemberToGroup(ctx context.Context, groupID primitive.ObjectID, member *Member) error {
+	// Step 1: Query PostgreSQL to retrieve user information (UserID, TenantID, TeamID) using GORM
+	var user User
+	err := r.pgDb.Where("email = ?", member.UserEmail).First(&user).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("user with email %s not found", member.UserEmail)
+		}
+		return fmt.Errorf("failed to retrieve user information from PostgreSQL: %w", err)
+	}
+
+	// Step 2: Populate the member struct with data from PostgreSQL
+	member.UserID = user.ID
+	member.TenantID = user.TenantID
+	member.TeamID = user.TeamID
+	member.JoinedAt = time.Now()
+	member.IsActive = true
+
+	// Step 3: Check if the user already exists in the group in MongoDB
+	collection := r.db.Collection(GroupsCollection)
 	existing := collection.FindOne(ctx, bson.M{
 		"_id":                groupID,
 		"members.user_email": member.UserEmail,
@@ -234,24 +265,38 @@ func (r *MongoRepository) AddMemberToGroup(ctx context.Context, groupID primitiv
 		return existing.Err()
 	}
 
-	member.JoinedAt = time.Now()
-	member.IsActive = true
-
+	// Step 4: Add the member to the group in MongoDB
 	filter := bson.M{"_id": groupID}
 	update := bson.M{
 		"$push": bson.M{"members": member},
 		"$set":  bson.M{"updated_at": time.Now()},
 	}
 
-	_, err := collection.UpdateOne(ctx, filter, update)
+	_, err = collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("failed to add member to group: %w", err)
 	}
-
-	// // ✅ Trigger notification without direct websocket dependency
-	// if r.notifier != nil {
-	// 	_ = r.notifier.NotifyMemberAdded(groupID.Hex(), member.UserEmail)
-	// }
+	// Step 5: Fetch the group name for the notification
+	var group ChatGroup
+	err = collection.FindOne(ctx, bson.M{"_id": groupID}).Decode(&group)
+	if err != nil {
+		return fmt.Errorf("failed to fetch group name: %w", err)
+	}
+	// Step 5: Send notification (optional)
+	if r.hub != nil && r.notificationService != nil {
+		go func() {
+			// Notify the new member that they've been added
+			_ = websocket.NotifyUser(
+				r.hub,
+				r.notificationService,
+				member.UserID,
+				member.TenantID,
+				member.TeamID,
+				"Added to Group",
+				`You’ve been added to Secure Chat Group: `+group.Name,
+			)
+		}()
+	}
 
 	return nil
 }
