@@ -147,7 +147,7 @@ CREATE TABLE case_collaborators (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     case_id         UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id         UUID NOT NULL REFERENCES enum_roles(id),
+    role            user_role NOT NULL,
     invited_by      UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
     invited_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     expires_at      TIMESTAMP WITH TIME ZONE,
