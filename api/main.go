@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"aegis-api/db"
+	"fmt"
 
 	"aegis-api/handlers"
 	"aegis-api/middleware"
@@ -43,6 +44,7 @@ import (
 	"aegis-api/services_/timeline"
 
 	"aegis-api/services_/user/profile"
+	"aegis-api/pkg/encryption"
 
 	//"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -87,6 +89,19 @@ func main() {
 		log.Fatalf("❌ Failed to extract SQL DB: %v", err)
 	}
 	permChecker := &middleware.DBPermissionChecker{DB: sqlDB}
+
+	// ─── Initialize Encryption ──────────────────────────────────
+	// Initialize encryption with master key
+	if err := encryption.Init(); err != nil {
+		log.Fatal("encryption init failed:", err)
+	}
+
+	// Test encryption
+	enc, _ := encryption.Encrypt("secret123")
+	fmt.Println("Encrypted:", enc)
+
+	dec, _ := encryption.Decrypt(enc)
+	fmt.Println("Decrypted:", string(dec))
 
 	// ─── websocket ─────────────────────────────────
 

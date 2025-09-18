@@ -30,6 +30,7 @@ services:
       - DB_NAME=${DB_NAME}
       - MONGO_URI=${MONGO_URI}
       - IPFS_API=${IPFS_API}
+      - ENCRYP_REST_MASTER_KEY=${ENCRYP_REST_MASTER_KEY}
     depends_on:
       - postgres
       - mongo
