@@ -54,7 +54,7 @@ func setupTestRouter(service *MockMetadataService) (*gin.Engine, *httptest.Respo
 	zapLogger := auditlog.NewZapLogger()
 	auditLogger := auditlog.NewAuditLogger(fakeMongo, zapLogger)
 
-	handler := handlers.NewMetadataHandler(service, auditLogger)
+	handler := handlers.NewMetadataHandler(service, auditLogger, nil)
 
 	router.GET("/evidence/:id", func(c *gin.Context) {
 		c.Set("userID", "test-user-id")

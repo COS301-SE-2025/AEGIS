@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"testing"
 
-	x3 "aegis-api/internal/X3dh" // Update with your actual module path
+	x3 "aegis-api/internal/x3dh" // Update with your actual module path
 
 	"github.com/stretchr/testify/assert"
 )

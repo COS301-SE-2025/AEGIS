@@ -1,19 +1,19 @@
 version: "3.8"
 
-
 services:
   frontend:
     build:
       context: ./frontend
     ports:
-
       - "3001:5173"
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
     environment:
       - NODE_ENV=development
+      # From your host browser you’ll hit the backend on localhost:8080
       - VITE_API_URL=http://localhost:8080
+    # If the frontend needs the backend container’s hostname inside the container, set it to http://backend:8080 instead.
 
   backend:
     build:
@@ -30,10 +30,20 @@ services:
       - DB_NAME=${DB_NAME}
       - MONGO_URI=${MONGO_URI}
       - IPFS_API=${IPFS_API}
+
+ 
+      - REDIS_ADDR=redis:6379  
+      - REDIS_PASS=             
+      - REDIS_DB=0
     depends_on:
-      - postgres
-      - mongo
-      - ipfs
+      postgres:
+        condition: service_started
+      mongo:
+        condition: service_started
+      ipfs:
+        condition: service_started
+      redis:
+        condition: service_healthy
 
   postgres:
     image: postgres:15
@@ -54,7 +64,7 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
       - MONGO_INITDB_DATABASE=app_database
-    command: [ --auth ]  # Enables authentication
+    command: [ "--auth" ]
     volumes:
       - mongo_data:/data/db
 
@@ -66,10 +76,21 @@ services:
     volumes:
       - ipfs_data:/data/ipfs
 
+  # Redis cache
+  redis:
+    image: redis:7
+    # ports:
+    #   - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+
 volumes:
   postgres_data:
   mongo_data:
   ipfs_data:
-
   frontend_node_modules:
-
+  # redis_data:
