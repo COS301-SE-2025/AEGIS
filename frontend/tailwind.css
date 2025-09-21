@@ -1,3 +1,4 @@
+
 @tailwind components;
 @tailwind utilities;
 
@@ -45,38 +46,74 @@
     --radius: 0.5rem;
   }
 
-  .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
+.dark {
+  --background: 224 71% 4%;
+  --foreground: 213 31% 91%;
+  --muted: 223 47% 11%;
+  --muted-foreground: 215.4 16.3% 56.9%;
+  --accent: 216 34% 17%;
+  --accent-foreground: 210 40% 98%;
+  --popover: 224 71% 4%;
+  --popover-foreground: 215 20.2% 65.1%;
+  --border: 216 34% 17%;
+  --input: 216 34% 17%;
+  --card: transparent;
+  --card-foreground: 213 31% 91%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 1.2%;
+  --secondary: 222.2 47.4% 11.2%;
+  --secondary-foreground: 210 40% 98%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 216 34% 17%;
+  --radius: 0.5rem;
+}
 
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
+.light {
+  --background: 45 56% 96%; /* IVORY */
+  --foreground: 120 13% 30%; /* SAGE (text) */
+  --card: 24 33% 94%; /* NUDE */
+  --card-foreground: 120 13% 30%; /* SAGE (text) */
+  --primary: 205 79% 70%; /* BABY BLUE */
+  --primary-foreground: 120 13% 30%; /* SAGE (text) */
+  --secondary: 340 26% 76%; /* DUSTY ROSE */
+  --secondary-foreground: 120 13% 30%; /* SAGE (text) */
+  --accent: 120 13% 86%; /* SAGE */
+  --accent-foreground: 120 13% 30%; /* SAGE (text) */
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 120 13% 30%;
+  --border: 24 33% 80%;
+  --input: 24 33% 80%;
+  --muted: 45 56% 90%;
+  --muted-foreground: 120 13% 50%;
+  --popover: 45 56% 96%;
+  --popover-foreground: 120 13% 30%;
+  --ring: 205 79% 70%;
+  --radius: 0.5rem;
+}
 
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 98%;
-
-    --popover: 224 71% 4%;
-    --popover-foreground: 215 20.2% 65.1%;
-
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-
-    --card: transparent;
-    --card-foreground: 213 31% 91%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 1.2%;
-
-    --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 40% 98%;
-
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-
-    --ring: 216 34% 17%;
-
-    --radius: 0.5rem;
-  }
+.default {
+  --background: 220 14% 96%;
+  --foreground: 222 47% 11%;
+  --card: 210 20% 98%;
+  --card-foreground: 222 47% 11%;
+  --primary: 213 96% 53%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 215 19% 35%;
+  --secondary-foreground: 210 40% 98%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+  --ring: 215 20.2% 65.1%;
+  --radius: 0.5rem;
+}
 }
 
 @layer base {
