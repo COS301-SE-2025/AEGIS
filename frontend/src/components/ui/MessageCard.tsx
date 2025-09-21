@@ -190,7 +190,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="Type your reply..."
-                className="w-full bg-muted text-foreground text-sm px-3 py-2 rounded border border-gray-600 focus:outline-none"
+                className="w-full bg-muted text-foreground text-sm px-3 py-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary/60"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -199,7 +199,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                 }}
               />
               <button
-                className="mt-1 px-3 py-1 bg-blue-600 text-foreground text-xs rounded hover:bg-blue-700"
+                className="mt-1 px-3 py-1 bg-primary text-white text-xs rounded hover:bg-primmary/60"
                 onClick={handleSendReply}
               >
                 Send Reply

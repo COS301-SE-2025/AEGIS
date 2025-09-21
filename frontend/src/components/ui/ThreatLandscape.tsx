@@ -116,7 +116,7 @@ useEffect(() => {
         selector: 'node',
         style: {
           label: 'data(label)',
-          color: '#fff',
+          color: '#a08d8dff',
           'text-valign': 'center',
           'text-halign': 'center',
           'font-size': '10px',
@@ -148,21 +148,25 @@ useEffect(() => {
 }, [elements]);
 
   return (
-    <div className="overflow-hidden w-[550px] h-[366px] rounded-lg border bg-card p-6">
+    <div className="overflow-hidden w-[550px] h-[366px] rounded-lg border border-border bg-card p-6">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="font-bold text-white text-lg">Threat Landscape</h2>
+        <h2 className="font-bold text-foreground text-lg">Threat Landscape</h2>
         <div className="flex gap-2">
           <button
-            className={`px-2 py-1 text-sm rounded ${
-              mode === "case" ? "bg-blue-600 text-white" : "bg-muted text-foreground"
+            className={`px-2 py-1 text-sm rounded transition-colors ${
+              mode === "case"
+                ? "bg-primary text-primary-foreground"
+                : "bg-primary/10 text-primary border border-primary"
             }`}
             onClick={() => setMode("case")}
           >
             Case View
           </button>
           <button
-            className={`px-2 py-1 text-sm rounded ${
-              mode === "network" ? "bg-blue-600 text-white" : "bg-muted text-foreground"
+            className={`px-2 py-1 text-sm rounded transition-colors ${
+              mode === "network"
+                ? "bg-primary text-primary-foreground"
+                : "bg-primary/10 text-primary border border-primary"
             }`}
             onClick={() => setMode("network")}
           >
@@ -175,7 +179,7 @@ useEffect(() => {
         <select
           value={selectedCase}
           onChange={(e) => setSelectedCase(e.target.value)}
-          className="mb-3 w-full bg-muted text-white p-1 rounded border border-border text-sm"
+          className="mb-3 w-full bg-primary/10 text-foreground border border-primary rounded p-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         >
           {userCases.map((c) => (
             <option key={c.id} value={c.id}>

@@ -129,13 +129,13 @@ export const ChainOfCustody = () => {
   return (
     <div className="min-h-screen p-8 bg-background text-foreground">
       {showConfirmation && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded shadow-lg z-50">
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-success text-success-foreground px-6 py-3 rounded shadow-lg z-50">
           Entry saved successfully!
         </div>
       )}
       <form onSubmit={handleSubmit} className="bg-card p-6 rounded-lg space-y-6 max-w-3xl mx-auto">
         <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Shield className="w-5 h-5 text-blue-400" />
+          <Shield className="w-5 h-5 text-primary" />
           {entryId ? "Update Custody Information" : "New Custody Information"}
         </h2>
 
@@ -154,7 +154,7 @@ export const ChainOfCustody = () => {
         {/* Acquisition */}
         <div>
           <h3 className="font-semibold flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-purple-400" /> Acquisition Details
+            <Calendar className="w-5 h-5 text-secondary" /> Acquisition Details
           </h3>
           <input type="datetime-local" name="acquisitionDate" className="w-full mt-2 p-2 bg-muted border rounded text-sm" value={formData.acquisitionDate} onChange={handleChange} />
           <input name="acquisitionTool" placeholder="Tool Used" className="w-full mt-2 p-2 bg-muted border rounded text-sm" value={formData.acquisitionTool} onChange={handleChange} />
@@ -163,7 +163,7 @@ export const ChainOfCustody = () => {
         {/* System Info */}
         <div>
           <h3 className="font-semibold flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-indigo-400" /> System Information
+            <Cpu className="w-5 h-5 text-accent" /> System Information
           </h3>
           <div className="grid grid-cols-2 gap-4 mt-2">
             <input name="osVersion" placeholder="OS Version" value={formData.systemInfo.osVersion} onChange={handleChange} className="p-2 bg-muted border rounded text-sm" />
@@ -184,7 +184,7 @@ export const ChainOfCustody = () => {
         {/* Forensic Metadata */}
         <div>
           <h3 className="font-semibold flex items-center gap-2">
-            <Hash className="w-5 h-5 text-amber-400" /> Forensic Metadata
+            <Hash className="w-5 h-5 text-warning" /> Forensic Metadata
           </h3>
           <input name="method" placeholder="Acquisition Method" value={formData.forensic.method} onChange={handleChange} className="w-full mt-2 p-2 bg-muted border rounded text-sm" />
           <input name="examiner" placeholder="Examiner Name" value={formData.forensic.examiner} onChange={handleChange} className="w-full mt-2 p-2 bg-muted border rounded text-sm" />
@@ -193,7 +193,7 @@ export const ChainOfCustody = () => {
         </div>
 
         {/* Save */}
-        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+        <button type="submit" className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90">
           {entryId ? "Update" : "Save"}
         </button>
       </form>

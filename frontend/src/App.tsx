@@ -13,7 +13,6 @@ import { DashBoardPage } from "./screens/DashboardPage";
 import { LandingPage } from "./screens/LandingPage";
 import {VerifyEmailPage} from "./screens/VerifyEmailPage/VerifyEmailPage";
 import {TermsAndConditionsPage} from "./screens/TermsAndConditionsPage/TermsAndConditionsPage";
-import {ThemeProvider} from "./context/ThemeContext"
 import {FAQ} from "./screens/FAQ"
 import {About} from "./screens/About"
 import { TutorialsPage } from "./screens/TutorialsPage";  
@@ -94,7 +93,6 @@ export default function App() {
   }, []);
   return (
   <SidebarProvider>
-  <ThemeProvider>
         {/* Mount globally so WS is active across all routes */}
     <NotificationsWSProvider />
   <Toaster position="top-right" reverseOrder={false} />
@@ -146,7 +144,6 @@ export default function App() {
 
       {/* Fallback route */}
     </Routes>
-    </ThemeProvider>
     </SidebarProvider>
   );
 }

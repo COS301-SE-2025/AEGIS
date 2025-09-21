@@ -113,7 +113,7 @@ useEffect(() => {
     "px-3 py-1.5 rounded-md font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 
   return (
-    <div className="min-h-screen bg-white dark:bg-background text-foreground p-6">
+  <div className="min-h-screen bg-background text-foreground p-6">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
@@ -146,7 +146,7 @@ useEffect(() => {
               if (!tenant.name || !tenant.createdAt || !tenant.status) return null;
 
               return (
-                <div key={tenant.id} className="flex justify-between items-center border rounded-xl p-4 shadow-md bg-card dark:bg-gray-900">
+                <div key={tenant.id} className="flex justify-between items-center border rounded-xl p-4 shadow-md bg-card">
                   <div>
                     <p className="text-lg font-medium">{tenant.name}</p>
                     <p className="text-sm text-muted-foreground">Created: {tenant.createdAt ? new Date(tenant.createdAt).toLocaleString() :"Unknown"}</p>
@@ -175,7 +175,7 @@ useEffect(() => {
                     </button>
                     <button
                       onClick={() => confirmRemoveTenant(tenant)}
-                      className={`${btnBase} bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600`}
+                      className={`${btnBase} bg-destructive text-destructive-foreground hover:bg-destructive/80`}
                     >
                       Remove
                     </button>
@@ -221,7 +221,7 @@ useEffect(() => {
                 type="text"
                 value={newTenantName}
                 onChange={(e) => setNewTenantName(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 required
                 autoFocus
               />
@@ -236,7 +236,7 @@ useEffect(() => {
               </button>
               <button
                 type="submit"
-                className={`${btnBase} bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600`}
+                className={`${btnBase} bg-primary text-primary-foreground hover:bg-primary/90`}
               >
                 Save
               </button>
@@ -260,7 +260,7 @@ useEffect(() => {
             </button>
             <button
               onClick={handleRemoveTenant}
-              className={`${btnBase} bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600`}
+              className={`${btnBase} bg-destructive text-destructive-foreground hover:bg-destructive/80`}
             >
               Remove
             </button>

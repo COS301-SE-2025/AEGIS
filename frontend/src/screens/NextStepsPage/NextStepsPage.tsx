@@ -12,7 +12,7 @@ export default function NextStepsPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-background text-foreground">
       <div className="bg-card p-8 rounded-xl shadow-xl w-full max-w-md border">
-        <h1 className="text-2xl font-bold text-cyan-400 mb-2">
+  <h1 className="text-2xl font-bold text-success mb-2">
           ✅ Case #{caseId} Created
         </h1>
         <p className="text-muted-foreground mb-6">

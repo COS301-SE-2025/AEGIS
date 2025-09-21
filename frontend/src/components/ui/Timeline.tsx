@@ -314,15 +314,15 @@ useEffect(() => {
 }, [caseId]);
 
   return (
-    <div className="bg-card border border-bg-accent rounded-lg p-8 text-gray-100 min-h screen max-w-6xl mx-auto shadow-lg">
+    <div className="bg-card border border rounded-lg p-8 text-foreground min-h screen max-w-6xl mx-auto shadow-lg">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+        <h2 className="text-2xl font-semibold text-foreground flex items-center gap-2">
           <Calendar className="text-blue-400" size={24} />
           Investigation Timeline
         </h2>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-blue-500/25"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary transition-all duration-200 shadow-lg hover:shadow-blue-500/25"
         >
           <Plus size={18} />
           Add Event
@@ -333,7 +333,7 @@ useEffect(() => {
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8 p-6 bg-gray-800 border border-gray-600 rounded-lg shadow-xl"
+          className="mb-8 p-6 bg-background border border-border rounded-lg shadow-xl"
         >
           <div className="flex items-center gap-2 mb-4 text-blue-400">
             <Calendar size={16} />
@@ -346,13 +346,13 @@ useEffect(() => {
             value={newEventDescription}
             onChange={(e) => setNewEventDescription(e.target.value)}
             placeholder="Describe the investigation event..."
-            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-lg mb-4 focus:border-blue-500 focus:outline-none resize-none"
+            className="w-full px-4 py-3 bg-background border border-border text-foreground placeholder-gray-400 rounded-lg mb-4 focus:border-primary focus:outline-none resize-none"
             rows={3}
           />
           
           {/* Severity Selection */}
           <div className="mb-4">
-            <label className="text-sm font-medium text-gray-300 mb-2 block">Severity Level:</label>
+            <label className="text-sm font-medium text-foreground mb-2 block">Severity Level:</label>
             <div className="flex gap-2">
               {['low', 'medium', 'high', 'critical'].map((level) => (
                 <button
@@ -361,7 +361,7 @@ useEffect(() => {
                   className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                     newEventSeverity === level
                       ? getSeverityColor(level).replace('bg-', 'bg-').replace('/10', '/30') + ' border-2'
-                      : 'bg-gray-700 border border-gray-600 text-gray-300 hover:bg-gray-600'
+                      : 'bg-background border border-border text-foreground hover:bg-primary/10'
                   }`}
                 >
                   {getSeverityIcon(level)}
@@ -373,10 +373,10 @@ useEffect(() => {
 
           {/* Evidence linking */}
           <div className="mb-4">
-            <label className="text-sm font-medium text-gray-300 mb-2 block">Link Evidence Files:</label>
-            <div className="max-h-40 overflow-y-auto bg-gray-700 rounded-lg p-3">
+            <label className="text-sm font-medium text-foreground mb-2 block">Link Evidence Files:</label>
+            <div className="max-h-40 overflow-y-auto bg-background rounded-lg p-3">
               {evidenceItems.length === 0 ? (
-                <p className="text-gray-500 text-sm">No evidence files available</p>
+                <p className="text-foreground text-sm">No evidence files available</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {evidenceItems.map((item) => (
@@ -385,8 +385,8 @@ useEffect(() => {
                       onClick={() => setNewEventEvidence(item.value)}
                       className={`p-2 border rounded-lg text-xs transition-all text-left ${
                         newEventEvidence === item.value
-                          ? "bg-blue-600 border-blue-500 text-white shadow-lg"
-                          : "bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-600"
+                          ? "bg-primary border-border text-foreground shadow-lg"
+                          : "bg-primary border-border text-foreground hover:bg-primary/10"
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -409,13 +409,13 @@ useEffect(() => {
 
           {/* Tags */}
           <div className="mb-6">
-            <label className="text-sm font-medium text-gray-300 mb-2 block">Tags:</label>
+            <label className="text-sm font-medium text-foreground mb-2 block">Tags:</label>
             <input
               type="text"
               placeholder="e.g., Analysis, Containment, Malware Detection, Network Forensics"
               value={newEventTags.join(", ")}
               onChange={(e) => setNewEventTags(e.target.value.split(",").map((t) => t.trim()).filter(t => t))}
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 rounded-lg focus:border-blue-500 focus:outline-none"
+              className="w-full px-4 py-2 bg-background border border-border text-foreground placeholder-gray-400 rounded-lg focus:border-primary focus:outline-none"
             />
           </div>
 
@@ -423,14 +423,14 @@ useEffect(() => {
             <button
               onClick={addEvent}
               disabled={!newEventDescription.trim()}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-primary/10 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
             >
               <Plus size={16} />
               Add Event
             </button>
             <button
               onClick={() => setShowAddForm(false)}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors"
+              className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/60 transition-colors"
             >
               Cancel
             </button>
@@ -484,7 +484,7 @@ useEffect(() => {
                                 <textarea
                                   value={editDescription}
                                   onChange={(e) => setEditDescription(e.target.value)}
-                                  className="w-full mb-3 px-3 py-2 bg-gray-700 border border-gray-600 text-gray-100 rounded-lg resize-none"
+                                  className="w-full mb-3 px-3 py-2 bg-background border border-primary text-foreground rounded-lg resize-none"
                                   rows={3}
                                 />
                                 <div className="flex gap-2">
@@ -505,7 +505,7 @@ useEffect(() => {
                             ) : (
                               <div>
                                 <div className="flex justify-between items-start mb-3">
-                                  <p className="text-gray-100 leading-relaxed">{event.description}</p>
+                                  <p className="text-foreground leading-relaxed">{event.description}</p>
                                   <div className="flex gap-2 ml-4">
                                     <button 
                                       onClick={() => startEditing(index, event.description)} 
@@ -528,7 +528,7 @@ useEffect(() => {
                                 {event.tags?.length > 0 && (
                                   <div className="mb-3 flex flex-wrap gap-2">
                                     {event.tags.map((tag: string, i: number) => (
-                                      <span key={i} className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs rounded-full flex items-center gap-1">
+                                      <span key={i} className="px-2 py-1 bg-primary/60 border border-primary/60 text-foreground/80 text-xs rounded-full flex items-center gap-1">
                                         <Tag size={10} /> {tag}
                                       </span>
                                     ))}
@@ -537,15 +537,15 @@ useEffect(() => {
 
                                 {/* Linked Evidence */}
                                 {event.evidence?.length > 0 && (
-                                  <div className="mt-3 border-t border-gray-700 pt-3">
+                                  <div className="mt-3 border-t border-border pt-3">
                                     <div className="flex items-center justify-between mb-2">
-                                      <span className="text-sm font-medium text-gray-300 flex items-center gap-1">
+                                      <span className="text-sm font-medium text-foreground/80 flex items-center gap-1">
                                         <Paperclip size={14} />
                                         Linked Evidence ({event.evidence.length})
                                       </span>
                                       <button
                                         onClick={() => toggleEvidenceExpansion(event.id || `${index}`)}
-                                        className="text-blue-400 hover:text-blue-300 text-xs"
+                                        className="text-primary hover:text-primary/60 text-xs"
                                       >
                                         {expandedEvidence[event.id || `${index}`] ? 'Collapse' : 'Expand'}
                                       </button>
@@ -558,11 +558,11 @@ useEffect(() => {
                                       {event.evidence.map((evidenceName: string, i: number) => {
                                         const evidenceItem = evidenceItems.find(item => item.name === evidenceName);
                                         return (
-                                          <div key={i} className="bg-gray-700/50 border border-gray-600 rounded-lg p-2">
+                                          <div key={i} className="bg-background border border-border rounded-lg p-2">
                                             <div className="flex items-center justify-between">  
                                               <div className="flex items-center gap-2 min-w-0">
-                                                <FileText size={14} className="text-gray-400 flex-shrink-0" />
-                                                <span className="text-sm text-gray-200 truncate">{evidenceName}</span>
+                                                <FileText size={14} className="text-foreground/80 flex-shrink-0" />
+                                                <span className="text-sm text-foreground/80 truncate">{evidenceName}</span>
                                               </div>
                                               <div className="flex gap-1 ml-2">
                                                 <button
@@ -597,7 +597,7 @@ useEffect(() => {
 
                                 {/* Analyst info */}
                                 {event.analystName && (
-                                  <div className="mt-3 text-xs text-gray-500 border-t border-gray-700 pt-2">
+                                  <div className="mt-3 text-xs text-foreground border-t border-gray-700 pt-2">
                                     Added by: {event.analystName}
                                   </div>
                                 )}
