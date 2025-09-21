@@ -1,6 +1,10 @@
 package report
 
 import (
+	reportshared "aegis-api/services_/report/shared"
+	"log"
+
+	// ...existing imports...
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -23,7 +27,7 @@ import (
 type ReportService interface {
 	GenerateReport(ctx context.Context, caseID, examinerID, tenantID, teamID uuid.UUID) (*Report, error)
 	SaveReport(ctx context.Context, report *Report) error
-	GetReportByID(ctx context.Context, reportID uuid.UUID) (*Report, error)
+	GetReportByID(ctx context.Context, reportID string) (*Report, error)
 	UpdateReport(ctx context.Context, report *Report) error
 	GetAllReports(ctx context.Context) ([]Report, error)
 	GetReportsByCaseID(ctx context.Context, caseID uuid.UUID) ([]ReportWithDetails, error)
@@ -48,10 +52,10 @@ type ReportService interface {
 
 // ReportServiceImpl is the concrete implementation of ReportService.
 type ReportServiceImpl struct {
-	repo      ReportRepository
-	mongoRepo ReportMongoRepository
+	repo          ReportRepository
+	mongoRepo     ReportMongoRepository
+	pgSectionRepo reportshared.ReportSectionRepository // Postgres section repository
 	// artifactsRepo   ReportArtifactsRepository
-	// storage     Storage
 	// auditLogger AuditLogger
 	// authorizer  Authorizer
 	//coCRepo     GormCoCRepo
@@ -60,14 +64,16 @@ type ReportServiceImpl struct {
 func NewReportService(
 	repo ReportRepository,
 	mongoRepo ReportMongoRepository,
+	pgSectionRepo reportshared.ReportSectionRepository,
 	// storage Storage,
 	// auditLogger AuditLogger,
 	// authorizer Authorizer,
 	//coCRepo GormCoCRepo,
 ) ReportService {
 	return &ReportServiceImpl{
-		repo:      repo,
-		mongoRepo: mongoRepo,
+		repo:          repo,
+		mongoRepo:     mongoRepo,
+		pgSectionRepo: pgSectionRepo,
 		// storage:     storage,
 		// auditLogger: auditLogger,
 		// authorizer:  authorizer,
@@ -100,7 +106,6 @@ func (s *ReportServiceImpl) GenerateReport(
 	// 2) Generate MongoID for content
 	mongoID := primitive.NewObjectID()
 	report.MongoID = mongoID.Hex()
-
 	// 3) Save metadata in Postgres
 	if err := s.repo.SaveReport(ctx, report); err != nil {
 		return nil, fmt.Errorf("failed to generate report metadata: %w", err)
@@ -121,23 +126,45 @@ func (s *ReportServiceImpl) GenerateReport(
 	}
 
 	// 5) Save content in Mongo WITH tenant/team
+	// 4b) Insert default sections into Postgres report_sections
+	log.Printf("[DEBUG] pgSectionRepo is nil? %v (type: %T)", s.pgSectionRepo == nil, s.pgSectionRepo)
+	for _, sec := range defaultSections {
+		pgSection := &reportshared.ReportSection{
+			ID:        sec.ID.Hex(),
+			ReportID:  report.ID.String(),
+			Title:     sec.Title,
+			Content:   sec.Content,
+			Order:     sec.Order,
+			CreatedAt: sec.CreatedAt,
+			UpdatedAt: sec.UpdatedAt,
+		}
+		log.Printf("[DEBUG] Inserting section into Postgres: ID=%s, ReportID=%s, Title=%s", pgSection.ID, pgSection.ReportID, pgSection.Title)
+		if s.pgSectionRepo != nil {
+			if err := s.pgSectionRepo.CreateSection(ctx, pgSection); err != nil {
+				log.Printf("[ERROR] Failed to insert section into Postgres: ID=%s, err=%v", pgSection.ID, err)
+				return nil, fmt.Errorf("failed to create default section '%s' in Postgres: %w", sec.Title, err)
+			}
+		} else {
+			log.Printf("[WARN] pgSectionRepo is nil, skipping Postgres section insert for section: %s", pgSection.Title)
+		}
+	}
+
 	reportContent := &ReportContentMongo{
 		ID:        mongoID,
 		ReportID:  report.ID.String(),
-		TenantID:  tenantID.String(), // NEW
-		TeamID:    teamID.String(),   // NEW
 		Sections:  defaultSections,
+		TenantID:  tenantID.String(),
+		TeamID:    teamID.String(),
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 	if err := s.mongoRepo.SaveReportContent(ctx, reportContent); err != nil {
 		return nil, fmt.Errorf("failed to save report content in Mongo: %w", err)
 	}
-
 	return report, nil
-}
 
-// SaveReport persists a report to the repository.
+	// SaveReport persists a report to the repository.
+}
 func (s *ReportServiceImpl) SaveReport(ctx context.Context, report *Report) error {
 	if report.ID == uuid.Nil {
 		report.ID = uuid.New()
@@ -145,8 +172,9 @@ func (s *ReportServiceImpl) SaveReport(ctx context.Context, report *Report) erro
 	return s.repo.SaveReport(ctx, report)
 }
 
-// GetReportByID retrieves a report by its ID.
-func (s *ReportServiceImpl) GetReportByID(ctx context.Context, reportID uuid.UUID) (*Report, error) {
+// GetReportByID retrieves a report by its hex string ID.
+func (s *ReportServiceImpl) GetReportByID(ctx context.Context, reportID string) (*Report, error) {
+	// If your repo expects a hex string, pass directly
 	return s.repo.GetByID(ctx, reportID)
 }
 
@@ -195,7 +223,7 @@ func (s *ReportServiceImpl) DeleteReportByID(ctx context.Context, reportID uuid.
 
 func (s *ReportServiceImpl) DownloadReport(ctx context.Context, reportID uuid.UUID) (*ReportWithContent, error) {
 	// 1) Fetch Postgres metadata (also gives us TenantID/TeamID)
-	meta, err := s.repo.GetByID(ctx, reportID)
+	meta, err := s.repo.GetByID(ctx, reportID.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch report metadata: %w", err)
 	}
