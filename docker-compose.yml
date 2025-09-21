@@ -67,6 +67,14 @@ services:
     volumes:
       - ipfs_data:/data/ipfs
 
+  localai:
+    build:
+      context: ./localai
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./localai:/app
+
 volumes:
   postgres_data:
   mongo_data:
