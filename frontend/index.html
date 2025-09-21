@@ -1,6 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script>
+      // Set theme class and CSS variables on <html> before React loads
+      (function() {
+        try {
+          var basePalettes = {
+            dark: {
+              background: "224 71% 4%",
+              foreground: "213 31% 91%",
+              card: "220 40% 15%",
+              'card-foreground': "213 31% 91%",
+              primary: "220 60% 25%",
+              'primary-foreground': "213 31% 91%",
+              secondary: "220 40% 35%",
+              'secondary-foreground': "213 31% 91%",
+              accent: "216 34% 17%",
+              'accent-foreground': "210 40% 98%",
+              destructive: "0 63% 31%",
+              'destructive-foreground': "210 40% 98%",
+              border: "216 34% 17%",
+              input: "216 34% 17%",
+              muted: "223 47% 11%",
+              'muted-foreground': "215.4 16.3% 56.9%",
+              popover: "224 71% 4%",
+              'popover-foreground': "215 20.2% 65.1%",
+              ring: "216 34% 17%"
+            },
+            light: {
+              background: "45 56% 96%",
+              foreground: "120 13% 30%",
+              card: "24 33% 94%",
+              'card-foreground': "120 13% 30%",
+              primary: "205 79% 70%",
+              'primary-foreground': "120 13% 30%",
+              secondary: "340 26% 76%",
+              'secondary-foreground': "120 13% 30%",
+              accent: "120 13% 86%",
+              'accent-foreground': "120 13% 30%",
+              destructive: "0 84% 60%",
+              'destructive-foreground': "120 13% 30%",
+              border: "24 33% 80%",
+              input: "24 33% 80%",
+              muted: "45 56% 90%",
+              'muted-foreground': "120 13% 50%",
+              popover: "45 56% 96%",
+              'popover-foreground': "120 13% 30%",
+              ring: "205 79% 70%"
+            },
+            default: {
+              background: "220 14% 96%",
+              foreground: "222 47% 11%",
+              card: "210 20% 98%",
+              'card-foreground': "222 47% 11%",
+              primary: "213 96% 53%",
+              'primary-foreground': "210 40% 98%",
+              secondary: "215 19% 35%",
+              'secondary-foreground': "210 40% 98%",
+              accent: "210 40% 96.1%",
+              'accent-foreground': "222.2 47.4% 11.2%",
+              destructive: "0 100% 50%",
+              'destructive-foreground': "210 40% 98%",
+              border: "214.3 31.8% 91.4%",
+              input: "214.3 31.8% 91.4%",
+              muted: "210 40% 96.1%",
+              'muted-foreground': "215.4 16.3% 46.9%",
+              popover: "0 0% 100%",
+              'popover-foreground': "222.2 47.4% 11.2%",
+              ring: "215 20.2% 65.1%"
+            }
+          };
+          var theme = localStorage.getItem('theme');
+          if (theme !== 'dark' && theme !== 'light' && theme !== 'default') {
+            theme = 'default';
+          }
+          document.documentElement.classList.remove('dark', 'light', 'default');
+          document.documentElement.classList.add(theme);
+          var palette = basePalettes[theme];
+          try {
+            var override = localStorage.getItem('palette-override-' + theme);
+            if (override) {
+              var parsed = JSON.parse(override);
+              palette = Object.assign({}, palette, parsed);
+            }
+          } catch (e) {}
+          for (var key in palette) {
+            if (palette.hasOwnProperty(key)) {
+              document.documentElement.style.setProperty('--' + key, palette[key]);
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta charset="utf-8" />
     <title>AEGIS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
