@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -9,7 +10,13 @@ import (
 	"strings"
 	"time"
 
+	graphicalmapping "aegis-api/services_/GraphicalMapping"
+	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/report"
+	"aegis-api/services_/timeline"
+
+	// removed duplicate import
+	"context"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -18,13 +25,202 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// ContextAutofillResponse is the JSON payload for context autofill
+
+// GetSectionContext returns structured context for a report section (case info, IOCs, evidence, timeline)
+func (h *ReportHandler) GetSectionContext(c *gin.Context) {
+	reportIDStr := c.Param("reportID")
+	sectionIDStr := c.Param("sectionID")
+	ctx := c.Request.Context()
+
+	log.Printf("[DEBUG] GetSectionContext: reportID=%s sectionID=%s", reportIDStr, sectionIDStr)
+
+	// Fetch report (for validation only)
+	rep, err := h.ReportService.DownloadReport(ctx, uuid.MustParse(reportIDStr))
+	if err != nil || rep == nil {
+		log.Printf("[DEBUG] Report not found: %s", reportIDStr)
+		writeError(c, http.StatusNotFound, "report_not_found", "report not found")
+		return
+	}
+
+	// Validate section existence
+	found := false
+	for _, sec := range rep.Content {
+		log.Printf("[DEBUG] Checking section: %s", sec.ID.Hex())
+		if sec.ID.Hex() == sectionIDStr {
+			found = true
+			break
+		}
+	}
+	if !found {
+		log.Printf("[DEBUG] Section not found: %s in report %s", sectionIDStr, reportIDStr)
+		writeError(c, http.StatusNotFound, "section_not_found", "section not found")
+		return
+	}
+
+	// --- Fetch Case Info (join case + report metadata) ---
+	var caseInfo any
+	caseDetails := map[string]any{}
+	// Example: fetch from case service (pseudo-code, replace with actual call)
+	if h.CaseService != nil {
+		caseObj, err := h.CaseService.GetCaseByID(ctx, rep.Metadata.CaseID.String())
+		if err == nil && caseObj != nil {
+			// Try to type assert to struct, else marshal/unmarshal to map
+			switch v := caseObj.(type) {
+			case map[string]any:
+				caseDetails = v
+			default:
+				b, _ := json.Marshal(v)
+				json.Unmarshal(b, &caseDetails)
+			}
+		}
+	}
+	// Merge report metadata
+	if rep.Metadata != nil {
+		caseDetails["report_name"] = rep.Metadata.Name
+		caseDetails["report_status"] = rep.Metadata.Status
+		caseDetails["examiner_id"] = rep.Metadata.ExaminerID.String()
+		caseDetails["team_id"] = rep.Metadata.TeamID.String()
+		caseDetails["tenant_id"] = rep.Metadata.TenantID.String()
+		caseDetails["report_created_at"] = rep.Metadata.CreatedAt
+		caseDetails["report_updated_at"] = rep.Metadata.UpdatedAt
+	}
+	caseInfo = caseDetails
+
+	// --- Fetch Evidence ---
+	var evidence []any
+	if h.EvidenceService != nil {
+		evidences, err := h.EvidenceService.FindEvidenceByCaseID(rep.Metadata.CaseID)
+		if err == nil {
+			for _, ev := range evidences {
+				var hashes map[string]string
+				if err := json.Unmarshal([]byte(ev.Metadata), &hashes); err != nil {
+					hashes = map[string]string{}
+				}
+				evidence = append(evidence, map[string]any{
+					"filename": ev.Filename,
+					"md5":      hashes["md5"],
+					"sha256":   hashes["sha256"],
+				})
+			}
+		}
+	}
+
+	// --- Fetch IOCs from IOC service ---
+	var iocs []any
+	if h.IOCService != nil {
+		iocList, err := h.IOCService.ListIOCsByCase(rep.Metadata.CaseID.String())
+		if err == nil {
+			for _, ioc := range iocList {
+				iocs = append(iocs, map[string]any{
+					"id":         ioc.ID,
+					"type":       ioc.Type,
+					"value":      ioc.Value,
+					"created_at": ioc.CreatedAt,
+				})
+			}
+		}
+	}
+
+	// --- Fetch Timeline Events ---
+	var timeline []any
+	if h.TimelineService != nil {
+		events, err := h.TimelineService.ListEvents(rep.Metadata.CaseID.String())
+		if err == nil {
+			for _, ev := range events {
+				timeline = append(timeline, map[string]any{
+					"id":          ev.ID,
+					"description": ev.Description,
+					"severity":    ev.Severity,
+					"analyst":     ev.AnalystName,
+					"date":        ev.Date,
+					"time":        ev.Time,
+					"tags":        ev.Tags,
+				})
+			}
+		}
+	}
+
+	resp := ContextAutofillResponse{
+		CaseInfo: caseInfo,
+		IOCs:     iocs,
+		Evidence: evidence,
+		Timeline: timeline,
+	}
+	log.Printf("[DEBUG] Returning rich context autofill for section %s in report %s", sectionIDStr, reportIDStr)
+	c.JSON(http.StatusOK, resp)
+}
+
+// ContextAutofillResponse is the JSON payload for context autofill
+type ContextAutofillResponse struct {
+	CaseInfo any `json:"case_info"`
+	IOCs     any `json:"iocs"`
+	Evidence any `json:"evidence"`
+	Timeline any `json:"timeline"`
+}
+
 // ReportHandler handles HTTP requests for reports.
 type ReportHandler struct {
-	ReportService report.ReportService
+	ReportService   report.ReportService
+	EvidenceService interface {
+		FindEvidenceByCaseID(caseID uuid.UUID) ([]metadata.Evidence, error)
+	}
+	TimelineService interface {
+		ListEvents(caseID string) ([]*timeline.TimelineEventResponse, error)
+	}
+	CaseService interface {
+		GetCaseByID(ctx context.Context, caseID string) (any, error)
+	}
+	IOCService interface {
+		ListIOCsByCase(caseID string) ([]*graphicalmapping.IOC, error)
+	}
+}
+
+// GetReportByID returns a report by its ID
+func (h *ReportHandler) GetReportByID(c *gin.Context) {
+	reportIDStr := c.Param("reportID")
+	ctx := c.Request.Context()
+	reportID, err := uuid.Parse(reportIDStr)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, "invalid_report_id", "Invalid report ID")
+		return
+	}
+	rep, err := h.ReportService.DownloadReport(ctx, reportID)
+	if err != nil || rep == nil {
+		writeError(c, http.StatusNotFound, "report_not_found", "Report not found")
+		return
+	}
+	c.JSON(http.StatusOK, rep)
 }
 
 func NewReportHandler(s report.ReportService) *ReportHandler {
+	// Usage: NewReportHandler(reportService)
 	return &ReportHandler{ReportService: s}
+}
+
+// Use this constructor to inject dependencies for context autofill
+func NewReportHandlerWithDeps(
+	reportService report.ReportService,
+	evidenceService interface {
+		FindEvidenceByCaseID(caseID uuid.UUID) ([]metadata.Evidence, error)
+	},
+	timelineService interface {
+		ListEvents(caseID string) ([]*timeline.TimelineEventResponse, error)
+	},
+	caseService interface {
+		GetCaseByID(ctx context.Context, caseID string) (any, error)
+	},
+	iocService interface {
+		ListIOCsByCase(caseID string) ([]*graphicalmapping.IOC, error)
+	},
+) *ReportHandler {
+	return &ReportHandler{
+		ReportService:   reportService,
+		EvidenceService: evidenceService,
+		TimelineService: timelineService,
+		CaseService:     caseService,
+		IOCService:      iocService,
+	}
 }
 
 // handlers/report_handler.go
@@ -135,10 +331,10 @@ func (h *ReportHandler) GenerateReport(c *gin.Context) {
 
 	// 2) Otherwise create it
 	claims := MustClaims(c) // your JWT claims extraction (user/team/tenant)
-	rep, err := h.ReportService.GenerateReport(ctx, caseID, claims.UserID, claims.TenantID, claims.TeamID)
-	if err != nil {
+	rep, genErr := h.ReportService.GenerateReport(ctx, caseID, claims.UserID, claims.TenantID, claims.TeamID)
+	if genErr != nil {
 		// If a parallel request created it, surface the existing one
-		if IsUniqueViolation(err) {
+		if IsUniqueViolation(genErr) {
 			if again, e2 := h.ReportService.GetReportsByCaseID(ctx, caseID); e2 == nil && len(again) > 0 {
 				c.JSON(http.StatusOK, gin.H{"id": again[0].ID})
 				return
@@ -148,35 +344,35 @@ func (h *ReportHandler) GenerateReport(c *gin.Context) {
 		return
 	}
 
+	// Use rep.CaseID (not rep.Metadata)
+	caseObj, caseErr := h.CaseService.GetCaseByID(ctx, rep.CaseID.String())
+	var caseMap map[string]any
+	if caseErr == nil {
+		switch v := caseObj.(type) {
+		case map[string]any:
+			caseMap = v
+		default:
+			b, _ := json.Marshal(v)
+			json.Unmarshal(b, &caseMap)
+		}
+	} else {
+		caseMap = map[string]any{}
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"id":            rep.ID,
 		"name":          rep.Name,
 		"status":        rep.Status,
-		"version":       rep.Version,
 		"last_modified": rep.UpdatedAt,
+		"case_id":       caseMap["ID"],
+		"case_name":     caseMap["Name"],
+		"case_status":   caseMap["Status"],
+		"description":   caseMap["Description"],
+		"created_at":    caseMap["CreatedAt"],
+		"updated_at":    caseMap["UpdatedAt"],
 	})
 }
 
-// GetReportByID retrieves a report with metadata and content.
-func (h *ReportHandler) GetReportByID(c *gin.Context) {
-	reportIDStr := c.Param("reportID")
-	reportID, err := uuid.Parse(reportIDStr)
-	if err != nil {
-		writeError(c, http.StatusBadRequest, "invalid_report_id", "invalid report ID")
-		return
-	}
-
-	rep, err := h.ReportService.DownloadReport(c.Request.Context(), reportID)
-	if err != nil {
-		logWithCtx("info", "report not found", c, map[string]any{"reportID": reportIDStr, "err": err.Error()})
-		writeError(c, http.StatusNotFound, "report_not_found", "report not found")
-		return
-	}
-
-	c.JSON(http.StatusOK, rep)
-}
-
-// Error writer with a stable shape
+// writeError is a helper to send error responses in a consistent format.
 func writeError(c *gin.Context, status int, code, msg string) {
 	c.AbortWithStatusJSON(status, gin.H{
 		"error": gin.H{
@@ -269,7 +465,6 @@ func (h *ReportHandler) DownloadReportPDF(c *gin.Context) {
 	c.Data(http.StatusOK, "application/pdf", pdfBytes)
 }
 
-// DownloadReportJSON returns the report as JSON.
 // DownloadReportJSON returns the report as JSON.
 func (h *ReportHandler) DownloadReportJSON(c *gin.Context) {
 	reportIDStr := c.Param("reportID")

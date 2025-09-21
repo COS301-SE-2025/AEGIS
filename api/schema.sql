@@ -1004,5 +1004,61 @@ CREATE TABLE reports (
     INDEX idx_reports_created_at (created_at),
     INDEX idx_reports_report_number (report_number),
     INDEX idx_reports_date_examined (date_examined)
+);*/
+
+CREATE TABLE report_sections (
+  id CHAR(24) PRIMARY KEY,
+  report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+  section_name VARCHAR(255) NOT NULL,
+  section_order INTEGER DEFAULT 0,
+  content TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
-*/
+
+CREATE INDEX idx_report_sections_report_id ON report_sections(report_id);
+
+-- AI suggestions table
+CREATE TABLE report_ai_suggestions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+  section_id CHAR(24) REFERENCES report_sections(id) ON DELETE CASCADE,
+  suggestion_text TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  status VARCHAR(20) DEFAULT 'pending',
+  created_by_ai BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_suggestions_report_id ON report_ai_suggestions(report_id);
+CREATE INDEX idx_ai_suggestions_section_id ON report_ai_suggestions(section_id);
+
+-- AI references tables
+CREATE TABLE report_section_timeline_refs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  section_id CHAR(24) NOT NULL REFERENCES report_sections(id) ON DELETE CASCADE,
+  timeline_event_id UUID NOT NULL REFERENCES timeline_events(id) ON DELETE CASCADE
+);
+
+CREATE TABLE report_section_evidence_refs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  section_id CHAR(24) NOT NULL REFERENCES report_sections(id) ON DELETE CASCADE,
+  evidence_id UUID NOT NULL REFERENCES evidence(id) ON DELETE CASCADE
+);
+
+CREATE TABLE report_section_ioc_refs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  section_id CHAR(24) NOT NULL REFERENCES report_sections(id) ON DELETE CASCADE,
+  ioc_id INT NOT NULL REFERENCES iocs(id) ON DELETE CASCADE
+);
+
+-- Feedback table
+CREATE TABLE report_ai_feedback (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ai_suggestion_id UUID NOT NULL REFERENCES report_ai_suggestions(id) ON DELETE CASCADE,
+    feedback VARCHAR(50),
+    comments TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_feedback_suggestion_id ON report_ai_feedback(ai_suggestion_id);

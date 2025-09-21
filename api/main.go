@@ -39,6 +39,7 @@ import (
 	"aegis-api/services_/notification"
 
 	"aegis-api/services_/report"
+	report_ai_assistance "aegis-api/services_/report/report_ai_assistance"
 	"aegis-api/services_/report/update_status"
 
 	"aegis-api/services_/timeline"
@@ -317,23 +318,52 @@ func main() {
 	// Initialize the repository and service for report generation and management
 	// ─── Report Service Initialization ─────────────────────────────
 
+	// ...existing code...
 	reportRepo := report.NewReportRepository(db.DB)
-	// coCRepo := report.NewCoCRepo(db.DB)
 	reportContentCollection := mongoDatabase.Collection("report_contents")
-
 	reportMongoRepo := report.NewReportMongoRepo(reportContentCollection)
-
+	pgSectionRepo := report_ai_assistance.NewGormReportSectionRepo(db.DB)
 	reportService := report.NewReportService(
 		reportRepo,
-		//nil,         // ReportArtifactsRepo
 		reportMongoRepo,
-		// nil,         // Storage
-		// auditLogger, // AuditLogger
-		// nil,         // Authorizer
-		// coCRepo,
+		pgSectionRepo,
 	)
-	reportHandler := handlers.NewReportHandler(reportService)
 
+	// Evidence metadata service for context autofill
+	metadataRepo = metadata.NewGormRepository(db.DB)
+	ipfsClient = upload.NewIPFSClient("")
+	metadataService = metadata.NewService(metadataRepo, ipfsClient)
+
+	// Timeline service for context autofill
+	timelineRepo = timeline.NewRepository(db.DB)
+	timelineService = timeline.NewService(timelineRepo)
+
+	// Use the new handler constructor with dependencies
+	reportHandler := handlers.NewReportHandlerWithDeps(
+		reportService,
+		metadataService, // implements FindEvidenceByCaseID
+		timelineService, // implements ListEvents
+		caseService,     // implements GetCaseByID
+		iocService,      // implements ListIOCsByCase
+	)
+
+	// Instantiate Report AI Service
+	mongoSectionRepo := report_ai_assistance.NewMongoSectionRepositoryWithPg(mongoDatabase, db.DB)
+	aiSuggestionRepo := report_ai_assistance.NewGormAISuggestionRepo(db.DB)
+	sectionRefsRepo := report_ai_assistance.NewGormSectionRefsRepo(db.DB)
+	aiFeedbackRepo := report_ai_assistance.NewGormAIFeedbackRepo(db.DB)
+	// Ensure AIClient implementation matches the expected interface signature
+	aiClient := report_ai_assistance.NewAIClientLocalAI("")
+	reportAIService := report_ai_assistance.NewReportService(
+		mongoSectionRepo,
+		aiSuggestionRepo,
+		sectionRefsRepo,
+		aiFeedbackRepo,
+		aiClient, // Your AI client (e.g., OpenAI wrapper)
+	)
+
+	// Instantiate Report AI Handler
+	reportAIHandler := handlers.NewReportAIHandler(reportAIService, reportService)
 	// ─── Report Status Update ─────────────────────────────
 
 	reportStatusRepo := update_status.NewReportStatusRepository(db.DB)
@@ -369,6 +399,7 @@ func main() {
 		notificationService,
 		reportHandler,
 		reportStatusHandler,
+		reportAIHandler,
 
 		iocHandler,
 		timelineHandler,
