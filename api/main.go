@@ -62,7 +62,7 @@ func main() {
 	// ─── Set JWT Secret ─────────────────────────────────────────
 	jwtSecret := os.Getenv("JWT_SECRET_KEY")
 	if jwtSecret == "" {
-		log.Fatal("❌ JWT_SECRET not set in environment")
+		log.Fatal("❌ JWT_SECRET_KEY not set in environment")
 	}
 	middleware.SetJWTSecret([]byte(jwtSecret))
 
@@ -371,10 +371,18 @@ func main() {
 	wsGroup.Use(middleware.WebSocketAuthMiddleware()) // ✅ For ws://.../cases/:id?token=...
 	websocket.RegisterWebSocketRoutes(wsGroup, hub)
 
-	log.Println("🚀 Starting AEGIS API on :8080...")
-	log.Println("📚 Swagger docs: http://localhost:8080/swagger/index.html")
+	//load balance port
+	// Get port from environment variable or use default
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // default
+	}
 
-	if err := router.Run(":8080"); err != nil {
+	log.Println("🚀 Starting AEGIS API on :" + port + "...")
+	log.Println("📚 Swagger docs: http://localhost:" + port + "/swagger/index.html")
+
+	if err := router.Run(":" + port); err != nil {
 		log.Fatal("❌ Failed to start server:", err)
 	}
+
 }
