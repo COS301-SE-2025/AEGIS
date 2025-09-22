@@ -78,8 +78,8 @@ if (!caseId) {
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
       <div className="max-w-3xl w-full bg-card border border-border p-6 rounded-2xl shadow-xl font-mono">
-        <h1 className="text-3xl font-bold text-cyan-400 mb-6 flex items-center gap-2">
-          <ShieldPlus size={28} /> Upload Evidence
+        <h1 className="text-3xl font-bold text-primary mb-6 flex items-center gap-2">
+          <ShieldPlus size={28} className="text-primary" /> Upload Evidence
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -99,10 +99,10 @@ if (!caseId) {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragging ? "border-green-500 bg-muted" : "border-cyan-500 bg-muted"
+              isDragging ? "border-secondary bg-muted" : "border-primary bg-muted"
             }`}
           >
-            <UploadCloud size={32} className="mx-auto mb-2 text-cyan-400" />
+            <UploadCloud size={32} className="mx-auto mb-2 text-primary" />
             Drag & drop files here
           </div>
 
@@ -131,7 +131,7 @@ if (!caseId) {
 
             <Button
               type="submit"
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Upload Evidence
             </Button>

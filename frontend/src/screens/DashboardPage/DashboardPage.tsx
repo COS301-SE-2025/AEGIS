@@ -527,7 +527,7 @@ useEffect(() => {
 
 
   return (
-    <div className="min-h-screen bg-background text-white">
+  <div className="min-h-screen bg-background text-foreground">
       {/* Sidebar */}
       <div className="fixed left-0 top-0 h-full w-80 bg-background border-r border-border p-6 flex flex-col z-10">
         {/* Logo */}
@@ -539,31 +539,31 @@ useEffect(() => {
               className="w-full h-full object-cover"
             />
           </div>
-          <span className="font-bold text-white text-2xl">AEGIS</span>
+          <span className="font-bold text-foreground text-2xl">AEGIS</span>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 space-y-2">
-          <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
+          <div className="flex items-center gap-3 bg-primary text-primary-foreground p-3 rounded-lg">
             <Home className="w-6 h-6" />
             <span className="text-lg">Dashboard</span>
           </div>
-          <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+          <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <FileText className="w-6 h-6" />
             <Link to="/case-management"><span className="text-lg">Case Management</span></Link>
           </div>
-          <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+          <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <Folder className="w-6 h-6" />
             <Link to="/evidence-viewer"><span className="text-lg">Evidence Viewer</span></Link>
           </div>
-          <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+          <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <MessageSquare className="w-6 h-6" />
             <span className="text-lg">
               <Link to="/secure-chat">Secure Chat</Link>
             </span>
           </div>
             {isDFIRAdmin && (
-              <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+              <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
                 <ClipboardList className="w-6 h-6" />
                 <Link to="/report-dashboard">
                   <span className="text-lg">Case Reports</span>
@@ -604,24 +604,24 @@ useEffect(() => {
       </div>
 
       {/* Main Content */}
-      <div className="ml-80 min-h-screen bg-background">
+  <div className="ml-80 min-h-screen bg-background">
         {/* Topbar */}
         <div className="sticky top-0 bg-background bg-opacity-100 border-b border-border p-4 z-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <SidebarToggleButton />
-              <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">Dashboard</button>
+              <button className="text-primary bg-primary/10 px-4 py-2 rounded-lg">Dashboard</button>
               <Link to="/case-management">
-                <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
+                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                   Case Management
                 </button>
               </Link>
               <Link to="/evidence-viewer">
-                <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
+                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                   Evidence Viewer
                 </button>
               </Link>
-              <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
+              <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                 <Link to="/secure-chat">Secure Chat</Link>
               </button>
             </div>
@@ -631,7 +631,7 @@ useEffect(() => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <input
-                className="w-80 h-12 bg-card border border-muted rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                className="w-80 h-12 bg-card border border-border rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-primary/10"
                 placeholder="Search cases"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -684,7 +684,7 @@ useEffect(() => {
         </div>
 
         {/* Page Content */}
-        <main className="p-8">
+        <main className="p-8 text-foreground">
         {evidenceError && (
           <div className="mb-4 p-3 bg-red-900 text-red-300 rounded">{evidenceError}</div>
         )}
@@ -695,7 +695,7 @@ useEffect(() => {
           <div className="flex justify-between items-center mb-4">
             <button
               onClick={() => setShowTileCustomizer(true)}
-              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700"
+              className="bg-primary text-primary-foreground text-sm px-4 py-2 rounded-md hover:bg-primary/90"
             >
               Customize Dashboard
             </button>
@@ -717,9 +717,9 @@ useEffect(() => {
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
-                            className={`w-[266px] h-[123px] flex-shrink-0 bg-card border-[5px] border rounded-[8px] p-4 flex items-center justify-between ${
-                              snapshot.isDragging ? 'opacity-50' : ''
-                            }`}
+                            className={`w-[266px] h-[123px] flex-shrink-0 bg-card border border-border rounded-lg shadow p-4 flex items-center justify-between ${
+                                snapshot.isDragging ? 'opacity-50' : ''
+                              }`}
                           >
                             <div>
                               <p className={`text-3xl font-bold ${tile.color}`}>{tile.value}</p>
@@ -743,7 +743,7 @@ useEffect(() => {
 
             <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border border-border bg-card p-6 overflow-hidden">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-[#58a6ff] text-lg flex items-center gap-2">
+                <h2 className="font-bold text-foreground text-lg flex items-center gap-2">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
                   </svg>
@@ -751,7 +751,7 @@ useEffect(() => {
                 </h2>
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-                  <span className="text-xs text-muted-foreground">LIVE</span>
+                  <span className="text-xs text-success">LIVE</span>
                 </div>
               </div>
 
@@ -766,21 +766,20 @@ useEffect(() => {
                       ? new Date(activity.Timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })
                       : "---";
 
-                    // Color coding based on action type
-                    let activityColor = "text-[#58a6ff]"; // Default blue
+                    // Color coding based on action type (semantic classes)
+                    let activityColor = "text-primary"; // Default primary
                     if (activity.Action.toLowerCase().includes("alert") || activity.Action.toLowerCase().includes("threat")) {
-                      activityColor = "text-[#f85149]"; // Red for alerts
+                      activityColor = "text-error"; // Red for alerts
                     } else if (activity.Action.toLowerCase().includes("login")) {
-                      activityColor = "text-[#3fb950]"; // Green for logins
+                      activityColor = "text-success"; // Green for logins
                     }
 
                     return (
                       <li key={index} className="group">
-                        <div className="flex gap-3 p-2 rounded-md hover:bg-[#161b22] transition-colors">
+                        <div className="flex gap-3 p-2 rounded-md hover:bg-muted transition-colors">
                           <div className={`flex-shrink-0 mt-1 ${activityColor}`}>
                             <Icon className="w-4 h-4" />
                           </div>
-                          
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-baseline gap-2">
                               <p className={`text-sm font-mono truncate ${activityColor}`}>
@@ -788,29 +787,26 @@ useEffect(() => {
                               </p>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-muted-foreground">{date}</span>
-                                <span className="text-xs text-[#484f58]">{timeAgo}</span>
+                                <span className="text-xs text-muted-foreground">{timeAgo}</span>
                               </div>
                             </div>
-                            
-                            <p className="text-[#c9d1d9] text-sm mt-1 font-mono">
+                            <p className="text-foreground text-sm mt-1 font-mono">
                               {activity.Description}
                             </p>
-                            
                             <div className="mt-1 flex gap-2">
-                              <span className="text-[10px] px-2 py-0.5 bg-[#21262d] text-[#8b949e] rounded-full">
+                              <span className="text-[10px] px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
                                 {activity.Action}
                               </span>
                               {activity.Timestamp && (
-                                <span className="text-[10px] px-2 py-0.5 bg-[#1e60e5] bg-opacity-20 text-[#58a6ff] rounded-full">
+                                <span className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full">
                                   {new Date(activity.Timestamp).toLocaleTimeString([], { hour12: false }) + " UTC"}
                                 </span>
                               )}
                             </div>
                           </div>
                         </div>
-                        
                         {index < recentActivities.length - 1 && (
-                          <div className="h-px bg-[#21262d] mx-2 my-1 group-last:hidden"></div>
+                          <div className="h-px bg-border mx-2 my-1 group-last:hidden"></div>
                         )}
                       </li>
                     );
@@ -821,16 +817,16 @@ useEffect(() => {
           </div>
 
           {/* Case cards */}
-          <div className="w-full bg-card border border-border rounded-lg mt-8 p-6">
+          <div className="w-full bg-card border border-border rounded-2xl shadow-lg mt-8 p-8">
             <div className="flex justify-between items-center mb-4">
               <div className="flex gap-2">
                 <button
                   onClick={() => setActiveTab("active")}
                   className={cn(
-                    "text-sm rounded-lg h-8 px-4",
+                    "text-sm rounded-lg h-8 px-4 transition-colors",
                     activeTab === "active"
-                      ? "bg-muted text-foreground"
-                      : "bg-card text-muted-foreground border border-muted"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-primary/10 text-primary border border-primary"
                   )}
                 >
                   Active Cases ({openCases.length})
@@ -838,10 +834,10 @@ useEffect(() => {
                 <button
                   onClick={() => setActiveTab("archived")}
                   className={cn(
-                    "text-sm rounded-lg h-8 px-4",
+                    "text-sm rounded-lg h-8 px-4 transition-colors",
                     activeTab === "archived"
-                      ? "bg-muted text-white"
-                      : "bg-card text-muted-foreground border border-muted"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-primary/10 text-primary border border-primary"
                   )}
                 >
                   Archived Cases ({archivedCases.length})
@@ -849,17 +845,17 @@ useEffect(() => {
                 <button
                   onClick={() => setActiveTab("closed")}
                   className={cn(
-                    "text-sm rounded-lg h-8 px-4",
+                    "text-sm rounded-lg h-8 px-4 transition-colors",
                     activeTab === "closed"
-                      ? "bg-muted text-white"
-                      : "bg-card text-muted-foreground border border-muted"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-primary/10 text-primary border border-primary"
                   )}
                 >
                   Closed Cases ({closedCases.length})
                 </button>
               </div>
               <Link to="/create-case">
-                <button className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700">
+                <button className="bg-primary text-primary-foreground text-sm px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
                   Create Case
                 </button>
               </Link>
@@ -879,11 +875,10 @@ useEffect(() => {
                   card.team_name.toLowerCase().includes(searchQuery.toLowerCase())
                 )
                 .map((card) => {
-                  console.log("Evidence Card ID:", card.id);
                   return (
                     <div
                       key={card.id}
-                      className="relative flex flex-col justify-between items-center w-[460px] h-[450px] p-4 bg-card border border rounded-[8px]"
+                      className="relative flex flex-col justify-between items-center w-[460px] h-[450px] p-4 bg-card border border-border rounded-lg shadow"
                     >
                       <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2 z-10">
                         {/* Edit button (below) */}
@@ -895,7 +890,7 @@ useEffect(() => {
                             setUpdatedTitle(card.title);
                             setUpdatedDescription(card.description);
                           }}
-                          className="text-muted-foreground hover:text-blue-500 transition-colors"
+                          className="text-muted-foreground hover:text-primary transition-colors"
                           title="Edit Case"
                         >
                           <Pencil className="w-4 h-4" />
@@ -943,7 +938,7 @@ useEffect(() => {
                         height={180}
                         className="rounded-md mb-3"
                       />
-                      <h3 className="text-white text-lg font-bold text-center mb-1">
+                      <h3 className="text-foreground text-lg font-bold text-center mb-1">
                         {card.title || "Untitled Case"}
                       </h3>
                       <div className="text-sm text-muted-foreground text-center mb-2">
@@ -987,7 +982,7 @@ useEffect(() => {
                       />
                       <Link to={card.id && card.id.length === 36 ? `/evidence-viewer/${card.id}` : "#"}>
                         <button
-                          className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted"
+                          className="bg-primary text-primary-foreground text-sm px-14 py-2 rounded hover:bg-primary/90 transition-colors"
                           disabled={!card.id || card.id.length !== 36}
                           title={!card.id || card.id.length !== 36 ? "Invalid Case ID" : "View Evidence Details"}
                         >
@@ -995,7 +990,7 @@ useEffect(() => {
                         </button>
                       </Link>
                       <Link to={`/case-management/${card.id}`}>
-                        <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
+                        <button className="bg-primary text-primary-foreground text-sm px-14 py-2 rounded hover:bg-primary/90 transition-colors">
                           View Details
                         </button>
                       </Link>
@@ -1078,7 +1073,7 @@ useEffect(() => {
                         Upload Evidence
                       </label>
                       <Link to={`/upload-evidence/${editingCase.id}`} className="inline-block w-full">
-                        <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                        <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 text-sm transition-colors">
                           Go to Upload Evidence Page
                         </button>
                       </Link>
@@ -1090,7 +1085,7 @@ useEffect(() => {
                         Assign Members
                       </label>
                       <Link to={`/assign-case-members/${editingCase.id}`} className="inline-block w-full">
-                        <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                        <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 text-sm transition-colors">
                           Go to Assign Members Page
                         </button>
                       </Link>
@@ -1100,14 +1095,14 @@ useEffect(() => {
                     <div className="flex justify-end gap-3 pt-2">
                       <button
                         onClick={() => setEditingCase(null)}
-                        className="px-4 py-2 text-sm text-muted-foreground hover:text-white"
+                        className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                       >
                         Cancel
                       </button>
 
                       <button
                         onClick={handleSaveCase}
-                        className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                        className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded hover:bg-primary/90 transition-colors"
                       >
                         Save Changes
                       </button>
@@ -1122,7 +1117,7 @@ useEffect(() => {
           {/* Tile Customizer Modal */}
             {showTileCustomizer && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-card p-6 rounded-2xl shadow-lg border border-border w-full max-w-md">
+                <div className="bg-background p-6 rounded-2xl shadow-lg border border-background w-full max-w-md">
                   <h2 className="text-xl font-semibold text-foreground mb-4">Customize Dashboard</h2>
                   
                   <div className="space-y-3 max-h-96 overflow-y-auto">

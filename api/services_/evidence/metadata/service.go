@@ -18,6 +18,11 @@ type Service struct {
 	// IPFS client used for uploading evidence files
 }
 
+// FindEvidenceByCaseID satisfies the interface for context autofill
+func (s *Service) FindEvidenceByCaseID(caseID uuid.UUID) ([]Evidence, error) {
+	return s.repo.FindEvidenceByCaseID(caseID)
+}
+
 // NewService creates a new instance of the metadata service.
 func NewService(repo Repository, ipfs upload.IPFSClientImp) *Service {
 	return &Service{repo: repo, ipfs: ipfs}

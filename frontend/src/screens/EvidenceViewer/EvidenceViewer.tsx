@@ -1045,11 +1045,10 @@ if (!caseId || caseId === "undefined") {
             <div className="flex gap-2 mb-4">
               {/* Filter by type */}
               <Select onValueChange={(value) => setTypeFilter(value)}>
-                <SelectTrigger className="w-40 bg-muted border-border text-foreground text-xs">
+                <SelectTrigger className="w-40 bg-muted border-border text-foreground text-xs hover:bg-muted/50">
                   <SelectValue placeholder="Filter by type" />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 text-popover-foreground text-sm">
-                  <SelectItem value="all">All files</SelectItem>
+                <SelectContent className="bg-gray-800/80 text-muted-foreground text-sm border-border">                  <SelectItem value="all">All files</SelectItem>
                   <SelectItem value="memory_dump">Memory Dump</SelectItem>
                   <SelectItem value="executable">Executable</SelectItem>
                   <SelectItem value="network_capture">Network Capture</SelectItem>
@@ -1062,11 +1061,10 @@ if (!caseId || caseId === "undefined") {
 
               {/* Sort by time */}
               <Select onValueChange={(value) => setTimeFilter(value as 'recent' | 'oldest')}>
-                <SelectTrigger className="w-36 bg-muted border-border text-foreground text-xs">
+                <SelectTrigger className="w-36 bg-muted border-border text-foreground text-xs hover:bg-muted/50">
                   <SelectValue placeholder="Sort by time" />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 text-popover-foreground text-sm">
-                  <SelectItem value="recent">Most Recent</SelectItem>
+                <SelectContent className="bg-gray-800/80 text-muted-foreground text-sm border-border">                  <SelectItem value="recent">Most Recent</SelectItem>
                   <SelectItem value="oldest">Oldest First</SelectItem>
                 </SelectContent>
               </Select>
@@ -1362,12 +1360,12 @@ if (!caseId || caseId === "undefined") {
                               <input
                                 type="text"
                                 placeholder="Thread title"
-                                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-gray-200 text-sm"
+                                className="w-full px-3 py-2 bg-card border border-border rounded text-foreground text-sm focus:outline-none focus:border-primary/60"
                                 value={newThreadTitle}
                                 onChange={(e) => setNewThreadTitle(e.target.value)}
                               />
                               <button
-                                className="w-full px-4 py-2 bg-blue-600 text-foreground rounded hover:bg-blue-700 text-sm"
+                                className="w-full px-4 py-2 bg-primary text-white rounded hover:bg-primary/60 text-sm"
                                 onClick={async () => {
                                   if (!newThreadTitle.trim()) return;
                                   try {
@@ -1716,7 +1714,7 @@ if (!caseId || caseId === "undefined") {
                     </div>
                     <button
                       onClick={() => handleSendMessage()}
-                      className="p-1.5 bg-blue-600 text-foreground rounded hover:bg-blue-700"
+                      className="p-1.5 bg-primary text-white rounded hover:bg-primary/60"
                     >
                       <Send className="w-4 h-4" />
                     </button>

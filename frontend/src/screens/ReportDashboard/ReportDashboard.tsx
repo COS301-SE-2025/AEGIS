@@ -215,15 +215,15 @@ const handleOpenReport = (reportId: string) => {
   // );
 
   const ReportCard = ({ report }: { report: ReportWithDetails }) => (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors">
+    <div className="bg-card rounded-lg p-6 border border hover:border-primary transition-colors shadow-xl">
       <div className="flex items-start justify-between mb-4">
 
         <div>
-          <h3 className="text-white font-semibold mb-1">{report.name}</h3>
-          <p className="text-gray-400 text-sm">Last Modified: {formatTimestamp(report.last_modified)}</p>
+          <h3 className="text-foreground font-semibold mb-1">{report.name}</h3>
+          <p className="text-foreground text-sm">Last Modified: {formatTimestamp(report.last_modified)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-gray-400">
+          <div className="flex items-center gap-1 text-foreground">
             <Users className="w-4 h-4" />
             <span className="text-sm">{report.collaborators}</span>
             <div className="hidden md:flex items-center gap-2 mx-4">
@@ -244,15 +244,15 @@ const handleOpenReport = (reportId: string) => {
   <div className="flex items-center gap-3">
     <button 
      onClick={() => handleOpenReport(report.id)}  
-    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/60 transition-colors text-sm font-medium">
       Open
     </button>
-    <button className="p-2 text-gray-400 hover:text-white transition-colors">
+    <button className="p-2 text-foreground hover:text-foreground/60 transition-colors">
       <Users className="w-4 h-4" />
     </button>
     <button
       onClick={() => downloadReport(report.id)}
-      className="p-2 text-gray-400 hover:text-white transition-colors"
+      className="p-2 text-foreground hover:text-foreground/60 transition-colors"
     >
       <Download className="w-4 h-4" />
     </button>
@@ -263,7 +263,7 @@ const handleOpenReport = (reportId: string) => {
   );
 
   const ReportListItem = ({ report }: { report: ReportWithDetails }) => (
-    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors">
+    <div className="bg-card rounded-lg p-4 border border hover:border-primary/60 transition-colors">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4 flex-1">
           <div className="flex items-center gap-2">
@@ -272,11 +272,11 @@ const handleOpenReport = (reportId: string) => {
           </div>
           
           <div className="flex-1 min-w-0">
-            <h3 className="text-white font-medium truncate">{report.name}</h3>
-            <p className="text-gray-400 text-sm">{report.author} • {formatTimestamp(report.last_modified)}</p>
+            <h3 className="text-foreground font-medium truncate">{report.name}</h3>
+            <p className="text-foreground text-sm">{report.author} • {formatTimestamp(report.last_modified)}</p>
           </div>
           
-          <div className="flex items-center gap-1 text-gray-400">
+          <div className="flex items-center gap-1 text-foreground">
             <Users className="w-4 h-4" />
             <span className="text-sm">{report.collaborators}</span>
           </div>
@@ -285,12 +285,12 @@ const handleOpenReport = (reportId: string) => {
         <div className="flex items-center gap-2 ml-4">
           <button 
             onClick={() => handleOpenReport(report.id)}  
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/60 transition-colors text-sm font-medium">
               Open
             </button>
                     <button
               onClick={() => downloadReport(report.id)}
-              className="p-2 text-gray-400 hover:text-white transition-colors"
+              className="p-2 text-foreground hover:text-foreground/60 transition-colors"
             >
               <Download className="w-4 h-4" />
             </button>
@@ -309,13 +309,13 @@ const handleOpenReport = (reportId: string) => {
 
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+      <div className="bg-background border border px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-white">Report Dashboard</h1>
-            <span className="text-gray-400">Team #{shortId(teamId)}</span>
+            <h1 className="text-2xl font-bold text-foreground">Report Dashboard</h1>
+            <span className="text-foreground">Team #{shortId(teamId)}</span>
 
 
           </div>
@@ -340,7 +340,7 @@ const handleOpenReport = (reportId: string) => {
               placeholder="Search reports..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+              className="w-full bg-background border rounded-lg pl-10 pr-4 py-2 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
             />
           </div>
 
@@ -387,7 +387,7 @@ const handleOpenReport = (reportId: string) => {
         {/* Existing Reports */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-white">Existing Reports</h2>
+            <h2 className="text-xl font-semibold text-foreground">Existing Reports</h2>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode('grid')}
@@ -403,7 +403,7 @@ const handleOpenReport = (reportId: string) => {
                 onClick={() => setViewMode('list')}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === 'list' 
-                    ? 'bg-blue-600 text-white' 
+                    ? 'bg-primary text-white' 
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
               >

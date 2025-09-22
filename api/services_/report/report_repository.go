@@ -1,6 +1,7 @@
 package report
 
 import (
+	reportshared "aegis-api/services_/report/shared"
 	"context"
 	"errors"
 	"fmt"
@@ -246,7 +247,27 @@ func (s *ReportServiceImpl) AddCustomSection(
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	return s.mongoRepo.AddSection(ctx, mongoID, section, tenantID, teamID)
+	// Insert into MongoDB
+	errMongo := s.mongoRepo.AddSection(ctx, mongoID, section, tenantID, teamID)
+	if errMongo != nil {
+		return errMongo
+	}
+	// Insert into Postgres
+	if s.pgSectionRepo != nil {
+		sectionPG := reportshared.ReportSection{
+			ID:        section.ID.Hex(),
+			ReportID:  reportUUID.String(),
+			Title:     section.Title,
+			Content:   section.Content,
+			Order:     section.Order,
+			CreatedAt: section.CreatedAt,
+			UpdatedAt: section.UpdatedAt,
+		}
+		if errPG := s.pgSectionRepo.CreateSection(ctx, &sectionPG); errPG != nil {
+			return errPG
+		}
+	}
+	return nil
 }
 
 func (s *ReportServiceImpl) DeleteCustomSection(
@@ -265,7 +286,7 @@ func (s *ReportServiceImpl) getMongoID(
 	ctx context.Context,
 	reportUUID uuid.UUID,
 ) (oid primitive.ObjectID, tenant string, team string, err error) {
-	meta, err := s.repo.GetByID(ctx, reportUUID)
+	meta, err := s.repo.GetByID(ctx, reportUUID.String())
 	if err != nil {
 		return primitive.NilObjectID, "", "", fmt.Errorf("%w", ErrReportNotFound)
 	}

@@ -29,6 +29,9 @@ func RegisterReportRoutes(router *gin.RouterGroup, handler *handlers.ReportHandl
 		report.PUT("/:reportID/sections/:sectionID/reorder", handler.ReorderSection)       // Reorder section
 		report.DELETE("/:reportID/sections/:sectionID", handler.DeleteSection)
 
+		// Context autofill endpoint
+		report.GET("/:reportID/sections/:sectionID/context", handler.GetSectionContext)
+
 		// Recent reports endpoint
 		report.GET("/recent", handler.GetRecentReports) // List recent reports
 
@@ -36,5 +39,25 @@ func RegisterReportRoutes(router *gin.RouterGroup, handler *handlers.ReportHandl
 		report.PUT("/:reportID/name", handler.UpdateReportName) // Update report name
 		// 🔹 Team-scoped list — add this near the top
 		report.GET("/teams/:teamID", handler.GetReportsForTeam)
+
+	}
+}
+
+// RegisterReportAIRoutes registers routes for AI assistance on reports
+func RegisterReportAIRoutes(router *gin.RouterGroup, handler *handlers.ReportAIHandler) {
+	reportAI := router.Group("/reports/ai")
+	{
+		// Generate AI suggestion for a section (GET and POST)
+		reportAI.GET("/:reportID/sections/:sectionID/suggest", handler.SuggestSection)
+		reportAI.POST("/:reportID/sections/:sectionID/suggest", handler.SuggestSectionPOST)
+
+		// Submit feedback on AI suggestion
+		reportAI.POST("/sections/:sectionID/feedback", handler.SubmitFeedback)
+
+		// Optionally, generate AI references for a section
+		reportAI.GET("/:reportID/sections/:sectionID/references", handler.GenerateReferences)
+
+		// Enhance summary endpoint
+		reportAI.POST("/enhance-summary", handler.EnhanceSummary)
 	}
 }

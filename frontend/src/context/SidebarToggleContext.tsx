@@ -124,7 +124,7 @@ export const SidebarToggleButton: React.FC<SidebarToggleButtonProps> = ({
   return (
     <button
       onClick={toggleSidebar}
-      className={`ml-2 p-1 rounded bg-blue-600 text-white hover:bg-indigo-700 transition ${className}`}
+      className={`ml-2 p-1 rounded bg-primary/60 text-foreground hover:bg-primary/10 transition ${className}`}
       style={style}
       aria-label={sidebarVisible ? 'Hide Sidebar' : 'Show Sidebar'}
     >
