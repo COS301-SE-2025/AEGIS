@@ -47,6 +47,7 @@ import (
 
 	"aegis-api/pkg/encryption"
 	"aegis-api/services_/user/profile"
+	"aegis-api/services_/health"
 
 	//"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -381,6 +382,17 @@ func main() {
 	reportStatusService := update_status.NewReportStatusService(reportStatusRepo)
 	reportStatusHandler := handlers.NewReportStatusHandler(reportStatusService)
 
+	// ─── Health Check Service and Handler ─────────────────────────────
+	
+	repo := &health.Repository{
+		Mongo:    db.MongoClient,
+		Postgres: sqlDB,
+		IPFS:     viewerIPFSClient,
+	}
+	healthService:= &health.Service{Repo: repo}
+	healthHandler := &handlers.HealthHandler{Service: healthService}
+
+
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -416,6 +428,7 @@ func main() {
 		timelineHandler,
 		evidenceHandler,
 		chainOfCustodyHandler,
+		healthHandler,
 		
 	)
 
