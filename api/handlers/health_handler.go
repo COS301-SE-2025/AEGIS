@@ -1,41 +1,37 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"aegis-api/services_/health"
+	"github.com/gin-gonic/gin"
 )
 
 type HealthHandler struct {
 	Service *health.Service
 }
 
-func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
+func (h *HealthHandler) Health(c *gin.Context) {
 	resp := h.Service.GetHealth()
 	statusCode := http.StatusOK
 	if resp.Status != "ok" {
 		statusCode = http.StatusServiceUnavailable
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(resp)
+	c.JSON(statusCode, resp)
 }
 
-func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
+func (h *HealthHandler) Readiness(c *gin.Context) {
 	if h.Service.GetReadiness() {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ready"))
+		c.String(http.StatusOK, "ready")
 	} else {
-		http.Error(w, "not ready", http.StatusServiceUnavailable)
+		c.String(http.StatusServiceUnavailable, "not ready")
 	}
 }
 
-func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
+func (h *HealthHandler) Liveness(c *gin.Context) {
 	if h.Service.GetLiveness() {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("alive"))
+		c.String(http.StatusOK, "alive")
 	} else {
-		http.Error(w, "dead", http.StatusServiceUnavailable)
+		c.String(http.StatusServiceUnavailable, "dead")
 	}
 }
