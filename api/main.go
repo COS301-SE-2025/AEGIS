@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"aegis-api/db"
 	"fmt"
@@ -44,8 +45,8 @@ import (
 
 	"aegis-api/services_/timeline"
 
-	"aegis-api/services_/user/profile"
 	"aegis-api/pkg/encryption"
+	"aegis-api/services_/user/profile"
 
 	//"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -57,6 +58,16 @@ func InitCollections(db *mongo.Database) {
 }
 
 func main() {
+	// Granular endpoint/method limit config for rate limiting
+	granularLimits := middleware.EndpointLimitConfig{
+		"POST": {
+			"/api/v1/auth/login": 100,
+			"/api/v1/register":   50,
+		},
+		"GET": {
+			"/api/v1/teams": 200,
+		},
+	}
 	// ─── Load Environment Variables ──────────────────────────────
 	if err := godotenv.Load(); err != nil {
 		log.Println("⚠️  No .env file found. Using system environment variables.")
@@ -411,6 +422,8 @@ func main() {
 	//router := routes.SetUpRouter(mainHandler)
 	// ─── Set Up Router and Launch ───────────────────────────────
 	router := routes.SetUpRouter(mainHandler)
+	router.Use(middleware.AuthMiddleware())
+	router.Use(middleware.RateLimitMiddleware(100, time.Minute, granularLimits)) // 100 requests per minute per user, granular config
 
 	// ─── websocket ─────────────────────────────────
 	wsGroup := router.Group("/ws")

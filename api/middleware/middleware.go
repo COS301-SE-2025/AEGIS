@@ -2,13 +2,137 @@ package middleware
 
 import (
 	"aegis-api/structs"
+	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 )
+
+// Granular limit config: map[method][path]limit
+type EndpointLimitConfig map[string]map[string]int
+
+// IPThrottleMiddleware applies rate limiting based on client IP, endpoint, and method
+func IPThrottleMiddleware(defaultLimit int, window time.Duration, config EndpointLimitConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		method := c.Request.Method
+		path := c.FullPath()
+		limit := defaultLimit
+		if config != nil {
+			if m, ok := config[method]; ok {
+				if l, ok := m[path]; ok {
+					limit = l
+				}
+			}
+		}
+		key := fmt.Sprintf("ip_rate_limit:%s:%s:%s", ip, method, path)
+		count, err := RedisClient.Incr(ctx, key).Result()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "server_error",
+				Message: "Could not check IP rate limit",
+			})
+			c.Abort()
+			return
+		}
+		if count == 1 {
+			RedisClient.Expire(ctx, key, window)
+		}
+		if count > int64(limit) {
+			c.JSON(http.StatusTooManyRequests, structs.ErrorResponse{
+				Error:   "rate_limited",
+				Message: "Too many requests from this IP, slow down",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RedisClientInterface allows mocking for tests
+type RedisClientInterface interface {
+	Incr(ctx context.Context, key string) *redis.IntCmd
+	Expire(ctx context.Context, key string, expiration time.Duration) *redis.BoolCmd
+}
+
+var ctx = context.Background()
+
+// Setup Redis client (you can move this into a config/init file)
+var RedisClient RedisClientInterface = redis.NewClient(&redis.Options{
+	Addr:     getRedisAddr(),
+	Password: "", // set if needed
+	DB:       0,
+})
+
+func getRedisAddr() string {
+	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
+		return addr
+	}
+	return "localhost:6379"
+}
+
+// RateLimitMiddleware with granular endpoint/method limits
+func RateLimitMiddleware(defaultLimit int, window time.Duration, config EndpointLimitConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := c.Get("userID")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+				Error:   "unauthorized",
+				Message: "User not authenticated",
+			})
+			c.Abort()
+			return
+		}
+		method := c.Request.Method
+		path := c.FullPath()
+		roleLimit := defaultLimit
+		roleName := "user"
+		if role, ok := c.Get("role"); ok {
+			roleName, _ = role.(string)
+		}
+		// Tenant Admins/DFIR Admins get higher limits
+		if roleName == "Tenant Admin" || roleName == "DFIR Admin" {
+			roleLimit = defaultLimit * 5
+		}
+		// Granular override
+		if config != nil {
+			if m, ok := config[method]; ok {
+				if l, ok := m[path]; ok {
+					roleLimit = l
+				}
+			}
+		}
+		key := fmt.Sprintf("rate_limit:%s:%s:%s", userID, method, path)
+		count, err := RedisClient.Incr(ctx, key).Result()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "server_error",
+				Message: "Could not check rate limit",
+			})
+			c.Abort()
+			return
+		}
+		if count == 1 {
+			RedisClient.Expire(ctx, key, window)
+		}
+		if count > int64(roleLimit) {
+			c.JSON(http.StatusTooManyRequests, structs.ErrorResponse{
+				Error:   "rate_limited",
+				Message: fmt.Sprintf("Too many requests, slow down (role: %s)", roleName),
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

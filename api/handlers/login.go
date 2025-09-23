@@ -9,6 +9,7 @@ import (
 	"aegis-api/services_/auth/reset_password"
 	"aegis-api/services_/notification"
 	"aegis-api/structs"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -42,6 +43,7 @@ type Handler struct {
 	EvidenceService           EvidenceServiceInterface
 	UserService               UserServiceInterface
 	CaseHandler               *CaseHandler
+	CaseListHandler           *CaseListHandler
 	UploadHandler             *UploadHandler
 	DownloadHandler           *DownloadHandler
 	MetadataHandler           *MetadataHandler
@@ -148,18 +150,23 @@ func NewHandler(
 }
 
 func (h *AuthHandler) LoginHandler(c *gin.Context) {
+	// Debug: Print all request headers
+	for k, v := range c.Request.Header {
+		fmt.Printf("[DEBUG] Header: %s = %v\n", k, v)
+	}
 	var req struct {
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("[DEBUG] Body bind error: %v\n", err)
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: err.Error(),
 		})
 		return
 	}
+	fmt.Printf("[DEBUG] Body: email=%s, password=%s\n", req.Email, req.Password)
 
 	resp, err := h.authService.Login(req.Email, req.Password)
 	status := "SUCCESS"
