@@ -31,10 +31,17 @@ services:
       - MONGO_URI=${MONGO_URI}
       - IPFS_API=${IPFS_API}
       - ENCRYP_REST_MASTER_KEY=${ENCRYP_REST_MASTER_KEY}
+      - REDIS_ADDR=redis:6379
     depends_on:
       - postgres
       - mongo
       - ipfs
+      - redis
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
 
   postgres:
     image: postgres:15
