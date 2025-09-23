@@ -5,6 +5,7 @@ import (
 	"aegis-api/handlers"
 	routesPkg "aegis-api/routes"
 	report "aegis-api/services_/report"
+	reportai "aegis-api/services_/report/report_ai_assistance"
 	"context"
 	"database/sql"
 	_ "embed"
@@ -61,7 +62,8 @@ func buildRouter() *gin.Engine {
 	// existing report wiring...
 	pgRepo := report.NewReportRepository(pgDB)
 	mRepo := report.NewReportMongoRepo(mongoColl)
-	svc := report.NewReportService(pgRepo, mRepo)
+	sectionRepo := reportai.NewGormReportSectionRepo(pgDB) // Use the correct constructor for sectionRepo
+	svc := report.NewReportService(pgRepo, mRepo, sectionRepo)
 	h := handlers.NewReportHandler(svc)
 
 	r := gin.New()
