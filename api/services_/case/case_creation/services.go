@@ -55,6 +55,7 @@ func (s *Service) CreateCase(req *CreateCaseRequest) (*Case, error) {
 		TenantID:           req.TenantID, // Assuming this is a tenant ID for multi-tenancy
 		TeamID:             req.TeamID,   // Optional team ID
 		UpdatedAt:          time.Now(),   // Set initial update time
+		Progress:           GetProgressForStage(req.InvestigationStage),
 	}
 
 	// Persist the case in the repository

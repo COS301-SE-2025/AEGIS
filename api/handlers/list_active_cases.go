@@ -78,6 +78,11 @@ func (h *CaseHandler) ListActiveCasesHandler(c *gin.Context) {
 		return
 	}
 
+	// Map progress for each active case
+	for i := range cases {
+		cases[i].Progress = getProgressForStage(cases[i].InvestigationStage)
+	}
+
 	// ✅ Audit successful request
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action: "LIST_ACTIVE_CASES",

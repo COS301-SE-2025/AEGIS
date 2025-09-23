@@ -1,9 +1,10 @@
+
 import "react-quill/dist/quill.snow.css";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { createRoot } from "react-dom/client";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import  { useState, useEffect, useRef, useCallback } from "react";
 import ReactQuill from "react-quill";
 import { useParams } from "react-router-dom";
 interface ContextAutofillResponse {
@@ -12,7 +13,7 @@ interface ContextAutofillResponse {
   evidence: any[];
   timeline: any[];
 }
-import { Plus, Download, Check, X, Pencil, Sparkles, BookOpen, ChevronUp, ChevronDown, Shield, AlertCircle, FileText, Clock, Calendar, Eye, CheckCircle, XCircle, Loader2, Trash2, GripVertical, AlertTriangle, Save, User } from "lucide-react";
+import { Plus, Download, Check, X, Pencil, Sparkles, ChevronUp, ChevronDown, Shield, AlertCircle, FileText, Clock, Calendar, Eye, CheckCircle, XCircle, Loader2, Trash2, GripVertical, AlertTriangle, Save, User } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -281,6 +282,8 @@ function SortableSectionItem({
 }
 
 export const ReportEditor = () => {
+  // Dummy key to force ghost text unmount
+  const [ghostKey, setGhostKey] = useState(0);
   // Enhancement button state for last dropped summary
   const [showEnhanceButton, setShowEnhanceButton] = useState(false);
   const [lastDroppedSummary, setLastDroppedSummary] = useState("");
@@ -292,6 +295,8 @@ export const ReportEditor = () => {
   const [contextOpen, setContextOpen] = useState(true);
   const [sectionContext, setSectionContext] = useState<ContextAutofillResponse | null>(null);
   const { reportId } = useParams<{ reportId: string }>();
+  // Ref to block suggestion re-setting during insertion
+  const insertingSuggestionRef = useRef(false);
   useEffect(() => {
     const fetchContext = async () => {
       const token = sessionStorage.getItem("authToken");
@@ -360,7 +365,6 @@ const [recentReports, setRecentReports] = useState<RecentReport[]>([]); // NEW
 const [recentLoading, setRecentLoading] = useState(true);               // NEW
 const [recentError, setRecentError] = useState<string | null>(null);    // NEW
 const [lastModified, setLastModified] = useState<string>("");
-const [showFeedback, setShowFeedback] = useState(false);
 
   // fetch report
   // useEffect(() => {
@@ -484,6 +488,22 @@ useEffect(() => {
       prev.map((s, i) => (i === index ? { ...s, completed: !s.completed } : s))
     );
   };
+    // Automatically insert AI suggestion when it arrives
+  useEffect(() => {
+    if (aiSuggestion && !aiLoading) {
+      setSections(prev => {
+        const copy = [...prev];
+        if (copy[activeSection]) {
+          copy[activeSection] = {
+            ...copy[activeSection],
+            content: (copy[activeSection].content || "") + aiSuggestion,
+          };
+        }
+        return copy;
+      });
+      setAiSuggestion("");
+    }
+  }, [aiSuggestion, aiLoading, activeSection, setSections]);
 
 const EMPTY_PATTERNS = ["<p><br></p>", "<p></p>"];
 const normalizeHtml = (html: string) => {
@@ -1519,8 +1539,10 @@ const commitEditingTitle = useCallback(async () => {
               suggestionText = suggestionObj;
             }
             console.log("AI suggestion received:", suggestionText); // Debug log
-            setAiSuggestion(suggestionText);
-            setShowFeedback(true);
+            if (!insertingSuggestionRef.current) {
+              setAiSuggestion(suggestionText);
+            }
+            // Removed setShowFeedback(true) to prevent duplicate overlay and ghost text persistence
           } catch (e) {
             console.error("AI suggest failed", e);
             toast.error("Failed to fetch AI suggestion");
@@ -1901,6 +1923,25 @@ const commitEditingTitle = useCallback(async () => {
                               }
                             }}
                           >
+                          <div style={{ position: "relative" }}
+                            onDragOver={e => {
+                              if (e.dataTransfer.types.includes("application/json")) {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = "copy";
+                              }
+                            }}
+                            onDrop={e => {
+                              const data = e.dataTransfer.getData("application/json");
+                              if (data) {
+                                try {
+                                  const parsed = JSON.parse(data);
+                                  let description = "";
+                                  // ...existing code...
+                                } catch (err) {
+                                  toast.error("Failed to parse dropped card data");
+                                }
+                              }
+                            }}>
                             <ReactQuill
                               theme="snow"
                               value={sections[activeSection]?.content ?? ""}
@@ -1912,6 +1953,32 @@ const commitEditingTitle = useCallback(async () => {
                               onKeyDown={e => {
                                 if (aiSuggestion && !aiLoading && e.key === "Tab") {
                                   e.preventDefault();
+                                  if (!insertingSuggestionRef.current) {
+                                    insertingSuggestionRef.current = true;
+                                    setSections(prev => {
+                                      const copy = [...prev];
+                                      if (copy[activeSection]) {
+                                        copy[activeSection] = {
+                                          ...copy[activeSection],
+                                          content: (copy[activeSection].content || "") + aiSuggestion,
+                                        };
+                                      }
+                                      return copy;
+                                    });
+                                    setAiSuggestion("");
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+                          {/* AI suggestion box always visible below editor */}
+                          {(aiSuggestion && !aiLoading) && (
+                            <div className="mt-2 p-3 bg-blue-50 border border-blue-300 rounded text-blue-900 flex items-center justify-between">
+                              <span className="font-mono text-sm">{aiSuggestion}</span>
+                              <button
+                                type="button"
+                                className="ml-4 px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                onClick={() => {
                                   setSections(prev => {
                                     const copy = [...prev];
                                     if (copy[activeSection]) {
@@ -1923,17 +1990,13 @@ const commitEditingTitle = useCallback(async () => {
                                     return copy;
                                   });
                                   setAiSuggestion("");
-                                  toast.success("Suggestion inserted");
-                                }
-                              }}
-                            />
-                            {/* Inline ghost text overlay at end of user content */}
-                            {aiSuggestion && !aiLoading && (
-                              <GhostTextInline
-                                suggestion={aiSuggestion}
-                                quillRef={quillRef}
-                              />
-                            )}
+                                }}
+                              >
+                                Insert Suggestion
+                              </button>
+                              <span className="ml-2 text-xs text-blue-700">(or press Tab)</span>
+                            </div>
+                          )}
                           </div>
                         </div>
                       )}
