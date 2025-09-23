@@ -139,6 +139,9 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		// ─── Report AI Assistance ─────────────────────────────
 		RegisterReportAIRoutes(protected, h.ReportAIHandler)
 
+		// ─── Health Checks ──────────────────────────────
+		RegisterHealthRoutes(protected, h.HealthHandler)
+
 	}
 	return router
 }
