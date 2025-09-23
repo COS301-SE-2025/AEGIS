@@ -416,6 +416,7 @@ func main() {
 		timelineHandler,
 		evidenceHandler,
 		chainOfCustodyHandler,
+		
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────

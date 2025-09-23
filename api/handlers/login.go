@@ -63,6 +63,7 @@ type Handler struct {
 	TenantRepo                registration.TenantRepository
 	UserRepo                  registration.UserRepository // Optional, if you have a user repository
 	NotificationService       *notification.NotificationService
+	HealthHandler			*HealthHandler
 
 	ReportHandler       *ReportHandler       // Optional: Report generation handler
 	ReportStatusHandler *ReportStatusHandler // Optional: Report status update handler
@@ -109,6 +110,7 @@ func NewHandler(
 	TimelineHandler *TimelineHandler,
 	EvidenceHandler *EvidenceHandler,
 	ChainOfCustodyHandler *ChainOfCustodyHandler,
+	healthHandler *HealthHandler,
 
 ) *Handler {
 	return &Handler{
@@ -146,6 +148,7 @@ func NewHandler(
 		TimelineHandler:       TimelineHandler,
 		EvidenceHandler:       EvidenceHandler,
 		ChainOfCustodyHandler: ChainOfCustodyHandler,
+		HealthHandler:         healthHandler,
 	}
 }
 
