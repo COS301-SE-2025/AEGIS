@@ -1,11 +1,8 @@
-
-
 import { useEffect } from "react";
 
 // GhostTextInline: inserts faded suggestion span directly into editor content at caret
 export function GhostTextInline({ suggestion, quillRef }: { suggestion: string, quillRef: any }) {
   useEffect(() => {
-    if (!suggestion) return;
     const quill = quillRef?.current;
     if (!quill) return;
     const editor = quill.getEditor?.() || quill.editor;
@@ -13,9 +10,10 @@ export function GhostTextInline({ suggestion, quillRef }: { suggestion: string, 
     const qlEditor = editor.root;
     if (!qlEditor) return;
 
-    // Remove previous ghost text
-    const prevGhost = qlEditor.querySelector(".ghost-text-inline");
-    if (prevGhost) prevGhost.remove();
+    // Remove ALL ghost text spans
+    Array.from(qlEditor.querySelectorAll('.ghost-text-inline')).forEach(node => (node as HTMLElement).remove());
+
+    if (!suggestion) return;
 
     // Get caret position
     const range = editor.getSelection(true);

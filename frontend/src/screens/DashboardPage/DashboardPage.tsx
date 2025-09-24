@@ -196,6 +196,7 @@ useEffect(() => {
         priority: c.priority,
         description: c.description,
         lastActivity: c.created_at,
+        investigation_stage: c.investigation_stage || "Triage",
         progress: c.progress || 0,
         image:
           c.image ||
@@ -226,6 +227,8 @@ useEffect(() => {
       return null;
     }
   }
+  // Add this helper function in your component
+
 
   const tenantId = getTenantIdFromJWT(token);
   if (!tenantId) return;
@@ -381,6 +384,19 @@ const getIcon = (action: string) => {
   if (action.toLowerCase().includes("login")) return Pencil;
   return FileText;
 };
+function getProgressForStage(stage: string): number {
+  switch (stage) {
+    case "Triage": return 10;
+    case "Evidence Collection": return 25;
+    case "Analysis": return 40;
+    case "Correlation & Threat Intelligence": return 55;
+    case "Containment & Eradication": return 70;
+    case "Recovery": return 85;
+    case "Reporting & Documentation": return 95;
+    case "Case Closure & Review": return 100;
+    default: return 0;
+  }
+}
 
 const handleSaveCase = async () => {
   if (!editingCase) return;
@@ -407,10 +423,9 @@ const handleSaveCase = async () => {
     const data = await res.json();
     console.log("Case updated:", data);
 
-    // ✅ Close the modal
     setEditingCase(null);
 
-    // ✅ Update the list locally without refetch
+    //  Update the list locally using backend progress value
     setCaseCards(prev =>
       prev.map(c =>
         c.id === editingCase.id
@@ -420,6 +435,7 @@ const handleSaveCase = async () => {
               description: updatedDescription,
               status: updatedStatus,
               investigation_stage: updatedStage,
+              progress: getProgressForStage(updatedStage), // Update progress based on stage
             }
           : c
       )

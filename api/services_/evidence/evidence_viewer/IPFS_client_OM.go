@@ -4,6 +4,7 @@ import (
     "io"
     "fmt"
     "github.com/ipfs/go-ipfs-api"
+    "context"
 )
 
 //IPFSClient is a struct that holds the IPFS shell client
@@ -35,3 +36,10 @@ func (client *IPFSClient) getEvidence(cid string ) ([]byte, error) {
     return content, nil
 }
 
+func (c *IPFSClient) ID(ctx context.Context) (string, error) {
+    id, err := c.Shell.ID()
+    if err != nil {
+        return "", err
+    }
+    return id.ID, nil 
+}

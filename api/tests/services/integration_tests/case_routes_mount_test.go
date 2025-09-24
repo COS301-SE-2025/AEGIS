@@ -2,6 +2,7 @@ package integration_test
 
 // --- add these imports at top of integration_bootstrap_test.go ---
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"time"
@@ -26,10 +27,48 @@ type testCaseRepo struct{ db *sql.DB }
 func (r *testCaseRepo) CreateCase(c *case_creation.Case) error {
 	// Keep it minimal; let defaults fill status/stage/priority/created_at
 	_, err := r.db.Exec(`
-        INSERT INTO cases (id, title, description, team_name, created_by, tenant_id, team_id)
-        VALUES ($1,$2,$3,$4,$5,$6,$7)
-    `, c.ID, c.Title, c.Description, c.TeamName, c.CreatedBy, c.TenantID, c.TeamID)
+		INSERT INTO cases (id, title, description, team_name, created_by, tenant_id, team_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
+	`, c.ID, c.Title, c.Description, c.TeamName, c.CreatedBy, c.TenantID, c.TeamID)
 	return err
+}
+
+// Implement GetCaseByID to satisfy case_creation.CaseRepository
+func (r *testCaseRepo) GetCaseByID(ctx context.Context, id uuid.UUID) (*case_creation.Case, error) {
+	var (
+		title, description, teamName, status, priority, stage string
+		createdBy, tenantID, teamID                           uuid.UUID
+		createdAt                                             time.Time
+	)
+	err := r.db.QueryRowContext(ctx, `
+		SELECT title,
+			   COALESCE(description,''), team_name,
+			   COALESCE(status::text,'open'),
+			   COALESCE(priority::text,'medium'),
+			   COALESCE(investigation_stage::text,'Triage'),
+			   created_by, tenant_id, team_id, created_at
+		FROM cases WHERE id = $1
+	`, id).Scan(&title, &description, &teamName, &status, &priority, &stage,
+		&createdBy, &tenantID, &teamID, &createdAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &case_creation.Case{
+		ID:                 id,
+		Title:              title,
+		Description:        description,
+		TeamName:           teamName,
+		Status:             status,
+		Priority:           priority,
+		InvestigationStage: stage,
+		CreatedBy:          createdBy,
+		TenantID:           tenantID,
+		TeamID:             teamID,
+		CreatedAt:          createdAt,
+	}, nil
 }
 
 // --- helper to register the two endpoints on the test router ---
