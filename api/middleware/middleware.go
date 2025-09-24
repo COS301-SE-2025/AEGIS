@@ -31,20 +31,30 @@ func IPThrottleMiddleware(defaultLimit int, window time.Duration, config Endpoin
 				}
 			}
 		}
-		key := fmt.Sprintf("ip_rate_limit:%s:%s:%s", ip, method, path)
-		count, err := RedisClient.Incr(ctx, key).Result()
-		if err != nil {
+		key := fmt.Sprintf("ip_sliding_window:%s:%s:%s", ip, method, path)
+		now := time.Now().Unix()
+		windowSec := int64(window.Seconds())
+		// Remove old timestamps
+		if err := RedisClient.ZRemRangeByScore(ctx, key, "-inf", fmt.Sprintf("%d", now-windowSec)).Err(); err != nil {
 			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-				Error:   "server_error",
-				Message: "Could not check IP rate limit",
+				Error:   "internal_error",
+				Message: "Redis error",
 			})
 			c.Abort()
 			return
 		}
-		if count == 1 {
-			RedisClient.Expire(ctx, key, window)
+		// Count requests in window
+		count, err := RedisClient.ZCard(ctx, key).Result()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "internal_error",
+				Message: "Redis error",
+			})
+			c.Abort()
+			return
 		}
-		if count > int64(limit) {
+		if int(count) >= limit {
+			fmt.Fprintf(os.Stderr, "[THROTTLE] IP %s hit limit for %s %s at %v\n", ip, method, path, now)
 			c.JSON(http.StatusTooManyRequests, structs.ErrorResponse{
 				Error:   "rate_limited",
 				Message: "Too many requests from this IP, slow down",
@@ -52,20 +62,33 @@ func IPThrottleMiddleware(defaultLimit int, window time.Duration, config Endpoin
 			c.Abort()
 			return
 		}
+		// Add current timestamp
+		if err := RedisClient.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: now}).Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "internal_error",
+				Message: "Redis error",
+			})
+			c.Abort()
+			return
+		}
+		// Set expiry
+		RedisClient.Expire(ctx, key, window)
 		c.Next()
 	}
 }
 
-// RedisClientInterface allows mocking for tests
-type RedisClientInterface interface {
-	Incr(ctx context.Context, key string) *redis.IntCmd
+// SlidingWindowRedisClient allows mocking for tests (includes sorted set ops)
+type SlidingWindowRedisClient interface {
+	ZAdd(ctx context.Context, key string, members ...redis.Z) *redis.IntCmd
+	ZCard(ctx context.Context, key string) *redis.IntCmd
+	ZRemRangeByScore(ctx context.Context, key, min, max string) *redis.IntCmd
 	Expire(ctx context.Context, key string, expiration time.Duration) *redis.BoolCmd
 }
 
 var ctx = context.Background()
 
 // Setup Redis client (you can move this into a config/init file)
-var RedisClient RedisClientInterface = redis.NewClient(&redis.Options{
+var RedisClient SlidingWindowRedisClient = redis.NewClient(&redis.Options{
 	Addr:     getRedisAddr(),
 	Password: "", // set if needed
 	DB:       0,
@@ -82,10 +105,11 @@ func getRedisAddr() string {
 func RateLimitMiddleware(defaultLimit int, window time.Duration, config EndpointLimitConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("userID")
-		if !exists {
+		tenantID, tenantExists := c.Get("tenantID")
+		if !exists || !tenantExists {
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
-				Message: "User not authenticated",
+				Message: "User or tenant not authenticated",
 			})
 			c.Abort()
 			return
@@ -109,20 +133,49 @@ func RateLimitMiddleware(defaultLimit int, window time.Duration, config Endpoint
 				}
 			}
 		}
-		key := fmt.Sprintf("rate_limit:%s:%s:%s", userID, method, path)
-		count, err := RedisClient.Incr(ctx, key).Result()
-		if err != nil {
+		// Sliding window for user
+		userKey := fmt.Sprintf("user_sliding_window:%s:%s:%s", userID, method, path)
+		tenantKey := fmt.Sprintf("tenant_sliding_window:%s:%s:%s", tenantID, method, path)
+		now := time.Now().Unix()
+		windowSec := int64(window.Seconds())
+		// Remove old timestamps
+		if err := RedisClient.ZRemRangeByScore(ctx, userKey, "-inf", fmt.Sprintf("%d", now-windowSec)).Err(); err != nil {
 			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-				Error:   "server_error",
-				Message: "Could not check rate limit",
+				Error:   "internal_error",
+				Message: "Redis error",
 			})
 			c.Abort()
 			return
 		}
-		if count == 1 {
-			RedisClient.Expire(ctx, key, window)
+		if err := RedisClient.ZRemRangeByScore(ctx, tenantKey, "-inf", fmt.Sprintf("%d", now-windowSec)).Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "internal_error",
+				Message: "Redis error",
+			})
+			c.Abort()
+			return
 		}
-		if count > int64(roleLimit) {
+		// Count requests in window
+		userCount, err := RedisClient.ZCard(ctx, userKey).Result()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "internal_error",
+				Message: "Redis error",
+			})
+			c.Abort()
+			return
+		}
+		tenantCount, err := RedisClient.ZCard(ctx, tenantKey).Result()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "internal_error",
+				Message: "Redis error",
+			})
+			c.Abort()
+			return
+		}
+		if int(userCount) >= roleLimit || int(tenantCount) >= roleLimit*20 {
+			fmt.Fprintf(os.Stderr, "[THROTTLE] User %v or Tenant %v hit limit for %s %s at %v\n", userID, tenantID, method, path, now)
 			c.JSON(http.StatusTooManyRequests, structs.ErrorResponse{
 				Error:   "rate_limited",
 				Message: fmt.Sprintf("Too many requests, slow down (role: %s)", roleName),
@@ -130,6 +183,26 @@ func RateLimitMiddleware(defaultLimit int, window time.Duration, config Endpoint
 			c.Abort()
 			return
 		}
+		// Add current timestamp
+		if err := RedisClient.ZAdd(ctx, userKey, redis.Z{Score: float64(now), Member: now}).Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "internal_error",
+				Message: "Redis error",
+			})
+			c.Abort()
+			return
+		}
+		if err := RedisClient.ZAdd(ctx, tenantKey, redis.Z{Score: float64(now), Member: now}).Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "internal_error",
+				Message: "Redis error",
+			})
+			c.Abort()
+			return
+		}
+		// Set expiry
+		RedisClient.Expire(ctx, userKey, window)
+		RedisClient.Expire(ctx, tenantKey, window)
 		c.Next()
 	}
 }
