@@ -4,6 +4,7 @@ import (
 	"aegis-api/handlers"
 	routesPkg "aegis-api/routes"
 	report "aegis-api/services_/report"
+	reportai "aegis-api/services_/report/report_ai_assistance"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,7 +15,8 @@ func init() {
 		// Use the globals from bootstrap: pgDB, mongoColl
 		pgRepo := report.NewReportRepository(pgDB)
 		mRepo := report.NewReportMongoRepo(mongoColl)
-		svc := report.NewReportService(pgRepo, mRepo)
+		sectionRepo := reportai.NewGormReportSectionRepo(pgDB) // Use the correct constructor for sectionRepo
+		svc := report.NewReportService(pgRepo, mRepo, sectionRepo)
 		h := handlers.NewReportHandler(svc)
 
 		// Reuse your real routes

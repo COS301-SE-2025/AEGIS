@@ -150,14 +150,16 @@ const payload = {
   }
 );
 
-
       if (response.status === 201) {
         //alert("Case created successfully!");
         clearSavedFormData();
-        const data = response.data as { case: { ID: string } };
-        navigate(`/case/${data.case.ID}/next-steps`);
+        const data = response.data as { case: { id: string } };
+        console.log("Case ID to navigate:", data.case.id);
+        navigate(`/case/${data.case.id}/next-steps`);
         // Save the case ID to localStorage so upload can find it
       localStorage.setItem("currentCase", JSON.stringify(data.case));
+
+      
 
       }
     } catch (error: any) {

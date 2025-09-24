@@ -39,7 +39,8 @@ func TestListRecentReports_EmptyCandidates(t *testing.T) {
 	ctx := context.Background()
 	repoMock := new(MockRepo)
 	mongoMock := new(MockMongo)
-	svc := newSvc(repoMock, mongoMock)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repoMock, mongoMock, sectionRepo)
 
 	opts := report.RecentReportsOptions{
 		TenantID: uuid.New(),
@@ -66,7 +67,8 @@ func TestListRecentReports_DefaultLimit_TeamNil_TimezoneConversion(t *testing.T)
 	ctx := context.Background()
 	repoMock := new(MockRepo)
 	mongoMock := new(MockMongo)
-	svc := newSvc(repoMock, mongoMock)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repoMock, mongoMock, sectionRepo)
 
 	tenant := uuid.New()
 	// Limit <= 0 → candidateLimit=10, window = max(10*3,30)=30
@@ -116,7 +118,8 @@ func TestListRecentReports_MergeSortTruncate_WithTeamID(t *testing.T) {
 	ctx := context.Background()
 	repoMock := new(MockRepo)
 	mongoMock := new(MockMongo)
-	svc := newSvc(repoMock, mongoMock)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repoMock, mongoMock, sectionRepo)
 
 	tenant := uuid.New()
 	team := uuid.New()

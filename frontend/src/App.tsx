@@ -13,7 +13,6 @@ import { DashBoardPage } from "./screens/DashboardPage";
 import { LandingPage } from "./screens/LandingPage";
 import {VerifyEmailPage} from "./screens/VerifyEmailPage/VerifyEmailPage";
 import {TermsAndConditionsPage} from "./screens/TermsAndConditionsPage/TermsAndConditionsPage";
-import {ThemeProvider} from "./context/ThemeContext"
 import {FAQ} from "./screens/FAQ"
 import {About} from "./screens/About"
 import { TutorialsPage } from "./screens/TutorialsPage";  
@@ -42,6 +41,9 @@ import { ShareCaseForm } from "./screens/ShareCasePage/ShareCasePage";
 import { SidebarProvider } from './context/SidebarToggleContext';
 import { Toaster } from 'react-hot-toast';
 import { useEffect, useState } from "react"; // make sure this import exists
+
+//Notification WS
+import NotificationsWSProvider from "./components/NotificationWSProvider";
 
 function decodeRoleFromToken(): string {
   try {
@@ -91,7 +93,8 @@ export default function App() {
   }, []);
   return (
   <SidebarProvider>
-  <ThemeProvider>
+        {/* Mount globally so WS is active across all routes */}
+    <NotificationsWSProvider />
   <Toaster position="top-right" reverseOrder={false} />
     <Routes>
       <Route path="/" element={<LandingPage />} />
@@ -141,7 +144,6 @@ export default function App() {
 
       {/* Fallback route */}
     </Routes>
-    </ThemeProvider>
     </SidebarProvider>
   );
 }

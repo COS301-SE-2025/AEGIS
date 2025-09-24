@@ -138,10 +138,30 @@ func (h *CaseHandler) AssignUserToCase(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
 		return
 	}
-
+	teamIDVal, ok := c.Get("teamID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing team ID in token"})
+		return
+	}
+	teamIDStr, ok := teamIDVal.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid team ID in context"})
+		return
+	}
+	teamUUID, err := uuid.Parse(teamIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team ID format"})
+		return
+	}
 	// Proceed with assignment
 	if err := h.CaseService.AssignUserToCase(
-		assignerRole.(string), assigneeID, caseID, assignerID, req.Role, assignerTenantUUID,
+		assignerRole.(string),
+		assigneeID,
+		caseID,
+		assignerID,
+		req.Role,
+		assignerTenantUUID,
+		teamUUID,
 	); err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action: "ASSIGN_USER_TO_CASE",

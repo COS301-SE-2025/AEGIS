@@ -113,6 +113,7 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 	titleTerm := c.Query("title_term")
 	sortBy := c.Query("sort_by")
 	order := c.Query("order")
+	progress := c.Query("progress")
 
 	cases, err := h.ListCasesService.GetFilteredCases(
 		tenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order,
@@ -132,6 +133,7 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 					"titleTerm": titleTerm,
 					"sortBy":    sortBy,
 					"order":     order,
+					"progress":  progress,
 				},
 			},
 			Service:     "case",
@@ -155,6 +157,7 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 				"titleTerm": titleTerm,
 				"sortBy":    sortBy,
 				"order":     order,
+				"progress":  progress,
 			},
 		},
 		Service:     "case",

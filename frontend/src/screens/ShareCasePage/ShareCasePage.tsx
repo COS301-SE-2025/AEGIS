@@ -46,7 +46,7 @@ export function ShareCaseForm(): JSX.Element {
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
       <div className="max-w-xl w-full bg-card border border-border p-6 rounded-2xl shadow-xl font-mono">
         <h1 className="text-3xl font-bold text-primary mb-6 flex items-center gap-2">
-          <Share2Icon size={28} /> Share Case
+          <Share2Icon size={28} className="text-primary" /> Share Case
         </h1>
 
         {caseName && (
@@ -91,9 +91,9 @@ export function ShareCaseForm(): JSX.Element {
 
             <Button
               type="submit"
-              className="bg-cyan-400 text-cyan-600 hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              <MailIcon size={18} className="mr-2" />
+              <MailIcon size={18} className="mr-2 text-primary-foreground" />
               Send Invite
             </Button>
           </div>

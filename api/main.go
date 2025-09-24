@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"aegis-api/db"
+	"fmt"
 
 	"aegis-api/handlers"
 	"aegis-api/middleware"
@@ -36,12 +38,16 @@ import (
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/notification"
+	timelineai "aegis-api/services_/timeline/timeline_ai"
 
 	"aegis-api/services_/report"
+	report_ai_assistance "aegis-api/services_/report/report_ai_assistance"
 	"aegis-api/services_/report/update_status"
 
 	"aegis-api/services_/timeline"
 
+	"aegis-api/pkg/encryption"
+	"aegis-api/services_/health"
 	"aegis-api/services_/user/profile"
 
 	//"github.com/gin-gonic/gin"
@@ -54,6 +60,16 @@ func InitCollections(db *mongo.Database) {
 }
 
 func main() {
+	// Granular endpoint/method limit config for rate limiting
+	granularLimits := middleware.EndpointLimitConfig{
+		"POST": {
+			"/api/v1/auth/login": 100,
+			"/api/v1/register":   50,
+		},
+		"GET": {
+			"/api/v1/teams": 200,
+		},
+	}
 	// ─── Load Environment Variables ──────────────────────────────
 	if err := godotenv.Load(); err != nil {
 		log.Println("⚠️  No .env file found. Using system environment variables.")
@@ -62,7 +78,7 @@ func main() {
 	// ─── Set JWT Secret ─────────────────────────────────────────
 	jwtSecret := os.Getenv("JWT_SECRET_KEY")
 	if jwtSecret == "" {
-		log.Fatal("❌ JWT_SECRET not set in environment")
+		log.Fatal("❌ JWT_SECRET_KEY not set in environment")
 	}
 	middleware.SetJWTSecret([]byte(jwtSecret))
 
@@ -87,6 +103,19 @@ func main() {
 		log.Fatalf("❌ Failed to extract SQL DB: %v", err)
 	}
 	permChecker := &middleware.DBPermissionChecker{DB: sqlDB}
+
+	// ─── Initialize Encryption ──────────────────────────────────
+	// Initialize encryption with master key
+	// if err := encryption.Init(); err != nil {
+	// 	log.Fatal("encryption init failed:", err)
+	// }
+
+	// Test encryption
+	enc, _ := encryption.Encrypt("secret123")
+	fmt.Println("Encrypted:", enc)
+
+	dec, _ := encryption.Decrypt(enc)
+	fmt.Println("Decrypted:", string(dec))
 
 	// ─── websocket ─────────────────────────────────
 
@@ -195,6 +224,8 @@ func main() {
 	iocHandler := handlers.NewIOCHandler(iocService)
 	//timeline
 	timelineHandler := handlers.NewTimelineHandler(timelineService)
+
+	//Timeline
 	// ─── Evidence Upload/Download/Metadata ──────────────────────
 	evidenceHandler := handlers.NewEvidenceHandler(evidenceCountService)
 	metadataRepo := metadata.NewGormRepository(db.DB)
@@ -231,7 +262,7 @@ func main() {
 
 	// ─── Chat Service ───────────────────────────────────────────
 	// Initialize chat repository, user service, IPFS uploader, WebSocket manager, and chat
-	chatRepo := chat.NewChatRepository(mongoDatabase)
+	chatRepo := chat.NewChatRepository(mongoDatabase, db.DB, hub, notificationService)
 	userService := chat.NewUserService(mongoDatabase)
 	ipfsUploader := chat.NewIPFSUploader("http://ipfs:5001", "")
 	wsManager := chat.NewWebSocketManager(userService, chatRepo)
@@ -302,28 +333,84 @@ func main() {
 	// Initialize the repository and service for report generation and management
 	// ─── Report Service Initialization ─────────────────────────────
 
+	// ...existing code...
 	reportRepo := report.NewReportRepository(db.DB)
-	// coCRepo := report.NewCoCRepo(db.DB)
 	reportContentCollection := mongoDatabase.Collection("report_contents")
-
 	reportMongoRepo := report.NewReportMongoRepo(reportContentCollection)
-
+	pgSectionRepo := report_ai_assistance.NewGormReportSectionRepo(db.DB)
 	reportService := report.NewReportService(
 		reportRepo,
-		//nil,         // ReportArtifactsRepo
 		reportMongoRepo,
-		// nil,         // Storage
-		// auditLogger, // AuditLogger
-		// nil,         // Authorizer
-		// coCRepo,
+		pgSectionRepo,
 	)
-	reportHandler := handlers.NewReportHandler(reportService)
 
+	// Evidence metadata service for context autofill
+	metadataRepo = metadata.NewGormRepository(db.DB)
+	ipfsClient = upload.NewIPFSClient("")
+	metadataService = metadata.NewService(metadataRepo, ipfsClient)
+
+	// Timeline service for context autofill
+	timelineRepo = timeline.NewRepository(db.DB)
+	timelineService = timeline.NewService(timelineRepo)
+	timelineAIrepo := timelineai.NewAIRepository(db.DB)
+
+	aiConfig := timelineai.AIModelConfig{
+		ModelName:   "gpt2",
+		MaxTokens:   1500,
+		Temperature: 0.7,
+		BaseURL:     os.Getenv("AI_BASE_URL"),
+		Enabled:     os.Getenv("AI_ENABLED") == "true",
+	}
+
+	TimelineAIService := timelineai.NewAIService(timelineAIrepo, &aiConfig)
+
+	// Instantiate Timeline AI Handler
+	timelineAIHandler := handlers.NewTimelineAIHandler(TimelineAIService)
+	log.Println("✅ Timeline AI service initialized")
+
+	// ─── Report Handler Initialization ─────────────────────────────
+
+	// Use the new handler constructor with dependencies
+	reportHandler := handlers.NewReportHandlerWithDeps(
+		reportService,
+		metadataService, // implements FindEvidenceByCaseID
+		timelineService, // implements ListEvents
+		caseService,     // implements GetCaseByID
+		iocService,      // implements ListIOCsByCase
+	)
+
+	// Instantiate Report AI Service
+	mongoSectionRepo := report_ai_assistance.NewMongoSectionRepositoryWithPg(mongoDatabase, db.DB)
+	aiSuggestionRepo := report_ai_assistance.NewGormAISuggestionRepo(db.DB)
+	sectionRefsRepo := report_ai_assistance.NewGormSectionRefsRepo(db.DB)
+	aiFeedbackRepo := report_ai_assistance.NewGormAIFeedbackRepo(db.DB)
+	// Ensure AIClient implementation matches the expected interface signature
+	aiClient := report_ai_assistance.NewAIClientLocalAI("")
+	reportAIService := report_ai_assistance.NewReportService(
+		mongoSectionRepo,
+		aiSuggestionRepo,
+		sectionRefsRepo,
+		aiFeedbackRepo,
+		aiClient, // Your AI client (e.g., OpenAI wrapper)
+	)
+
+	// Instantiate Report AI Handler
+	reportAIHandler := handlers.NewReportAIHandler(reportAIService, reportService)
 	// ─── Report Status Update ─────────────────────────────
 
 	reportStatusRepo := update_status.NewReportStatusRepository(db.DB)
 	reportStatusService := update_status.NewReportStatusService(reportStatusRepo)
 	reportStatusHandler := handlers.NewReportStatusHandler(reportStatusService)
+
+	// ─── Health Check Service and Handler ─────────────────────────────
+
+	repo := &health.Repository{
+		Mongo:    db.MongoClient,
+		Postgres: sqlDB,
+		IPFS:     viewerIPFSClient,
+	}
+	healthService := &health.Service{Repo: repo}
+	healthHandler := &handlers.HealthHandler{Service: healthService}
 
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
@@ -354,27 +441,40 @@ func main() {
 		notificationService,
 		reportHandler,
 		reportStatusHandler,
+		reportAIHandler,
 
 		iocHandler,
 		timelineHandler,
+		timelineAIHandler,
 		evidenceHandler,
 		chainOfCustodyHandler,
+		healthHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────
 	//router := routes.SetUpRouter(mainHandler)
 	// ─── Set Up Router and Launch ───────────────────────────────
 	router := routes.SetUpRouter(mainHandler)
+	router.Use(middleware.AuthMiddleware())
+	router.Use(middleware.RateLimitMiddleware(100, time.Minute, granularLimits)) // 100 requests per minute per user, granular config
 
 	// ─── websocket ─────────────────────────────────
 	wsGroup := router.Group("/ws")
 	wsGroup.Use(middleware.WebSocketAuthMiddleware()) // ✅ For ws://.../cases/:id?token=...
 	websocket.RegisterWebSocketRoutes(wsGroup, hub)
 
-	log.Println("🚀 Starting AEGIS API on :8080...")
-	log.Println("📚 Swagger docs: http://localhost:8080/swagger/index.html")
+	//load balance port
+	// Get port from environment variable or use default
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // default
+	}
 
-	if err := router.Run(":8080"); err != nil {
+	log.Println("🚀 Starting AEGIS API on :" + port + "...")
+	log.Println("📚 Swagger docs: http://localhost:" + port + "/swagger/index.html")
+
+	if err := router.Run(":" + port); err != nil {
 		log.Fatal("❌ Failed to start server:", err)
 	}
+
 }

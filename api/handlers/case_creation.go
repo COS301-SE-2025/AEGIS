@@ -81,7 +81,7 @@ func (s *CaseServices) GetAllCases(userID string) ([]ListCases.Case, error) {
 type CaseServiceInterface interface {
 	CreateCase(req *case_creation.CreateCaseRequest) (*case_creation.Case, error)
 
-	AssignUserToCase(assignerRole string, assigneeID uuid.UUID, caseID uuid.UUID, assignerID uuid.UUID, role string, tenantID uuid.UUID) error
+	AssignUserToCase(assignerRole string, assigneeID uuid.UUID, caseID uuid.UUID, assignerID uuid.UUID, role string, tenantID, teamID uuid.UUID) error
 	ListActiveCases(userID string, tenantID string, teamID string) ([]ListActiveCases.ActiveCase, error)
 	GetCaseByID(caseID string, tenantID string) (*ListCases.Case, error)
 	UnassignUserFromCase(assignerID *gin.Context, assigneeID, caseID uuid.UUID) error // ← Add this
@@ -112,8 +112,8 @@ func (s *CaseServices) CreateCase(req *case_creation.CreateCaseRequest) (*case_c
 	return s.createCase.CreateCase(req)
 }
 
-func (s *CaseServices) AssignUserToCase(assignerRole string, assigneeID uuid.UUID, caseID uuid.UUID, assignerID uuid.UUID, role string, tenantID uuid.UUID) error {
-	return s.assignCase.AssignUserToCase(assignerRole, assigneeID, caseID, assignerID, role, tenantID)
+func (s *CaseServices) AssignUserToCase(assignerRole string, assigneeID uuid.UUID, caseID uuid.UUID, assignerID uuid.UUID, role string, tenantID, teamID uuid.UUID) error {
+	return s.assignCase.AssignUserToCase(assignerRole, assigneeID, caseID, assignerID, role, tenantID, tenantID)
 }
 
 func (s *CaseServices) GetCaseByID(caseID string, tenantID string) (*ListCases.Case, error) {

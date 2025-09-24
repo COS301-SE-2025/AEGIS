@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useTheme } from "../../context/ThemeContext";
+
+
 import {
   LogOut,
   Trash2,
@@ -6,15 +9,61 @@ import {
   UserCog,
   Shield,
   Bell,
-  Sun,
-  Moon,
   User,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useTheme } from "../../context/ThemeContext";
+import { ColorPalettePicker } from "../../components/ui/ColorPalettePicker";
 
+// Section for toggling and displaying theme customization
+const ThemeCustomizationSection = () => {
+  const { theme } = useTheme();
+  const [customizing, setCustomizing] = useState(false);
+  const themeLabels: Record<string, string> = {
+    default: 'Default (Cool Greys)',
+    light: 'Light (Warmer Blues)',
+    dark: 'Dark',
+  };
+  return (
+    <div className="mt-6">
+      <label className="flex items-center gap-2 mb-4">
+        <input
+          type="checkbox"
+          checked={customizing}
+          onChange={e => setCustomizing(e.target.checked)}
+          className="accent-primary"
+        />
+        <span className="font-medium">Customize current theme palette</span>
+      </label>
+      {customizing && (
+        <>
+          <div className="mb-2 text-muted-foreground text-sm">
+            Customizing: <span className="font-semibold">{themeLabels[theme]}</span>
+          </div>
+          <ColorPalettePicker />
+        </>
+      )}
+    </div>
+  );
+};
+// ThemeToggle component for switching between themes
+const ThemeToggle = () => {
+  const { theme, setTheme } = useTheme();
+  return (
+    <div className="flex items-center gap-4 mb-4">
+      <label className="font-medium">Theme:</label>
+      <select
+        className="bg-input border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none"
+        value={theme}
+        onChange={e => setTheme(e.target.value as any)}
+      >
+        <option value="default">Default</option>
+        <option value="light">Neutral</option>
+        <option value="dark">Dark</option>
+      </select>
+    </div>
+  );
+};
 export const SettingsPage = () => {
-  const { theme, toggleTheme } = useTheme();
 
   const isAdmin = true;
   const [users, setUsers] = useState([
@@ -75,7 +124,7 @@ export const SettingsPage = () => {
           Manage your AEGIS account preferences.
         </p>
         <Link to="/profile">
-          <button className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-500 transition-colors">
+          <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
             Edit Profile
           </button>
         </Link>
@@ -106,8 +155,8 @@ export const SettingsPage = () => {
           </div>
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Notification Preferences</span>
-            <button className="flex items-center gap-2 text-blue-500 hover:text-blue-400">
-              <Bell className="w-5 h-5" />
+            <button className="flex items-center gap-2 text-primary hover:text-primary/80">
+              <Bell className="w-5 h-5 text-primary" />
               Configure Alerts
             </button>
           </div>
@@ -147,9 +196,9 @@ export const SettingsPage = () => {
         <h2 className="text-xl font-semibold mb-4">Reset Password</h2>
         <button
           onClick={() => setShowPasswordModal(true)}
-          className="inline-flex items-center gap-2 bg-yellow-600 px-4 py-2 rounded-lg hover:bg-yellow-500 transition-colors text-white"
+          className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-4 py-2 rounded-lg hover:bg-secondary/80 transition-colors"
         >
-          <Shield className="w-5 h-5" />
+          <Shield className="w-5 h-5 text-secondary-foreground" />
           Reset Password
         </button>
       </div>
@@ -159,9 +208,9 @@ export const SettingsPage = () => {
         <h2 className="text-xl font-semibold mb-4">Logout</h2>
         <Link
           to="/login"
-          className="inline-flex items-center gap-2 bg-red-600 px-4 py-2 rounded-lg hover:bg-red-500 transition-colors"
+          className="inline-flex items-center gap-2 bg-destructive text-destructive-foreground px-4 py-2 rounded-lg hover:bg-destructive/80 transition-colors"
         >
-          <LogOut className="w-5 h-5" />
+          <LogOut className="w-5 h-5 text-destructive-foreground" />
           Logout
         </Link>
       </div>
@@ -170,36 +219,18 @@ export const SettingsPage = () => {
         <h2 className="text-xl font-semibold mb-4">Register User</h2>
         <Link
           to="/register"
-          className="inline-flex items-center gap-2 bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-500 transition-colors"
+          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
         >
-          <User className="w-5 h-5" />
+          <User className="w-5 h-5 text-primary-foreground" />
           Register User
         </Link>
       </div>
 
-      {/* Theme Toggle */}
-      <div className="bg-card text-card-foreground rounded-lg p-6 mt-6">
-        <h2 className="text-xl font-semibold mb-4">Appearance</h2>
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">Theme</span>
-          <button
-            onClick={toggleTheme}
-            className="flex items-center gap-2 bg-muted px-4 py-2 rounded-lg hover:bg-muted/70 transition"
-          >
-            {theme === "dark" ? (
-              <>
-                <Sun className="w-5 h-5 text-yellow-400" />
-                Light Mode
-              </>
-            ) : (
-              <>
-                <Moon className="w-5 h-5 text-blue-400" />
-                Dark Mode
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+    <div className="p-8">
+      <h2 className="text-2xl font-bold mb-4">Customize Theme</h2>
+      <ThemeToggle />
+      <ThemeCustomizationSection />
+    </div>
       {showPasswordModal && (
       <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
         <div className="bg-card text-card-foreground rounded-lg p-6 w-full max-w-md shadow-lg">
@@ -245,7 +276,7 @@ export const SettingsPage = () => {
                 // TODO: Implement reset logic
                 setShowPasswordModal(false);
               }}
-              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Save
             </button>

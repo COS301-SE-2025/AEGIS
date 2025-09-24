@@ -20,8 +20,8 @@ export const TermsAndConditionsPage = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground p-8 font-mono">
-      <div className="max-w-3xl mx-auto bg-muted p-6 rounded-xl shadow-lg border border-primary">
-        <h1 className="text-2xl text-green-400 mb-4 font-bold">AEGIS Terms & Conditions</h1>
+  <div className="max-w-3xl mx-auto bg-muted p-6 rounded-xl shadow-lg border border-border">
+  <h1 className="text-2xl text-success mb-4 font-bold">AEGIS Terms & Conditions</h1>
 
         <div className="h-64 overflow-y-scroll p-4 bg-background border border-border rounded">
           <p className="text-muted-foreground text-sm leading-relaxed">
@@ -53,15 +53,15 @@ export const TermsAndConditionsPage = () => {
             onClick={handleSubmit}
             className={`px-6 py-2 rounded-xl font-semibold transition ${
               accepted
-                ? "bg-green-500 hover:bg-green-600 text-black"
-                : "bg-zinc-600 text-zinc-400 cursor-not-allowed"
+                ? "bg-success hover:bg-success/90 text-success-foreground"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
             }`}
           >
             Accept & Continue
           </button>
           <button
             onClick={() => alert("You must accept the terms to proceed.")}
-            className="px-6 py-2 bg-red-500 hover:bg-red-600 text-black rounded-xl"
+            className="px-6 py-2 bg-destructive hover:bg-destructive/80 text-destructive-foreground rounded-xl"
           >
             Reject
           </button>

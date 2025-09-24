@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"aegis-api/pkg/encryption"
+	gorm "gorm.io/gorm"
 )
 
 // ThreadMessage represents a message in an annotation thread.
@@ -23,6 +25,30 @@ type ThreadMessage struct {
 	Reactions []MessageReaction `gorm:"foreignKey:MessageID"`
 }
 
+// ✅ Add GORM lifecycle hooks for encryption/decryption
+func (m *ThreadMessage) BeforeSave(tx *gorm.DB) (err error) {
+	if m.Message != "" {
+		encrypted, err := encryption.Encrypt(m.Message)
+		if err != nil {
+			return err
+		}
+		m.Message = encrypted
+	}
+	return nil
+}
+
+func (m *ThreadMessage) AfterFind(tx *gorm.DB) (err error) {
+	if m.Message != "" {
+		decrypted, err := encryption.Decrypt(m.Message)
+		if err != nil {
+			return err
+		}
+		m.Message = decrypted
+	}
+	return nil
+}
+
+
 // MessageMention represents a mention in a thread message.
 type MessageMention struct {
 	MessageID       uuid.UUID `gorm:"primaryKey"`
@@ -38,3 +64,5 @@ type MessageReaction struct {
 	Reaction  string    `gorm:"not null"`
 	CreatedAt time.Time
 }
+
+

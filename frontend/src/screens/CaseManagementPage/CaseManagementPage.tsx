@@ -414,9 +414,12 @@ const handleViewReport = async () => {
   try {
     const reportId = await getOrCreateReportForCase(caseId);
     navigate(`/report-editor/${reportId}`);
+    console.log("Navigating to report:", reportId);
+
   } catch (err) {
     console.error(err);
     alert("Could not open or create a report for this case.");
+    
   } finally {
     setViewReportBusy(false);
   }
@@ -532,7 +535,7 @@ const handleViewReport = async () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
-                  className="w-80 h-12 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500"
+                  className="w-80 h-12 bg-background border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
                   placeholder="Search cases, evidence, users"
                 />
               </div>
@@ -578,7 +581,7 @@ const handleViewReport = async () => {
             <h1 className="text-3xl font-bold text-foreground">Case Details & Timeline</h1>
             <div className="flex gap-4">
 
-              <button className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500">
+              <button className="flex items-center gap-2 px-4 py-2 bg-card border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500">
                 <Share2 className="w-4 h-4" />
                   {userRole === "admin" && (
                   //<ShareButton caseId={caseId} caseName={caseName} />
@@ -596,7 +599,7 @@ const handleViewReport = async () => {
               </button>
               <button
                 onClick={() => setShowFilterInput(!showFilterInput)}
-                className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500"
+                className="flex items-center gap-2 px-4 py-2 bg-card border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
               >
                 <Filter className="w-4 h-4" />
                 Filter Timeline
@@ -634,7 +637,7 @@ const handleViewReport = async () => {
                   setFilterKeyword('');
                   setFilterDate('');
                 }}
-                className="px-4 py-2 bg-gray-500 text-foreground rounded-md hover:bg-gray-600 transition-colors"
+                className="px-4 py-2 bg-primary text-foreground rounded-md hover:bg-primary/60 transition-colors"
               >
                 Clear
               </button>
@@ -650,7 +653,7 @@ const handleViewReport = async () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Case Details Section */}
           <div className="lg:col-span-1">
-            <div className="bg-card border border-bg-accent rounded-lg p-6 mb-6">
+            <div className="bg-card border border-bg-accent rounded-lg p-6 mb-6 shadow-xl">
               {/* Case Title and Threat Level */}
               <div className="mb-6">
               <div className="flex items-center justify-between">

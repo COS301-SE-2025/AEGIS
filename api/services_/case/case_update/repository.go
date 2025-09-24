@@ -1,9 +1,9 @@
 package update_case
 
 import (
+	case_creation "aegis-api/services_/case/case_creation"
 	"context"
 	"errors"
-
 	"time"
 
 	"gorm.io/gorm"
@@ -21,6 +21,7 @@ func NewGormUpdateCaseRepository(db *gorm.DB) *GormUpdateCaseRepository {
 
 // UpdateCase updates case details in the DB
 func (r *GormUpdateCaseRepository) UpdateCase(ctx context.Context, req *UpdateCaseRequest) error {
+	progress := case_creation.GetProgressForStage(req.InvestigationStage)
 	result := r.db.WithContext(ctx).Model(&Case{}).
 		Where("id = ? AND tenant_id = ? AND team_id = ?", req.CaseID, req.TenantID, req.TeamID).
 		Updates(map[string]interface{}{
@@ -28,6 +29,7 @@ func (r *GormUpdateCaseRepository) UpdateCase(ctx context.Context, req *UpdateCa
 			"description":         req.Description,
 			"status":              req.Status,
 			"investigation_stage": req.InvestigationStage,
+			"progress":            progress,
 			"updated_at":          time.Now(), // Update the timestamp
 		})
 

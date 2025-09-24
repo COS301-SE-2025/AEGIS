@@ -18,6 +18,7 @@ import (
 
 	// 👇 change to your real module path
 	report "aegis-api/services_/report"
+	reportshared "aegis-api/services_/report/shared"
 )
 
 /*
@@ -42,7 +43,7 @@ func (m *MockRepo) SaveReport(ctx context.Context, r *report.Report) error {
 	args := m.Called(ctx, r)
 	return args.Error(0)
 }
-func (m *MockRepo) GetByID(ctx context.Context, id uuid.UUID) (*report.Report, error) {
+func (m *MockRepo) GetByID(ctx context.Context, id string) (*report.Report, error) {
 	args := m.Called(ctx, id)
 	if v := args.Get(0); v != nil {
 		return v.(*report.Report), args.Error(1)
@@ -154,9 +155,38 @@ func (m *MockMongo) LatestUpdateByReportIDs(ctx context.Context, reportIDs []str
 
 /* --------------------------- Constructor --------------------------- */
 
+// MockSectionRepo stubs the ReportSectionRepository interface.
+type MockSectionRepo struct{ mock.Mock }
+
+// Implement CreateSection to satisfy the interface.
+func (m *MockSectionRepo) CreateSection(ctx context.Context, section *reportshared.ReportSection) error {
+	return m.Called(ctx, section).Error(0)
+}
+func (m *MockSectionRepo) GetSectionByID(ctx context.Context, id string) (*reportshared.ReportSection, error) {
+	args := m.Called(ctx, id)
+	if v := args.Get(0); v != nil {
+		return v.(*reportshared.ReportSection), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+// Implement ListSectionsByReport to satisfy the interface.
+func (m *MockSectionRepo) ListSectionsByReport(ctx context.Context, reportID string) ([]*reportshared.ReportSection, error) {
+	args := m.Called(ctx, reportID)
+	if v := args.Get(0); v != nil {
+		return v.([]*reportshared.ReportSection), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+// Stub UpdateSection to satisfy the interface
+func (m *MockSectionRepo) UpdateSection(ctx context.Context, section *reportshared.ReportSection) error {
+	return m.Called(ctx, section).Error(0)
+}
+
 // newSvc wires the service under test with our mocks.
-func newSvc(repo *MockRepo, mongo *MockMongo) report.ReportService {
-	return report.NewReportService(repo, mongo)
+func newSvc(repo *MockRepo, mongo *MockMongo, sectionRepo *MockSectionRepo) report.ReportService {
+	return report.NewReportService(repo, mongo, sectionRepo)
 }
 
 /* ----------------------------- Tests ------------------------------ */
@@ -169,7 +199,8 @@ func TestGenerateReport_HappyPath(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	caseID := uuid.New()
 	examinerID := uuid.New()
@@ -190,6 +221,9 @@ func TestGenerateReport_HappyPath(t *testing.T) {
 			r.Status == "draft" &&
 			r.Version == 1
 	})).Return(nil).Once()
+
+	// Expect SectionRepo to be called for each default section
+	sectionRepo.On("CreateSection", ctx, mock.AnythingOfType("*reportshared.ReportSection")).Return(nil).Times(10)
 
 	// Expect Mongo save and validate multi-tenancy + default sections (10, ordered, with timestamps/IDs).
 	mongo.On("SaveReportContent", ctx, mock.MatchedBy(func(c *report.ReportContentMongo) bool {
@@ -227,6 +261,7 @@ func TestGenerateReport_HappyPath(t *testing.T) {
 
 	repo.AssertExpectations(t)
 	mongo.AssertExpectations(t)
+	sectionRepo.AssertExpectations(t)
 }
 
 // TestGenerateReport_SaveFails ensures we surface repo save errors and DO NOT attempt Mongo writes afterward.
@@ -234,7 +269,8 @@ func TestGenerateReport_SaveFails(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	repo.On("SaveReport", ctx, mock.AnythingOfType("*report.Report")).
 		Return(errors.New("db down")).Once()
@@ -252,9 +288,11 @@ func TestGenerateReport_MongoSaveFails(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	repo.On("SaveReport", ctx, mock.AnythingOfType("*report.Report")).Return(nil).Once()
+	sectionRepo.On("CreateSection", ctx, mock.AnythingOfType("*reportshared.ReportSection")).Return(nil).Times(10)
 	mongo.On("SaveReportContent", ctx, mock.AnythingOfType("*report.ReportContentMongo")).Return(errors.New("mongo err")).Once()
 
 	_, err := svc.GenerateReport(ctx, uuid.New(), uuid.New(), uuid.New(), uuid.New())
@@ -262,6 +300,7 @@ func TestGenerateReport_MongoSaveFails(t *testing.T) {
 
 	repo.AssertExpectations(t)
 	mongo.AssertExpectations(t)
+	sectionRepo.AssertExpectations(t)
 }
 
 // TestSaveReport_AssignsIDIfNil checks the service generates an ID if the caller didn't set one.
@@ -269,7 +308,8 @@ func TestSaveReport_AssignsIDIfNil(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	// The matcher asserts the ID was set by the service.
 	repo.On("SaveReport", ctx, mock.MatchedBy(func(r *report.Report) bool { return r.ID != uuid.Nil })).
@@ -285,17 +325,18 @@ func TestGet_By_All_Delete_Passthroughs(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	id := uuid.New()
 	rep := &report.Report{ID: id, Name: "x"}
 
-	repo.On("GetByID", ctx, id).Return(rep, nil).Once()
+	repo.On("GetByID", ctx, id.String()).Return(rep, nil).Once()
 	repo.On("GetAllReports", ctx).Return([]report.Report{{ID: id}}, nil).Once()
 	repo.On("GetReportsByEvidenceID", ctx, id).Return([]report.Report{{ID: id}}, nil).Once()
 	repo.On("DeleteReportByID", ctx, id).Return(nil).Once()
 
-	got, err := svc.GetReportByID(ctx, id)
+	got, err := svc.GetReportByID(ctx, id.String())
 	require.NoError(t, err)
 	assert.Equal(t, "x", got.Name)
 
@@ -319,7 +360,8 @@ func TestGetReportsByCaseID_ConvertsTimezone(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	caseID := uuid.New()
 	// Given UTC inputs…
@@ -343,7 +385,8 @@ func TestDownloadReport_NoMongoID_ReturnsEmptyContent(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	meta := &report.Report{
 		ID:       uuid.New(),
@@ -352,7 +395,7 @@ func TestDownloadReport_NoMongoID_ReturnsEmptyContent(t *testing.T) {
 		TeamID:   uuid.New(),
 		MongoID:  "", // no content to fetch
 	}
-	repo.On("GetByID", ctx, meta.ID).Return(meta, nil).Once()
+	repo.On("GetByID", ctx, meta.ID.String()).Return(meta, nil).Once()
 
 	rc, err := svc.DownloadReport(ctx, meta.ID)
 	require.NoError(t, err)
@@ -369,7 +412,8 @@ func TestDownloadReport_WithMongo_Success(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	tenant := uuid.New()
 	team := uuid.New()
@@ -382,7 +426,7 @@ func TestDownloadReport_WithMongo_Success(t *testing.T) {
 		TeamID:   team,
 		MongoID:  mid.Hex(),
 	}
-	repo.On("GetByID", ctx, meta.ID).Return(meta, nil).Once()
+	repo.On("GetByID", ctx, meta.ID.String()).Return(meta, nil).Once()
 
 	mongoDoc := &report.ReportContentMongo{
 		ID:       mid,
@@ -407,7 +451,8 @@ func TestDownloadReport_InvalidMongoID_Error(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	meta := &report.Report{
 		ID:       uuid.New(),
@@ -416,7 +461,7 @@ func TestDownloadReport_InvalidMongoID_Error(t *testing.T) {
 		TeamID:   uuid.New(),
 		MongoID:  "not-an-oid",
 	}
-	repo.On("GetByID", ctx, meta.ID).Return(meta, nil).Once()
+	repo.On("GetByID", ctx, meta.ID.String()).Return(meta, nil).Once()
 
 	_, err := svc.DownloadReport(ctx, meta.ID)
 	require.ErrorContains(t, err, "failed to convert MongoID")
@@ -427,7 +472,8 @@ func TestDownloadReport_MongoError_Propagates(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	tenant := uuid.New()
 	team := uuid.New()
@@ -440,7 +486,7 @@ func TestDownloadReport_MongoError_Propagates(t *testing.T) {
 		TeamID:   team,
 		MongoID:  mid.Hex(),
 	}
-	repo.On("GetByID", ctx, meta.ID).Return(meta, nil).Once()
+	repo.On("GetByID", ctx, meta.ID.String()).Return(meta, nil).Once()
 
 	mongo.On("GetReportContent", ctx, mid, tenant.String(), team.String()).
 		Return(nil, errors.New("mongo boom")).Once()
@@ -454,7 +500,8 @@ func TestDownloadReportAsJSON_Works(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	tenant := uuid.New()
 	team := uuid.New()
@@ -462,7 +509,7 @@ func TestDownloadReportAsJSON_Works(t *testing.T) {
 	id := uuid.New()
 
 	meta := &report.Report{ID: id, Name: "R", TenantID: tenant, TeamID: team, MongoID: mid.Hex()}
-	repo.On("GetByID", ctx, id).Return(meta, nil).Once()
+	repo.On("GetByID", ctx, id.String()).Return(meta, nil).Once()
 	mongo.On("GetReportContent", ctx, mid, tenant.String(), team.String()).
 		Return(&report.ReportContentMongo{ID: mid, Sections: []report.ReportSection{}}, nil).Once()
 
@@ -477,7 +524,8 @@ func TestDownloadReportAsPDF_BasicPDF(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	tenant := uuid.New()
 	team := uuid.New()
@@ -485,7 +533,7 @@ func TestDownloadReportAsPDF_BasicPDF(t *testing.T) {
 	id := uuid.New()
 
 	meta := &report.Report{ID: id, Name: "Sample", TenantID: tenant, TeamID: team, MongoID: mid.Hex()}
-	repo.On("GetByID", ctx, id).Return(meta, nil).Once()
+	repo.On("GetByID", ctx, id.String()).Return(meta, nil).Once()
 	mongo.On("GetReportContent", ctx, mid, tenant.String(), team.String()).
 		Return(&report.ReportContentMongo{
 			ID: mid,
@@ -505,7 +553,8 @@ func TestUpdateCustomSectionContent_Success(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	rid := uuid.New()
 	tenant := uuid.New()
@@ -514,7 +563,7 @@ func TestUpdateCustomSectionContent_Success(t *testing.T) {
 	secID := primitive.NewObjectID()
 
 	// getMongoID: service reads report metadata to discover MongoID + tenant/team
-	repo.On("GetByID", ctx, rid).Return(&report.Report{
+	repo.On("GetByID", ctx, rid.String()).Return(&report.Report{
 		ID:       rid,
 		TenantID: tenant,
 		TeamID:   team,
@@ -536,10 +585,11 @@ func TestUpdateCustomSectionContent_MissingMongoID(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	rid := uuid.New()
-	repo.On("GetByID", ctx, rid).Return(&report.Report{
+	repo.On("GetByID", ctx, rid.String()).Return(&report.Report{
 		ID:       rid,
 		TenantID: uuid.New(),
 		TeamID:   uuid.New(),
@@ -552,18 +602,35 @@ func TestUpdateCustomSectionContent_MissingMongoID(t *testing.T) {
 
 // TestUpdateSectionContent_Delegates confirms UpdateSectionContent just forwards to UpdateCustomSectionContent.
 func TestUpdateSectionContent_Delegates(t *testing.T) {
-	ctx := context.Background()
-	repo := new(MockRepo)
-	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
 
-	rid := uuid.New()
-	tenant := uuid.New()
-	team := uuid.New()
-	mid := primitive.NewObjectID()
-	secID := primitive.NewObjectID()
+	var (
+		ctx         context.Context
+		repo        *MockRepo
+		mongo       *MockMongo
+		sectionRepo *MockSectionRepo
+		svc         report.ReportService
+		rid         uuid.UUID
+		tenant      uuid.UUID
+		team        uuid.UUID
+		mid         primitive.ObjectID
+		secID       primitive.ObjectID
+	)
 
-	repo.On("GetByID", ctx, rid).Return(&report.Report{
+	// First test: UpdateSectionContent delegates to UpdateCustomSectionContent
+	ctx = context.Background()
+	repo = new(MockRepo)
+	mongo = new(MockMongo)
+	sectionRepo = new(MockSectionRepo)
+	svc = newSvc(repo, mongo, sectionRepo)
+
+	rid = uuid.New()
+	tenant = uuid.New()
+	team = uuid.New()
+	mid = primitive.NewObjectID()
+	secID = primitive.NewObjectID()
+
+	// The service calls GetByID with rid.String(), not rid
+	repo.On("GetByID", ctx, rid.String()).Return(&report.Report{
 		ID:       rid,
 		TenantID: tenant,
 		TeamID:   team,
@@ -573,22 +640,24 @@ func TestUpdateSectionContent_Delegates(t *testing.T) {
 		Return(nil).Once()
 
 	require.NoError(t, svc.UpdateSectionContent(ctx, rid, secID, "c"))
-}
 
-// TestUpdateSectionTitle_Success verifies title updates route to Mongo with scoping.
-func TestUpdateSectionTitle_Success(t *testing.T) {
-	ctx := context.Background()
-	repo := new(MockRepo)
-	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	repo.AssertExpectations(t)
+	mongo.AssertExpectations(t)
 
-	rid := uuid.New()
-	tenant := uuid.New()
-	team := uuid.New()
-	mid := primitive.NewObjectID()
-	secID := primitive.NewObjectID()
+	// Second test: UpdateSectionTitle
+	ctx = context.Background()
+	repo = new(MockRepo)
+	mongo = new(MockMongo)
+	sectionRepo = new(MockSectionRepo)
+	svc = newSvc(repo, mongo, sectionRepo)
 
-	repo.On("GetByID", ctx, rid).Return(&report.Report{
+	rid = uuid.New()
+	tenant = uuid.New()
+	team = uuid.New()
+	mid = primitive.NewObjectID()
+	secID = primitive.NewObjectID()
+
+	repo.On("GetByID", ctx, rid.String()).Return(&report.Report{
 		ID:       rid,
 		TenantID: tenant,
 		TeamID:   team,
@@ -605,7 +674,8 @@ func TestReorderCustomSection_Success(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	rid := uuid.New()
 	tenant := uuid.New()
@@ -613,7 +683,7 @@ func TestReorderCustomSection_Success(t *testing.T) {
 	mid := primitive.NewObjectID()
 	secID := primitive.NewObjectID()
 
-	repo.On("GetByID", ctx, rid).Return(&report.Report{
+	repo.On("GetByID", ctx, rid.String()).Return(&report.Report{
 		ID:       rid,
 		TenantID: tenant,
 		TeamID:   team,
@@ -630,7 +700,8 @@ func TestUpdateReportName_ValidationAndRepoCall(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	id := uuid.New()
 
@@ -658,7 +729,8 @@ func TestGetReportsByTeamID_Passthrough(t *testing.T) {
 	ctx := context.Background()
 	repo := new(MockRepo)
 	mongo := new(MockMongo)
-	svc := newSvc(repo, mongo)
+	sectionRepo := new(MockSectionRepo)
+	svc := newSvc(repo, mongo, sectionRepo)
 
 	tenant := uuid.New()
 	team := uuid.New()

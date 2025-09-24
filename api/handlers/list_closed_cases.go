@@ -55,6 +55,11 @@ func (h *CaseHandler) ListClosedCasesHandler(c *gin.Context) {
 		return
 	}
 
+	// Map progress for each closed case
+	for i := range cases {
+		cases[i].Progress = getProgressForStage(cases[i].InvestigationStage)
+	}
+
 	// Audit successful retrieval
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action: "LIST_CLOSED_CASES",
@@ -70,4 +75,29 @@ func (h *CaseHandler) ListClosedCasesHandler(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{"closed_cases": cases})
+
+}
+
+// getProgressForStage returns a progress value (0-100) based on investigation stage
+func getProgressForStage(stage string) int {
+	switch stage {
+	case "Triage":
+		return 10
+	case "Evidence Collection":
+		return 25
+	case "Analysis":
+		return 40
+	case "Correlation & Threat Intelligence":
+		return 55
+	case "Containment & Eradication":
+		return 70
+	case "Recovery":
+		return 85
+	case "Reporting & Documentation":
+		return 95
+	case "Case Closure & Review":
+		return 100
+	default:
+		return 0
+	}
 }

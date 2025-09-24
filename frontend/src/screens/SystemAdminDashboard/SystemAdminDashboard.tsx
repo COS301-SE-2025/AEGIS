@@ -108,7 +108,7 @@ const navigate = useNavigate();
             </p>
             <button
               onClick={() => navigate("/tenants")}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded"
             >
               View Tenants
             </button>
@@ -121,7 +121,7 @@ const navigate = useNavigate();
             </p>
             <button
               onClick={() => navigate("/tenant-registration")}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+              className="bg-success hover:bg-success/90 text-success-foreground px-4 py-2 rounded"
             >
               Register Tenant Admin
             </button>
