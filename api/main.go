@@ -37,6 +37,7 @@ import (
 	"aegis-api/services_/evidence/metadata"
 	"aegis-api/services_/evidence/upload"
 	"aegis-api/services_/notification"
+	timelineai "aegis-api/services_/timeline/timeline_ai"
 
 	"aegis-api/services_/report"
 	report_ai_assistance "aegis-api/services_/report/report_ai_assistance"
@@ -44,8 +45,8 @@ import (
 
 	"aegis-api/services_/timeline"
 
-	"aegis-api/services_/user/profile"
 	"aegis-api/pkg/encryption"
+	"aegis-api/services_/user/profile"
 
 	//"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -93,9 +94,9 @@ func main() {
 
 	// ─── Initialize Encryption ──────────────────────────────────
 	// Initialize encryption with master key
-	if err := encryption.Init(); err != nil {
-		log.Fatal("encryption init failed:", err)
-	}
+	// if err := encryption.Init(); err != nil {
+	// 	log.Fatal("encryption init failed:", err)
+	// }
 
 	// Test encryption
 	enc, _ := encryption.Encrypt("secret123")
@@ -211,6 +212,8 @@ func main() {
 	iocHandler := handlers.NewIOCHandler(iocService)
 	//timeline
 	timelineHandler := handlers.NewTimelineHandler(timelineService)
+
+	//Timeline
 	// ─── Evidence Upload/Download/Metadata ──────────────────────
 	evidenceHandler := handlers.NewEvidenceHandler(evidenceCountService)
 	metadataRepo := metadata.NewGormRepository(db.DB)
@@ -337,6 +340,23 @@ func main() {
 	// Timeline service for context autofill
 	timelineRepo = timeline.NewRepository(db.DB)
 	timelineService = timeline.NewService(timelineRepo)
+	timelineAIrepo := timelineai.NewAIRepository(db.DB)
+
+	aiConfig := timelineai.AIModelConfig{
+		ModelName:   "gpt2",
+		MaxTokens:   1500,
+		Temperature: 0.7,
+		BaseURL:     os.Getenv("AI_BASE_URL"),
+		Enabled:     os.Getenv("AI_ENABLED") == "true",
+	}
+
+	TimelineAIService := timelineai.NewAIService(timelineAIrepo, &aiConfig)
+
+	// Instantiate Timeline AI Handler
+	timelineAIHandler := handlers.NewTimelineAIHandler(TimelineAIService)
+	log.Println("✅ Timeline AI service initialized")
+
+	// ─── Report Handler Initialization ─────────────────────────────
 
 	// Use the new handler constructor with dependencies
 	reportHandler := handlers.NewReportHandlerWithDeps(
@@ -403,6 +423,7 @@ func main() {
 
 		iocHandler,
 		timelineHandler,
+		timelineAIHandler,
 		evidenceHandler,
 		chainOfCustodyHandler,
 	)

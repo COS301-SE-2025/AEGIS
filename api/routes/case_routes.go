@@ -61,6 +61,22 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		api.POST("/upload", h.UploadHandler.Upload)
 		api.GET("/download/:cid", h.DownloadHandler.Download)
 
+		//________AI Routes________
+		timelineAIGroup := api.Group("/ai")
+		{
+			timelineAIGroup.POST("/suggestions", middleware.AuthMiddleware(), h.TimelineAIHandler.GetEventSuggestions)
+			timelineAIGroup.POST("/severity", middleware.AuthMiddleware(), h.TimelineAIHandler.GetSeverityRecommendation)
+			timelineAIGroup.POST("/tags", middleware.AuthMiddleware(), h.TimelineAIHandler.GetTagSuggestions)
+			timelineAIGroup.POST("/iocs", middleware.AuthMiddleware(), h.TimelineAIHandler.ExtractIOCs)
+			timelineAIGroup.POST("/analyze-event", middleware.AuthMiddleware(), h.TimelineAIHandler.AnalyzeEvent)
+			timelineAIGroup.GET("/cases/:case_id/next-steps", middleware.AuthMiddleware(), h.TimelineAIHandler.GetNextSteps)
+			timelineAIGroup.GET("/analyze-event", middleware.AuthMiddleware(), h.TimelineAIHandler.AnalyzeEvent)
+			timelineAIGroup.POST("/correlate-evidence", middleware.AuthMiddleware(), h.TimelineAIHandler.CorrelateEvidence)
+			//timelineAIGroup.POST("/feedback", middleware.AuthMiddleware(), h.TimelineAIHandler.SubmitFeedback)
+			//timelineAIGroup.GET("/model-status", middleware.AuthMiddleware(), h.TimelineAIHandler.GetModelStatus)
+			//timelineAIGroup.POST("/update-model-config", middleware.AuthMiddleware(), middleware.RequireRole("DFIR Admin"), h.TimelineAIHandler.UpdateModelConfig)
+		}
+
 		// ─── Protected Routes ────────────────────────────
 		protected := api.Group("/")
 		protected.Use(middleware.AuthMiddleware())
