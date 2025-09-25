@@ -4,6 +4,7 @@ import (
 	"aegis-api/structs"
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -209,10 +210,11 @@ func RateLimitMiddleware(defaultLimit int, window time.Duration, config Endpoint
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		fmt.Println("Authorization Header:", c.GetHeader("Authorization"))
+		log.Printf("[DEBUG] AuthMiddleware: Authorization Header: %s", c.GetHeader("Authorization"))
 		authHeader := c.GetHeader("Authorization")
 
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			log.Printf("[ERROR] AuthMiddleware: Missing or invalid Authorization header")
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
 				Message: "Authorization token required",
@@ -222,16 +224,18 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		fmt.Println("Parsed Token String:", tokenString)
+		log.Printf("[DEBUG] AuthMiddleware: Parsed Token String: %s", tokenString)
 
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				log.Printf("[ERROR] AuthMiddleware: Unexpected signing method: %v", token.Header["alg"])
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 			return GetJWTSecret(), nil
 		})
 
 		if err != nil || !token.Valid {
+			log.Printf("[ERROR] AuthMiddleware: Invalid or expired token: %v", err)
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
 				Message: "Invalid or expired token",
@@ -242,6 +246,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
+			log.Printf("[ERROR] AuthMiddleware: Invalid token claims format")
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
 				Message: "Invalid token claims format",
@@ -259,7 +264,9 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		teamID, _ := getStringClaim(claims, "team_id")
 
+		log.Printf("[DEBUG] AuthMiddleware: Claims extracted userID=%s email=%s role=%s tenantID=%s teamID=%s", userID, email, role, tenantID, teamID)
 		if !ok1 || !ok2 || !ok3 || !ok4 || userID == "" || email == "" || role == "" || tenantID == "" {
+			log.Printf("[ERROR] AuthMiddleware: Missing required token claims")
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
 				Message: "Missing required token claims",
@@ -270,6 +277,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// Only enforce teamID for roles that must belong to a team
 		if teamID == "" && (role == "DFIR Admin" || role == "DFIR User") {
+			log.Printf("[ERROR] AuthMiddleware: Team ID required for role %s", role)
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
 				Message: "Team ID required for this role",
@@ -353,6 +361,7 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRole, exists := c.Get("userRole")
 		if !exists {
+			log.Printf("[ERROR] RequireRole: userRole not found in context")
 			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
 				Error:   "unauthorized",
 				Message: "Authentication required",
@@ -362,13 +371,16 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 		}
 
 		role := userRole.(string)
+		log.Printf("[DEBUG] RequireRole: userRole=%s allowedRoles=%v", role, allowedRoles)
 		for _, allowed := range allowedRoles {
 			if role == allowed {
+				log.Printf("[DEBUG] RequireRole: role %s is allowed", role)
 				c.Next()
 				return
 			}
 		}
 
+		log.Printf("[ERROR] RequireRole: role %s is not allowed", role)
 		c.JSON(http.StatusForbidden, structs.ErrorResponse{
 			Error:   "forbidden",
 			Message: "Insufficient permissions",

@@ -4,6 +4,7 @@ import (
 	"aegis-api/services_/auditlog"
 	"aegis-api/services_/evidence/metadata"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -244,4 +245,37 @@ func (h *MetadataHandler) GetEvidenceByCaseID(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, evidences)
+}
+
+// VerifyEvidenceChain verifies the hash chain integrity for a given evidence ID.
+func (h *MetadataHandler) VerifyEvidenceChain(c *gin.Context) {
+	log.Printf("[DEBUG] Handler entered for verify-chain")
+
+	idStr := c.Param("evidence_id")
+	log.Printf("[DEBUG] Received verify-chain request for evidence_id: %s\n", idStr)
+
+	evidenceID, err := uuid.Parse(idStr)
+	if err != nil {
+		log.Printf("[ERROR] Invalid evidence ID format: %v\n", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid evidence ID format"})
+		return
+	}
+
+	log.Printf("[DEBUG] Calling service.VerifyEvidenceLogChain for evidenceID: %s\n", evidenceID.String())
+	ok, details, err := h.service.VerifyEvidenceLogChain(evidenceID)
+	if err != nil {
+		log.Printf("[ERROR] Verification failed: %v | Details: %s\n", err, details)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Verification failed",
+			"details": err.Error(),
+		})
+		return
+	}
+	log.Printf("[DEBUG] Verification result: valid=%v, details=%s\n", ok, details)
+	fmt.Printf("[DEBUG] Verification result: valid=%v, details=%s\n", ok, details)
+	c.JSON(http.StatusOK, gin.H{
+		"evidence_id": evidenceID.String(),
+		"valid":       ok,
+		"details":     details,
+	})
 }

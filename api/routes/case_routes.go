@@ -143,7 +143,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		RegisterChatRoutes(protected, h.ChatHandler)
 
 		// ─── Evidence Viewer + Tagging ────────────────
-		RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.PermissionChecker)
+		RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.MetadataHandler, h.PermissionChecker)
 
 		RegisterCaseTagRoutes(protected, h.CaseTagHandler, h.PermissionChecker)
 
