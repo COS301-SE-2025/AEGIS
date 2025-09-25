@@ -49,6 +49,12 @@ func (m *MockEvidenceRepo) FindEvidenceByID(id uuid.UUID) (*metadata.Evidence, e
 	return args.Get(0).(*metadata.Evidence), args.Error(1)
 }
 
+// Implement AppendEvidenceLog to satisfy metadata.Repository interface.
+func (m *MockEvidenceRepo) AppendEvidenceLog(log *metadata.EvidenceLog) error {
+	args := m.Called(log)
+	return args.Error(0)
+}
+
 // Use the MockIPFS defined in evidence_download_test.go, or rename this struct if both are needed.
 // For example, rename to MockIPFSUploader if you need both mocks:
 
@@ -101,6 +107,9 @@ func TestUploadEvidence_Success(t *testing.T) {
 		_, ok := r.(io.Reader)
 		return ok
 	})).Return("Qm123", nil)
+
+	// Add expectation for AppendEvidenceLog to prevent panic
+	mockRepo.On("AppendEvidenceLog", mock.AnythingOfType("*metadata.EvidenceLog")).Return(nil)
 
 	mockRepo.On("SaveEvidence", mock.AnythingOfType("*metadata.Evidence")).Return(nil).Run(func(args mock.Arguments) {
 		e := args.Get(0).(*metadata.Evidence)

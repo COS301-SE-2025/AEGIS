@@ -119,6 +119,15 @@ func (r *testMetadataRepo) FindEvidenceByID(id uuid.UUID) (*metadata.Evidence, e
 	return &ev, nil
 }
 
+// AppendEvidenceLog implements metadata.Repository for testMetadataRepo.
+// Adjusted to match expected signature: (*metadata.EvidenceLog) error
+func (r *testMetadataRepo) AppendEvidenceLog(logEntry *metadata.EvidenceLog) error {
+	return r.db.Exec(`
+		INSERT INTO evidence_log (evidence_id, action, timestamp, details)
+		VALUES (?, ?, ?, ?, ?)
+	`, logEntry.EvidenceID, logEntry.Action, logEntry.Timestamp, logEntry.Details).Error
+}
+
 // ---- register the upload endpoint ----
 func registerEvidenceTestEndpoints(r *gin.Engine) {
 	repo := &testMetadataRepo{db: pgDB}

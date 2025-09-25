@@ -18,6 +18,11 @@ type MockRepo struct {
 	mock.Mock
 }
 
+func (m *MockRepo) AppendEvidenceLog(log *metadata.EvidenceLog) error {
+	args := m.Called(log)
+	return args.Error(0)
+}
+
 func (m *MockRepo) SaveEvidence(e *metadata.Evidence) error {
 	args := m.Called(e)
 	return args.Error(0)
