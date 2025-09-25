@@ -206,11 +206,11 @@ CREATE TABLE IF NOT EXISTS cases (
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     -- New Fields
-    team_id UUID REFERENCES teams(id) ON DELETE SET NULL, -- Link to team
-    tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
+  team_id UUID REFERENCES teams(id) ON DELETE SET NULL, -- Link to team
+  tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
+  progress INTEGER DEFAULT 0 -- Progress percentage (0-100)
 );
 
--- Groups table
 CREATE TABLE IF NOT EXISTS groups (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
@@ -239,6 +239,8 @@ CREATE TABLE annotation_threads (
   tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
     -- New Fields
 );
+
+
 
 CREATE TABLE thread_tags (
   id UUID PRIMARY KEY,
@@ -320,21 +322,53 @@ ALTER TABLE message_reactions
 
 -- Evidence table
 CREATE TABLE IF NOT EXISTS evidence (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    case_id UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
-    uploaded_by UUID NOT NULL REFERENCES users(id),
-    filename TEXT NOT NULL,
-    file_type TEXT NOT NULL,
-    ipfs_cid TEXT NOT NULL,
-    file_size INTEGER CHECK (file_size >= 0),
-    checksum TEXT NOT NULL,
-    metadata JSONB, -- stores metadata as a key-value JSON object
-    uploaded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    -- New Fields
-    -- 🔹 Multi-tenancy fields
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    team_id   UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  uploaded_by UUID NOT NULL REFERENCES users(id),
+  filename TEXT NOT NULL,
+  file_type TEXT NOT NULL,
+  ipfs_cid TEXT NOT NULL,
+  file_size INTEGER CHECK (file_size >= 0),
+  checksum TEXT NOT NULL,
+  metadata JSONB, -- stores metadata as a key-value JSON object (no md5)
+  uploaded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  -- 🔹 Multi-tenancy fields
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  team_id   UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE
 );
+
+--- Evidence Log table with hash chain support
+CREATE TABLE IF NOT EXISTS evidence_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  evidence_id UUID NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
+  sha256 TEXT NOT NULL,
+  sha512 TEXT NOT NULL,
+  action TEXT NOT NULL,     -- "upload", "verify"
+  result BOOLEAN,           --  true/false for verification
+  timestamp TIMESTAMP,
+  details TEXT,
+  created_at TIMESTAMP DEFAULT now(),
+  previous_hash TEXT        --links each entry to the hash of the previous log entry.
+                            -- to create a hash chain for integrity verification
+);
+
+-- Enforce immutability: revoke UPDATE/DELETE for evidence_log
+REVOKE UPDATE, DELETE ON evidence_log FROM PUBLIC;
+
+-- Trigger function to block UPDATE/DELETE
+CREATE OR REPLACE FUNCTION forbid_evidence_log_update_delete()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'Evidence log entries are immutable';
+END $$;
+
+CREATE TRIGGER trg_evidence_log_no_update
+BEFORE UPDATE ON evidence_log
+FOR EACH ROW EXECUTE FUNCTION forbid_evidence_log_update_delete();
+
+CREATE TRIGGER trg_evidence_log_no_delete
+BEFORE DELETE ON evidence_log
+FOR EACH ROW EXECUTE FUNCTION forbid_evidence_log_update_delete();
 
 --IOCS
 CREATE TABLE iocs (
