@@ -1,4 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+// Simple toast implementation (replace with your UI lib if available)
+function showToast(message: string, type: 'success' | 'error' = 'success') {
+  const toast = document.createElement('div');
+  toast.textContent = message;
+  toast.style.position = 'fixed';
+  toast.style.bottom = '32px';
+  toast.style.left = '50%';
+  toast.style.transform = 'translateX(-50%)';
+  toast.style.background = type === 'success' ? '#22c55e' : '#ef4444';
+  toast.style.color = 'white';
+  toast.style.padding = '12px 24px';
+  toast.style.borderRadius = '8px';
+  toast.style.fontSize = '1rem';
+  toast.style.zIndex = '9999';
+  toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.remove(); }, 2500);
+}
+import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
 
 
@@ -8,7 +27,6 @@ import {
   Settings,
   UserCog,
   Shield,
-  Bell,
   User,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -63,23 +81,90 @@ const ThemeToggle = () => {
     </div>
   );
 };
-export const SettingsPage = () => {
 
-  const isAdmin = true;
-  const [users, setUsers] = useState([
-    { id: 1, name: "Analyst One", email: "analyst1@aegis.com" },
-    { id: 2, name: "Responder Alpha", email: "responder@aegis.com" },
-    { id: 3, name: "Manager Zeta", email: "manager@aegis.com" },
-  ]);
+function SettingsPage() {
+  const [users, setUsers] = useState<any[]>([]);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [isDFIRAdmin, setIsDFIRAdmin] = useState(false);
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
 
+  useEffect(() => {
+    // Check role and tenantId after mount (when sessionStorage is available)
+    try {
+      const token = sessionStorage.getItem('authToken');
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setIsDFIRAdmin(payload.role === 'DFIR Admin');
+        setTenantId(payload.tenant_id || payload.tenantId || null);
+      }
+    } catch {}
+  }, []);
 
-  const handleRemoveUser = (userId: number) => {
-    if (!isAdmin) return;
-    setUsers((prev) => prev.filter((user) => user.id !== userId));
+  useEffect(() => {
+    if (isDFIRAdmin && tenantId) {
+      axios.get(`http://localhost:8080/api/v1/tenants/${tenantId}/users`, {
+        headers: { Authorization: `Bearer ${sessionStorage.getItem('authToken')}` },
+        params: { page, page_size: pageSize }
+      })
+        .then(res => {
+          let data = (res.data as any)?.data;
+          let total = (res.data as any)?.total || null;
+          if (typeof data === 'undefined' && Array.isArray((res.data as any)?.users)) {
+            data = (res.data as any).users;
+            total = (res.data as any).total || null;
+          }
+          setUsers(data || []);
+          setTotalUsers(total);
+        })
+        .catch(() => { setUsers([]); setTotalUsers(null); });
+    }
+  }, [isDFIRAdmin, tenantId, page, pageSize]);
+
+  const handleRemoveUser = async (userId: string) => {
+    if (!isDFIRAdmin) return;
+    // Confirm with a toast instead of window.confirm
+    const confirmed = await new Promise<boolean>((resolve) => {
+      const confirmToast = document.createElement('div');
+      confirmToast.style.position = 'fixed';
+      confirmToast.style.bottom = '32px';
+      confirmToast.style.left = '50%';
+      confirmToast.style.transform = 'translateX(-50%)';
+      confirmToast.style.background = '#334155';
+      confirmToast.style.color = 'white';
+      confirmToast.style.padding = '16px 32px';
+      confirmToast.style.borderRadius = '8px';
+      confirmToast.style.fontSize = '1rem';
+      confirmToast.style.zIndex = '9999';
+      confirmToast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+      confirmToast.innerHTML = `Are you sure you want to remove this user?
+        <button id="yesBtn" style="margin-left:16px;padding:4px 12px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Yes</button>
+        <button id="noBtn" style="margin-left:8px;padding:4px 12px;background:#64748b;color:white;border:none;border-radius:4px;cursor:pointer;">No</button>`;
+      document.body.appendChild(confirmToast);
+      confirmToast.querySelector('#yesBtn')?.addEventListener('click', () => { confirmToast.remove(); resolve(true); });
+      confirmToast.querySelector('#noBtn')?.addEventListener('click', () => { confirmToast.remove(); resolve(false); });
+    });
+    if (!confirmed) return;
+    try {
+      await axios.delete(`http://localhost:8080/api/v1/users/${userId}`, {
+        headers: { Authorization: `Bearer ${sessionStorage.getItem('authToken')}` },
+      });
+      setUsers((prev) => prev.filter((user) => (user.id || user.ID) !== userId));
+      setTotalUsers((old) => (old !== null ? Math.max(0, old - 1) : null));
+      showToast('User removed successfully.', 'success');
+    } catch (err: any) {
+      showToast(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        'Failed to remove user.',
+        'error'
+      );
+    }
   };
 
   return (
@@ -130,57 +215,60 @@ export const SettingsPage = () => {
         </Link>
       </div>
 
-      {/* DFIR Settings */}
-      <div className="bg-card text-card-foreground rounded-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <Shield className="w-5 h-5" /> DFIR Configuration
-        </h2>
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Alert Threshold Level</span>
-            <select className="bg-input border border-border rounded-lg px-3 py-1 text-foreground">
-              <option>Low</option>
-              <option>Moderate</option>
-              <option>High</option>
-              <option>Critical</option>
-            </select>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Evidence Retention (Days)</span>
-            <input
-              type="number"
-              defaultValue={90}
-              className="bg-input border border-border rounded-lg px-3 py-1 w-24 text-foreground"
-            />
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Notification Preferences</span>
-            <button className="flex items-center gap-2 text-primary hover:text-primary/80">
-              <Bell className="w-5 h-5 text-primary" />
-              Configure Alerts
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* User Management */}
-      {isAdmin && (
+      {isDFIRAdmin && (
         <div className="bg-card text-card-foreground rounded-lg p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <UserCog className="w-5 h-5" /> User Management
           </h2>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <span className="text-sm text-muted-foreground">Page {page}</span>
+              {totalUsers !== null && (
+                <span className="ml-2 text-sm text-muted-foreground">Total Users: {totalUsers}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="px-2 py-1 rounded bg-muted text-foreground border border-border disabled:opacity-50"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Prev
+              </button>
+              <button
+                className="px-2 py-1 rounded bg-muted text-foreground border border-border disabled:opacity-50"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={users.length < pageSize}
+              >
+                Next
+              </button>
+              <select
+                className="ml-2 px-2 py-1 rounded border border-border bg-muted text-foreground"
+                value={pageSize}
+                onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+              >
+                {[5, 10, 20, 50].map(size => (
+                  <option key={size} value={size}>{size} per page</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <ul className="space-y-4">
+            {users.length === 0 && (
+              <li className="text-muted-foreground">No users found for this tenant.</li>
+            )}
             {users.map((user) => (
               <li
-                key={user.id}
+                key={user.id || user.ID}
                 className="flex justify-between items-center bg-muted p-3 rounded-lg"
               >
                 <div>
-                  <p className="font-semibold">{user.name}</p>
-                  <p className="text-muted-foreground text-sm">{user.email}</p>
+                  <p className="font-semibold">{user.full_name || user.FullName || user.name}</p>
+                  <p className="text-muted-foreground text-sm">{user.email || user.Email}</p>
                 </div>
                 <button
-                  onClick={() => handleRemoveUser(user.id)}
+                  onClick={() => handleRemoveUser(user.id || user.ID)}
                   className="text-red-400 hover:text-red-300 flex items-center gap-1"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -287,4 +375,6 @@ export const SettingsPage = () => {
 
     </div>
   );
-};
+}
+
+export { SettingsPage };

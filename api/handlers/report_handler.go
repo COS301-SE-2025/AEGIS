@@ -99,7 +99,7 @@ func (h *ReportHandler) GetSectionContext(c *gin.Context) {
 				}
 				evidence = append(evidence, map[string]any{
 					"filename": ev.Filename,
-					"md5":      hashes["md5"],
+					"sha512":   hashes["sha512"],
 					"sha256":   hashes["sha256"],
 				})
 			}
