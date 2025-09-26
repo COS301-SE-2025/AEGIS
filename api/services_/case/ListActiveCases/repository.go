@@ -22,10 +22,10 @@ func (r *ActiveCaseRepository) GetActiveCasesByUserID(ctx context.Context, userI
 		Select("DISTINCT cases.*").
 		Joins("LEFT JOIN case_user_roles ON case_user_roles.case_id = cases.id").
 		Where(`(case_user_roles.user_id = ? OR cases.created_by = ?) 
-		       AND cases.status != ? 
-		       AND cases.tenant_id = ? 
-		       AND cases.team_id = ?`,
-			userID, userID, "closed", tenantID, teamID).
+			   AND cases.status NOT IN (?, ?) 
+			   AND cases.tenant_id = ? 
+			   AND cases.team_id = ?`,
+			userID, userID, "closed", "archived", tenantID, teamID).
 		Scan(&cases).Error
 
 	if err != nil {
