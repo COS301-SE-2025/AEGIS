@@ -33,9 +33,18 @@ export function AssignCaseMembersForm(): JSX.Element {
 useEffect(() => {
   const fetchUsers = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/v1/users", {
+      const token = sessionStorage.getItem("authToken") || "";
+      // Extract tenantId from JWT
+      let tenantId = null;
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        tenantId = payload.tenant_id || payload.tenantId || null;
+      } catch {}
+      if (!tenantId) throw new Error("No tenantId found in token");
+
+      const res = await fetch(`http://localhost:8080/api/v1/tenants/${tenantId}/users`, {
         headers: {
-          "Authorization": `Bearer ${sessionStorage.getItem("authToken") || ""}`
+          "Authorization": `Bearer ${token}`
         }
       });
       if (!res.ok) throw new Error("Failed to fetch users");
@@ -43,7 +52,12 @@ useEffect(() => {
 
       const users = Array.isArray(data.data)
         ? data.data
-            .filter((u: any) => u.FullName && u.ID)
+            .filter((u: any) =>
+              u.FullName &&
+              u.ID &&
+              u.Role !== "Tenant Admin" &&
+              u.Role !== "DFIR Admin"
+            )
             .map((u: any) => ({ id: u.ID, name: u.FullName }))
         : [];
 

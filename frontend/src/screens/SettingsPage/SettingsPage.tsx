@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 // Simple toast implementation (replace with your UI lib if available)
 function showToast(message: string, type: 'success' | 'error' = 'success') {
   const toast = document.createElement('div');
@@ -119,8 +121,13 @@ function SettingsPage() {
             data = (res.data as any).users;
             total = (res.data as any).total || null;
           }
-          setUsers(data || []);
-          setTotalUsers(total);
+          // Exclude DFIR Admin and Tenant Admin from the list
+          const filtered = (data || []).filter((u: any) => {
+            const role = u.role || u.Role;
+            return role !== 'DFIR Admin' && role !== 'Tenant Admin';
+          });
+          setUsers(filtered);
+          setTotalUsers(total !== null ? filtered.length : total);
         })
         .catch(() => { setUsers([]); setTotalUsers(null); });
     }
@@ -128,26 +135,27 @@ function SettingsPage() {
 
   const handleRemoveUser = async (userId: string) => {
     if (!isDFIRAdmin) return;
-    // Confirm with a toast instead of window.confirm
+    // Confirm with react-toastify toast (like CaseManagementPage)
     const confirmed = await new Promise<boolean>((resolve) => {
-      const confirmToast = document.createElement('div');
-      confirmToast.style.position = 'fixed';
-      confirmToast.style.bottom = '32px';
-      confirmToast.style.left = '50%';
-      confirmToast.style.transform = 'translateX(-50%)';
-      confirmToast.style.background = '#334155';
-      confirmToast.style.color = 'white';
-      confirmToast.style.padding = '16px 32px';
-      confirmToast.style.borderRadius = '8px';
-      confirmToast.style.fontSize = '1rem';
-      confirmToast.style.zIndex = '9999';
-      confirmToast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-      confirmToast.innerHTML = `Are you sure you want to remove this user?
-        <button id="yesBtn" style="margin-left:16px;padding:4px 12px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Yes</button>
-        <button id="noBtn" style="margin-left:8px;padding:4px 12px;background:#64748b;color:white;border:none;border-radius:4px;cursor:pointer;">No</button>`;
-      document.body.appendChild(confirmToast);
-      confirmToast.querySelector('#yesBtn')?.addEventListener('click', () => { confirmToast.remove(); resolve(true); });
-      confirmToast.querySelector('#noBtn')?.addEventListener('click', () => { confirmToast.remove(); resolve(false); });
+      let toastInstance: any = null;
+      toastInstance = toast.info(
+        <span>
+          Are you sure you want to remove this user?
+          <button
+            style={{ marginLeft: 16, padding: '4px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+            onClick={() => { toast.dismiss(toastInstance); resolve(true); }}
+          >
+            Yes
+          </button>
+          <button
+            style={{ marginLeft: 8, padding: '4px 12px', background: '#64748b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+            onClick={() => { toast.dismiss(toastInstance); resolve(false); }}
+          >
+            No
+          </button>
+        </span>,
+        { autoClose: false, closeOnClick: false, closeButton: true }
+      );
     });
     if (!confirmed) return;
     try {
@@ -169,6 +177,7 @@ function SettingsPage() {
 
   return (
     <div className="min-h-screen px-8 py-10 bg-background text-foreground transition-colors">
+      <ToastContainer position="top-center" aria-label="Notification Toasts" />
      
       <div className="flex items-center justify-between border-b border-border pb-4 mb-6">
         {/* Left: Page title */}
@@ -266,6 +275,7 @@ function SettingsPage() {
                 <div>
                   <p className="font-semibold">{user.full_name || user.FullName || user.name}</p>
                   <p className="text-muted-foreground text-sm">{user.email || user.Email}</p>
+                  <p className="text-sm text-muted-foreground">Role: {user.role || user.Role || 'N/A'}</p>
                 </div>
                 <button
                   onClick={() => handleRemoveUser(user.id || user.ID)}
