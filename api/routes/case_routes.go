@@ -120,6 +120,8 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.GET("/evidence/count/:tenantId", h.EvidenceHandler.GetEvidenceCount)
 		// ─── Admin: Users ────────────────────────────
 		protected.GET("/users", h.AdminService.ListUsers)
+		protected.GET("tenants/:tenantId/users", middleware.AuthMiddleware(), h.AdminService.ListUsersByTenant)
+		protected.DELETE("/users/:userId", h.AdminService.DeleteUserHandler)
 
 		// ─── Profile Routes ──────────────────────────
 		protected.GET("/profile/:userID", h.ProfileHandler.GetProfileHandler)

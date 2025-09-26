@@ -1,6 +1,7 @@
 package main
 
 import (
+	"aegis-api/services_/admin/delete_user"
 	"log"
 	"os"
 	"time"
@@ -203,6 +204,11 @@ func main() {
 	// ─── List Users ─────────────────────────────────────────────
 	listUserRepo := ListUsers.NewUserRepository(db.DB)
 	listUserService := ListUsers.NewListUserService(listUserRepo)
+
+	// ─── User Delete Service (Admin) ───────────────────────────
+	deleteUserGormRepo := delete_user.NewGormUserRepository(db.DB)
+	userDeleteService := delete_user.NewUserDeleteService(deleteUserGormRepo)
+
 	// ioc
 	iocService := graphicalmapping.NewIOCService(iocRepo)
 	//timeline
@@ -211,7 +217,7 @@ func main() {
 	evidenceCountService := evidencecount.NewEvidenceService(evidenceCountRepo)
 
 	// ─── Handlers ───────────────────────────────────────────────
-	adminHandler := handlers.NewAdminService(regService, listUserService, nil, nil, auditLogger)
+	adminHandler := handlers.NewAdminService(regService, listUserService, nil, userDeleteService, auditLogger)
 	authHandler := handlers.NewAuthHandler(authService, resetService, userRepo, auditLogger)
 
 	//pass separate services explicitly
