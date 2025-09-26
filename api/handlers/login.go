@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	x3dh "aegis-api/internal/x3dh"
 	"aegis-api/middleware"
 	"aegis-api/pkg/websocket"
 	"aegis-api/services_/auditlog"
@@ -69,6 +70,7 @@ type Handler struct {
 	TimelineHandler       *TimelineHandler
 	EvidenceHandler       *EvidenceHandler
 	ChainOfCustodyHandler *ChainOfCustodyHandler
+	X3DHService           *x3dh.BundleService // Add this
 }
 
 func NewHandler(
@@ -104,6 +106,7 @@ func NewHandler(
 	TimelineHandler *TimelineHandler,
 	EvidenceHandler *EvidenceHandler,
 	ChainOfCustodyHandler *ChainOfCustodyHandler,
+	x3dhService *x3dh.BundleService,
 
 ) *Handler {
 	return &Handler{
@@ -140,6 +143,8 @@ func NewHandler(
 		TimelineHandler:       TimelineHandler,
 		EvidenceHandler:       EvidenceHandler,
 		ChainOfCustodyHandler: ChainOfCustodyHandler,
+
+		X3DHService: x3dhService,
 	}
 }
 

@@ -361,60 +361,76 @@ func (h *ChatHandler) RemoveMemberFromGroup(c *gin.Context) {
 
 func (h *ChatHandler) SendMessage(c *gin.Context) {
 	actor := auditlog.MakeActor(c)
-	email, _ := c.Get("email")
+
+	emailVal, _ := c.Get("email")
 	fullNameVal, _ := c.Get("fullName")
-	fullName := fullNameVal.(string)
+	senderEmail := fmt.Sprint(emailVal)
+	senderName := fmt.Sprint(fullNameVal)
 
 	groupID, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action:      "SEND_GROUP_MESSAGE",
-			Actor:       actor,
-			Target:      auditlog.Target{Type: "group", ID: c.Param("id")},
-			Service:     "chat",
-			Status:      "FAILED",
+			Action: "SEND_GROUP_MESSAGE", Actor: actor,
+			Target:  auditlog.Target{Type: "group", ID: c.Param("id")},
+			Service: "chat", Status: "FAILED",
 			Description: "Invalid group ID",
 		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group ID"})
 		return
 	}
 
-	var req struct {
-		Content  string `json:"content"`
-		File     string `json:"file"`     // base64 encoded
-		FileName string `json:"fileName"` // e.g. "photo.png"
+	// Request supports BOTH plaintext and E2EE + optional base64 file (existing path)
+	type reqBody struct {
+		// Plaintext path
+		Content string `json:"content,omitempty"`
+
+		// File path (existing)
+		File     string `json:"file,omitempty"`     // base64
+		FileName string `json:"fileName,omitempty"` // e.g. "photo.png"
+
+		// 🔐 E2EE path
+		IsEncrypted bool                   `json:"is_encrypted"`
+		Envelope    *chat.CryptoEnvelopeV1 `json:"envelope,omitempty"`
+
+		// (Optional) If you encrypt attachments client-side and want to pass per-file envelopes,
+		// you could extend this later to accept an array with per-file envelopes.
 	}
+	var req reqBody
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action:      "SEND_GROUP_MESSAGE",
-			Actor:       actor,
-			Target:      auditlog.Target{Type: "group", ID: groupID.Hex()},
-			Service:     "chat",
-			Status:      "FAILED",
+			Action: "SEND_GROUP_MESSAGE", Actor: actor,
+			Target:  auditlog.Target{Type: "group", ID: groupID.Hex()},
+			Service: "chat", Status: "FAILED",
 			Description: "Invalid input JSON",
 		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
 		return
 	}
 
+	now := time.Now()
 	var attachments []*chat.Attachment
 	messageType := "text"
 
+	// ----- Optional file flow (unchanged, but safer on content-type) -----
 	if req.File != "" && req.FileName != "" {
 		data, err := base64.StdEncoding.DecodeString(req.File)
 		if err != nil {
 			h.auditLogger.Log(c, auditlog.AuditLog{
-				Action:      "SEND_GROUP_MESSAGE",
-				Actor:       actor,
-				Target:      auditlog.Target{Type: "group", ID: groupID.Hex()},
-				Service:     "chat",
-				Status:      "FAILED",
+				Action: "SEND_GROUP_MESSAGE", Actor: actor,
+				Target:  auditlog.Target{Type: "group", ID: groupID.Hex()},
+				Service: "chat", Status: "FAILED",
 				Description: "Invalid base64 file encoding",
 			})
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid base64 file"})
 			return
 		}
-		contentType := http.DetectContentType(data[:512])
+
+		// Detect MIME type safely even for small buffers
+		sample := data
+		if len(sample) > 512 {
+			sample = sample[:512]
+		}
+		contentType := http.DetectContentType(sample)
 
 		ext := filepath.Ext(req.FileName)
 		switch ext {
@@ -425,12 +441,11 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		case ".xlsx":
 			contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 		}
-
-		fallbackType := mime.TypeByExtension(ext)
-		if contentType == "application/octet-stream" && fallbackType != "" {
-			contentType = fallbackType
+		if contentType == "application/octet-stream" {
+			if fb := mime.TypeByExtension(ext); fb != "" {
+				contentType = fb
+			}
 		}
-		fileSize := int64(len(data))
 
 		result, err := h.ChatService.IPFSUploader().UploadBytes(
 			c.Request.Context(),
@@ -439,77 +454,88 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		)
 		if err != nil {
 			h.auditLogger.Log(c, auditlog.AuditLog{
-				Action:      "SEND_GROUP_MESSAGE",
-				Actor:       actor,
-				Target:      auditlog.Target{Type: "group", ID: groupID.Hex()},
-				Service:     "chat",
-				Status:      "FAILED",
+				Action: "SEND_GROUP_MESSAGE", Actor: actor,
+				Target:  auditlog.Target{Type: "group", ID: groupID.Hex()},
+				Service: "chat", Status: "FAILED",
 				Description: "IPFS upload failed: " + err.Error(),
 			})
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "file upload failed", "details": err.Error()})
 			return
 		}
 
-		fileUrl := h.ChatService.IPFSUploader().GetFileURL(result.Hash)
+		fileURL := h.ChatService.IPFSUploader().GetFileURL(result.Hash)
 
-		attachments = []*chat.Attachment{
-			{
-				ID:       primitive.NewObjectID().Hex(),
-				FileName: req.FileName,
-				FileType: contentType,
-				FileSize: fileSize,
-				URL:      fileUrl,
-				Hash:     result.Hash,
-			},
+		att := &chat.Attachment{
+			ID:       primitive.NewObjectID().Hex(),
+			FileName: req.FileName,
+			FileType: contentType,
+			FileSize: int64(len(data)),
+			URL:      fileURL,
+			Hash:     result.Hash,
+
+			// If you encrypt file bytes client-side, set these two and omit URL/Hash
+			// IsEncrypted: true,
+			// Envelope:    req.AttachmentEnvelope, // future extension if needed
 		}
+		attachments = []*chat.Attachment{att}
 		messageType = "file"
 	}
 
+	// ----- Build message (E2EE-aware) -----
 	msg := &chat.Message{
-		GroupID:       groupID,
-		SenderEmail:   email.(string),
-		SenderName:    fullName, // if you have `Name` on actor
-		Content:       req.Content,
-		MessageType:   messageType,
-		Attachments:   attachments,
-		Status:        chat.MessageStatus{Sent: time.Now()},
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
-		IsDeleted:     false,
-		AttachmentURL: "", // keep empty unless you want a direct link outside Attachments
+		GroupID:     groupID,
+		SenderEmail: senderEmail,
+		SenderName:  senderName,
+
+		MessageType: messageType,
+		Attachments: attachments,
+
+		// 🔐 E2EE fields (persist ciphertext only)
+		IsEncrypted: req.IsEncrypted,
+		Envelope:    req.Envelope,
+
+		// Plaintext only when not encrypted
+		Content:   "",
+		Status:    chat.MessageStatus{Sent: now},
+		CreatedAt: now,
+		UpdatedAt: now,
+		IsDeleted: false,
+	}
+
+	if !req.IsEncrypted {
+		msg.Content = req.Content
 	}
 
 	if err := h.ChatService.Repo().CreateMessage(c.Request.Context(), msg); err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action:      "SEND_GROUP_MESSAGE",
-			Actor:       actor,
-			Target:      auditlog.Target{Type: "group", ID: groupID.Hex()},
-			Service:     "chat",
-			Status:      "FAILED",
+			Action: "SEND_GROUP_MESSAGE", Actor: actor,
+			Target:  auditlog.Target{Type: "group", ID: groupID.Hex()},
+			Service: "chat", Status: "FAILED",
 			Description: "Failed to save message: " + err.Error(),
 		})
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save message", "details": err.Error()})
 		return
 	}
 
+	// ----- Broadcast the same shape the clients expect -----
 	_ = h.ChatService.WsManager().BroadcastToGroup(groupID.Hex(), chat.WebSocketMessage{
-		Type:      "NEW_MESSAGE", // ✅ correct message type
+		// ❗ Standardize on "new_message" to match the WS layer & frontend
+		Type:      "new_message",
 		GroupID:   groupID.Hex(),
-		Payload:   msg, // ✅ fixed field name
-		Timestamp: time.Now(),
+		Payload:   msg, // includes IsEncrypted + Envelope or Content accordingly
+		Timestamp: now,
 	})
 
 	h.auditLogger.Log(c, auditlog.AuditLog{
-		Action:      "SEND_GROUP_MESSAGE",
-		Actor:       actor,
-		Target:      auditlog.Target{Type: "group_message", ID: msg.ID},
-		Service:     "chat",
-		Status:      "SUCCESS",
+		Action: "SEND_GROUP_MESSAGE", Actor: actor,
+		Target:  auditlog.Target{Type: "group_message", ID: msg.ID},
+		Service: "chat", Status: "SUCCESS",
 		Description: "Message sent",
 	})
 
 	c.JSON(http.StatusOK, msg)
 }
+
 func (h *ChatHandler) GetGroupsByCaseID(c *gin.Context) {
 	actor := auditlog.MakeActor(c)
 

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"aegis-api/handlers"
+	x3dh "aegis-api/internal/x3dh"
 	"aegis-api/middleware"
 
 	"github.com/gin-contrib/cors"
@@ -126,6 +127,10 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			protected.DELETE("/notifications/delete", h.DeleteNotifications)
 			protected.POST("/notifications/archive", h.ArchiveNotifications)
 
+			x3dhGroup := api.Group("/x3dh")
+			x3dh.RegisterX3DHHandlers(x3dhGroup, h.X3DHService)
+			// ─── X3DH Key Bundle Route ───────────────────────────────
+
 			// RegisterMessageRoutes(protected, h.MessageService, auditLogger)
 			// ─── Thread Messaging ────────────────────────
 
@@ -145,7 +150,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 			RegisterReportRoutes(protected, h.ReportHandler)
 
 			// // ─── Report Status Update ─────────────────────────────
-			 RegisterReportStatusRoutes(protected, h.ReportStatusHandler)
+			RegisterReportStatusRoutes(protected, h.ReportStatusHandler)
 
 		}
 	}
