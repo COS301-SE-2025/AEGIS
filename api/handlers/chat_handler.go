@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"aegis-api/services_/chat"
-	"encoding/base64"
 	"fmt"
 	"io"
-	"mime"
+	"log"
+	"mime/multipart"
 	"net/http"
-	"path/filepath"
+	"net/textproto"
 	"strconv"
 	"time"
 
@@ -360,6 +360,9 @@ func (h *ChatHandler) RemoveMemberFromGroup(c *gin.Context) {
 // ───── Messages ─────────────────────────────────────────────
 
 func (h *ChatHandler) SendMessage(c *gin.Context) {
+	// Increase max body size for large base64 strings
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 32<<20) // 32MB limit
+
 	actor := auditlog.MakeActor(c)
 
 	emailVal, _ := c.Get("email")
@@ -379,21 +382,16 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	// Request supports BOTH plaintext and E2EE + optional base64 file (existing path)
 	type reqBody struct {
-		// Plaintext path
 		Content string `json:"content,omitempty"`
 
-		// File path (existing)
-		File     string `json:"file,omitempty"`     // base64
-		FileName string `json:"fileName,omitempty"` // e.g. "photo.png"
+		File     string `json:"file,omitempty"` // base64
+		FileName string `json:"fileName,omitempty"`
+		FileMime string `json:"file_mime,omitempty"`
+		FileSize int64  `json:"file_size,omitempty"`
 
-		// 🔐 E2EE path
 		IsEncrypted bool                   `json:"is_encrypted"`
 		Envelope    *chat.CryptoEnvelopeV1 `json:"envelope,omitempty"`
-
-		// (Optional) If you encrypt attachments client-side and want to pass per-file envelopes,
-		// you could extend this later to accept an array with per-file envelopes.
 	}
 	var req reqBody
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -406,123 +404,76 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
 		return
 	}
+	log.Printf("Received request: %+v", req)
 
 	now := time.Now()
-	var attachments []*chat.Attachment
-	messageType := "text"
+	var msg *chat.Message
 
-	// ----- Optional file flow (unchanged, but safer on content-type) -----
 	if req.File != "" && req.FileName != "" {
-		data, err := base64.StdEncoding.DecodeString(req.File)
-		if err != nil {
-			h.auditLogger.Log(c, auditlog.AuditLog{
-				Action: "SEND_GROUP_MESSAGE", Actor: actor,
-				Target:  auditlog.Target{Type: "group", ID: groupID.Hex()},
-				Service: "chat", Status: "FAILED",
-				Description: "Invalid base64 file encoding",
-			})
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid base64 file"})
-			return
+		fileHeader := &multipart.FileHeader{
+			Filename: req.FileName,
+			Size:     req.FileSize,
+			Header:   textproto.MIMEHeader{"Content-Type": []string{req.FileMime}},
 		}
-
-		// Detect MIME type safely even for small buffers
-		sample := data
-		if len(sample) > 512 {
-			sample = sample[:512]
-		}
-		contentType := http.DetectContentType(sample)
-
-		ext := filepath.Ext(req.FileName)
-		switch ext {
-		case ".docx":
-			contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-		case ".pptx":
-			contentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-		case ".xlsx":
-			contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-		}
-		if contentType == "application/octet-stream" {
-			if fb := mime.TypeByExtension(ext); fb != "" {
-				contentType = fb
-			}
-		}
-
-		result, err := h.ChatService.IPFSUploader().UploadBytes(
+		msg, err = h.ChatService.SendMessageWithAttachment(
 			c.Request.Context(),
-			data,
-			fmt.Sprintf("%s-%s", primitive.NewObjectID().Hex(), req.FileName),
+			senderEmail,
+			senderName,
+			groupID,
+			req.Content,
+			req.IsEncrypted,
+			req.Envelope,
+			req.File,
+			fileHeader,
+			req.Envelope,
 		)
 		if err != nil {
 			h.auditLogger.Log(c, auditlog.AuditLog{
 				Action: "SEND_GROUP_MESSAGE", Actor: actor,
 				Target:  auditlog.Target{Type: "group", ID: groupID.Hex()},
 				Service: "chat", Status: "FAILED",
-				Description: "IPFS upload failed: " + err.Error(),
+				Description: "Failed to send attachment: " + err.Error(),
 			})
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "file upload failed", "details": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to send attachment", "details": err.Error()})
 			return
 		}
-
-		fileURL := h.ChatService.IPFSUploader().GetFileURL(result.Hash)
-
-		att := &chat.Attachment{
-			ID:       primitive.NewObjectID().Hex(),
-			FileName: req.FileName,
-			FileType: contentType,
-			FileSize: int64(len(data)),
-			URL:      fileURL,
-			Hash:     result.Hash,
-
-			// If you encrypt file bytes client-side, set these two and omit URL/Hash
-			// IsEncrypted: true,
-			// Envelope:    req.AttachmentEnvelope, // future extension if needed
+	} else {
+		// Text message logic (unchanged)
+		msg = &chat.Message{
+			GroupID:     groupID,
+			SenderEmail: senderEmail,
+			SenderName:  senderName,
+			MessageType: "text",
+			Content:     req.Content,
+			IsEncrypted: req.IsEncrypted,
+			Envelope:    req.Envelope,
+			Status:      chat.MessageStatus{Sent: now},
+			CreatedAt:   now,
+			UpdatedAt:   now,
+			IsDeleted:   false,
 		}
-		attachments = []*chat.Attachment{att}
-		messageType = "file"
+		if req.IsEncrypted {
+			msg.Content = ""
+		}
+		if err := h.ChatService.Repo().CreateMessage(c.Request.Context(), msg); err != nil {
+			h.auditLogger.Log(c, auditlog.AuditLog{
+				Action: "SEND_GROUP_MESSAGE", Actor: actor,
+				Target:  auditlog.Target{Type: "group", ID: groupID.Hex()},
+				Service: "chat", Status: "FAILED",
+				Description: "Failed to save message: " + err.Error(),
+			})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save message", "details": err.Error()})
+			return
+		}
 	}
 
-	// ----- Build message (E2EE-aware) -----
-	msg := &chat.Message{
-		GroupID:     groupID,
-		SenderEmail: senderEmail,
-		SenderName:  senderName,
+	// normalizeMessageEncryption(msg)
+	// log.Printf("After normalize: Message: %+v", msg)
 
-		MessageType: messageType,
-		Attachments: attachments,
-
-		// 🔐 E2EE fields (persist ciphertext only)
-		IsEncrypted: req.IsEncrypted,
-		Envelope:    req.Envelope,
-
-		// Plaintext only when not encrypted
-		Content:   "",
-		Status:    chat.MessageStatus{Sent: now},
-		CreatedAt: now,
-		UpdatedAt: now,
-		IsDeleted: false,
-	}
-
-	if !req.IsEncrypted {
-		msg.Content = req.Content
-	}
-
-	if err := h.ChatService.Repo().CreateMessage(c.Request.Context(), msg); err != nil {
-		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action: "SEND_GROUP_MESSAGE", Actor: actor,
-			Target:  auditlog.Target{Type: "group", ID: groupID.Hex()},
-			Service: "chat", Status: "FAILED",
-			Description: "Failed to save message: " + err.Error(),
-		})
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save message", "details": err.Error()})
-		return
-	}
-
-	// ----- Broadcast the same shape the clients expect -----
 	_ = h.ChatService.WsManager().BroadcastToGroup(groupID.Hex(), chat.WebSocketMessage{
-		// ❗ Standardize on "new_message" to match the WS layer & frontend
 		Type:      "new_message",
 		GroupID:   groupID.Hex(),
-		Payload:   msg, // includes IsEncrypted + Envelope or Content accordingly
+		Payload:   msg,
 		Timestamp: now,
 	})
 
@@ -535,7 +486,6 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 
 	c.JSON(http.StatusOK, msg)
 }
-
 func (h *ChatHandler) GetGroupsByCaseID(c *gin.Context) {
 	actor := auditlog.MakeActor(c)
 

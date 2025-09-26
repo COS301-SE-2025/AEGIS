@@ -46,28 +46,34 @@ func (s *ChatService) SendMessageWithAttachment(
 	fileBase64 string,
 	fileHeader *multipart.FileHeader,
 	attEnvelope *CryptoEnvelopeV1,
-) error {
+) (*Message, error) {
 	if fileBase64 == "" || fileHeader == nil {
-		return errors.New("fileBase64 and fileHeader required")
+		return nil, errors.New("fileBase64 and fileHeader required")
 	}
 	if fileHeader.Size == 0 {
-		return errors.New("empty file")
+		return nil, errors.New("empty file")
 	}
 
 	var data []byte
 	var err error
 	if isEncrypted {
 		if attEnvelope == nil || attEnvelope.CT == "" {
-			return errors.New("missing attEnvelope.Ct for encrypted attachment")
+			return nil, errors.New("missing attEnvelope.CT for encrypted attachment")
 		}
+		log.Printf("attEnvelope.CT length: %d, sample (first 100 chars): %s", len(attEnvelope.CT), attEnvelope.CT[:min(len(attEnvelope.CT), 100)])
 		data, err = base64.URLEncoding.DecodeString(attEnvelope.CT)
 		if err != nil {
-			return fmt.Errorf("decode attEnvelope.Ct: %w", err)
+			log.Printf("Failed to decode attEnvelope.CT: %v", err)
+			data, err = base64.StdEncoding.DecodeString(fileBase64)
+			if err != nil {
+				return nil, fmt.Errorf("decode fileBase64 fallback: %w", err)
+			}
+			log.Printf("Using fallback fileBase64")
 		}
 	} else {
 		data, err = base64.StdEncoding.DecodeString(fileBase64)
 		if err != nil {
-			return fmt.Errorf("decode fileBase64: %w", err)
+			return nil, fmt.Errorf("decode fileBase64: %w", err)
 		}
 	}
 
@@ -87,7 +93,7 @@ func (s *ChatService) SendMessageWithAttachment(
 
 	ipfsResult, err := s.ipfsUploader.UploadBytes(ctx, data, fileHeader.Filename)
 	if err != nil {
-		return fmt.Errorf("IPFS upload failed: %w", err)
+		return nil, fmt.Errorf("IPFS upload failed: %w", err)
 	}
 	log.Printf("IPFS CID: %s, URL: %s", ipfsResult.Hash, ipfsResult.URL)
 
@@ -112,24 +118,19 @@ func (s *ChatService) SendMessageWithAttachment(
 		Attachments: []*Attachment{att},
 		IsEncrypted: isEncrypted,
 		Envelope:    msgEnvelope,
+		Content:     content, // Preserve content as caption, even for encrypted messages
 		CreatedAt:   now,
 		UpdatedAt:   now,
 		IsDeleted:   false,
 		Status:      MessageStatus{Sent: now},
 	}
 
-	if isEncrypted {
-		msg.Content = ""
-	} else {
-		msg.Content = content
-	}
-
 	log.Printf("Message before normalize: %+v", msg)
-	normalizeMessageEncryption(msg)
+	NormalizeMessageEncryption(msg)
 	log.Printf("Message after normalize: %+v", msg)
 
 	if err := s.repo.CreateMessage(ctx, msg); err != nil {
-		return fmt.Errorf("store message: %w", err)
+		return nil, fmt.Errorf("store message: %w", err)
 	}
 
 	err = s.wsManager.BroadcastToGroup(groupID.Hex(), WebSocketMessage{
@@ -143,7 +144,7 @@ func (s *ChatService) SendMessageWithAttachment(
 		log.Printf("Failed to broadcast message: %v", err)
 	}
 
-	return nil
+	return msg, nil
 }
 
 // Helper function to avoid index out of range
@@ -412,7 +413,7 @@ func (s *ChatService) HandleMessage(
 	}
 
 	// ✅ enforce flags consistently
-	normalizeMessageEncryption(msg)
+	NormalizeMessageEncryption(msg)
 
 	if err := s.repo.CreateMessage(ctx, msg); err != nil {
 		return fmt.Errorf("store message: %w", err)

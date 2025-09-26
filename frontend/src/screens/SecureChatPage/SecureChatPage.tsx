@@ -1139,31 +1139,26 @@ useEffect(() => {
       if (msg.type !== "new_message" || String(msg.payload.groupId) !== String(activeChat.id)) return;
 
       const incoming = msg.payload;
-      let displayedText = incoming.content; // default for plaintext
+      let displayedText = incoming.content || ""; // Default to content for captions
       let attachmentsForUI: Message["attachments"] = [];
+      let shared: Uint8Array | undefined;
 
       try {
         if (incoming.is_encrypted && incoming.envelope) {
           const envelope = incoming.envelope as CryptoEnvelopeV1;
+          console.log("Processing encrypted message, groupId:", incoming.groupId);
 
-          await sodium.ready;
-          const { ikPriv: ourIKPrivEd, spkPriv: ourSPKPrivX, opks: ourOPKs } = useUserKeys.getState();
-          if (!ourIKPrivEd || !ourSPKPrivX) throw new Error("Missing private keys");
-
-          // base64url → Uint8Array
-          const ephPubX = base64ToU8((envelope.ephemeral_pub || "").trim());
-          const opkId: string | undefined = envelope.opk_id;
-
-          // Use groupId as the cache key (matches send/receive paths)
-          const groupId = String(incoming.groupId);
-          let shared = useSharedSecrets.getState().getSharedSecret(groupId);
-
-          // If not cached, derive as responder
+          // Retrieve or derive shared secret
+          shared = useSharedSecrets.getState().getSharedSecret(String(incoming.groupId));
           if (!shared) {
-            const ourIKPrivX = sodium.crypto_sign_ed25519_sk_to_curve25519(ourIKPrivEd);
+            await sodium.ready;
+            const { ikPriv: ourIKPrivEd, spkPriv: ourSPKPrivX, opks: ourOPKs } = useUserKeys.getState();
+            if (!ourIKPrivEd || !ourSPKPrivX) throw new Error("Missing private keys (IK/SPK) for decryption.");
 
-            // Fetch & normalize sender bundle, verify SPK sig
-            const senderId = incoming.from || incoming.senderId || incoming.senderEmail;
+            const ephPubX = base64ToU8((envelope.ephemeral_pub || "").trim());
+            const opkId: string | undefined = envelope.opk_id;
+            const senderId = incoming.senderEmail || incoming.from || "";
+
             if (!senderId) throw new Error("Missing sender identity");
             const raw = await fetchBundle(senderId);
             const nb = normalizeIncomingBundle(raw);
@@ -1176,6 +1171,7 @@ useEffect(() => {
 
             const senderIKPubEd = sodium.from_base64(nb.identityKeyEd);
             const senderIKPubX = sodium.crypto_sign_ed25519_pk_to_curve25519(senderIKPubEd);
+            const ourIKPrivX = sodium.crypto_sign_ed25519_sk_to_curve25519(ourIKPrivEd);
 
             let ourOPKPrivX: Uint8Array | undefined;
             if (opkId) {
@@ -1184,29 +1180,27 @@ useEffect(() => {
             }
 
             shared = await deriveSharedSecretResponder(
-              ourIKPrivX,
-              ourSPKPrivX,
-              ephPubX,
-              senderIKPubX,
-              ourOPKPrivX
+              u8Fresh(ourIKPrivX),
+              u8Fresh(ourSPKPrivX),
+              u8Fresh(ephPubX),
+              u8Fresh(senderIKPubX),
+              ourOPKPrivX ? u8Fresh(ourOPKPrivX) : undefined
             );
 
-            // Cache under stable group key
-            useSharedSecrets.getState().setSharedSecret(groupId, shared);
+            if (!shared) throw new Error("Failed to derive shared secret");
+            useSharedSecrets.getState().setSharedSecret(String(incoming.groupId), shared);
           }
 
-          // Decrypt payload (base64url nonce/ct)
-          if (incoming.message_type === "attachment") {
-            const bytes = await e2eeDecryptBytes(envelope.ct, envelope.nonce, shared); // Uint8Array
-            const safeBytes = u8Fresh(bytes);
-            const buf = u8ToArrayBuffer(safeBytes);
-            const mime = incoming.file_mime || "application/octet-stream";
+          const stableShared = u8Fresh(shared);
 
-            const blob = new Blob([buf], { type: mime });
+          if (incoming.message_type === "attachment") {
+            const bytes = await e2eeDecryptBytes(envelope.ct, envelope.nonce, stableShared);
+            const safeBytes = u8Fresh(bytes);
+            const mime = incoming.file_mime || "application/octet-stream";
+            const blob = new Blob([u8ToArrayBuffer(safeBytes)], { type: mime });
             const blobUrl = URL.createObjectURL(blob);
             trackBlobUrl(blobUrl);
-
-            displayedText = incoming.content || ""; // caption (plaintext)
+            displayedText = incoming.content || ""; // Use content as caption
             attachmentsForUI = [{
               file_name: incoming.file_name || "file",
               file_type: mime,
@@ -1215,15 +1209,13 @@ useEffect(() => {
               isImage: mime.startsWith("image/"),
             }];
           } else {
-            displayedText = await e2eeDecryptText(envelope.ct, envelope.nonce, shared);
+            displayedText = await e2eeDecryptText(envelope.ct, envelope.nonce, stableShared);
           }
 
-          // Mark OPK used (best-effort)
-          if (opkId) {
-            try { await useUserKeys.getState().markOPKUsed(opkId, true); } catch {}
+          if (envelope.opk_id) {
+            try { await useUserKeys.getState().markOPKUsed(envelope.opk_id, true); } catch {}
           }
         } else {
-          // Optional plaintext attachment fallback
           if (incoming.message_type === "attachment" && incoming.file_url) {
             const mime = incoming.file_mime || "application/octet-stream";
             attachmentsForUI = [{
@@ -1237,21 +1229,21 @@ useEffect(() => {
         }
       } catch (err) {
         console.warn("Failed to decrypt incoming message:", err);
+        displayedText = "[Decryption failed]";
       }
 
-      // Map into your UI message type
       const mappedMessage: Message = {
         id: incoming.messageId,
-        user: incoming.from,
-        color: incoming.from === userEmail ? "text-green-400" : "text-blue-400",
+        user: incoming.senderName,
+        color: incoming.senderEmail === userEmail ? "text-green-400" : "text-blue-400",
         content: displayedText,
         time: new Date(incoming.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         status: "read",
-        self: incoming.from === userEmail,
+        self: incoming.senderEmail === userEmail,
         attachments: attachmentsForUI,
       };
 
-      setChatMessages((prev: Record<string, Message[]>) => {
+      setChatMessages(prev => {
         const existing = prev[activeChat.id] || [];
         if (existing.some(m => m.id === mappedMessage.id)) return prev;
         return { ...prev, [activeChat.id]: [...existing, mappedMessage] };
@@ -1262,15 +1254,11 @@ useEffect(() => {
     handleTypingStatus
   );
 
-  // Cleanup on unmount or case change
   return () => {
     if (reconnectTimeoutRef.current) { clearTimeout(reconnectTimeoutRef.current); reconnectTimeoutRef.current = null; }
     try { socketRef.current?.close(); } catch {}
   };
-// include activeChat.id to avoid stale closure when switching groups with same caseId
 }, [activeChat?.caseId, activeChat?.id, token, user?.id]);
-
-
 
 
   const handleFileSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1341,6 +1329,7 @@ const sendAttachment = async () => {
   const groupId = chatId;
   const token = sessionStorage.getItem("authToken") || "";
 
+  let envelope: CryptoEnvelopeV1; // Declare envelope outside try block
   try {
     // 1) Ensure shared secret for the group
     let secret = useSharedSecrets.getState().getSharedSecret(groupId) as Uint8Array | undefined;
@@ -1367,24 +1356,31 @@ const sendAttachment = async () => {
 
     // 2) Encrypt file bytes
     const rawBytes = new Uint8Array(await previewFile.arrayBuffer());
-    const { nonce, ciphertext } = await encryptBytes(secret, rawBytes /*, optional AAD */);
-    // ciphertext is base64url
+    const { nonce, ciphertext } = await encryptBytes(secret, rawBytes);
+    const ctU8 = unb64url(ciphertext); // Convert base64url to Uint8Array
+    const fileStdB64 = toStdB64(ctU8); // Convert to standard base64
 
-    // Envelope for receivers (keep ct+nonce in b64url)
-    const envelope: CryptoEnvelopeV1 = {
+    // 3) Create envelope
+    envelope = {
       v: 1,
       algo: "aes-gcm",
       ephemeral_pub: ephPubB64u || "",
       ...(opkIdUsed ? { opk_id: opkIdUsed } : {}),
-      nonce,         // base64url
-      ct: ciphertext // base64url
+      nonce,
+      ct: ciphertext
     };
 
-    // 3) Convert to standard base64 for backend field `file`
-    const ctU8 = unb64url(ciphertext);            // b64url -> Uint8Array
-    const fileStdB64 = toStdB64(ctU8);            // Uint8Array -> std b64
+    // 4) Log payload for debugging
+    console.log("Sending attachment payload:", {
+      file: fileStdB64,
+      fileName: previewFile.name,
+      file_mime: previewFile.type,
+      file_size: previewFile.size,
+      content: attachmentMessage || "",
+      envelope,
+    });
 
-    // 4) Persist message (ciphertext as std b64, plus envelope for receivers)
+    // 5) Persist message
     const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -1393,17 +1389,11 @@ const sendAttachment = async () => {
         sender_name: "You",
         message_type: "attachment",
         is_encrypted: true,
-
-        // legacy/expected fields:
-        file: fileStdB64,                  // ciphertext (std b64)
-        fileName: previewFile.name,        // camelCase as per your note
+        file: fileStdB64,
+        fileName: previewFile.name,
         file_mime: previewFile.type || "application/octet-stream",
         file_size: previewFile.size,
-
-        // receivers will use this; server can ignore
-        envelope,
-
-        // optional plaintext caption
+        envelope: envelope, // Use full object instead of shorthand
         content: attachmentMessage || "",
       })
     });
@@ -1416,11 +1406,12 @@ const sendAttachment = async () => {
     }
 
     const saved = await res.json();
+    console.log("Backend response:", saved);
 
-    // 5) Broadcast over WebSocket so other clients can decrypt immediately
+    // 6) Broadcast over WebSocket
     const socket = socketRef.current;
     if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({
+      const payload = {
         type: "new_message",
         payload: {
           messageId: saved.id,
@@ -1429,38 +1420,35 @@ const sendAttachment = async () => {
           senderName: "You",
           message_type: "attachment",
           is_encrypted: true,
-
-          // receivers will use envelope.ct + nonce to decrypt
-          envelope,
-
+          envelope: saved.envelope,
           file_name: previewFile.name,
           file_mime: previewFile.type,
           file_size: previewFile.size,
-
+          content: saved.content || attachmentMessage || "",
           timestamp: new Date(saved.created_at || Date.now()).toISOString(),
         }
-      }));
+      };
+      console.log("WebSocket broadcast:", payload);
+      socket.send(JSON.stringify(payload));
     }
 
-    // 6) Optimistic UI: show a local preview (no re-encrypt/decrypt needed)
+    // 7) Optimistic UI
     const messageBlobUrl = URL.createObjectURL(previewFile);
-    // Safe optional global tracker if you have one; otherwise no-op.
-    const globalTrack = (globalThis as any).trackBlobUrl as undefined | ((u: string) => void);
-    globalTrack?.(messageBlobUrl);
+    trackBlobUrl(messageBlobUrl);
 
     const optimistic: Message = {
       id: saved.id || Date.now(),
       user: "You",
       self: true,
       color: "text-blue-400",
-      content: saved.content || (attachmentMessage || `Shared file: ${previewFile.name}`),
+      content: saved.content || attachmentMessage || `Shared file: ${previewFile.name}`,
       time: new Date(saved.created_at || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       status: "sent",
       attachments: [{
         file_name: previewFile.name,
         file_type: previewFile.type || "application/octet-stream",
         file_size: previewFile.size,
-        url: messageBlobUrl,                                 // local preview
+        url: messageBlobUrl,
         isImage: (previewFile.type || "").startsWith("image/"),
       }],
       ...(replyingTo && {
@@ -1493,19 +1481,16 @@ const sendAttachment = async () => {
     console.error("Failed to send attachment:", err);
     toast.error("Attachment failed.");
   } finally {
-    // 7) Cleanup local preview state
     setShowAttachmentPreview(false);
     setPreviewFile(null);
     setAttachmentMessage("");
-
     if (previewUrl) {
-      URL.revokeObjectURL(previewUrl); // this was a pre-send preview URL
+      URL.revokeObjectURL(previewUrl);
       setPreviewUrl("");
     }
     setReplyingTo(null);
   }
 };
-
 
 
 
@@ -1766,7 +1751,7 @@ async function resolvePreviewUrl(url: string, mime: string): Promise<string> {
 }
 
 
-const loadMessages = async (groupId: string) => {
+async function loadMessages(groupId: string) {
   if (!activeChat?.id) {
     console.warn("❌ No activeChat ID, skipping message load.");
     return;
@@ -1783,6 +1768,7 @@ const loadMessages = async (groupId: string) => {
     }
 
     const data = await res.json();
+    console.log("Fetched messages:", data); // Debug log
     if (!Array.isArray(data)) {
       setChatMessages(prev => ({ ...prev, [groupId]: [] }));
       return;
@@ -1802,26 +1788,21 @@ const loadMessages = async (groupId: string) => {
     const messages: Message[] = [];
 
     for (const msg of data) {
+      console.log("Processing message:", { id: msg.id, content: msg.content, message_type: msg.message_type }); // Debug log
       let text = msg.content ?? "";
       let attachmentsForUI: Message["attachments"] = [];
 
       try {
-        // 1) If message is encrypted, get (or derive) the group shared secret
-        let stableShared: Uint8Array | undefined;
-
         if (msg.is_encrypted && msg.envelope) {
           const envelope = msg.envelope as CryptoEnvelopeV1;
           const opkId: string | undefined = envelope.opk_id;
 
-          // Try cache
           let shared = useSharedSecrets.getState().getSharedSecret(groupKey);
 
-          // Derive if missing
           if (!shared) {
             const ephB64u = (envelope.ephemeral_pub || "").trim();
 
             if (ephB64u) {
-              // Responder path (X3DH) with ephemeral_pub
               const { ikPriv: ourIKPrivEd, spkPriv: ourSPKPrivX, opks: ourOPKs } = useUserKeys.getState();
               if (!ourIKPrivEd || !ourSPKPrivX) throw new Error("Missing private keys (IK/SPK) for decryption.");
 
@@ -1857,7 +1838,6 @@ const loadMessages = async (groupId: string) => {
                 ourOPKPrivX ? u8Fresh(ourOPKPrivX) : undefined
               );
             } else {
-              // Deterministic group secret fallback
               const jwt = sessionStorage.getItem("authToken") || "";
               const currentUserId =
                 userId ||
@@ -1878,33 +1858,18 @@ const loadMessages = async (groupId: string) => {
             useSharedSecrets.getState().setSharedSecret(groupKey, shared);
           }
 
-          stableShared = u8Fresh(shared);
+          let stableShared = u8Fresh(shared);
 
-          // Decrypt TEXT content if present
           if ((msg.message_type ?? "text") === "text") {
-            text = await decryptMessage(stableShared, envelope.nonce, envelope.ct /* aad? */);
-          }
-
-          // Decrypt FILE attachments if present (supports external ct or inline ct)
-          if ((msg.message_type ?? "").toLowerCase() === "file" && Array.isArray(msg.attachments) && msg.attachments.length) {
+            text = await decryptMessage(stableShared, envelope.nonce, envelope.ct);
+          } else if ((msg.message_type ?? "").toLowerCase() === "file" && Array.isArray(msg.attachments) && msg.attachments.length) {
             const att = msg.attachments[0];
             const mime = att.file_type || "application/octet-stream";
             let plainBytes: Uint8Array | undefined;
 
-            if (att.is_encrypted && att.url) {
-              // External ciphertext at att.url; need envelope.nonce
-              if (!msg.envelope?.nonce) throw new Error("Missing nonce for encrypted attachment");
-              const resp = await fetch(att.url, { mode: "cors" });
-              const ctBuf = new Uint8Array(await resp.arrayBuffer());
-              // if your decryptBytes expects base64url, convert
-              const ctB64u = u8ToB64url(ctBuf);
-              plainBytes = await decryptBytes(stableShared, msg.envelope.nonce, ctB64u);
-            } else if (msg.envelope?.ct && msg.envelope?.nonce) {
-              // Inline ciphertext in envelope.ct
+            if (msg.is_encrypted && msg.envelope?.ct && msg.envelope?.nonce) {
               plainBytes = await decryptBytes(stableShared, msg.envelope.nonce, msg.envelope.ct);
-            } else if (att.url) {
-              // Plain legacy file
-              // don't download here; let UI use direct URL
+            } else if (att.url && !att.is_encrypted) {
               attachmentsForUI = [{
                 file_name: att.file_name || "file",
                 file_type: mime,
@@ -1912,6 +1877,7 @@ const loadMessages = async (groupId: string) => {
                 url: att.url,
                 isImage: mime.startsWith("image/"),
               }];
+              text = msg.content || ""; // Use caption for file messages
             }
 
             if (plainBytes) {
@@ -1927,12 +1893,10 @@ const loadMessages = async (groupId: string) => {
             }
           }
 
-          // Best-effort OPK mark
           if (envelope.opk_id) {
             try { await useUserKeys.getState().markOPKUsed(envelope.opk_id, true); } catch {}
           }
         } else {
-          // PLAINTEXT paths (text or file)
           if ((msg.message_type ?? "text") === "text") {
             text = msg.content ?? "";
           } else if ((msg.message_type ?? "").toLowerCase() === "file" && Array.isArray(msg.attachments) && msg.attachments.length) {
@@ -1945,7 +1909,7 @@ const loadMessages = async (groupId: string) => {
               url: att.url,
               isImage: mime.startsWith("image/"),
             }];
-            text = msg.content || ""; // optional caption
+            text = msg.content || ""; // Use caption for file messages
           }
         }
       } catch (e) {
@@ -1975,23 +1939,30 @@ const loadMessages = async (groupId: string) => {
     console.error("Failed to load messages:", err);
     setChatMessages(prev => ({ ...prev, [groupId]: [] }));
   }
-};
+}
 
 
 
+useEffect(() => {
+  if (!activeChat?.id || chatMessages[activeChat.id]?.length > 0) {
+    console.warn("Skipping loadMessages as messages are already present");
+    return;
+  }
+  console.log("🔄 Loading messages for group ID:", activeChat.id);
+  loadMessages(String(activeChat.id));
+}, [activeChat]);
 
-
-
-
-  useEffect(() => {
-    if (!activeChat?.id) {
-      console.warn("❌ Cannot load messages, no group ID");
-    } else {
-      console.log("🔄 Loading messages for group ID:", activeChat.id);
-      loadMessages(String(activeChat.id));
+useEffect(() => {
+  if (activeChat) return; // Skip if activeChat is already set (prevents reset on groups update)
+  const storedChat = localStorage.getItem("activeChat");
+  if (storedChat) {
+    const parsed = JSON.parse(storedChat);
+    const match = groups.find(g => g.id === parsed.id);
+    if (match) {
+      setActiveChat(parsed);
     }
-  }, [activeChat, showAddMembersModal]);
-
+  }
+}, [groups]);
   useEffect(() => {
     if (!previewFile) {
       setPreviewUrl(""); // ensure consistency
@@ -2087,17 +2058,7 @@ const loadMessages = async (groupId: string) => {
     fetchCollaborators();
   }, [activeChat, token]);
 
-  useEffect(() => {
-    const storedChat = localStorage.getItem("activeChat");
-    if (storedChat) {
-      const parsed = JSON.parse(storedChat);
-      // Ensure it matches current group IDs
-      const match = groups.find(g => g.id === parsed.id);
-      if (match) {
-        setActiveChat(parsed);
-      }
-    }
-  }, [groups]);
+
 
   const handleOpenAddMembersModal = async () => {
     if (!activeChat?.caseId) {
@@ -2153,121 +2114,97 @@ const loadMessages = async (groupId: string) => {
 
 
 
-  const MessageComponent = ({ msg }: { msg: Message }) => (
-    <div className={`flex ${msg.self ? "justify-end" : "justify-start"} group`}>
-      <div
-        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative ${msg.self ? "bg-blue-600 text-white" : "bg-muted text-foreground"
-          }`}
-      >
-        {/* Reply preview */}
-        {msg.replyTo && (
-          <div
-            className={`mb-2 p-2 rounded border-l-4 ${msg.self
-                ? "border-white/30 bg-white/10"
-                : "border-blue-400 bg-blue-50 dark:bg-blue-900/20"
-              }`}
-          >
-            <p
-              className={`text-xs font-semibold ${msg.self ? "text-white/80" : "text-blue-600"
-                }`}
-            >
-              {msg.replyTo.user}
-            </p>
-            <p
-              className={`text-xs truncate ${msg.self ? "text-white/70" : "text-muted-foreground"
-                }`}
-            >
-              {msg.replyTo.attachment
-                ? `📎 ${msg.replyTo.attachment.name}`
-                : msg.replyTo.content}
-            </p>
-          </div>
-        )}
+const MessageComponent = ({ msg }: { msg: Message }) => (
+  <div className={`flex ${msg.self ? "justify-end" : "justify-start"} group`}>
+    <div
+      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative ${msg.self ? "bg-blue-600 text-white" : "bg-muted text-foreground"}`}
+    >
+      {/* Reply preview */}
+      {msg.replyTo && (
+        <div
+          className={`mb-2 p-2 rounded border-l-4 ${msg.self ? "border-white/30 bg-white/10" : "border-blue-400 bg-blue-50 dark:bg-blue-900/20"}`}
+        >
+          <p className={`text-xs font-semibold ${msg.self ? "text-white/80" : "text-blue-600"}`}>
+            {msg.replyTo.user}
+          </p>
+          <p className={`text-xs truncate ${msg.self ? "text-white/70" : "text-muted-foreground"}`}>
+            {msg.replyTo.attachment ? `📎 ${msg.replyTo.attachment.name}` : msg.replyTo.content}
+          </p>
+        </div>
+      )}
 
-        {/* Sender name (for incoming only) */}
-        {!msg.self && (
-          <p className={`text-xs font-bold ${msg.color} mb-1`}>{msg.user}</p>
-        )}
+      {/* Sender name (for incoming only) */}
+      {!msg.self && (
+        <p className={`text-xs font-bold ${msg.color} mb-1`}>{msg.user}</p>
+      )}
 
-        {/* Attachments */}
-        {Array.isArray(msg.attachments) &&
-          msg.attachments.map((attachment, idx) => (
-            <div key={idx} className="mb-2">
-              {attachment.file_type?.startsWith?.("image/") ? (
-                <div className="relative">
-                  <img
-                    src={attachment.url}
-                    alt={attachment.file_name}
-                    className="max-w-full h-auto rounded cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => attachment.url && handleImageClick(attachment.url)}
-                  />
-                  <button
-                    onClick={() =>
-                      attachment.url && handleImageClick(attachment.url)
-                    }
-                    className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-all"
-                    title="Preview"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  className={`p-3 rounded border ${msg.self ? "bg-black/20 border-white/20" : "bg-accent border-border"
-                    }`}
+      {/* Attachments */}
+      {Array.isArray(msg.attachments) &&
+        msg.attachments.map((attachment, idx) => (
+          <div key={idx} className="mb-2">
+            {attachment.file_type?.startsWith?.("image/") ? (
+              <div className="relative">
+                <img
+                  src={attachment.url}
+                  alt={attachment.file_name}
+                  className="max-w-full h-auto rounded cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => attachment.url && handleImageClick(attachment.url)}
+                />
+                <button
+                  onClick={() => attachment.url && handleImageClick(attachment.url)}
+                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-all"
+                  title="Preview"
                 >
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-sm">
-                        {attachment.file_name}
-                      </p>
-                      <p className="text-xs opacity-70">
-                        {Number.isFinite(attachment.file_size)
-                          ? `${(attachment.file_size / 1024).toFixed(1)} KB`
-                          : ""}
-                      </p>
-                    </div>
-                    {attachment.url && (
-                      <a
-                        href={attachment.url}
-                        download
-                        className="p-1 hover:bg-black/20 rounded"
-                        title="Download"
-                      >
-                        <Download className="w-4 h-4" />
-                      </a>
-                    )}
+                  <Eye className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className={`p-3 rounded border ${msg.self ? "bg-black/20 border-white/20" : "bg-accent border-border"}`}>
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate text-sm">{attachment.file_name}</p>
+                    <p className="text-xs opacity-70">
+                      {Number.isFinite(attachment.file_size) ? `${(attachment.file_size / 1024).toFixed(1)} KB` : ""}
+                    </p>
                   </div>
+                  {attachment.url && (
+                    <a href={attachment.url} download className="p-1 hover:bg-black/20 rounded" title="Download">
+                      <Download className="w-4 h-4" />
+                    </a>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            )}
+          </div>
+        ))}
 
-        {/* Message Content (already decrypted upstream) */}
+      {/* Message Content */}
+      {msg.content && ( // Only render if content exists
         <div className="text-sm">
           <p>{msg.content}</p>
         </div>
+      )}
 
-        {/* Footer: time + actions */}
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-xs opacity-70">{msg.time}</span>
-          <div className="flex items-center gap-1">
-            {msg.self && getStatusIcon(msg.status)}
-            {!msg.self && (
-              <button
-                onClick={() => handleReplyToMessage(msg)}
-                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/20 rounded transition-all"
-                title="Reply"
-              >
-                <Reply className="w-3 h-3" />
-              </button>
-            )}
-          </div>
+      {/* Footer: time + actions */}
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-xs opacity-70">{msg.time}</span>
+        <div className="flex items-center gap-1">
+          {msg.self && getStatusIcon(msg.status)}
+          {!msg.self && (
+            <button
+              onClick={() => handleReplyToMessage(msg)}
+              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/20 rounded transition-all"
+              title="Reply"
+            >
+              <Reply className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 
 
 
