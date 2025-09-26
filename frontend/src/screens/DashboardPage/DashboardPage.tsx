@@ -951,11 +951,13 @@ useEffect(() => {
                   Closed Cases ({closedCases.length})
                 </button>
               </div>
-              <Link to="/create-case">
-                <button className="bg-primary text-primary-foreground text-sm px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
-                  Create Case
-                </button>
-              </Link>
+              {isDFIRAdmin && (
+                <Link to="/create-case">
+                  <button className="bg-primary text-primary-foreground text-sm px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                    Create Case
+                  </button>
+                </Link>
+              )}
             </div>
 
             {caseCards.length === 0 ? (

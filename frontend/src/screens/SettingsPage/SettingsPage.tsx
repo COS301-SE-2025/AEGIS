@@ -302,17 +302,19 @@ function SettingsPage() {
           Logout
         </Link>
       </div>
-      {/* Register User */}
-      <div className="bg-card text-card-foreground rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Register User</h2>
-        <Link
-          to="/register"
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          <User className="w-5 h-5 text-primary-foreground" />
-          Register User
-        </Link>
-      </div>
+      {/* Register User (DFIR Admin only) */}
+      {isDFIRAdmin && (
+        <div className="bg-card text-card-foreground rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Register User</h2>
+          <Link
+            to="/register"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            <User className="w-5 h-5 text-primary-foreground" />
+            Register User
+          </Link>
+        </div>
+      )}
 
     <div className="p-8">
       <h2 className="text-2xl font-bold mb-4">Customize Theme</h2>
