@@ -26,9 +26,11 @@ import (
 	"aegis-api/services_/case/ListUsers"
 	"aegis-api/services_/case/case_assign"
 	"aegis-api/services_/case/case_creation"
+	"aegis-api/services_/case/case_deletion"
 	"aegis-api/services_/case/case_evidence_totals"
 	"aegis-api/services_/case/case_tags"
 	update_case "aegis-api/services_/case/case_update"
+	"aegis-api/services_/case/listArchiveCases"
 	"aegis-api/services_/chain_of_custody"
 	"aegis-api/services_/chat"
 	evidencecount "aegis-api/services_/evidence/evidence_count"
@@ -142,6 +144,7 @@ func main() {
 
 	listActiveCasesRepo := ListActiveCases.NewActiveCaseRepository(db.DB)
 	listClosedCasesRepo := ListClosedCases.NewClosedCaseRepository(db.DB)
+	listArchivedCasesRepo := listArchiveCases.NewArchiveCaseRepository(db.DB)
 	listCasesRepo := ListCases.NewGormCaseQueryRepository(db.DB)
 	iocRepo := graphicalmapping.NewIOCRepository(db.DB)
 
@@ -167,6 +170,7 @@ func main() {
 
 	listActiveCasesService := ListActiveCases.NewService(listActiveCasesRepo)
 	listClosedCasesService := ListClosedCases.NewService(listClosedCasesRepo)
+	listArchiveCasesService := listArchiveCases.NewArchiveCaseService(listArchivedCasesRepo)
 	listCasesService := ListCases.NewListCasesService(listCasesRepo)
 
 	// ─── Audit Logging ──────────────────────────────────────────
@@ -216,6 +220,7 @@ func main() {
 		listCasesService,
 		listActiveCasesService,
 		listClosedCasesService,
+		listArchiveCasesService,
 		auditLogger, // AuditLogger
 		userAdapter, // UserRepo
 		updateCaseService,
@@ -301,6 +306,11 @@ func main() {
 	caseEviRepo := case_evidence_totals.NewCaseEviRepository(db.DB)
 	dashboardService := case_evidence_totals.NewDashboardService(caseEviRepo)
 	caseEviTotalsHandler := handlers.NewCaseEvidenceTotalsHandler(dashboardService)
+
+	// ─── Case Deletion ──────────────────────────────────────
+	caseDeletionRepo := case_deletion.NewGormCaseRepository(db.DB)
+	caseDeletionService := case_deletion.NewCaseDeletionService(caseDeletionRepo)
+	caseDeletionHandler := handlers.NewCaseDeletionHandler(caseDeletionService)
 
 	// ─── AuditLog Service and Handler ─────────────────────────────
 	auditLogService := auditlog.NewAuditLogService(mongoDatabase, userRepo)
@@ -420,6 +430,7 @@ func main() {
 		nil, // evidenceHandler
 		nil, // userHandler
 		caseHandler,
+		caseDeletionHandler,
 		uploadHandler,
 		downloadHandler,
 		metadataHandler,

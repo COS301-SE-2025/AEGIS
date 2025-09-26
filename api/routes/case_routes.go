@@ -83,6 +83,10 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.POST("/cases/unassign", h.CaseHandler.UnassignUserFromCase)
 		protected.GET("/cases/closed", h.CaseHandler.ListClosedCasesHandler)
 		protected.PATCH("/cases/:case_id", h.CaseHandler.UpdateCaseHandler)
+		// Archive case (move to archived tab)
+		protected.PATCH("/cases/:case_id/archive", h.CaseDeletionHandler.ArchiveCaseHandler)
+		// List archived cases
+		protected.GET("/cases/archived", h.CaseHandler.ListArchivedCasesHandler)
 
 		// ─── New List / Filter Cases ──────────────────
 		protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)

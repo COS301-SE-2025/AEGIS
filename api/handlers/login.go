@@ -43,6 +43,7 @@ type Handler struct {
 	EvidenceService           EvidenceServiceInterface
 	UserService               UserServiceInterface
 	CaseHandler               *CaseHandler
+	CaseDeletionHandler       *CaseDeletionHandler
 	CaseListHandler           *CaseListHandler
 	UploadHandler             *UploadHandler
 	DownloadHandler           *DownloadHandler
@@ -63,7 +64,7 @@ type Handler struct {
 	TenantRepo                registration.TenantRepository
 	UserRepo                  registration.UserRepository // Optional, if you have a user repository
 	NotificationService       *notification.NotificationService
-	HealthHandler			*HealthHandler
+	HealthHandler             *HealthHandler
 
 	ReportHandler       *ReportHandler       // Optional: Report generation handler
 	ReportStatusHandler *ReportStatusHandler // Optional: Report status update handler
@@ -84,6 +85,7 @@ func NewHandler(
 	evidenceSvc EvidenceServiceInterface,
 	userSvc UserServiceInterface,
 	caseHandler *CaseHandler,
+	caseDeletionHandler *CaseDeletionHandler,
 	uploadHandler *UploadHandler,
 	downloadHandler *DownloadHandler, // Optional, if you have a download handler
 	metadataHandler *MetadataHandler, // Optional, if you have a metadata handler
@@ -123,6 +125,7 @@ func NewHandler(
 		EvidenceService:           evidenceSvc,
 		UserService:               userSvc,
 		CaseHandler:               caseHandler,
+		CaseDeletionHandler:       caseDeletionHandler,
 		UploadHandler:             uploadHandler,
 		DownloadHandler:           downloadHandler,
 		MetadataHandler:           metadataHandler,

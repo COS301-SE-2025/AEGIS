@@ -7,6 +7,7 @@ import (
 	"aegis-api/services_/case/ListClosedCases"
 	"aegis-api/services_/case/case_assign"
 	"aegis-api/services_/case/case_creation"
+	"aegis-api/services_/case/listArchiveCases"
 
 	"fmt"
 	"net/http"
@@ -18,13 +19,14 @@ import (
 )
 
 type CaseHandler struct {
-	CaseService            CaseServiceInterface
-	ListCasesService       ListCasesService
-	ListActiveCasesServ    ListActiveCasesService
-	auditLogger            *auditlog.AuditLogger
-	ListClosedCasesService ListClosedCasesService
-	UpdateCaseService      *update_case.Service
-	UserRepo               case_assign.UserRepo // Add UserRepo here
+	CaseService              CaseServiceInterface
+	ListCasesService         ListCasesService
+	ListActiveCasesServ      ListActiveCasesService
+	auditLogger              *auditlog.AuditLogger
+	ListClosedCasesService   ListClosedCasesService
+	UpdateCaseService        *update_case.Service
+	UserRepo                 case_assign.UserRepo               // Add UserRepo here
+	ListArchivedCasesService listArchiveCases.ArchiveCaseLister // Add ListArchivedCasesService
 }
 type ListActiveCasesService interface {
 	ListActiveCases(userID, tenantID, teamID string) ([]ListActiveCases.ActiveCase, error)
@@ -32,6 +34,9 @@ type ListActiveCasesService interface {
 
 type ListClosedCasesService interface {
 	ListClosedCases(userID, tenantID, teamID string) ([]ListClosedCases.ClosedCase, error)
+}
+type ListArchivedCasesService interface {
+	ListArchivedCases(userID, tenantID, teamID string) ([]listArchiveCases.ArchivedCase, error)
 }
 
 type CaseServices struct {
@@ -93,18 +98,20 @@ func NewCaseHandler(
 	listCasesService ListCasesService,
 	listActiveCasesService ListActiveCasesService,
 	listClosedCasesService ListClosedCasesService,
+	listArchivedCasesService listArchiveCases.ArchiveCaseLister, // Add ListArchivedCasesService parameter
 	auditLogger *auditlog.AuditLogger,
 	userRepo case_assign.UserRepo, // Inject UserRepo here
 	updateCaseService *update_case.Service,
 ) *CaseHandler {
 	return &CaseHandler{
-		CaseService:            caseService,
-		ListCasesService:       listCasesService,
-		ListActiveCasesServ:    listActiveCasesService,
-		ListClosedCasesService: listClosedCasesService,
-		auditLogger:            auditLogger,
-		UserRepo:               userRepo, // Assign UserRepo
-		UpdateCaseService:      updateCaseService,
+		CaseService:              caseService,
+		ListCasesService:         listCasesService,
+		ListActiveCasesServ:      listActiveCasesService,
+		ListClosedCasesService:   listClosedCasesService,
+		ListArchivedCasesService: listArchivedCasesService, // Assign ListArchivedCasesService
+		auditLogger:              auditLogger,
+		UserRepo:                 userRepo, // Assign UserRepo
+		UpdateCaseService:        updateCaseService,
 	}
 }
 
