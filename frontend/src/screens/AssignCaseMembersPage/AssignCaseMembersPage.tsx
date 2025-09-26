@@ -158,7 +158,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                     onValueChange={(val) => handleMemberUserChange(idx, val)}
                     disabled={availableUsers.length === 0}
                   >
-                    <SelectTrigger className="bg-background border-border text-foreground w-full">
+                    <SelectTrigger className="bg-background border-border text-foreground w-full hover:bg-cyan-800">
                       <SelectValue
                         placeholder={
                           availableUsers.length === 0
@@ -178,7 +178,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                           .slice(0, 100)
                           .map((user) => (
                             <SelectItem key={user.id} value={user.name}>
-                              {user.name}
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-cyan-700 text-white flex items-center justify-center font-bold text-xs">
+                                  {user.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                                </div>
+                                <span className="font-semibold text-foreground">{user.name}</span>
+                              </div>
                             </SelectItem>
                           ))
                       )}
@@ -199,7 +204,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                     value={dfirRoles.includes(member.role) ? member.role : ""}
                     onValueChange={(val: string) => handleMemberRoleChange(idx, val)}
                   >
-                    <SelectTrigger className="bg-background border-border text-foreground w-full">
+                    <SelectTrigger className="bg-background border-border text-foreground w-full hover:bg-cyan-800">
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent
@@ -210,7 +215,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                     >
                       {dfirRoles.slice(0, 100).map((role) => (
                         <SelectItem key={role} value={role}>
-                          {role}
+                          <span className="inline-block px-2 py-1 rounded bg-cyan-800 text-cyan-100 font-semibold text-xs">{role}</span>
                         </SelectItem>
                       ))}
                       {dfirRoles.length > 100 && (

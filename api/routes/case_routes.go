@@ -44,7 +44,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 	auth.POST("/accept-terms", h.AdminService.AcceptTerms)
 
 	// ─── Registration ────────────────────────────────
-	api.POST("/register", middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.AdminService.RegisterUser)
+	api.POST("/register", middleware.AuthMiddleware(), middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.AdminService.RegisterUser)
 	api.POST("/register/tenant", middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.AdminService.RegisterTenantUser)
 	api.POST("/register/team", middleware.AuthMiddleware(), middleware.RequireRole("Tenant Admin"), h.AdminService.RegisterTeamUser)
 	api.GET("/teams/:id", h.GetTeamByID)
