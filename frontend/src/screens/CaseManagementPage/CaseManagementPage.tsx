@@ -77,7 +77,7 @@ const getPriorityStyle = (priority: string) => {
 const { caseId } = useParams<{ caseId: string }>();
 
 
-const API_URL = "http://localhost:8080/api/v1";
+const API_URL = "https://localhost/api/v1";
 
 const navigate = useNavigate();
 
@@ -89,7 +89,7 @@ useEffect(() => {
     if (!caseId) return;
     try {
       const token = sessionStorage.getItem("authToken");
-      const res = await fetch(`http://localhost:8080/api/v1/cases/${caseId}`, {
+      const res = await fetch(`https://localhost/api/v1/cases/${caseId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -160,7 +160,7 @@ useEffect(() => {
     if (!caseId) return;
     try {
       const token = sessionStorage.getItem("authToken");
-      const res = await fetch(`http://localhost:8080/api/v1/cases/${caseId}/collaborators`, {
+      const res = await fetch(`https://localhost/api/v1/cases/${caseId}/collaborators`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"
@@ -196,7 +196,7 @@ useEffect(() => {
     if (!caseId) return;
     try {
       const token = sessionStorage.getItem("authToken");
-      const res = await fetch(`http://localhost:8080/api/v1/evidence-metadata/case/${caseId}`, {
+      const res = await fetch(`https://localhost/api/v1/evidence-metadata/case/${caseId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -289,7 +289,7 @@ useEffect(() => {
     const fetchProfile = async () => {
       try {
         const token = sessionStorage.getItem("authToken");
-        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
+        const res = await fetch(`https://localhost/api/v1/profile/${user?.id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -489,7 +489,7 @@ const handleViewReport = async () => {
                   src={
                     user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `http://localhost:8080${user.image_url}`
+                      : `https://localhost${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -552,7 +552,7 @@ const handleViewReport = async () => {
                     src={
                       user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `http://localhost:8080${user.image_url}`
+                        : `https://localhost${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"

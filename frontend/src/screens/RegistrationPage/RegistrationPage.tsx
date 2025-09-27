@@ -34,7 +34,7 @@ useEffect(() => {
         return;
       }
 
-      const res = await fetch(`http://localhost:8080/api/v1/teams/${teamId}`, {
+      const res = await fetch(`https://localhost/api/v1/teams/${teamId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

@@ -11,6 +11,7 @@ import (
 	"aegis-api/structs"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -63,7 +64,7 @@ type Handler struct {
 	TenantRepo                registration.TenantRepository
 	UserRepo                  registration.UserRepository // Optional, if you have a user repository
 	NotificationService       *notification.NotificationService
-	HealthHandler			*HealthHandler
+	HealthHandler             *HealthHandler
 
 	ReportHandler       *ReportHandler       // Optional: Report generation handler
 	ReportStatusHandler *ReportStatusHandler // Optional: Report status update handler
@@ -161,10 +162,12 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 	for k, v := range c.Request.Header {
 		fmt.Printf("[DEBUG] Header: %s = %v\n", k, v)
 	}
+
 	var req struct {
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required"`
 	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fmt.Printf("[DEBUG] Body bind error: %v\n", err)
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -173,16 +176,21 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 		})
 		return
 	}
+
 	fmt.Printf("[DEBUG] Body: email=%s, password=%s\n", req.Email, req.Password)
 
+	// Add detailed error handling around the service call
 	resp, err := h.authService.Login(req.Email, req.Password)
-	status := "SUCCESS"
 	if err != nil {
-		status = "FAILED"
+		// Log the actual error details
+		fmt.Printf("[ERROR] Login service error: %v\n", err)
+		fmt.Printf("[ERROR] Error type: %T\n", err)
+
+		status := "FAILED"
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action: "LOGIN_ATTEMPT",
 			Actor: auditlog.Actor{
-				ID:   "", // Unknown until login successful
+				ID:   "",
 				Role: "",
 			},
 			Target: auditlog.Target{
@@ -191,16 +199,26 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 			},
 			Service:     "auth",
 			Status:      status,
-			Description: "Failed login attempt",
+			Description: fmt.Sprintf("Failed login attempt: %v", err),
 		})
-		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
-			Error:   "authentication_failed",
-			Message: "Invalid email or password",
-		})
+
+		// Return 500 if it's an unexpected error, 401 for auth failures
+		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+				Error:   "authentication_failed",
+				Message: "Invalid email or password",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "internal_error",
+				Message: "An internal error occurred",
+			})
+		}
 		return
 	}
 
 	// Log successful attempt
+	status := "SUCCESS"
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action: "LOGIN_ATTEMPT",
 		Actor: auditlog.Actor{

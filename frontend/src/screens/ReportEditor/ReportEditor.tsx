@@ -67,7 +67,7 @@ type ConfirmOpts = {
 };
 
 //type Section = { id: string; title: string; content: string; order: number; updated_at?: string }
-const API_URL = "http://localhost:8080/api/v1";
+const API_URL = "https://localhost/api/v1";
 
 
 async function putReportStatus(reportId: string, status: "draft" | "review" | "published") {

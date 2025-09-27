@@ -19,7 +19,7 @@ export const EnhancedEditor: React.FC<EnhancedEditorProps> = ({
   onChange,
   placeholder = "Start writing your report content here...",
   caseId,
-  apiBaseUrl = 'http://localhost:8080/api/v1'
+  apiBaseUrl = 'https://localhost/api/v1'
 }) => {
   const quillRef = useRef<ReactQuill>(null);
   const [showMentions, setShowMentions] = useState(false);
@@ -108,10 +108,12 @@ export const EnhancedEditor: React.FC<EnhancedEditorProps> = ({
      // const editorRect = quill.container.getBoundingClientRect();
       const editorRect = quill.root.getBoundingClientRect();
       
-      setMentionPosition({
-        x: editorRect.left + bounds.left,
-        y: editorRect.top + bounds.top + bounds.height
-      });
+      if (bounds) {
+        setMentionPosition({
+          x: editorRect.left + bounds.left,
+          y: editorRect.top + bounds.top + bounds.height
+        });
+      }
       
       setMentionStartIndex(mentionStart);
       setMentionQuery(currentQuery);

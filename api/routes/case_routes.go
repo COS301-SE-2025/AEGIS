@@ -92,6 +92,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 		protected.GET("/tenants/:tenantId/cases/:case_id/ioc-graph", middleware.AuthMiddleware(), h.IOCHandler.GetCaseIOCGraph)
 		protected.POST("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.AddIOCToCase)
+		protected.GET("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.GetIOCsByCase)
 		// ______timeline routes______________
 		// List all events for a case
 		protected.GET("/cases/:case_id/timeline", middleware.AuthMiddleware(), h.TimelineHandler.ListByCase)

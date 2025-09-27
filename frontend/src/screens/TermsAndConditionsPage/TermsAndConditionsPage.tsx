@@ -10,7 +10,7 @@ export const TermsAndConditionsPage = () => {
   const token = searchParams.get("token");
 
   const handleSubmit = () => {
-    fetch("http://localhost:8080/api/auth/accept-terms", {
+    fetch("https://localhost/api/auth/accept-terms", {
        method: "POST", 
        headers: { "Content-Type": "application/json" }, 
        body: JSON.stringify({ token }) })

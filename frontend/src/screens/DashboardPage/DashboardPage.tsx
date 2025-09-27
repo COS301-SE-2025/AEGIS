@@ -168,10 +168,10 @@ useEffect(() => {
       let responseKey = "";
 
       if (activeTab === "active") {
-        endpoint = "http://localhost:8080/api/v1/cases/active";
+        endpoint = "https://localhost/api/v1/cases/active";
         responseKey = "cases";
       } else if (activeTab === "closed") {
-        endpoint = "http://localhost:8080/api/v1/cases/closed";
+        endpoint = "https://localhost/api/v1/cases/closed";
         responseKey = "closed_cases";
       }
 
@@ -235,7 +235,7 @@ useEffect(() => {
 
   const fetchEvidenceCount = async () => {
     try {
-      const res = await fetch(`http://localhost:8080/api/v1/evidence/count/${tenantId}`, {
+      const res = await fetch(`https://localhost/api/v1/evidence/count/${tenantId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -305,7 +305,7 @@ useEffect(() => {
   const fetchRecentActivities = async () => {
     try {
       const token = sessionStorage.getItem("authToken") || "";
-      const res = await fetch(`http://localhost:8080/api/v1/auditlogs/recent/${user.id}`, {
+      const res = await fetch(`https://localhost/api/v1/auditlogs/recent/${user.id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -336,10 +336,10 @@ useEffect(() => {
 
     try {
       const [openRes, closedRes] = await Promise.all([
-        fetch("http://localhost:8080/api/v1/cases/filter?status=open", {
+        fetch("https://localhost/api/v1/cases/filter?status=open", {
           headers: { "Authorization": `Bearer ${token}` }
         }),
-        fetch("http://localhost:8080/api/v1/cases/filter?status=closed", {
+        fetch("https://localhost/api/v1/cases/filter?status=closed", {
           headers: { "Authorization": `Bearer ${token}` }
         }),
       ]);
@@ -404,7 +404,7 @@ const handleSaveCase = async () => {
   const token = sessionStorage.getItem("authToken") || "";
   
   try {
-    const res = await fetch(`http://localhost:8080/api/v1/cases/${editingCase.id}`, {
+    const res = await fetch(`https://localhost/api/v1/cases/${editingCase.id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -478,7 +478,7 @@ const handleSaveCase = async () => {
     const fetchProfile = async () => {
       try {
         const token = sessionStorage.getItem("authToken");
-        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
+        const res = await fetch(`https://localhost/api/v1/profile/${user?.id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -599,7 +599,7 @@ useEffect(() => {
                   src={
                     user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `http://localhost:8080${user.image_url}`
+                      : `https://localhost${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -683,7 +683,7 @@ useEffect(() => {
                     src={
                       user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `http://localhost:8080${user.image_url}`
+                        : `https://localhost${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"
@@ -920,7 +920,7 @@ useEffect(() => {
                             const token = sessionStorage.getItem("authToken") || "";
 
                             try {
-                              const res = await fetch(`http://localhost:8080/api/v1/cases/${card.id}`, {
+                              const res = await fetch(`https://localhost/api/v1/cases/${card.id}`, {
                                 method: "PATCH",
                                 headers: {
                                   "Content-Type": "application/json",

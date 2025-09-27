@@ -150,9 +150,9 @@ export const connectWebSocket = (
     return;
   }
 
-  const ws = new WebSocket(`ws://localhost:8080/ws/cases/${caseId}?token=${token}`);
-
-  ws.onopen = () => {
+// ✅ CORRECT - use query parameter
+const ws = new WebSocket(`wss://localhost:8443/ws/cases/${caseId}?token=${encodeURIComponent(token)}`);  
+ws.onopen = () => {
     console.log("✅ WebSocket connected");
     onOpen?.(); // Optional callback
   };
@@ -330,7 +330,7 @@ useEffect(() => {
   useEffect(() => {
     const fetchActiveCases = async () => {
       try {
-        const res = await fetch("http://localhost:8080/api/v1/cases/filter?status=open", {
+        const res = await fetch("https://localhost/api/v1/cases/filter?status=open", {
           headers: {
             Authorization: `Bearer ${sessionStorage.getItem("authToken") || ""}`,
           },
@@ -509,7 +509,7 @@ const sendTypingNotification = (type: "typing_start" | "typing_stop") => {
 //     if (!activeChat?.caseId) return;
 
 //      // Replace with actual token retrieval logic
-//     const socket = new WebSocket(`ws://localhost:8080/ws/cases/${activeChat.caseId}?token=${token}`);
+//     const socket = new WebSocket(`wss://localhost:8443/ws/cases/${activeChat.caseId}?token=${token}`);
 //     socketRef.current = socket;
 
 //     socket.onmessage = (event) => {
@@ -558,7 +558,7 @@ const handleGroupImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) =>
   formData.append('group_url', file);
 
   try {
-    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/image`, {
+    const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/image`, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -621,7 +621,7 @@ const fetchGroups = async () => {
   console.log("Calling fetchGroups with:", userEmail, token);
   if (token && userEmail) {
     try {
-      const res = await fetch(`http://localhost:8080/api/v1/chat/groups/user/${userEmail}`, {
+      const res = await fetch(`https://localhost/api/v1/chat/groups/user/${userEmail}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log("Response status:", res.status);
@@ -671,7 +671,7 @@ const sendMessage = async () => {
   if (!activeChat || !message.trim()) return;
 
   try {
-    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
+    const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/messages`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -742,7 +742,7 @@ const sendWebSocketMessage = async () => {
 
   // persist to database first regardless
   try {
-    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
+    const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/messages`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -873,7 +873,7 @@ const sendAttachment = async () => {
     }
 
     try {
-      const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/messages`, {
+      const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/messages`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -962,7 +962,7 @@ const handleCreateGroup = async (e?: React.MouseEvent | React.KeyboardEvent) => 
   if (!newGroupName.trim() || !selectedCaseId) return;
 
   try {
-    const res = await fetch('http://localhost:8080/api/v1/chat/groups', {
+    const res = await fetch('https://localhost/api/v1/chat/groups', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1061,7 +1061,7 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
   }
 
   try {
-    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/members`, {
+    const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/members`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1130,7 +1130,7 @@ const loadMessages = async (groupId: number) => {
     return;
   }
   try {
-    const res = await fetch(`http://localhost:8080/api/v1/chat/groups/${groupId}/messages`, {
+    const res = await fetch(`https://localhost/api/v1/chat/groups/${groupId}/messages`, {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -1259,7 +1259,7 @@ const updateGroup = async () => {
     return;
   }
   try {
-    await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}`, {
+    await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}`, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1295,7 +1295,7 @@ const removeGroupLocally = (groupId: number) => {
 const handleLeaveGroup = async () => {
   if (!activeChat) return;
   try {
-    await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}/members/${userEmail}`, {
+    await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/members/${userEmail}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -1311,7 +1311,7 @@ useEffect(() => {
 
   const fetchCollaborators = async () => {
     try {
-      const res = await fetch(`http://localhost:8080/api/v1/cases/${activeChat.caseId}/collaborators`, {
+      const res = await fetch(`https://localhost/api/v1/cases/${activeChat.caseId}/collaborators`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -1358,7 +1358,7 @@ const handleOpenAddMembersModal = async () => {
   }
 
   try {
-    const res = await fetch(`http://localhost:8080/api/v1/cases/${activeChat.caseId}/collaborators`, {
+    const res = await fetch(`https://localhost/api/v1/cases/${activeChat.caseId}/collaborators`, {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -1391,7 +1391,7 @@ const handleOpenAddMembersModal = async () => {
 const handleDeleteGroup = async () => {
   if (!activeChat) return;
   try {
-    await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}`, {
+    await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` }
     });

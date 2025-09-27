@@ -67,7 +67,7 @@ const [reports, setReports] = useState<ReportWithDetails[]>([]);
   // Change from Axios.AxiosResponse to axios.AxiosResponse (lowercase)
 
   // API URL - make sure to update with the correct URL
-  const API_URL = 'http://localhost:8080/api/v1';
+  const API_URL = 'https://localhost/api/v1';
 const getTeamIdFromSession = (): string => {
   try {
     const raw = sessionStorage.getItem("user");

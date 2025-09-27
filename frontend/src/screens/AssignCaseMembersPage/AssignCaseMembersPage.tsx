@@ -33,7 +33,7 @@ export function AssignCaseMembersForm(): JSX.Element {
 useEffect(() => {
   const fetchUsers = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/v1/users", {
+      const res = await fetch("https://localhost/api/v1/users", {
         headers: {
           "Authorization": `Bearer ${sessionStorage.getItem("authToken") || ""}`
         }
@@ -108,7 +108,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         throw new Error(`Could not find user ID for ${member.user}`);
       }
 
-      const res = await fetch("http://localhost:8080/api/v1/cases/assign", {
+      const res = await fetch("https://localhost/api/v1/cases/assign", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

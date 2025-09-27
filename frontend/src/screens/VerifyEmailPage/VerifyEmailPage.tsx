@@ -14,7 +14,7 @@ export const VerifyEmailPage = () => {
       return;
     }
 
-    fetch(`http://localhost:8080/api/v1/auth/verify?token=${encodeURIComponent(token)}`, {
+    fetch(`https://localhost/api/v1/auth/verify?token=${encodeURIComponent(token)}`, {
       method: "GET",
     })
       .then((response) => {

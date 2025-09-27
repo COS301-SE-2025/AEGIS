@@ -184,7 +184,7 @@ function getCustodyDetails(chainOfCustody: any[]) {
     notes: first?.forensic_info?.notes || "",
   };
 }
-const BASE_URL = "http://localhost:8080/api/v1";
+const BASE_URL = "https://localhost/api/v1";
   const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
@@ -786,7 +786,7 @@ if (!caseId || caseId === "undefined") {
                   src={
                     user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `http://localhost:8080${user.image_url}`
+                      : `https://localhost${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -860,7 +860,7 @@ if (!caseId || caseId === "undefined") {
                     src={
                       user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `http://localhost:8080${user.image_url}`
+                        : `https://localhost${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"
@@ -935,7 +935,7 @@ if (!caseId || caseId === "undefined") {
                   src={
                     user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `http://localhost:8080${user.image_url}`
+                      : `https://localhost${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -1004,7 +1004,7 @@ if (!caseId || caseId === "undefined") {
                     src={
                       user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `http://localhost:8080${user.image_url}`
+                        : `https://localhost${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"

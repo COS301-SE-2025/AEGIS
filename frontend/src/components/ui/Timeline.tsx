@@ -4,7 +4,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 
-const BASE_URL = "http://localhost:8080/api/v1";
+const BASE_URL = "https://localhost/api/v1";
 const LOCAL_AI_URL = "http://localhost:5000/api/v1"; // Our Flask app
 
 
