@@ -63,7 +63,7 @@ const handleChange = (e) => {
         setErrors({ general: "No auth token found, please login again" });
         return;
       }
-      const res = await fetch("http://localhost:8080/api/v1/register", {
+      const res = await fetch("https://localhost/api/v1/register", {
          method: "POST",
         headers: {
           "Content-Type": "application/json",
