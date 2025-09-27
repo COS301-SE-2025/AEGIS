@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 )
@@ -278,7 +279,7 @@ func extractCaseIDFromPath(path string) string {
 func GetJWTSecret() []byte {
 	return []byte(os.Getenv("JWT_SECRET_KEY"))
 }
-func (h *Hub) HandleConnection(w http.ResponseWriter, r *http.Request) error {
+func (h *Hub) HandleConnection(w http.ResponseWriter, r *http.Request, c *gin.Context) error {
 	tokenString := r.URL.Query().Get("token")
 	if tokenString == "" {
 		http.Error(w, "Missing token", http.StatusUnauthorized)
