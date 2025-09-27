@@ -1,18 +1,16 @@
-
 package handlers
 
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"aegis-api/services_/evidence/evidence_viewer"
+
+	"github.com/gin-gonic/gin"
 )
 
 type EvidenceViewerHandler struct {
 	Service *evidence_viewer.EvidenceService
 }
-
-
 
 func NewEvidenceViewerHandler(svc *evidence_viewer.EvidenceService) *EvidenceViewerHandler {
 	return &EvidenceViewerHandler{Service: svc}
@@ -37,7 +35,6 @@ func (h *EvidenceViewerHandler) GetEvidenceByCaseID(c *gin.Context) {
 		return
 	}
 
-	
 	c.JSON(http.StatusOK, gin.H{"files": files})
 }
 
@@ -60,7 +57,6 @@ func (h *EvidenceViewerHandler) GetEvidenceByID(c *gin.Context) {
 		return
 	}
 
-	
 	c.Data(http.StatusOK, "application/octet-stream", file.Data)
 }
 

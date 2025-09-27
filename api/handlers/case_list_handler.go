@@ -9,6 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Add the CaseHandler struct definition if not present, or update it:
+
 func getActorFromContext(c *gin.Context) auditlog.Actor {
 	userID, _ := c.Get("userID")
 	userRole, _ := c.Get("userRole")
@@ -208,8 +210,38 @@ func (h *CaseHandler) GetCaseByIDHandler(c *gin.Context) {
 		Target:      auditlog.Target{Type: "case_details", ID: caseID},
 		Service:     "case",
 		Status:      "SUCCESS",
-		Description: "Retrieved case details successfully",
+		Description: fmt.Sprintf("Retrieved case %s", caseID),
 	})
 
 	c.JSON(http.StatusOK, gin.H{"case": caseDetails})
+}
+
+// GET /cases/archived
+func (h *CaseHandler) ListArchivedCasesHandler(c *gin.Context) {
+	actor := getActorFromContext(c)
+	userID, _ := c.Get("userID")
+	tenantID, _ := c.Get("tenantID")
+	teamID, _ := c.Get("teamID")
+	cases, err := h.ListArchivedCasesService.ListArchivedCases(userID.(string), tenantID.(string), teamID.(string))
+	if err != nil {
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action:      "LIST_ARCHIVED_CASES",
+			Actor:       actor,
+			Target:      auditlog.Target{Type: "case_archived_listing"},
+			Service:     "case",
+			Status:      "FAILED",
+			Description: "Failed to list archived cases: " + err.Error(),
+		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not retrieve archived cases"})
+		return
+	}
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action:      "LIST_ARCHIVED_CASES",
+		Actor:       actor,
+		Target:      auditlog.Target{Type: "case_archived_listing"},
+		Service:     "case",
+		Status:      "SUCCESS",
+		Description: "Retrieved archived cases successfully",
+	})
+	c.JSON(http.StatusOK, gin.H{"archived_cases": cases})
 }

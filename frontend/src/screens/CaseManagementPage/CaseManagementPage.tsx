@@ -17,12 +17,13 @@ import {ShareButton} from "../ShareCasePage/sharecasebutton";
 //
 import { useParams } from 'react-router-dom';
 
-import axios from "axios";
 
 import { ClipboardList } from "lucide-react";
 
 
 import { InvestigationTimeline } from "../../components/ui/Timeline";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export const CaseManagementPage = () => {
 const storedUser = sessionStorage.getItem("user");
@@ -152,7 +153,7 @@ useEffect(() => {
   }
 }, [role]);
 
-const [assignedMembers, setAssignedMembers] = useState<{ name: string; role: string }[]>([]);
+const [assignedMembers, setAssignedMembers] = useState<{ id: string; name: string; role: string }[]>([]);
 const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
 
 useEffect(() => {
@@ -178,6 +179,7 @@ useEffect(() => {
 
       // 🔁 Map backend fields to your frontend structure
       const normalized = (data.data || []).map((collab: any) => ({
+        id: collab.id || collab.user_id || collab.assignee_id, // ensure id is present
         name: collab.full_name,
         role: collab.role
       }));
@@ -435,6 +437,7 @@ const handleViewReport = async () => {
 
   return (
     <div className="min-h-screen bg-background">
+  <ToastContainer position="top-center" aria-label="Notification Toasts" />
       {/* Left Sidebar - Fixed */}
       <div className="fixed left-0 top-0 h-full w-80 bg-background border-r border p-6 flex flex-col z-10">
         {/* Logo */}
@@ -707,6 +710,56 @@ const handleViewReport = async () => {
                             ({member.role})
                           </span>
                         </div>
+                        {/* Unassign button for DFIR Admins */}
+                        {isDFIRAdmin && member.id && (
+                          <button
+                            className="ml-2 px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                            title="Unassign member"
+                            onClick={() => {
+                              if (!caseId) return;
+                              toast.info(
+                                <span>
+                                  Unassign <b>{member.name}</b> from this case?
+                                  <button
+                                    style={{ marginLeft: 12, color: '#fff', background: '#d32f2f', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      toast.dismiss();
+                                      try {
+                                        const token = sessionStorage.getItem("authToken") || "";
+                                        const res = await fetch("http://localhost:8080/api/v1/cases/unassign", {
+                                          method: "POST",
+                                          headers: {
+                                            "Authorization": `Bearer ${token}`,
+                                            "Content-Type": "application/json"
+                                          },
+                                          body: JSON.stringify({
+                                            assignee_id: member.id,
+                                            case_id: caseId
+                                          })
+                                        });
+                                        if (!res.ok) {
+                                          const err = await res.text();
+                                          throw new Error(err || "Failed to unassign member");
+                                        }
+                                        setAssignedMembers(prev => prev.filter((_, i) => i !== index));
+                                        toast.success(`${member.name} unassigned from case.`);
+                                      } catch (err) {
+                                        toast.error("Failed to unassign member. See console for details.");
+                                        console.error(err);
+                                      }
+                                    }}
+                                  >
+                                    Confirm
+                                  </button>
+                                </span>,
+                                { autoClose: false, closeOnClick: false, closeButton: true }
+                              );
+                            }}
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
                     ))
                   ) : (

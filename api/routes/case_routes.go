@@ -44,7 +44,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 	auth.POST("/accept-terms", h.AdminService.AcceptTerms)
 
 	// ─── Registration ────────────────────────────────
-	api.POST("/register", middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.AdminService.RegisterUser)
+	api.POST("/register", middleware.AuthMiddleware(), middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.AdminService.RegisterUser)
 	api.POST("/register/tenant", middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.AdminService.RegisterTenantUser)
 	api.POST("/register/team", middleware.AuthMiddleware(), middleware.RequireRole("Tenant Admin"), h.AdminService.RegisterTeamUser)
 	api.GET("/teams/:id", h.GetTeamByID)
@@ -83,6 +83,10 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.POST("/cases/unassign", h.CaseHandler.UnassignUserFromCase)
 		protected.GET("/cases/closed", h.CaseHandler.ListClosedCasesHandler)
 		protected.PATCH("/cases/:case_id", h.CaseHandler.UpdateCaseHandler)
+		// Archive case (move to archived tab)
+		protected.PATCH("/cases/:case_id/archive", h.CaseDeletionHandler.ArchiveCaseHandler)
+		// List archived cases
+		protected.GET("/cases/archived", h.CaseHandler.ListArchivedCasesHandler)
 
 		// ─── New List / Filter Cases ──────────────────
 		protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)
@@ -117,6 +121,8 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.GET("/evidence/count/:tenantId", h.EvidenceHandler.GetEvidenceCount)
 		// ─── Admin: Users ────────────────────────────
 		protected.GET("/users", h.AdminService.ListUsers)
+		protected.GET("tenants/:tenantId/users", middleware.AuthMiddleware(), h.AdminService.ListUsersByTenant)
+		protected.DELETE("/users/:userId", h.AdminService.DeleteUserHandler)
 
 		// ─── Profile Routes ──────────────────────────
 		protected.GET("/profile/:userID", h.ProfileHandler.GetProfileHandler)
@@ -144,7 +150,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		RegisterChatRoutes(protected, h.ChatHandler)
 
 		// ─── Evidence Viewer + Tagging ────────────────
-		RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.PermissionChecker)
+		RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.MetadataHandler, h.PermissionChecker)
 
 		RegisterCaseTagRoutes(protected, h.CaseTagHandler, h.PermissionChecker)
 

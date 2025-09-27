@@ -64,9 +64,9 @@ const [updatedTitle, setUpdatedTitle] = useState("");
 const [updatedDescription, setUpdatedDescription] = useState("");
 
 
-const [openCases, setOpenCases] = useState([]);
-const [closedCases, setClosedCases] = useState([]);
-const [archivedCases] = useState([]); // <-- Add this line
+const [openCases, setOpenCases] = useState<CaseCard[]>([]);
+const [closedCases, setClosedCases] = useState<CaseCard[]>([]);
+const [archivedCases, setArchivedCases] = useState<CaseCard[]>([]);
 const [evidenceCount, setEvidenceCount] = useState(0);
 const [evidenceError, setEvidenceError] = useState<string | null>(null);
 const [searchQuery, setSearchQuery] = useState("");
@@ -174,6 +174,10 @@ useEffect(() => {
         endpoint = "https://localhost/api/v1/cases/closed";
         responseKey = "closed_cases";
       }
+      else if (activeTab === "archived") {
+        endpoint = "http://localhost:8080/api/v1/cases/archived";
+        responseKey = "archived_cases";
+      }
 
       const res = await fetch(endpoint, {
         headers: {
@@ -194,6 +198,7 @@ useEffect(() => {
         team_name: c.team_name,
         creator: c.created_by,
         priority: c.priority,
+        status: c.status,
         description: c.description,
         lastActivity: c.created_at,
         investigation_stage: c.investigation_stage || "Triage",
@@ -330,9 +335,9 @@ useEffect(() => {
 }, []);
 
 
-useEffect(() => {
-  const fetchCasesCount = async () => {
-    const token = sessionStorage.getItem("authToken") || "";
+                            useEffect(() => {
+                              const fetchCasesCount = async () => {
+                              const token = sessionStorage.getItem("authToken") || "";
 
     try {
       const [openRes, closedRes] = await Promise.all([
@@ -344,37 +349,38 @@ useEffect(() => {
         }),
       ]);
 
-      const openData = await openRes.json();
-      const closedData = await closedRes.json();
+                                const openData = await openRes.json();
+                                const closedData = await closedRes.json();
+                                const archivedData = await archivedRes.json();
 
-      setOpenCases(openData.cases || []);
-      setClosedCases(closedData.cases || []);
+                                setOpenCases(openData.cases || []);
+                                setClosedCases(closedData.cases || []);
+                                setArchivedCases(archivedData.cases || []);
 
-      // Update tile values
-      setAvailableTiles(prev => prev.map(tile => {
-        switch(tile.id) {
-          case 'ongoing-cases':
-            return { ...tile, value: (openData.cases || []).length.toString() };
-          case 'closed-cases':
-            return { ...tile, value: (closedData.cases || []).length.toString() };
-          case 'evidence-count':
-            // Only update if evidenceCount is still zero (not set by backend)
-            return tile.value === "0"
-              ? { ...tile, value: evidenceCount.toString() }
-              : tile;
-          default:
-            return tile;
-        }
-      }));
+                                // Update tile values
+                                setAvailableTiles(prev => prev.map(tile => {
+                                  switch(tile.id) {
+                                    case 'ongoing-cases':
+                                      return { ...tile, value: (openData.cases || []).length.toString() };
+                                    case 'closed-cases':
+                                      return { ...tile, value: (closedData.cases || []).length.toString() };
+                                    case 'evidence-count':
+                                      // Only update if evidenceCount is still zero (not set by backend)
+                                      return tile.value === "0"
+                                        ? { ...tile, value: evidenceCount.toString() }
+                                        : tile;
+                                    default:
+                                      return tile;
+                                  }
+                                }));
 
-    } catch (error) {
-      console.error("Failed to fetch cases:", error);
-    }
-  };
+                              } catch (error) {
+                                console.error("Failed to fetch cases:", error);
+                              }
+                            };
 
-  fetchCasesCount();
-}, []);
-
+                            fetchCasesCount();
+                          }, []);
 
 // Define getIcon ABOVE the .map
 const getIcon = (action: string) => {
@@ -423,9 +429,10 @@ const handleSaveCase = async () => {
     const data = await res.json();
     console.log("Case updated:", data);
 
+    // Remove the edit modal
     setEditingCase(null);
 
-    //  Update the list locally using backend progress value
+    // Update the caseCards list locally
     setCaseCards(prev =>
       prev.map(c =>
         c.id === editingCase.id
@@ -435,13 +442,84 @@ const handleSaveCase = async () => {
               description: updatedDescription,
               status: updatedStatus,
               investigation_stage: updatedStage,
-              progress: getProgressForStage(updatedStage), // Update progress based on stage
+              progress: getProgressForStage(updatedStage),
             }
           : c
       )
     );
 
-    //alert("Case updated successfully!");
+    // Update openCases state to always reflect cases with status 'open' or 'ongoing'
+    setOpenCases(prev => {
+      const filtered = prev.filter(c => c.id !== editingCase.id);
+      if (updatedStatus === "open" || updatedStatus === "ongoing") {
+        return [
+          ...filtered,
+          {
+            ...editingCase!,
+            title: updatedTitle,
+            description: updatedDescription,
+            status: updatedStatus,
+            investigation_stage: updatedStage,
+            progress: getProgressForStage(updatedStage),
+          },
+        ];
+      }
+      return filtered;
+    });
+
+    // Update closedCases state to always reflect cases with status 'closed'
+    setClosedCases(prev => {
+      const filtered = prev.filter(c => c.id !== editingCase.id);
+      if (updatedStatus === "closed") {
+        return [
+          ...filtered,
+          {
+            ...editingCase!,
+            title: updatedTitle,
+            description: updatedDescription,
+            status: updatedStatus,
+            investigation_stage: updatedStage,
+            progress: getProgressForStage(updatedStage),
+          },
+        ];
+      }
+      return filtered;
+    });
+
+    // If status changed, switch tab so the card moves immediately
+    let newTab = "active";
+    if (updatedStatus === "closed") {
+      newTab = "closed";
+    } else if (updatedStatus === "archived") {
+      newTab = "archived";
+    } else if (updatedStatus === "open" || updatedStatus === "ongoing") {
+      newTab = "active";
+    }
+    setActiveTab(newTab);
+
+    // Update dashboard tile counts immediately
+    setAvailableTiles(prev => prev.map(tile => {
+      let count = parseInt(tile.value, 10);
+      // Ongoing cases
+      if (tile.id === "ongoing-cases") {
+        if (editingCase?.status === "open" || editingCase?.status === "ongoing") count--;
+        if (newTab === "active") count++;
+        return { ...tile, value: Math.max(count, 0).toString() };
+      }
+      // Closed cases
+      if (tile.id === "closed-cases") {
+        if (editingCase?.status === "closed") count--;
+        if (newTab === "closed") count++;
+        return { ...tile, value: Math.max(count, 0).toString() };
+      }
+      // Archived cases (if you have a tile for it)
+      if (tile.id === "archived-cases") {
+        if (editingCase?.status === "archived") count--;
+        if (newTab === "archived") count++;
+        return { ...tile, value: Math.max(count, 0).toString() };
+      }
+      return tile;
+    }));
   } catch (err) {
     console.error("Error updating case:", err);
    // alert("Failed to update case");
@@ -845,7 +923,7 @@ useEffect(() => {
                       : "bg-primary/10 text-primary border border-primary"
                   )}
                 >
-                  Active Cases ({openCases.length})
+                  Active Cases ({(openCases as CaseCard[]).filter(c => c.status === "open" || c.status === "ongoing").length})
                 </button>
                 <button
                   onClick={() => setActiveTab("archived")}
@@ -870,11 +948,13 @@ useEffect(() => {
                   Closed Cases ({closedCases.length})
                 </button>
               </div>
-              <Link to="/create-case">
-                <button className="bg-primary text-primary-foreground text-sm px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
-                  Create Case
-                </button>
-              </Link>
+              {isDFIRAdmin && (
+                <Link to="/create-case">
+                  <button className="bg-primary text-primary-foreground text-sm px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                    Create Case
+                  </button>
+                </Link>
+              )}
             </div>
 
             {caseCards.length === 0 ? (
@@ -897,27 +977,28 @@ useEffect(() => {
                       className="relative flex flex-col justify-between items-center w-[460px] h-[450px] p-4 bg-card border border-border rounded-lg shadow"
                     >
                       <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2 z-10">
-                        {/* Edit button (below) */}
-                        <button
-                          onClick={() => {
-                            setEditingCase(card);
-                            setUpdatedStatus(card.status || "open");
-                            setUpdatedStage(card.investigation_stage || "Triage");
-                            setUpdatedTitle(card.title);
-                            setUpdatedDescription(card.description);
-                          }}
-                          className="text-muted-foreground hover:text-primary transition-colors"
-                          title="Edit Case"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        {/* Delete button  */}
-                        <button
-                          onClick={async () => {
-                            const confirmed = window.confirm("Are you sure you want to archive this case?");
-                            if (!confirmed) return;
+                        {/* Edit and Delete buttons are disabled in Archived tab */}
+                        {activeTab !== "archived" ? (
+                          <>
+                            <button
+                              onClick={() => {
+                                setEditingCase(card);
+                                setUpdatedStatus(card.status || "open");
+                                setUpdatedStage(card.investigation_stage || "Triage");
+                                setUpdatedTitle(card.title);
+                                setUpdatedDescription(card.description);
+                              }}
+                              className="text-muted-foreground hover:text-primary transition-colors"
+                              title="Edit Case"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                const confirmed = window.confirm("Are you sure you want to archive this case?");
+                                if (!confirmed) return;
 
-                            const token = sessionStorage.getItem("authToken") || "";
+                                const token = sessionStorage.getItem("authToken") || "";
 
                             try {
                               const res = await fetch(`https://localhost/api/v1/cases/${card.id}`, {
@@ -929,22 +1010,39 @@ useEffect(() => {
                                 body: JSON.stringify({ status: "archived" }),
                               });
 
-                              if (res.ok) {
-                                setCaseCards(prev => prev.filter(c => c.id !== card.id));
-                              } else {
-                               // alert("Failed to archive the case.");
-                              }
-                            } catch (error) {
-                              console.error("Archive error:", error);
-                              //alert("An error occurred.");
-                            }
-                          }}
-                          className="text-muted-foreground hover:text-red-500 transition-colors"
-                          title="Archive Case"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-
+                                  if (res.ok) {
+                                    // Move card to archived tab and update status locally
+                                    setCaseCards(prev => prev.filter(c => c.id !== card.id));
+                                    setOpenCases((prev: CaseCard[]) => prev
+                                      .filter(c => c.id !== card.id)
+                                      .filter(c => c.status === "open" || c.status === "ongoing")
+                                    );
+                                    setArchivedCases((prev: CaseCard[]) => [...prev, { ...card, status: "archived" }]);
+                                    setActiveTab("archived");
+                                  } else {
+                                    // alert("Failed to archive the case.");
+                                  }
+                                } catch (error) {
+                                  console.error("Archive error:", error);
+                                  //alert("An error occurred.");
+                                }
+                              }}
+                              className="text-muted-foreground hover:text-red-500 transition-colors"
+                              title="Archive Case"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button disabled className="text-muted-foreground opacity-50 cursor-not-allowed" title="Edit disabled">
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button disabled className="text-muted-foreground opacity-50 cursor-not-allowed" title="Delete disabled">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
 
                       <img
@@ -988,10 +1086,26 @@ useEffect(() => {
                           <span className="text-muted-foreground capitalize">{card.priority}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                          <span className="text-muted-foreground">Ongoing</span>
+                          <span
+                            className={cn(
+                              "w-2 h-2 rounded-full",
+                              card.status === "open"
+                                ? "bg-blue-400"
+                                : card.status === "ongoing"
+                                ? "bg-yellow-400"
+                                : card.status === "closed"
+                                ? "bg-green-500"
+                                : card.status === "archived"
+                                ? "bg-gray-500"
+                                : card.status === "under_review"
+                                ? "bg-purple-500"
+                                : "bg-muted"
+                            )}
+                          ></span>
+                          <span className="text-muted-foreground capitalize">{card.status ? card.status.replace(/_/g, " ") : "Unknown"}</span>
                         </div>
                       </div>
+                        
                       <Progress
                         value={card.progress}
                         className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
@@ -1095,17 +1209,19 @@ useEffect(() => {
                       </Link>
                     </div>
 
-                    {/* Assign Members Button */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-muted-foreground mb-1">
-                        Assign Members
-                      </label>
-                      <Link to={`/assign-case-members/${editingCase.id}`} className="inline-block w-full">
-                        <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 text-sm transition-colors">
-                          Go to Assign Members Page
-                        </button>
-                      </Link>
-                    </div>
+                    {/* Assign Members Button (DFIR Admin only) */}
+                    {isDFIRAdmin && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-muted-foreground mb-1">
+                          Assign Members
+                        </label>
+                        <Link to={`/assign-case-members/${editingCase.id}`} className="inline-block w-full">
+                          <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 text-sm transition-colors">
+                            Go to Assign Members Page
+                          </button>
+                        </Link>
+                      </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="flex justify-end gap-3 pt-2">

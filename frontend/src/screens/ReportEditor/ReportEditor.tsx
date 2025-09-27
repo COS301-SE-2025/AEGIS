@@ -2,7 +2,6 @@
 import "react-quill/dist/quill.snow.css";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import  { useState, useEffect, useRef, useCallback } from "react";
 import ReactQuill from "react-quill";
@@ -30,7 +29,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { GhostTextInline } from "./GhostTextInline";
 
 interface ReportSection {
   id: string;
@@ -283,7 +281,7 @@ function SortableSectionItem({
 
 export const ReportEditor = () => {
   // Dummy key to force ghost text unmount
-  const [ghostKey, setGhostKey] = useState(0);
+  const [] = useState(0);
   // Enhancement button state for last dropped summary
   const [showEnhanceButton, setShowEnhanceButton] = useState(false);
   const [lastDroppedSummary, setLastDroppedSummary] = useState("");
@@ -321,8 +319,8 @@ export const ReportEditor = () => {
 
   const [reportTitle, setReportTitle] = useState("");
   const [incidentId, setIncidentId] = useState("");
-  const [dateCreated, setDateCreated] = useState("");
-  const [analyst, setAnalyst] = useState("");
+  const [, setDateCreated] = useState("");
+  const [, setAnalyst] = useState("");
   const [reportType, setReportType] = useState("");
   const lastSavedRef  = useRef<string>("");
   const lastQueuedRef = useRef<string>("");
@@ -331,11 +329,11 @@ export const ReportEditor = () => {
   const [saveState, setSaveState] = useState<"idle"|"saving"|"saved"|"error">("idle");
 const [lastSavedAt, setLastSavedAt] = useState<number|null>(null);
 const [dirty, setDirty] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 // --- title edit state ---
 const [editingTitleSectionId, setEditingTitleSectionId] = useState<string|null>(null);
 const [tempSectionTitle, setTempSectionTitle] = useState("");
-const [titleDirty, setTitleDirty] = useState(false);
+const [, setTitleDirty] = useState(false);
 const [titleSaving, setTitleSaving] = useState<"idle"|"saving"|"saved"|"error">("idle");
 const [addingBusy, setAddingBusy] = useState(false);
 const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -350,8 +348,6 @@ const [isPreviewMode, setIsPreviewMode] = useState(false);
   // Place this at the top of the main return
 
 // local-only section helpers (so we can skip API calls until backend is wired)
-const makeLocalId = () =>
-  `local-${(crypto as any)?.randomUUID?.() ?? Date.now().toString(36)}`;
 const isLocalSection = (id: string) => id.startsWith("local-");
 
 // add/delete UI state
@@ -359,11 +355,10 @@ const [adding, setAdding] = useState(false);
 const [newSectionTitle, setNewSectionTitle] = useState("");
 
 
-const navigate = useNavigate(); // NEW
 
-const [recentReports, setRecentReports] = useState<RecentReport[]>([]); // NEW
-const [recentLoading, setRecentLoading] = useState(true);               // NEW
-const [recentError, setRecentError] = useState<string | null>(null);    // NEW
+const [, setRecentReports] = useState<RecentReport[]>([]); // NEW
+const [, setRecentLoading] = useState(true);               // NEW
+const [, setRecentError] = useState<string | null>(null);    // NEW
 const [lastModified, setLastModified] = useState<string>("");
 
   // fetch report
@@ -452,23 +447,6 @@ const loadReport = useCallback(async (id: string) => {
 }, []);
 
 // put this near the top of your component file (or in a utils file)
-const formatIsoDate = (
-  iso?: string,
-  opts: { locale?: string; utc?: boolean } = {}
-) => {
-  if (!iso) return "";
-  // handle your sentinel "no date" value
-  if (iso.startsWith("0001-01-01")) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso; // fallback if server sends odd value
-  const { locale = "en-GB", utc = false } = opts;
-  return new Intl.DateTimeFormat(locale, {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    ...(utc ? { timeZone: "UTC" } : {}),
-  }).format(d);
-};
 
 useEffect(() => {
   if (!reportId) return;
@@ -483,11 +461,6 @@ useEffect(() => {
   }, [sections, activeSection]);
 
   // toggle completion (purely client-side unless you add an API)
-  const toggleSectionCompletion = (index: number) => {
-    setSections(prev =>
-      prev.map((s, i) => (i === index ? { ...s, completed: !s.completed } : s))
-    );
-  };
     // Automatically insert AI suggestion when it arrives
   useEffect(() => {
     if (aiSuggestion && !aiLoading) {
@@ -729,38 +702,7 @@ useEffect(() => { // NEW
   return () => { cancelled = true; };
 }, []);
 
-const refreshRecent = async () => { // NEW (optional)
-  try {
-    setRecentLoading(true);
-    setRecentError(null);
-    const token = sessionStorage.getItem("authToken");
-    if (!token) return;
-    const res = await axios.get(`${API_URL}/reports/recent?limit=6&mine=true`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const items = (res.data as any[]).map(x => ({
-      id: x.id, title: x.title, status: x.status as RecentReport["status"], lastModified: x.lastModified
-    })) as RecentReport[];
-    setRecentReports(items);
-  } catch {
-    setRecentError("Failed to refresh");
-  } finally {
-    setRecentLoading(false);
-  }
-};
 
-const openReport = async (id: string) => {
-  try {
-    // only flush if there are pending edits
-    if (dirty || saveState === "saving") {
-      await flushSaveNow(sections[activeSection]?.content ?? ""); // no { force: true }
-    }
-    navigate(`/report-editor/${id}`);
-  } catch (e) {
-    console.error("Failed to save before navigation", e);
-    setError("Couldn't save changes before opening another report.");
-  }
-};
 
 const handleAddSection = useCallback(async () => {
   const rid = reportId ?? report?.id;
@@ -866,17 +808,6 @@ async function deleteSection(reportId: string, sectionId: string) {
   return res.data; // {status: "..."}
 }
 
-async function putSectionsOrderBulk(
-  reportId: string,
-  order: { id: string; order: number }[]
-) {
-  const token = sessionStorage.getItem("authToken");
-  await axios.put(
-    `${API_URL}/reports/${reportId}/sections/reorder`,
-    { order },
-    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
-  );
-}
 
 
 // API helper
@@ -1071,31 +1002,10 @@ useEffect(() => () => {
     'link', 'image', 'code-block', 'align'
   ];
 
-   const isLoading = !report;
 
 
 
-  const getStatusDot = (status: string) => {
-    switch (status) {
-      case 'draft': return 'bg-gray-400';
-      case 'review': return 'bg-yellow-400';
-      case 'published': return 'bg-green-400';
-      default: return 'bg-gray-400';
-    }
-  };
 
-  function timeAgo(iso: string) { // NEW
-  const d = new Date(iso);
-  const s = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m} min${m > 1 ? "s" : ""} ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h} hour${h > 1 ? "s" : ""} ago`;
-  const days = Math.floor(h / 24);
-  if (days < 7) return `${days} day${days > 1 ? "s" : ""} ago`;
-  return d.toLocaleString(); // fallback for older items
-}
 const startEditingTitle = useCallback((section: ReportSection) => {
   setEditingTitleSectionId(section.id);
   setTempSectionTitle(section.title || "");
@@ -1623,11 +1533,6 @@ const commitEditingTitle = useCallback(async () => {
             </div>
             {/* Evidence (draggable) */}
             <div
-              draggable
-              onDragStart={e => {
-                e.dataTransfer.setData("application/json", JSON.stringify(sectionContext.evidence));
-                e.dataTransfer.effectAllowed = "copy";
-              }}
               className="cursor-grab select-none"
               style={{ pointerEvents: 'auto', userSelect: 'none' }}
             >
@@ -1647,36 +1552,41 @@ const commitEditingTitle = useCallback(async () => {
                       return null;
                     }
                   }
-                  let md5 = evidenceObj.md5, sha256 = evidenceObj.sha256, uploader = evidenceObj.uploader;
+                  let sha512 = evidenceObj.sha512, sha256 = evidenceObj.sha256, uploader = evidenceObj.uploader;
                   if (evidenceObj.metadata) {
                     try {
                       const meta = typeof evidenceObj.metadata === 'string' ? JSON.parse(evidenceObj.metadata) : evidenceObj.metadata;
-                      md5 = meta.md5 || md5;
+                      sha512 = meta.sha512 || sha512;
                       sha256 = meta.sha256 || sha256;
                       uploader = meta.uploader || uploader;
                     } catch {}
                   }
-                  // Helper to truncate long hashes
-                  const truncateHash = (hash?: string, len = 16) =>
-                    hash && hash.length > len ? `${hash.slice(0, 8)}...${hash.slice(-8)}` : hash;
                   return (
-                    <li key={i} className="bg-green-950/80 border border-green-800 rounded-xl shadow flex flex-col gap-2 p-3 mb-2">
+                    <li
+                      key={i}
+                      className="bg-green-950/80 border border-green-800 rounded-xl shadow flex flex-col gap-2 p-3 mb-2"
+                      draggable
+                      onDragStart={e => {
+                        e.dataTransfer.setData("application/json", JSON.stringify([ev]));
+                        e.dataTransfer.effectAllowed = "copy";
+                      }}
+                    >
                       <div className="flex items-center gap-2 mb-1">
                         <FileText className="w-5 h-5 text-green-400" />
                         <span className="font-bold text-green-200 text-base">{evidenceObj.filename || evidenceObj.fileName || "Unknown file"}</span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 mb-1 overflow-x-auto">
                         <span
-                          className="bg-gray-800 px-2 py-0.5 rounded font-mono text-xs text-gray-300 max-w-[180px] overflow-x-auto whitespace-nowrap"
+                          className="bg-gray-800 px-2 py-0.5 rounded font-mono text-xs text-gray-300 break-all max-w-full"
                           title={sha256}
                         >
-                          SHA256: {sha256 ? truncateHash(sha256, 20) : <span className='italic text-gray-500'>N/A</span>}
+                          SHA256: {sha256 ? sha256 : <span className='italic text-gray-500'>N/A</span>}
                         </span>
                         <span
-                          className="bg-gray-800 px-2 py-0.5 rounded font-mono text-xs text-gray-300 max-w-[120px] overflow-x-auto whitespace-nowrap"
-                          title={md5}
+                          className="bg-gray-800 px-2 py-0.5 rounded font-mono text-xs text-gray-300 break-all max-w-full"
+                          title={sha512}
                         >
-                          MD5: {md5 ? truncateHash(md5, 16) : <span className='italic text-gray-500'>N/A</span>}
+                          SHA512: {sha512 ? sha512 : <span className='italic text-gray-500'>N/A</span>}
                         </span>
                       </div>
                       {uploader && (
@@ -1855,21 +1765,21 @@ const commitEditingTitle = useCallback(async () => {
                                     if (parsed.length && parsed[0] && typeof parsed[0] === "object") {
                                       // Evidence: look for filename, hashes
                                       if (parsed[0].filename || parsed[0].fileName) {
-                                        description = parsed.map((ev, idx) => {
+                                        description = parsed.map((ev) => {
                                           let evidenceObj = ev;
                                           if (typeof evidenceObj === 'string') {
                                             try { evidenceObj = JSON.parse(evidenceObj); } catch {}
                                           }
-                                          let md5 = evidenceObj.md5, sha256 = evidenceObj.sha256, uploader = evidenceObj.uploader;
+                                          let sha512 = evidenceObj.sha512, sha256 = evidenceObj.sha256, uploader = evidenceObj.uploader;
                                           if (evidenceObj.metadata) {
                                             try {
                                               const meta = typeof evidenceObj.metadata === 'string' ? JSON.parse(evidenceObj.metadata) : evidenceObj.metadata;
-                                              md5 = meta.md5 || md5;
+                                              sha512 = meta.sha512 || sha512;
                                               sha256 = meta.sha256 || sha256;
                                               uploader = meta.uploader || uploader;
                                             } catch {}
                                           }
-                                          return `Evidence: ${evidenceObj.filename || evidenceObj.fileName || "Unknown file"}${uploader ? ` (uploaded by ${uploader})` : ""}\nHashes: SHA256 ${sha256 || "N/A"}, MD5 ${md5 || "N/A"}`;
+                                          return `Evidence: ${evidenceObj.filename || evidenceObj.fileName || "Unknown file"}${uploader ? ` (uploaded by ${uploader})` : ""}\nHashes: SHA256 ${sha256 || "N/A"}, SHA512 ${sha512 || "N/A"}`;
                                         }).join("\n\n");
                                         toast.success("Evidence added to section");
                                       } else if (parsed[0].type || parsed[0].value) {
@@ -1934,8 +1844,6 @@ const commitEditingTitle = useCallback(async () => {
                               const data = e.dataTransfer.getData("application/json");
                               if (data) {
                                 try {
-                                  const parsed = JSON.parse(data);
-                                  let description = "";
                                   // ...existing code...
                                 } catch (err) {
                                   toast.error("Failed to parse dropped card data");

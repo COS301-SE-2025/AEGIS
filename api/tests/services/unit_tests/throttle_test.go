@@ -329,9 +329,10 @@ func TestRateLimitMiddleware_ConcurrentRequests(t *testing.T) {
 	}
 	success, throttled := 0, 0
 	for _, code := range codes {
-		if code == 200 {
+		switch code {
+		case 200:
 			success++
-		} else if code == 429 {
+		case 429:
 			throttled++
 		}
 	}
