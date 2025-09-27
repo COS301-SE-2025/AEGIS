@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
 	"aegis-api/db"
+	"crypto/tls"
 	"fmt"
+
+	"github.com/redis/go-redis/v9"
 
 	"aegis-api/handlers"
 	"aegis-api/middleware"
@@ -50,13 +55,99 @@ import (
 	"aegis-api/services_/health"
 	"aegis-api/services_/user/profile"
 
-	//"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func InitCollections(db *mongo.Database) {
 	chat.MessageCollection = db.Collection("chat_messages")
+}
+
+/*
+Function to enforce HTTPS and add HSTS headers.
+--ENCRYPTION IN TRANSIT HTTPS--
+*/
+// requireTLS is a middleware that rejects non-TLS requests.
+func requireTLS() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.TLS == nil {
+			// Option A: Respond with 426 Upgrade Required
+			c.Header("Connection", "close")
+			c.AbortWithStatusJSON(http.StatusUpgradeRequired, gin.H{
+				"error": "HTTPS required",
+			})
+			return
+		}
+		// Add HSTS header on TLS requests
+		// max-age=63072000 (2 years), includeSubDomains, preload candidate
+		c.Header("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+		c.Next()
+	}
+}
+
+var rdb *redis.Client
+var ctx = context.Background()
+
+// Updated InitRedis function
+func InitRedis() {
+	redisHost := os.Getenv("REDIS_HOST")
+	redisPort := os.Getenv("REDIS_PORT")
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+
+	// Default values if environment variables are not set
+	if redisHost == "" {
+		redisHost = "redis" // Docker service name
+	}
+	if redisPort == "" {
+		redisPort = "6379"
+	}
+
+	addr := fmt.Sprintf("%s:%s", redisHost, redisPort)
+	log.Printf("🔄 Attempting to connect to Redis at: %s", addr)
+
+	rdb = redis.NewClient(&redis.Options{
+		Addr:         addr,
+		Password:     redisPassword, // Can be empty string for no password
+		DB:           0,
+		DialTimeout:  5 * time.Second,
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 3 * time.Second,
+		PoolSize:     10,
+		MinIdleConns: 1,
+	})
+
+	// Test the connection with retries
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, err := rdb.Ping(ctx).Result()
+		cancel()
+
+		if err == nil {
+			log.Println("✅ Connected to Redis successfully")
+			// IMPORTANT: Set the Redis client for middleware
+			middleware.SetRedisClient(rdb)
+			return
+		}
+
+		log.Printf("⚠️  Redis connection attempt %d failed: %v", i+1, err)
+		if i < maxRetries-1 {
+			time.Sleep(time.Duration(i+1) * time.Second)
+		}
+	}
+
+	// Don't panic - just log the error and continue without Redis
+	log.Println("❌ Failed to connect to Redis after multiple attempts - continuing without rate limiting")
+}
+
+// Add this function to gracefully close Redis connection
+func CloseRedis() {
+	if rdb != nil {
+		if err := rdb.Close(); err != nil {
+			log.Printf("Error closing Redis connection: %v", err)
+		}
+	}
 }
 
 func main() {
@@ -73,7 +164,12 @@ func main() {
 	// ─── Load Environment Variables ──────────────────────────────
 	if err := godotenv.Load(); err != nil {
 		log.Println("⚠️  No .env file found. Using system environment variables.")
+	} else {
+		log.Println("✅ Loaded .env file")
 	}
+
+	// Initialize Redis
+	InitRedis()
 
 	// ─── Set JWT Secret ─────────────────────────────────────────
 	jwtSecret := os.Getenv("JWT_SECRET_KEY")
@@ -116,6 +212,11 @@ func main() {
 
 	dec, _ := encryption.Decrypt(enc)
 	fmt.Println("Decrypted:", string(dec))
+
+	//--Gin setup for HTTPS--
+	r := gin.Default()
+	// Enforce HTTPS and add HSTS headers
+	r.Use(gin.Recovery())
 
 	// ─── websocket ─────────────────────────────────
 
@@ -458,23 +559,162 @@ func main() {
 	router.Use(middleware.AuthMiddleware())
 	router.Use(middleware.RateLimitMiddleware(100, time.Minute, granularLimits)) // 100 requests per minute per user, granular config
 
-	// ─── websocket ─────────────────────────────────
-	wsGroup := router.Group("/ws")
-	wsGroup.Use(middleware.WebSocketAuthMiddleware()) // ✅ For ws://.../cases/:id?token=...
-	websocket.RegisterWebSocketRoutes(wsGroup, hub)
+	// //───────────── ENCRYPTION IN TRANSIT HTTPS ────────────────────────
+	// // Note: In production, use a proper TLS certificate from a trusted CA
+	// // For local testing, you can generate self-signed certs or use mkcert
+
+	// Example of setting up HTTPS with Gin (commented out for now)
+	router.GET("/ping", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "pong",
+		})
+	})
+
+	//Creating a test endpoint without authentication for testing HTTPS
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status":  "healthy",
+			"time":    time.Now().Format(time.RFC3339),
+			"message": "This is a test endpoint over HTTPS!",
+		})
+	})
+
+	// // Start HTTPS server (commented out to avoid accidental execution)
+	// //
+	// err = router.RunTLS(":8443", "certs/localhost.pem", "certs/localhost-key.pem")
+	// if err != nil {
+	// 	log.Fatal("Failed to start HTTPS server:", err)
+	// }
+
+	// // ─── websocket ─────────────────────────────────
+	// wsGroup := router.Group("/ws")
+	// wsGroup.Use(middleware.WebSocketAuthMiddleware()) // ✅ For ws://.../cases/:id?token=...
+	// websocket.RegisterWebSocketRoutes(wsGroup, hub)
 
 	//load balance port
 	// Get port from environment variable or use default
+	// port := os.Getenv("PORT")
+	// if port == "" {
+	// 	port = "8080" // default
+	// }
+
+	// log.Println("🚀 Starting AEGIS API on :" + port + "...")
+	// log.Println("📚 Swagger docs: http://localhost:" + port + "/swagger/index.html")
+
+	// if err := router.Run(":" + port); err != nil {
+	// 	log.Fatal("❌ Failed to start server:", err)
+	// }
+
+	// HTTPS port
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // default
+		port = "8443"
 	}
 
-	log.Println("🚀 Starting AEGIS API on :" + port + "...")
-	log.Println("📚 Swagger docs: http://localhost:" + port + "/swagger/index.html")
+	// HTTP port for redirects
+	httpPort := os.Getenv("HTTP_PORT")
+	if httpPort == "" {
+		httpPort = "8080"
+	}
 
-	if err := router.Run(":" + port); err != nil {
-		log.Fatal("❌ Failed to start server:", err)
+	// Certificate paths
+	certFile := os.Getenv("SSL_CERT_FILE")
+	keyFile := os.Getenv("SSL_KEY_FILE")
+	if certFile == "" {
+		certFile = "api/certs/localhost.pem"
+	}
+	if keyFile == "" {
+		keyFile = "api/certs/localhost-key.pem"
+	}
+
+	// Start HTTP redirect server
+	go func() {
+		redirectHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			httpsURL := "https://" + r.Host + ":" + port + r.URL.Path
+			if r.URL.RawQuery != "" {
+				httpsURL += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+		})
+
+		log.Printf("🔁 Starting HTTP redirect server on :%s...", httpPort)
+		if err := http.ListenAndServe(":"+httpPort, redirectHandler); err != nil {
+			log.Fatal("❌ Failed to start HTTP redirect server:", err)
+		}
+	}()
+
+	log.Println("🚀 Starting AEGIS API on :" + port + " (HTTPS)...")
+	log.Println("📚 Swagger docs: https://localhost:" + port + "/swagger/index.html")
+
+	// Start your Gin router with HTTPS
+	if err := router.RunTLS(":"+port, certFile, keyFile); err != nil {
+		log.Fatal("❌ Failed to start HTTPS server:", err)
+	}
+
+	// ───────────── ENCRYPTION IN TRANSIT HTTPS ────────────────────────
+	// Register websocket routes BEFORE starting the servers
+	wsGroup := router.Group("/ws")
+	wsGroup.Use(middleware.WebSocketAuthMiddleware()) // WebSocket auth for upgrades
+	websocket.RegisterWebSocketRoutes(wsGroup, hub)
+
+	// Enforce TLS and HSTS for all incoming requests handled by this router
+	// (allows only TLS requests to be processed — non-TLS should be redirected)
+	router.Use(requireTLS())
+
+	// Apply auth and rate-limit middleware after requireTLS
+	// (order matters: requireTLS first, then auth, then rate limiting)
+	router.Use(middleware.AuthMiddleware())
+	router.Use(middleware.RateLimitMiddleware(100, time.Minute, granularLimits))
+
+	// Simple test endpoints already registered earlier: /ping and /health
+
+	// Start an HTTP server that redirects all traffic to HTTPS.
+	// This runs in a goroutine so it does not block.
+	go func() {
+		redirectHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Build redirect target to same host/path but with https
+			target := "https://" + r.Host + r.URL.RequestURI()
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
+		})
+
+		srv := &http.Server{
+			Addr:         ":8080", // HTTP port for redirect (dev). In prod use :80.
+			Handler:      redirectHandler,
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 10 * time.Second,
+			IdleTimeout:  30 * time.Second,
+		}
+
+		log.Println("HTTP -> HTTPS redirect server listening on :8080")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP redirect server failed: %v", err)
+		}
+	}()
+
+	// Start the HTTPS server (blocking). Uses certs in certs/
+	// certFile := "certs/localhost.pem"
+	// keyFile := "certs/localhost-key.pem"
+
+	// // Log and start HTTPS only
+	// log.Println("🚀 Starting AEGIS API on :8443 (HTTPS only)")
+	// if err := router.RunTLS(":8443", certFile, keyFile); err != nil {
+	// 	log.Fatal("❌ Failed to start HTTPS server:", err)
+	// }
+
+	// Custom TLS configuration (force TLS 1.3)
+	tlsCfg := &tls.Config{
+		MinVersion: tls.VersionTLS13,
+	}
+
+	srv := &http.Server{
+		Addr:      ":8443",
+		Handler:   router,
+		TLSConfig: tlsCfg,
+	}
+
+	log.Println("🚀 Starting AEGIS API on :8443 (TLS 1.3 only)")
+	if err := srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
+		log.Fatal("❌ Failed to start HTTPS server:", err)
 	}
 
 }
