@@ -105,7 +105,7 @@ services:
       - frontend_node_modules:/app/node_modules
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=https://localhost/api   # through nginx
+      - VITE_API_URL=https://localhost/api
       - VITE_WS_URL=wss://localhost
     depends_on:
       - nginx
@@ -113,21 +113,36 @@ services:
   backend:
     build:
       context: ./api
-    expose:   # expose only inside Docker, don’t bind to host
+    expose:
       - "8443"
     env_file:
       - .env
     environment:
-    - REDIS_HOST=redis
-    - REDIS_PORT=6379
-    - REDIS_PASSWORD= 
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - MONGO_URI=${MONGO_URI}
+      - IPFS_API=${IPFS_API}
+      - ENCRYP_REST_MASTER_KEY=${ENCRYP_REST_MASTER_KEY}
+      - REDIS_ADDR=redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - REDIS_PASS=
+      - REDIS_DB=0
     depends_on:
-      - postgres
-      - mongo
-      - ipfs
-      - redis
+      postgres:
+        condition: service_started
+      mongo:
+        condition: service_started
+      ipfs:
+        condition: service_started
+      redis:
+        condition: service_healthy
     deploy:
-      replicas: 3   # run 3 backend containers
+      replicas: 3
 
   nginx:
     image: nginx:latest
@@ -136,18 +151,23 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./api/certs:/etc/nginx/certs:ro   # ✅ mount your certs folder
+      - ./api/certs:/etc/nginx/certs:ro
     depends_on:
       - backend
 
   redis:
-    image: redis:latest
-    ports:
-      - "6379:6379"
+    image: redis:7
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
 
   postgres:
     image: postgres:15
+    ports:
+      - "5432:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -157,11 +177,13 @@ services:
 
   mongo:
     image: mongo:latest
+    ports:
+      - "27017:27017"
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
       - MONGO_INITDB_DATABASE=app_database
-    command: [ "--auth" ]
+    command: [ --auth ]
     volumes:
       - mongo_data:/data/db
 

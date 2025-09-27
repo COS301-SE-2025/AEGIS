@@ -58,6 +58,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 	//________AI Routes________
 	timelineAIGroup := api.Group("/ai")
 	{
+
 		timelineAIGroup.POST("/suggestions", middleware.AuthMiddleware(), h.TimelineAIHandler.GetEventSuggestions)
 		timelineAIGroup.POST("/severity", middleware.AuthMiddleware(), h.TimelineAIHandler.GetSeverityRecommendation)
 		timelineAIGroup.POST("/tags", middleware.AuthMiddleware(), h.TimelineAIHandler.GetTagSuggestions)
@@ -69,6 +70,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		//timelineAIGroup.POST("/feedback", middleware.AuthMiddleware(), h.TimelineAIHandler.SubmitFeedback)
 		//timelineAIGroup.GET("/model-status", middleware.AuthMiddleware(), h.TimelineAIHandler.GetModelStatus)
 		//timelineAIGroup.POST("/update-model-config", middleware.AuthMiddleware(), middleware.RequireRole("DFIR Admin"), h.TimelineAIHandler.UpdateModelConfig)
+
 	}
 
 	// ─── Protected Routes ────────────────────────────

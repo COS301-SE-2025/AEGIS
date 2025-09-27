@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
+	"aegis-api/cache"
 	"aegis-api/services_/auditlog"
 
 	"github.com/gin-gonic/gin"
@@ -30,9 +33,37 @@ func (h *CaseHandler) GetAllCasesHandler(c *gin.Context) {
 	tenantID := c.GetString("tenantID")
 	actor := getActorFromContext(c)
 
+	// Optional paging/sorting to future-proof keys
+	page := c.DefaultQuery("page", "1")
+	pageSize := c.DefaultQuery("pageSize", "20")
+	sort := c.DefaultQuery("sort", "created_at")
+	order := c.DefaultQuery("order", "desc")
+
+	// Build qSig & key
+	qSig := cache.BuildQuerySig(page, pageSize, sort, order, map[string]any{
+		"scope": "all",
+	})
+	key := cache.ListKey(tenantID, cache.ScopeAll, qSig)
+
+	ctx := c.Request.Context()
+
+	// 1) Cache hit
+	if raw, ok, _ := h.Cache.Get(ctx, key); ok {
+		etag := cache.ListETag([]byte(raw))
+		if c.GetHeader("If-None-Match") == etag {
+			c.Header("ETag", etag)
+			c.Status(http.StatusNotModified)
+			return
+		}
+		c.Header("ETag", etag)
+		c.Header("Cache-Control", "private, max-age=120")
+		c.Data(http.StatusOK, "application/json", []byte(raw))
+		return
+	}
+
+	// 2) Miss → service
 	cases, err := h.ListCasesService.GetAllCases(tenantID)
 	if err != nil {
-		fmt.Printf("[GetAllCasesHandler] failed: %v\n", err)
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action:      "LIST_ALL_CASES",
 			Actor:       actor,
@@ -45,16 +76,33 @@ func (h *CaseHandler) GetAllCasesHandler(c *gin.Context) {
 		return
 	}
 
+	// 3) Build payload + cache it
+	body, _ := json.Marshal(gin.H{
+		"cases": cases,
+		"meta":  gin.H{"page": page, "pageSize": pageSize, "sort": sort, "order": order},
+	})
+	_ = h.Cache.Set(ctx, key, string(body), 120*time.Second)
+
+	// 4) ETag + headers + body
+	etag := cache.ListETag(body)
+	if c.GetHeader("If-None-Match") == etag {
+		c.Header("ETag", etag)
+		c.Status(http.StatusNotModified)
+		return
+	}
+	c.Header("ETag", etag)
+	c.Header("Cache-Control", "private, max-age=120")
+	c.Data(http.StatusOK, "application/json", body)
+
+	// 5) Friendlier activity text
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action:      "LIST_ALL_CASES",
 		Actor:       actor,
 		Target:      auditlog.Target{Type: "case_listing"},
 		Service:     "case",
 		Status:      "SUCCESS",
-		Description: fmt.Sprintf("Retrieved %d cases", len(cases)),
+		Description: fmt.Sprintf("You viewed all cases (%d found).", len(cases)),
 	})
-
-	c.JSON(http.StatusOK, gin.H{"cases": cases})
 }
 
 // GET /cases/user/:user_id
@@ -178,27 +226,40 @@ func (h *CaseHandler) GetCaseByIDHandler(c *gin.Context) {
 
 	if caseID == "" {
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action:      "GET_CASE_BY_ID",
-			Actor:       actor,
-			Target:      auditlog.Target{Type: "case_details"},
-			Service:     "case",
-			Status:      "FAILED",
+			Action: "GET_CASE_BY_ID", Actor: actor,
+			Target:  auditlog.Target{Type: "case_details"},
+			Service: "case", Status: "FAILED",
 			Description: "Missing case_id parameter",
 		})
 		c.JSON(http.StatusBadRequest, gin.H{"error": "case_id is required"})
 		return
 	}
 
+	// --- Cache lookup ---
+	key := cache.CaseHeaderKey(tenantID, caseID)
+	ctx := c.Request.Context()
+
+	if raw, ok, _ := h.Cache.Get(ctx, key); ok {
+		etag := cache.EntityETag([]byte(raw))
+		if c.GetHeader("If-None-Match") == etag {
+			c.Header("ETag", etag)
+			c.Status(http.StatusNotModified)
+			return
+		}
+		c.Header("ETag", etag)
+		c.Header("Cache-Control", "private, max-age=300")
+		c.Data(http.StatusOK, "application/json", []byte(raw))
+		return
+	}
+
+	// --- Cache miss → service ---
 	caseDetails, err := h.ListCasesService.GetCaseByID(caseID, tenantID)
 	if err != nil {
-		fmt.Printf("[GetCaseByIDHandler] failed: %v\n", err)
 		h.auditLogger.Log(c, auditlog.AuditLog{
-			Action:      "GET_CASE_BY_ID",
-			Actor:       actor,
-			Target:      auditlog.Target{Type: "case_details", ID: caseID},
-			Service:     "case",
-			Status:      "FAILED",
-			Description: "Failed to retrieve case by ID: " + err.Error(),
+			Action: "GET_CASE_BY_ID", Actor: actor,
+			Target:  auditlog.Target{Type: "case_details", ID: caseID},
+			Service: "case", Status: "FAILED",
+			Description: "Couldn’t load case details: " + err.Error(),
 		})
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not retrieve case"})
 		return
@@ -212,8 +273,28 @@ func (h *CaseHandler) GetCaseByIDHandler(c *gin.Context) {
 		Status:      "SUCCESS",
 		Description: fmt.Sprintf("Retrieved case %s", caseID),
 	})
+	// Build payload & cache it (5 min)
+	body, _ := json.Marshal(gin.H{"case": caseDetails})
+	_ = h.Cache.Set(ctx, key, string(body), 5*time.Minute)
 
-	c.JSON(http.StatusOK, gin.H{"case": caseDetails})
+	// ETag + conditional + headers
+	etag := cache.EntityETag(body)
+	if c.GetHeader("If-None-Match") == etag {
+		c.Header("ETag", etag)
+		c.Status(http.StatusNotModified)
+		return
+	}
+	c.Header("ETag", etag)
+	c.Header("Cache-Control", "private, max-age=300")
+	c.Data(http.StatusOK, "application/json", body)
+
+	// Friendlier activity text for the feed
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "GET_CASE_BY_ID", Actor: actor,
+		Target:  auditlog.Target{Type: "case_details", ID: caseID},
+		Service: "case", Status: "SUCCESS",
+		Description: "You viewed the case details of" + caseID + ".",
+	})
 }
 
 // GET /cases/archived

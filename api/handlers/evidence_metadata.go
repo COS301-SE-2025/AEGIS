@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"aegis-api/cache"
 	"aegis-api/services_/auditlog"
 	"aegis-api/services_/evidence/metadata"
 	"fmt"
@@ -14,12 +15,14 @@ import (
 type MetadataHandler struct {
 	service     metadata.MetadataService
 	auditLogger *auditlog.AuditLogger
+	cacheClient cache.Client
 }
 
-func NewMetadataHandler(svc metadata.MetadataService, logger *auditlog.AuditLogger) *MetadataHandler {
+func NewMetadataHandler(svc metadata.MetadataService, logger *auditlog.AuditLogger, c cache.Client) *MetadataHandler {
 	return &MetadataHandler{
 		service:     svc,
 		auditLogger: logger,
+		cacheClient: c,
 	}
 }
 
@@ -113,6 +116,13 @@ func (h *MetadataHandler) UploadEvidence(c *gin.Context) {
 		Status:      "SUCCESS",
 		Description: fmt.Sprintf("Uploaded %d evidence files for case %s", len(files), caseID),
 	})
+	// after all files are successfully saved
+	ctx := c.Request.Context()
+	tenantStr := tenantID.(string)
+	caseIDStr = caseID.String()
+
+	// Blow all list variants for that case (different q=sha)
+	cache.InvalidateEvidenceListsForCase(ctx, h.cacheClient, tenantStr, caseIDStr)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Evidence uploaded successfully"})
 }

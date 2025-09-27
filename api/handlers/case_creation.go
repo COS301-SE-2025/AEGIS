@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"aegis-api/cache"
 	update_case "aegis-api/services_/case/case_update"
 
 	"github.com/gin-gonic/gin"
@@ -25,8 +26,9 @@ type CaseHandler struct {
 	auditLogger              *auditlog.AuditLogger
 	ListClosedCasesService   ListClosedCasesService
 	UpdateCaseService        *update_case.Service
-	UserRepo                 case_assign.UserRepo               // Add UserRepo here
-	ListArchivedCasesService listArchiveCases.ArchiveCaseLister // Add ListArchivedCasesService
+	UserRepo                 case_assign.UserRepo // Add UserRepo here
+	ListArchivedCasesService listArchiveCases.ArchiveCaseLister
+	Cache                    cache.Client
 }
 type ListActiveCasesService interface {
 	ListActiveCases(userID, tenantID, teamID string) ([]ListActiveCases.ActiveCase, error)
@@ -102,16 +104,18 @@ func NewCaseHandler(
 	auditLogger *auditlog.AuditLogger,
 	userRepo case_assign.UserRepo, // Inject UserRepo here
 	updateCaseService *update_case.Service,
+	cacheClient cache.Client,
 ) *CaseHandler {
 	return &CaseHandler{
-		CaseService:              caseService,
-		ListCasesService:         listCasesService,
-		ListActiveCasesServ:      listActiveCasesService,
-		ListClosedCasesService:   listClosedCasesService,
-		ListArchivedCasesService: listArchivedCasesService, // Assign ListArchivedCasesService
-		auditLogger:              auditLogger,
-		UserRepo:                 userRepo, // Assign UserRepo
-		UpdateCaseService:        updateCaseService,
+
+		CaseService:            caseService,
+		ListCasesService:       listCasesService,
+		ListActiveCasesServ:    listActiveCasesService,
+		ListClosedCasesService: listClosedCasesService,
+		auditLogger:            auditLogger,
+		UserRepo:               userRepo, // Assign UserRepo
+		UpdateCaseService:      updateCaseService,
+		Cache:                  cacheClient,
 	}
 }
 
@@ -130,58 +134,6 @@ func (s *CaseServices) GetCaseByID(caseID string, tenantID string) (*ListCases.C
 func (s *CaseServices) UnassignUserFromCase(ctx *gin.Context, assigneeID, caseID uuid.UUID) error {
 	return s.assignCase.UnassignUserFromCase(ctx, assigneeID, caseID)
 }
-
-// func (cs CaseServices) CreateCase(c *gin.Context) {
-// 	var apiReq structs.CreateCaseRequest //
-// 	if err := c.ShouldBind(&apiReq); err != nil {
-// 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
-// 			Error:   "invalid_request",
-// 			Message: "Invalid case data",
-// 			Details: err.Error(),
-// 		})
-// 		return
-// 	}
-
-// 	fullName, exists := c.Get("fullName") //should be set by middleware
-// 	if !exists {
-// 		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
-// 			Error:   "unauthorized",
-// 			Message: "No authentication provided",
-// 		})
-// 		return
-// 	}
-
-// 	serviceReq := case_creation.CreateCaseRequest{ //map
-// 		Title:              apiReq.Title,
-// 		Description:        apiReq.Description,
-// 		Status:             apiReq.Status,
-// 		Priority:           apiReq.Priority,
-// 		InvestigationStage: apiReq.InvestigationStage,
-// 		CreatedByFullName:  fullName.(string),
-// 		TeamName:           apiReq.TeamName,
-// 	}
-// 	newCase, err := cs.createCase.CreateCase(&serviceReq)
-// 	if err != nil {
-// 		status := http.StatusInternalServerError
-// 		errorType := "creation_failed"
-// 		if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "invalid") {
-// 			status = http.StatusBadRequest
-// 			errorType = "validation_failed"
-// 		}
-// 		c.JSON(status, structs.ErrorResponse{
-// 			Error:   errorType,
-// 			Message: "Could not create case",
-// 			Details: err.Error(),
-// 		})
-// 		return
-// 	}
-
-// 	c.JSON(http.StatusCreated, structs.SuccessResponse{
-// 		Success: true,
-// 		Message: "Case created successfully",
-// 		Data:    newCase,
-// 	})
-// }
 
 func (h *CaseHandler) CreateCase(c *gin.Context) {
 	var req case_creation.CreateCaseRequest
@@ -300,6 +252,12 @@ func (h *CaseHandler) CreateCase(c *gin.Context) {
 		Status:      "SUCCESS",
 		Description: "Case created successfully",
 	})
+	// ✅ Invalidate caches
+	cache.InvalidateTenantLists(c, h.Cache, req.TenantID.String())
+	cache.InvalidateCaseHeader(c, h.Cache, req.TenantID.String(), newCase.ID.String())
+	cache.InvalidateByUserLists(c, h.Cache, req.TenantID.String(), req.CreatedBy.String())
+	cache.InvalidateDashboardTotals(c, h.Cache, req.TenantID.String(), userID.(string))
+	cache.InvalidateEvidenceCount(c.Request.Context(), h.Cache, req.TenantID.String())
 
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,

@@ -1,19 +1,20 @@
 package main
 
 import (
+	"aegis-api/db"
 	"aegis-api/services_/admin/delete_user"
 	"context"
+	"crypto/tls"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
-
-	"aegis-api/db"
-	"crypto/tls"
-	"fmt"
 
 	"github.com/redis/go-redis/v9"
 
+	"aegis-api/cache"
 	"aegis-api/handlers"
 	"aegis-api/middleware"
 	"aegis-api/pkg/websocket"
@@ -59,6 +60,7 @@ import (
 	"aegis-api/services_/user/profile"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -289,9 +291,9 @@ func main() {
 	updateCaseRepo := update_case.NewGormUpdateCaseRepository(db.DB)
 	updateCaseService := update_case.NewService(
 		updateCaseRepo,
-		collabService,       // ✅ GetCollaborators service
-		notificationService, // ✅ Notification service
-		hub,                 // ✅ WebSocket Hub
+		collabService,       //  GetCollaborators service
+		notificationService, //  Notification service
+		hub,                 //  WebSocket Hub
 	)
 	caseServices := handlers.NewCaseServices(
 		caseService,
@@ -321,6 +323,20 @@ func main() {
 	adminHandler := handlers.NewAdminService(regService, listUserService, nil, userDeleteService, auditLogger)
 	authHandler := handlers.NewAuthHandler(authService, resetService, userRepo, auditLogger)
 
+	addr := os.Getenv("REDIS_ADDR") // "redis:6379" in compose
+	pass := os.Getenv("REDIS_PASS")
+	db1 := 0
+	if v, err := strconv.Atoi(os.Getenv("REDIS_DB")); err == nil {
+		db1 = v
+	}
+
+	var cacheClient cache.Client
+	if addr != "" {
+		cacheClient = cache.NewRedis(addr, pass, db1)
+	} else {
+		cacheClient = cache.NewMemory()
+	}
+
 	//pass separate services explicitly
 	caseHandler := handlers.NewCaseHandler(
 		caseServices,
@@ -331,6 +347,7 @@ func main() {
 		auditLogger, // AuditLogger
 		userAdapter, // UserRepo
 		updateCaseService,
+		cacheClient, // Cache Client
 	)
 	//ioc
 	iocHandler := handlers.NewIOCHandler(iocService)
@@ -339,7 +356,7 @@ func main() {
 
 	//Timeline
 	// ─── Evidence Upload/Download/Metadata ──────────────────────
-	evidenceHandler := handlers.NewEvidenceHandler(evidenceCountService)
+	evidenceHandler := handlers.NewEvidenceHandler(evidenceCountService, cacheClient)
 	metadataRepo := metadata.NewGormRepository(db.DB)
 	ipfsClient := upload.NewIPFSClient("")
 
@@ -348,7 +365,7 @@ func main() {
 	downloadService := evidence_download.NewService(metadataRepo, ipfsClient)
 
 	uploadHandler := handlers.NewUploadHandler(uploadService, auditLogger)
-	metadataHandler := handlers.NewMetadataHandler(metadataService, auditLogger)
+	metadataHandler := handlers.NewMetadataHandler(metadataService, auditLogger, cacheClient)
 	downloadHandler := handlers.NewDownloadHandler(downloadService, auditLogger)
 
 	// ─── Chain of Custody ─────────────────────────────────────
@@ -412,7 +429,7 @@ func main() {
 	// ─── Case Evidence Totals ─────────────────────────────
 	caseEviRepo := case_evidence_totals.NewCaseEviRepository(db.DB)
 	dashboardService := case_evidence_totals.NewDashboardService(caseEviRepo)
-	caseEviTotalsHandler := handlers.NewCaseEvidenceTotalsHandler(dashboardService)
+	caseEviTotalsHandler := handlers.NewCaseEvidenceTotalsHandler(dashboardService, cacheClient)
 
 	// ─── Case Deletion ──────────────────────────────────────
 	caseDeletionRepo := case_deletion.NewGormCaseRepository(db.DB)
@@ -428,29 +445,6 @@ func main() {
 		DB: db.DB,
 	}
 
-	// ─── Chain of Custody (CoC) ─────────────────────────────
-	// Create an adapter for the AuditLogger to fit the coc.Auditor interface
-	// auditAdapter := &coc.AuditLogAdapter{
-	// 	AuditLogger: auditLogger, // Use the existing AuditLogger
-	// }
-
-	// Initialize the CoC service (pass it as a value, not a pointer)
-	// cocSvc := coc.Service{
-	// 	Repo:      coc.GormRepo{DB: db.DB}, // Initialize repository (GORM)
-	// 	Authz:     coc.SimpleAuthz{},       // Placeholder for RBAC (role-based access control)
-	// 	Audit:     auditAdapter,            // Use the adapter for AuditLogger
-	// 	DedupeWin: 3 * time.Second,         // Deduplication window (optional)
-	// }
-
-	// Initialize the handler, passing a pointer to cocSvc to avoid copying sync.Mutex
-	// cocHandler := handlers.NewCoCHandler(cocSvc, auditLogger) // Pass the service pointer
-
-	// ─── Report Service Initialization ─────────────────────
-
-	// Initialize the repository and service for report generation and management
-	// ─── Report Service Initialization ─────────────────────────────
-
-	// ...existing code...
 	reportRepo := report.NewReportRepository(db.DB)
 	reportContentCollection := mongoDatabase.Collection("report_contents")
 	reportMongoRepo := report.NewReportMongoRepo(reportContentCollection)
@@ -672,6 +666,7 @@ func main() {
 	// Register websocket routes BEFORE starting the servers
 	wsGroup := router.Group("/ws")
 	wsGroup.Use(middleware.WebSocketAuthMiddleware()) // WebSocket auth for upgrades
+
 	websocket.RegisterWebSocketRoutes(wsGroup, hub)
 
 	// Enforce TLS and HSTS for all incoming requests handled by this router
