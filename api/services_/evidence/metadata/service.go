@@ -115,10 +115,8 @@ func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
 
 	// Compute previous_hash for hash chain
 	var previousHash string
-	var lastLog EvidenceLog
-	err = s.repo.(*GormRepository).db.Where("evidence_id = ?", e.ID).Order("created_at DESC").First(&lastLog).Error
-	if err == nil {
-		// Concatenate relevant fields for hash chain
+	lastLog, err := s.repo.GetLastEvidenceLog(e.ID)
+	if err == nil && lastLog != nil {
 		hashInput := lastLog.Sha256 + lastLog.Sha512 + lastLog.Action + fmt.Sprintf("%v", lastLog.Result) + lastLog.Timestamp.String() + lastLog.Details + lastLog.CreatedAt.String()
 		hashBytes := sha256.Sum256([]byte(hashInput))
 		previousHash = hex.EncodeToString(hashBytes[:])

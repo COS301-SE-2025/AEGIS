@@ -304,6 +304,7 @@ func main() {
 		listActiveCasesService,
 		caseAssignService,
 		listClosedCasesService,
+		listArchiveCasesService,
 		updateCaseService,
 	)
 

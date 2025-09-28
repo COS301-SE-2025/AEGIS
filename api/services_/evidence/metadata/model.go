@@ -13,6 +13,7 @@ type Repository interface {
 	FindEvidenceByID(id uuid.UUID) (*Evidence, error)
 	FindEvidenceByCaseID(caseID uuid.UUID) ([]Evidence, error)
 	AppendEvidenceLog(log *EvidenceLog) error
+	GetLastEvidenceLog(evidenceID uuid.UUID) (*EvidenceLog, error)
 }
 
 // UploadEvidenceRequest is the input for uploading a file + metadata
