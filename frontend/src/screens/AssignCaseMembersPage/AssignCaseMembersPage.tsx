@@ -35,7 +35,7 @@ useEffect(() => {
     try {
       const res = await fetch("https://localhost/api/v1/users", {
         headers: {
-          "Authorization": `Bearer ${token}`
+          "Authorization": `Bearer ${sessionStorage.getItem("authToken") || ""}`
         }
       });
       if (!res.ok) throw new Error("Failed to fetch users");

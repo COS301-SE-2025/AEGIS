@@ -577,13 +577,15 @@ const debouncedGetWordSuggestions = useCallback(
   }, [caseId]);
 
   return (
-    <div className="bg-card border border rounded-lg p-8 text-foreground min-h-screen max-w-6xl mx-auto shadow-lg">
+    <div className="bg-card border border rounded-lg p-8 text-foreground min-h-screen max-w-7xl mx-auto shadow-lg">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <h2 className="text-2xl font-semibold text-foreground flex items-center gap-2">
             <Calendar className="text-blue-400" size={24} />
             Investigation Timeline
           </h2>
+        </div>
+        <div className="flex items-center gap-6">
           <button
             onClick={() => setShowAIPanel(!showAIPanel)}
             className="flex items-center gap-2 px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-200"
@@ -591,14 +593,14 @@ const debouncedGetWordSuggestions = useCallback(
             <Brain size={16} />
             AI Assistant
           </button>
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary transition-all duration-200 shadow-lg hover:shadow-blue-500/25"
+          >
+            <Plus size={18} />
+            Add Event
+          </button>
         </div>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary transition-all duration-200 shadow-lg hover:shadow-blue-500/25"
-        >
-          <Plus size={18} />
-          Add Event
-        </button>
       </div>
 
       {/* AI Assistant Panel */}

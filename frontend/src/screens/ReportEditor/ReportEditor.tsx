@@ -67,7 +67,6 @@ type ConfirmOpts = {
 //type Section = { id: string; title: string; content: string; order: number; updated_at?: string }
 const API_URL = "https://localhost/api/v1";
 
-
 async function putReportStatus(reportId: string, status: "draft" | "review" | "published") {
   const token = sessionStorage.getItem("authToken");
   console.log("report id:",reportId)
@@ -295,6 +294,20 @@ export const ReportEditor = () => {
   const { reportId } = useParams<{ reportId: string }>();
   // Ref to block suggestion re-setting during insertion
   const insertingSuggestionRef = useRef(false);
+   const [isDFIRAdmin, setIsDFIRAdmin] = useState(false);
+  const [, setTenantId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check role and tenantId after mount (when sessionStorage is available)
+    try {
+      const token = sessionStorage.getItem('authToken');
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setIsDFIRAdmin(payload.role === 'DFIR Admin' || payload.role === 'admin');
+        setTenantId(payload.tenant_id || payload.tenantId || null);
+      }
+    } catch {}
+  }, []);
   useEffect(() => {
     const fetchContext = async () => {
       const token = sessionStorage.getItem("authToken");
@@ -1306,15 +1319,17 @@ const commitEditingTitle = useCallback(async () => {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                {isDFIRAdmin && (
                 <button
-              type="button"
-              onClick={flushAndDownload}
-              disabled={!reportId && !report}  // disable until we know an id
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/60 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
+                  type="button"
+                  onClick={flushAndDownload}
+                  disabled={!reportId && !report}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/60 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+              )}
 
               </div>
             </div>

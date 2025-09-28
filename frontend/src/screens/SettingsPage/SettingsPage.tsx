@@ -110,7 +110,7 @@ function SettingsPage() {
 
   useEffect(() => {
     if (isDFIRAdmin && tenantId) {
-      axios.get(`http://localhost:8080/api/v1/tenants/${tenantId}/users`, {
+      axios.get(`https://localhost/api/v1/tenants/${tenantId}/users`, {
         headers: { Authorization: `Bearer ${sessionStorage.getItem('authToken')}` },
         params: { page, page_size: pageSize }
       })
@@ -159,7 +159,7 @@ function SettingsPage() {
     });
     if (!confirmed) return;
     try {
-      await axios.delete(`http://localhost:8080/api/v1/users/${userId}`, {
+      await axios.delete(`https://localhost/api/v1/users/${userId}`, {
         headers: { Authorization: `Bearer ${sessionStorage.getItem('authToken')}` },
       });
       setUsers((prev) => prev.filter((user) => (user.id || user.ID) !== userId));

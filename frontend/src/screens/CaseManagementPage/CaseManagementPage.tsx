@@ -727,7 +727,7 @@ const handleViewReport = async () => {
                                       toast.dismiss();
                                       try {
                                         const token = sessionStorage.getItem("authToken") || "";
-                                        const res = await fetch("http://localhost:8080/api/v1/cases/unassign", {
+                                        const res = await fetch("https://localhost/api/v1/cases/unassign", {
                                           method: "POST",
                                           headers: {
                                             "Authorization": `Bearer ${token}`,
