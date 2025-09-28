@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Hub struct {
@@ -27,6 +28,9 @@ type Hub struct {
 	mu                  sync.Mutex
 	connections         map[string]map[string]*websocket.Conn
 	NotificationService *notification.NotificationService
+
+	MongoDB     *mongo.Database // can be nil if Mongo disabled
+	MessagesCol *mongo.Collection
 }
 type Claims struct {
 	Email        string `json:"email"`
@@ -44,14 +48,20 @@ var _ chatModels.WebSocketManager = (*Hub)(nil)
 
 var ErrNoActiveConnection = errors.New("no active connection found for user")
 
-func NewHub(notificationService *notification.NotificationService) *Hub {
-	return &Hub{
+func NewHub(notificationService *notification.NotificationService, mongoDB *mongo.Database) *Hub {
+	h := &Hub{
 		clients:             make(map[string]map[*Client]bool),
 		broadcast:           make(chan MessageEnvelope),
 		register:            make(chan *Client),
 		unregister:          make(chan *Client),
 		NotificationService: notificationService,
+		MongoDB:             mongoDB,
 	}
+	// Initialize the collection if Mongo is wired up
+	if mongoDB != nil {
+		h.MessagesCol = mongoDB.Collection("chat_messages")
+	}
+	return h
 }
 
 func (h *Hub) Run() {
@@ -405,7 +415,7 @@ func (c *Client) readPump() {
 				GroupID:   payload.GroupID,
 				Payload:   payload,
 				Timestamp: time.Now(),
-				UserEmail: payload.SenderID, // or SenderEmail if available
+				UserEmail: payload.SenderEmail, // or SenderEmail if available
 			}
 
 			encoded, err := json.Marshal(broadcastMsg)

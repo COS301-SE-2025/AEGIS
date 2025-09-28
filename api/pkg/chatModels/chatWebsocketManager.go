@@ -710,7 +710,7 @@ func (w *webSocketManager) deliverQueuedMessages(userEmail string) {
 
 	for _, msg := range messages {
 		event := WebSocketMessage{
-			Type:      NewMessageType,
+			Type:      MessageType(EventNewMessage),
 			GroupID:   msg.GroupID.Hex(),
 			UserEmail: msg.SenderEmail,
 			Payload:   msg,

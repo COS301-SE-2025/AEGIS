@@ -19,12 +19,34 @@ import {
   Eye,
   Trash
 } from "lucide-react";
-import {Link} from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { toast } from 'react-hot-toast';
 import { MutableRefObject } from "react";
 import { ClipboardList } from "lucide-react";
-// Type definitions
+
+
+/*----------------------------------------
+End-to-End Encryption (E2EE) with X3DH + AES-GCM
+-------------------------------------------
+*/
+import {
+  deriveSharedSecretResponder
+} from '../../lib/crypto/x3dh';
+
+import { encryptMessage, decryptMessage,encryptBytes,decryptBytes } from '../../lib/crypto/aes_gcm'; // or your xchacha/secretbox helpers
+ // or wherever your helpers live
+import { useUserKeys } from '../../store/userKeys';
+import { useSharedSecrets } from '../../store/keys';
+import sodium from 'libsodium-wrappers';
+
+import { initializeE2EE } from "../../lib/crypto/init-e2ee";
+
+import { Buffer } from 'buffer';
+(window as any).Buffer = Buffer;
+import { hkdf } from "../../lib/crypto/hkdf";
+import { generateGroupSharedSecretForChat } from "../../lib/crypto/groupSecret";
+
 interface Message {
   id: number;
   user: string;
@@ -61,7 +83,7 @@ interface JwtPayload {
 }
 
 interface Group {
-  id: number;
+  id: string;
   caseID?: string;
   case_id?: string;
   name: string;
@@ -106,31 +128,65 @@ type WebSocketMessageType =
   | "user_left"
   | "file_attachment"
   | "system_alert"
-  |"typing_stop"
-  | "typing_start";
+  | "typing_stop";
 
-type NewMessagePayload = {
-  messageId: string;
-  text: string;
-  senderId: string;
-  senderName: string;
-  groupId: string;
-  timestamp: string;
-  attachments?: Attachment[];
-  replyingTo?: string;
+// Shared type everywhere
+type CryptoEnvelopeV1 = {
+  v: 1;
+  algo: "aes-gcm";
+  ephemeral_pub: string;   // base64 x25519
+  opk_id?: string;         // optional
+  nonce: string;           // base64
+  ct: string;              // base64 ciphertext
 };
 
-type Attachment = {
-  file_name: string;
-  file_type: string;
-  file_size: number;
-  url: string;
-  hash?: string;
-  isImage?: boolean;
-};
+export function generateEphemeralPublicKey(): string {
+  sodium.ready;
+  const keyPair = sodium.crypto_box_keypair();
+  return sodium.to_base64(keyPair.publicKey);
+}
 
-type ChatMessages = Record<number, Message[]>;
+const te = new TextEncoder();
 
+/** Hash a UTF-8 string to 32 bytes (SHA-256) for fixed-length salt. */
+async function sha256Utf8(s: string): Promise<Uint8Array> {
+  const digest = await crypto.subtle.digest("SHA-256", te.encode(s));
+  return new Uint8Array(digest);
+}
+
+/**
+ * Derive a 32-byte "shared secret" from a group of public keys.
+ * NOTE: This is NOT secret unless `ikm` includes a private contribution.
+ */
+export async function deriveSharedSecret(
+  groupId: string,
+  publicKeys: Uint8Array[]
+): Promise<Uint8Array> {
+  if (!Array.isArray(publicKeys) || publicKeys.length === 0) {
+    throw new Error("No public keys provided for secret derivation.");
+  }
+  if (!publicKeys.every((k) => k instanceof Uint8Array)) {
+    throw new Error("All public keys must be instances of Uint8Array.");
+  }
+  if (!publicKeys.every((k) => k.length === publicKeys[0].length)) {
+    throw new Error("All public keys must have the same length.");
+  }
+
+  // Concatenate keys into IKM (input keying material)
+  const keyLen = publicKeys[0].length;
+  const ikm = new Uint8Array(publicKeys.length * keyLen);
+  publicKeys.forEach((k, i) => ikm.set(k, i * keyLen));
+
+  // Salt = H(groupId) to ensure fixed, well-distributed salt bytes
+  const salt = await sha256Utf8(groupId);
+
+  // Context string to bind this derivation’s purpose
+  const info = te.encode("shared-secret-info");
+
+  // Derive 32-byte key with HKDF(SHA-256)
+  const okm = await hkdf(ikm, salt, info, 32);
+  return okm;
+}
 
 export const connectWebSocket = (
   caseId: string,
@@ -144,78 +200,193 @@ export const connectWebSocket = (
 ) => {
   if (!caseId || !token) return;
 
-  // Prevent reconnect if already open
-  if (socketRef.current?.readyState === WebSocket.OPEN) {
-    console.log("📡 WebSocket already connected.");
+  // Prevent duplicate connections on the same ref
+  const state = socketRef.current?.readyState;
+  if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) {
+    console.log("📡 WebSocket already connected/connecting.");
     return;
   }
 
-// ✅ CORRECT - use query parameter
-const ws = new WebSocket(`wss://localhost:8443/ws/cases/${caseId}?token=${encodeURIComponent(token)}`);  
-ws.onopen = () => {
+
+  // Clean up any stale socket before creating a new one
+  try { socketRef.current?.close(); } catch { /* noop */ }
+  socketRef.current = null;
+
+  // Scheme aware (use wss on https)
+  const scheme = (typeof window !== "undefined" && window.location?.protocol === "https:") ? "wss" : "ws";
+  const url = `${scheme}://localhost:8443/ws/cases/${encodeURIComponent(caseId)}?token=${encodeURIComponent(token)}`;
+
+  // Backoff state stored on the module-scope-ish ref so retries persist
+  const anyRef = socketRef as unknown as MutableRefObject<WebSocket & {
+    __retryAttempt?: number;
+    __hbTimer?: ReturnType<typeof setInterval> | null;
+    __hbTimeout?: ReturnType<typeof setTimeout> | null;
+  } | null>;
+
+  const attempt = (anyRef.current?.__retryAttempt ?? 0);
+
+  // Create socket
+  const ws = new WebSocket(url);
+
+  // Attach backoff/heartbeat fields
+  (ws as any).__retryAttempt = attempt;
+  (ws as any).__hbTimer = null;
+  (ws as any).__hbTimeout = null;
+
+  // --- Heartbeat helpers (app-level ping/pong) ---
+  const clearHeartbeat = () => {
+    const cur = socketRef.current as any;
+    if (!cur) return;
+    if (cur.__hbTimer) { clearInterval(cur.__hbTimer); cur.__hbTimer = null; }
+    if (cur.__hbTimeout) { clearTimeout(cur.__hbTimeout); cur.__hbTimeout = null; }
+  };
+
+  const startHeartbeat = () => {
+    const cur = socketRef.current as any;
+    if (!cur) return;
+
+    // send ping every 25s; expect a pong within 10s
+    cur.__hbTimer = setInterval(() => {
+      if (cur.readyState !== WebSocket.OPEN) return;
+      try {
+        const ts = Date.now();
+        cur.send(JSON.stringify({ type: "ping", payload: { ts } }));
+      } catch {/* ignore */}
+      // fail the connection if no pong arrives in time
+      cur.__hbTimeout = setTimeout(() => {
+        console.warn("💔 WS heartbeat timeout; closing socket to trigger reconnect.");
+        try { cur.close(); } catch {}
+      }, 10000);
+    }, 25000);
+  };
+
+  // --- Event handlers ---
+  ws.onopen = () => {
+
     console.log("✅ WebSocket connected");
-    onOpen?.(); // Optional callback
+    // reset backoff on a good connection
+    (ws as any).__retryAttempt = 0;
+    startHeartbeat();
+    onOpen?.();
   };
 
   ws.onmessage = (event) => {
-  try {
-    const parsed: WebSocketMessage = JSON.parse(event.data);
+    try {
+      const parsed = JSON.parse(event.data);
 
-    if (!parsed?.type || !parsed?.payload) {
-      throw new Error("Malformed WebSocket message");
+      // Heartbeat pong
+      if (parsed?.type === "pong") {
+        // clear the pong timeout
+        const cur = socketRef.current as any;
+        if (cur?.__hbTimeout) { clearTimeout(cur.__hbTimeout); cur.__hbTimeout = null; }
+        // Optional RTT log
+        if (parsed?.payload?.ts) {
+          const rtt = Date.now() - Number(parsed.payload.ts);
+          if (Number.isFinite(rtt)) console.log("🏓 WS RTT:", rtt, "ms");
+        }
+        return;
+      }
+
+      const msg = parsed as WebSocketMessage;
+      if (!msg || typeof msg !== "object") throw new Error("Malformed WS message: not an object");
+      if (!msg.type || !msg.payload) throw new Error("Malformed WS message: missing type or payload");
+
+      // Latency tracking (best-effort)
+      const receivedAt = Date.now();
+      const sentAt = Date.parse((msg.payload as any).timestamp || "");
+      if (!Number.isNaN(sentAt)) {
+        console.log("📥 WS message latency:", receivedAt - sentAt, "ms");
+      }
+
+      // Typing events
+      if (msg.type === "typing_start" || msg.type === "typing_stop") {
+        onTypingStatus?.(msg);
+        return;
+      }
+
+      onMessage(msg);
+    } catch (err) {
+      console.error("❌ Error handling WebSocket message:", err);
     }
+  };
 
-    // Latency tracking
-    const receivedAt = Date.now();
-    const sentAt = Date.parse(parsed.payload.timestamp || "");
-    if (!isNaN(sentAt)) {
-      console.log("📥 WS message latency:", receivedAt - sentAt, "ms");
-    } else {
-      console.warn("⏱️ Could not parse message timestamp.");
-    }
-
-    // ✅ Handle typing events separately
-    if (parsed.type === "typing_start") {
-      console.log(`✍️ Typing started by ${parsed.payload.userEmail} in group ${parsed.groupId}`);
-      onTypingStatus?.(parsed);
+  ws.onclose = (ev) => {
+    clearHeartbeat();
+    // Some servers use specific close codes for auth problems
+    const authish = [4001, 4003, 4401, 4403];
+    if (authish.includes(ev.code)) {
+      console.error(`🔒 WS closed with auth-like code ${ev.code}; not reconnecting.`);
+      onClose?.();
       return;
     }
 
-    if (parsed.type === "typing_stop") {
-      console.log(`🛑 Typing stopped by ${parsed.payload.userEmail} in group ${parsed.groupId}`);
-      onTypingStatus?.(parsed);
-      return;
-    }
-
-    // ✅ Default to message handler
-    onMessage(parsed);
-
-  } catch (err) {
-    console.error("❌ Error handling WebSocket message:", err);
-  }
-};
-
-
-
-  ws.onclose = () => {
+    // If a reconnect is already scheduled, skip
     if (reconnectTimeoutRef.current) return;
 
-    console.warn("⚠️ WebSocket closed. Retrying in 3s...");
+    // Exponential backoff with jitter
+    const prevAttempt = (ws as any).__retryAttempt ?? 0;
+    const nextAttempt = prevAttempt + 1;
+    const base = 1000;          // 1s
+    const max = 30000;          // 30s
+    const backoff = Math.min(max, base * Math.pow(2, prevAttempt));
+    const jitter = Math.floor(Math.random() * 400); // +0-400ms
+    const delay = backoff + jitter;
+
+    console.warn(`⚠️ WebSocket closed (code=${ev.code}, reason="${ev.reason || ""}"). Reconnecting in ${delay}ms...`);
     onClose?.();
 
     reconnectTimeoutRef.current = setTimeout(() => {
       reconnectTimeoutRef.current = null;
-      connectWebSocket(caseId, token, socketRef, reconnectTimeoutRef, onMessage, onOpen, onClose);
-    }, 3000);
+      // bump attempt count for next socket
+      (anyRef.current as any)?.__retryAttempt;
+      // Re-call connect; carry attempt via ref if available
+      // We store attempt on the new ws below after creating it.
+      connectWebSocket(
+        caseId,
+        token,
+        socketRef,
+        reconnectTimeoutRef,
+        onMessage,
+        onOpen,
+        onClose,
+        onTypingStatus
+      );
+      // Store attempt on the new socket after creation:
+      if (socketRef.current) {
+        (socketRef.current as any).__retryAttempt = nextAttempt;
+      }
+    }, delay);
   };
 
   ws.onerror = (err) => {
     console.error("❌ WebSocket error:", err);
-    ws.close(); // Triggers onclose
+    // Let onclose drive the reconnect/backoff path
+    try { ws.close(); } catch {/* noop */}
   };
 
+  // Replace the ref with this socket
   socketRef.current = ws;
+
+  // Optional: listen to online/offline to kick reconnect early
+  const handleOnline = () => {
+    const st = socketRef.current?.readyState;
+    if (st !== WebSocket.OPEN && !reconnectTimeoutRef.current) {
+      console.log("🌐 Network online — attempting early reconnect.");
+      try { socketRef.current?.close(); } catch {}
+    }
+  };
+  window.addEventListener("online", handleOnline);
+
+  // Clean this listener if/when the socket is replaced
+  const cleanupPrev = socketRef.current;
+  const cleanup = () => {
+    window.removeEventListener("online", handleOnline);
+    clearHeartbeat();
+  };
+  // Attach a small hook so whoever closes this socket triggers cleanup
+  (cleanupPrev as any).__cleanup = cleanup;
 };
+
 
 export const SecureChatPage = (): JSX.Element => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -235,17 +406,17 @@ export const SecureChatPage = (): JSX.Element => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [modalImageUrl, setModalImageUrl] = useState("");
   const [, setPreviewFileData] = useState<string>("");
-  const [typingUsers, setTypingUsers] = useState<Record<number, string[]>>({});
+  const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
   const [hasMounted, setHasMounted] = useState(false);
   const [] = useState<Thread[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const [, setSocketConnected] = useState(false);
-  const previousUrlRef = useRef<string | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const storedUser = sessionStorage.getItem("user");
-    const user = storedUser ? JSON.parse(storedUser) : null;
-const [role, setRole] = useState<string>(user?.role || "");
-const isDFIRAdmin = role === "DFIR Admin";
+  const storedUser = sessionStorage.getItem("user");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const [role, setRole] = useState<string>(user?.role || "");
+  const isDFIRAdmin = role === "DFIR Admin";
+
   interface Case {
     id: string;
     title?: string;
@@ -255,76 +426,383 @@ const isDFIRAdmin = role === "DFIR Admin";
   const [selectedCaseId, setSelectedCaseId] = useState("");
   // Removed unused setRetryCount state
 
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editIsPublic, setEditIsPublic] = useState(false);
+  const [showEditGroupModal, setShowEditGroupModal] = useState(false);
 
-  const handleTypingStatus = (msg: WebSocketMessage) => {
-  const { type, payload } = msg;
-  const groupId = activeChat?.id;
-  if (!groupId || payload.userEmail === userEmail) return;
+  // Mock data for groups and messages
+  const [groups, setGroups] = useState<Group[]>([]);
 
-  if (type === "typing_start") {
-    // Add user to typing list (without duplicates)
-    setTypingUsers(prev => {
-      const users = new Set([...(prev[groupId] || []), payload.userEmail]);
-      return { ...prev, [groupId]: Array.from(users) };
+  type ChatMessages = Record<string, Message[]>; // <-- string keys
+  const [chatMessages, setChatMessages] = useState<ChatMessages>({});
+
+  const B64 = sodium.base64_variants.ORIGINAL;
+
+  // Track any blob URLs we create so we can revoke them later safely
+  const blobUrlsRef = useRef<string[]>([]);
+  const trackBlobUrl = (u: string) => { blobUrlsRef.current.push(u); };
+
+  // Revoke tracked URLs on unmount
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
+      blobUrlsRef.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
+  return () => {
+    if (activeChat?.id) {
+      const groupTimeouts = typingTimeoutsRef.current[activeChat.id] || {};
+      Object.values(groupTimeouts).forEach(clearTimeout);
+      delete typingTimeoutsRef.current[activeChat.id];
+    }
+  };
+}, [activeChat?.id]);
+
+  // somewhere in app bootstrap (e.g., in a useEffect in SecureChatPage)
+  useEffect(() => {
+    const token = sessionStorage.getItem("authToken");
+    if (!token) return;
+
+    // decode your JWT the way you already do:
+    const userId = String(user.id);
+    const tenantId = /* if you have multi-tenant */ undefined;
+
+    initializeE2EE({ userId, tenantId, minOPKs: 10, targetOPKs: 40 })
+      .catch((e) => {
+        console.error("E2EE init failed:", e);
+      });
+  }, []);
+
+
+
+ function verifySpkSignature(ikPubEd_b64: string, spkPubX_b64: string, sig_b64: string) {
+    const ikPubEd = sodium.from_base64(ikPubEd_b64, B64);
+    const spkPubX = sodium.from_base64(spkPubX_b64, B64);
+    const sig = sodium.from_base64(sig_b64, B64);
+    return sodium.crypto_sign_verify_detached(sig, spkPubX, ikPubEd);
+  }
+
+
+async function e2eeDecryptText(
+  ctB64u: string,
+  nB64u: string,
+  secret: Uint8Array
+) {
+  // decryptMessage(key, nonceB64u, ciphertextB64u)
+  return await decryptMessage(secret, nB64u, ctB64u);
+}
+
+async function e2eeDecryptBytes(
+  ctB64u: string,
+  nB64u: string,
+  secret: Uint8Array
+) {
+  // decryptBytes(key, nonceB64u, ciphertextB64u)
+  return await decryptBytes(secret, nB64u, ctB64u);
+}
+
+
+
+
+  // Replace your current fetchBundle with this UUID-only version.
+  type ServerBundleWire = {
+    identity_key?: string;
+    signed_prekey?: string;
+    spk_signature?: string;
+    one_time_prekey?: string;
+    opk_id?: string;
+    opk?: { id?: string; publicKey?: string } | null;
+
+    // also accept camelCase from newer backend
+    identityKey?: string;
+    signedPreKey?: string;
+    spkSignature?: string;
+    oneTimePreKey?: string;
+  };
+
+
+  /** UUID-only bundle fetch. */
+  // put near fetchBundle()
+  async function resolvePeerIdentifier(identifier: string): Promise<string> {
+    // If already UUID-ish, return as-is
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier)) {
+      return identifier;
+    }
+    // If it's an email and your API supports resolving:
+    // (Skip this block if your backend already accepts email on /bundle/:id)
+    // const r = await fetch(`${API}/api/v1/users/resolve?email=${encodeURIComponent(identifier)}`, { headers:{ Authorization: `Bearer ${sessionStorage.getItem("authToken")||""}` } });
+    // if (r.ok) { const j = await r.json(); return j.user_id; }
+    return identifier;
+  }
+
+let bundleFetchInFlight: { [key: string]: Promise<ServerBundleWire> } = {};
+
+async function fetchBundle(recipient: string): Promise<ServerBundleWire> {
+  // Explicitly check if the key exists in the object
+  if (Object.prototype.hasOwnProperty.call(bundleFetchInFlight, recipient)) {
+    return bundleFetchInFlight[recipient];
+  }
+  const promise = (async () => {
+    const auth = sessionStorage.getItem("authToken") || "";
+    const id = await resolvePeerIdentifier(recipient);
+    const url = `https://localhost/api/v1/x3dh/bundle/${id}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${auth}` } });
+    if (!res.ok) throw new Error(`bundle(${id}) ${res.status}: ${await res.text()}`);
+    return res.json();
+  })();
+  bundleFetchInFlight[recipient] = promise;
+  try {
+    return await promise;
+  } finally {
+    delete bundleFetchInFlight[recipient];
+  }
+}
+
+
+
+
+
+
+
+
+
+
+const handleSendMessage = async (e?: React.MouseEvent | React.KeyboardEvent) => {
+  e?.preventDefault();
+  if (!activeChat) return;
+  const plain = (message || "").trim();
+  if (!plain || !userEmail) return;
+
+  const chatId = String(activeChat.id);
+  const token = sessionStorage.getItem("authToken") || "";
+
+  try {
+    // 1) Ensure shared secret for this group (cache by groupId)
+    let secret = useSharedSecrets.getState().getSharedSecret(chatId) as Uint8Array | undefined;
+    let ephPubB64u: string | undefined;
+    let opkIdUsed: string | undefined;
+
+    if (!secret) {
+      const members = (activeChat.members || []).map(email => ({ id: email, email }));
+      const chatForSecret: Chat = { id: chatId, members, name: activeChat.name };
+
+      const res = await generateGroupSharedSecretForChat(chatForSecret, token, userId || "");
+      if (!res || !res.sharedSecret) {
+        console.error("Failed to derive group shared secret");
+        toast.error("Failed to establish secure session.");
+        return;
+      }
+      secret = res.sharedSecret;               // 32-byte Uint8Array
+      ephPubB64u = res.ephemeralPubKey || "";  // base64url (if provided)
+      opkIdUsed = res.opkIdUsed;               // optional
+      useSharedSecrets.getState().setSharedSecret(chatId, secret);
+    }
+
+    // 2) Encrypt the text message (AES-GCM string helper)
+    const { nonce, ciphertext } = await encryptMessage(secret, plain );
+    const envelope: CryptoEnvelopeV1 = {
+      v: 1,
+      algo: "aes-gcm",
+      ephemeral_pub: ephPubB64u || "",
+      ...(opkIdUsed ? { opk_id: opkIdUsed } : {}),
+      nonce,          // base64url
+      ct: ciphertext, // base64url
+    };
+
+    // 3) Persist to backend
+    const res = await fetch(`https://localhost/api/v1/chat/groups/${chatId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sender_email: userEmail,
+        sender_name: "You",
+        message_type: "text",
+        is_encrypted: true,
+        envelope,
+        content: "", // no plaintext body on server for encrypted text
+        ...(replyingTo && {
+          reply_to: {
+            id: replyingTo.id,
+            user: replyingTo.user,
+            // optionally include minimal fields your API expects
+          }
+        })
+      })
     });
 
-    // Clear existing timeout
-    if (typingTimeoutsRef.current[groupId]?.[payload.userEmail]) {
-      clearTimeout(typingTimeoutsRef.current[groupId][payload.userEmail]);
+    if (!res.ok) {
+      console.error("Failed to send encrypted message:", await res.text());
+      toast.error("Message failed to send.");
+      return;
     }
 
-    // Set new timeout to remove user
-    const timeout = setTimeout(() => {
-      setTypingUsers(prev => ({
-        ...prev,
-        [groupId]: (prev[groupId] || []).filter(u => u !== payload.userEmail),
+    const saved = await res.json();
+
+    // 4) Broadcast over WebSocket (if connected)
+    const socket = socketRef.current;
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "new_message",
+        payload: {
+          messageId: saved.id,
+          groupId: chatId,
+          senderEmail: userEmail,
+          senderName: "You",
+          message_type: "text",
+          is_encrypted: true,
+          envelope,
+          timestamp: new Date(saved.created_at || Date.now()).toISOString(),
+        },
       }));
-    }, 3000);
-
-    // Store the timeout
-    typingTimeoutsRef.current[groupId] = {
-      ...(typingTimeoutsRef.current[groupId] || {}),
-      [payload.userEmail]: timeout,
-    };
-  }
-};
-const handleSelectGroup = (group: any) => {
-  const id = group.id || group._id;
-  if (!id) {
-    console.warn("Invalid group object: missing id");
-    return;
-  }
-
-  setActiveChat({
-    ...group,
-    caseId: group.caseId || group.case_id || "",
-    id, // ✅ now always a number
-  });
-  localStorage.setItem("activeChat", JSON.stringify({
-    ...group,
-    caseId: group.caseId || group.case_id || "",
-    id,
-  }));
-};
-useEffect(() => {
-  if (!role) {
-    const token = sessionStorage.getItem("authToken");
-    if (token) {
-      try {
-        const [, payloadB64] = token.split(".");
-        const json = JSON.parse(
-          decodeURIComponent(
-            atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
-              .split("")
-              .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-              .join("")
-          )
-        );
-        if (json?.role) setRole(json.role);
-      } catch { /* ignore */ }
     }
+
+    // 5) Optimistic UI (we already have plaintext)
+    const uiMsg: Message = {
+      id: saved.id || Date.now(),
+      user: "You",
+      self: true,
+      color: "text-blue-400",
+      content: plain, // show plaintext locally
+      time: new Date(saved.created_at || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      status: "sent",
+      ...(replyingTo && {
+        replyTo: {
+          id: replyingTo.id,
+          user: replyingTo.user,
+          content: replyingTo.content,
+          ...(replyingTo.attachments?.[0] && {
+            attachment: {
+              name: replyingTo.attachments[0].file_name,
+              type: replyingTo.attachments[0].file_type
+            }
+          })
+        }
+      })
+    };
+
+    setChatMessages(prev => ({
+      ...prev,
+      [chatId]: [...(prev[chatId] || []), uiMsg]
+    }));
+
+    setGroups(prev => prev.map(g =>
+      g.id === activeChat.id
+        ? { ...g, lastMessage: uiMsg.content, lastMessageTime: "now" }
+        : g
+    ));
+
+    // 6) Clear composer + typing
+    setMessage("");
+    setReplyingTo(null);
+    // best-effort typing stop
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "typing_stop",
+        payload: { userEmail },
+        groupId: chatId,
+        userEmail,
+      }));
+    }
+  } catch (err) {
+    console.error("handleSendMessage error:", err);
+    toast.error("Message failed.");
   }
-}, [role]);
+};
+
+
+
+// Generate shared secret for group
+// Define a Chat member type
+interface ChatMember {
+  id: string;
+  email?: string;
+  name?: string;
+  publicKey?: Uint8Array; 
+}
+
+// Define a Chat type
+interface Chat {
+  id: string;              // group ID
+  members: ChatMember[];   // array of members
+  name?: string;           // optional group name
+}
+
+
+
+
+
+
+  // --- Receiving a message ---
+
+
+
+  // replace your current ensureOPKs
+let ensureOPKsInFlight = false;
+
+
+  const handleTypingStatus = (msg: WebSocketMessage) => {
+    const { type, payload } = msg;
+    const groupId = activeChat?.id;
+    if (!groupId || payload.userEmail === userEmail) return;
+
+    if (type === "typing_start") {
+      // Add user to typing list (without duplicates)
+      setTypingUsers(prev => {
+        const users = new Set([...(prev[groupId] || []), payload.userEmail]);
+        return { ...prev, [groupId]: Array.from(users) };
+      });
+
+      // Clear existing timeout
+      if (typingTimeoutsRef.current[groupId]?.[payload.userEmail]) {
+        clearTimeout(typingTimeoutsRef.current[groupId][payload.userEmail]);
+      }
+
+      // Set new timeout to remove user
+      const timeout = setTimeout(() => {
+        setTypingUsers(prev => ({
+          ...prev,
+          [groupId]: (prev[groupId] || []).filter(u => u !== payload.userEmail),
+        }));
+      }, 3000);
+
+      // Store the timeout
+      typingTimeoutsRef.current[groupId] = {
+        ...(typingTimeoutsRef.current[groupId] || {}),
+        [payload.userEmail]: timeout,
+      };
+    }
+  };
+const handleSelectGroup = (group: any) => {
+  const id: string = group.id || group._id;
+const memberEmails = (group.members || [])
+  .map((m: any) => (typeof m === 'string' ? m : m?.user_email))
+  .filter(Boolean);
+setActiveChat({ ...group, id, caseId: group.caseId || group.case_id || "", members: memberEmails });
+  localStorage.setItem("activeChat", JSON.stringify({ ...group, caseId: group.caseId || group.case_id || "", id }));
+};
+
+  useEffect(() => {
+    if (!role) {
+      const token = sessionStorage.getItem("authToken");
+      if (token) {
+        try {
+          const [, payloadB64] = token.split(".");
+          const json = JSON.parse(
+            decodeURIComponent(
+              atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+                .split("")
+                .map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+                .join("")
+            )
+          );
+          if (json?.role) setRole(json.role);
+        } catch { /* ignore */ }
+      }
+    }
+  }, [role]);
 
 
   useEffect(() => {
@@ -349,49 +827,26 @@ useEffect(() => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
-  //for adding member
+
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
-//   const [availableUsers] = useState([
-//   "alex.morgan@company.com"
-// ]);
-const [availableUsers, setAvailableUsers] = useState<{ user_email: string, role: string }[]>([]);
+
+  const [availableUsers, setAvailableUsers] = useState<{ user_email: string, role: string }[]>([]);
 
 
-const [token] = useState(sessionStorage.getItem("authToken"));
-const [userEmail] = useState(() => {
-  try {
-    const token = sessionStorage.getItem("authToken");
-    if (!token) return null;
+  const [token] = useState(sessionStorage.getItem("authToken"));
+  const [userEmail] = useState(() => {
+    try {
+      const token = sessionStorage.getItem("authToken");
+      if (!token) return null;
 
-    const base64Payload = token.split(".")[1];
-    const decodedPayload = JSON.parse(atob(base64Payload)) as JwtPayload;
-    return decodedPayload?.email || null;
-  } catch {
-    return null;
-  }
-});
-
-
-
-const [editGroupName, setEditGroupName] = useState("");
-const [editDescription, setEditDescription] = useState("");
-const [editIsPublic, setEditIsPublic] = useState(false);
-const [showEditGroupModal, setShowEditGroupModal] = useState(false);
-
-  // Mock data for groups and messages
-  const [groups, setGroups] = useState<Group[]>([]);
-
-  const [chatMessages, setChatMessages] = useState<ChatMessages>({});
-  const [] = useState([
-  { name: "Alex Morgan", role: "Forensics Analyst", color: "text-blue-400" },
-  { name: "Jamie Lee", role: "Incident Responder", color: "text-red-400" },
-  { name: "Riley Smith", role: "Malware Analyst", color: "text-green-400" }
-  ]);
-
-  // Add this function to simulate incoming messages
-  // Add this enhanced function to simulate realistic flowing conversations
-
+      const base64Payload = token.split(".")[1];
+      const decodedPayload = JSON.parse(atob(base64Payload)) as JwtPayload;
+      return decodedPayload?.email || null;
+    } catch {
+      return null;
+    }
+  });
 
 
 
@@ -401,10 +856,10 @@ const [showEditGroupModal, setShowEditGroupModal] = useState(false);
   );
 
   // Filter messages based on chat search
-  const filteredMessages = activeChat && chatMessages[activeChat.id] 
+  const filteredMessages = activeChat && chatMessages[activeChat.id]
     ? chatMessages[activeChat.id].filter(msg =>
-        msg.content.toLowerCase().includes(chatSearchQuery.toLowerCase())
-      )
+      msg.content.toLowerCase().includes(chatSearchQuery.toLowerCase())
+    )
     : [];
 
   const displayMessages = showChatSearch && chatSearchQuery ? filteredMessages : (activeChat ? chatMessages[activeChat.id] || [] : []);
@@ -432,9 +887,9 @@ const [showEditGroupModal, setShowEditGroupModal] = useState(false);
   }, []);
 
   useEffect(() => {
-  const savedSidebar = localStorage.getItem("sidebarOpen");
-  if (savedSidebar) {
-    setSidebarOpen(savedSidebar === "true");
+    const savedSidebar = localStorage.getItem("sidebarOpen");
+    if (savedSidebar) {
+      setSidebarOpen(savedSidebar === "true");
     }
   }, []);
 
@@ -443,110 +898,71 @@ const [showEditGroupModal, setShowEditGroupModal] = useState(false);
   }, [sidebarOpen]);
 
   useEffect(() => {
-  setHasMounted(true);
-}, []);
+    setHasMounted(true);
+  }, []);
 
-  // Clean up preview URL when component unmounts or preview changes
 
-useEffect(() => {
-  return () => {
-    if (previousUrlRef.current) {
-      URL.revokeObjectURL(previousUrlRef.current);
+
+
+  const fileInputGroupRef = useRef<HTMLInputElement>(null);
+
+  const handleGroupImageClick = () => {
+    if (activeChat?.id) {
+      fileInputGroupRef.current?.click();
     }
   };
-}, []);
 
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingTimeoutsRef = useRef<{
+    [groupId: string]: { [email: string]: ReturnType<typeof setTimeout> };
+  }>({});
 
+  const sendTypingNotification = (type: "typing_start" | "typing_stop") => {
+    if (!activeChat?.id || !socketRef.current) return;
 
+    const message = {
+      type,
+      payload: { userEmail },
+      groupId: String(activeChat.id),
+      userEmail,
+    };
 
-const fileInputGroupRef = useRef<HTMLInputElement>(null);
+    socketRef.current.send(JSON.stringify(message));
 
-const handleGroupImageClick = () => {
-  if (activeChat?.id) {
-    fileInputGroupRef.current?.click();
-  }
-};
+    if (type === "typing_start") {
+      // Debounce sending "typing_stop"
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
-const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-const typingTimeoutsRef = useRef<{
-  [groupId: string]: { [email: string]: ReturnType<typeof setTimeout> };
-}>({});
-
-const sendTypingNotification = (type: "typing_start" | "typing_stop") => {
-  if (!activeChat?.id || !socketRef.current) return;
-
-  const message = {
-    type,
-    payload: { userEmail },
-    groupId: String(activeChat.id),
-    userEmail,
+      typingTimeoutRef.current = setTimeout(() => {
+        const stopMessage = {
+          type: "typing_stop",
+          payload: { userEmail },
+          groupId: String(activeChat.id),
+          userEmail,
+        };
+        socketRef.current?.send(JSON.stringify(stopMessage));
+      }, 3000); // 3s of inactivity
+    }
   };
 
-  socketRef.current.send(JSON.stringify(message));
-
-  if (type === "typing_start") {
-    // Debounce sending "typing_stop"
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
-    typingTimeoutRef.current = setTimeout(() => {
-      const stopMessage = {
-        type: "typing_stop",
-        payload: { userEmail },
-        groupId: String(activeChat.id),
-        userEmail,
-      };
-      socketRef.current?.send(JSON.stringify(stopMessage));
-    }, 3000); // 3s of inactivity
-  }
-};
 
 
 
 
+  useEffect(() => {
+    return () => {
+      Object.values(typingTimeoutsRef.current).forEach(group =>
+        Object.values(group).forEach(timeout => clearTimeout(timeout))
+      );
+    };
+  }, []);
 
 
-//  useEffect(() => {
-//     if (!activeChat?.caseId) return;
 
 //      // Replace with actual token retrieval logic
 //     const socket = new WebSocket(`wss://localhost:8443/ws/cases/${activeChat.caseId}?token=${token}`);
 //     socketRef.current = socket;
 
-//     socket.onmessage = (event) => {
-//       try {
-//         const parsed: WebSocketMessage = JSON.parse(event.data);
-//         if (!parsed?.type || !parsed?.payload) throw new Error("Malformed WS message");
-
-//         handleTypingStatus(parsed);
-//       } catch (err) {
-//         console.error("Error parsing WebSocket message:", err);
-//       }
-//     };
-
-//     socket.onopen = () => {
-//       console.log("WebSocket connected.");
-//     };
-
-//     socket.onclose = () => {
-//       console.warn("WebSocket closed. Retrying...");
-//     };
-
-//     socket.onerror = (err) => {
-//       console.error("WebSocket error:", err);
-//     };
-
-//     return () => {
-//       socket.close();
-//     };
-//   }, [activeChat?.caseId]);
-
-useEffect(() => {
-  return () => {
-    Object.values(typingTimeoutsRef.current).forEach(group =>
-      Object.values(group).forEach(timeout => clearTimeout(timeout))
-    );
-  };
-}, []);
 
 
 
@@ -589,7 +1005,7 @@ const handleGroupImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) =>
 };
 
 
-// Save to localStorage
+
   useEffect(() => {
     const hasRealMessages = Object.values(chatMessages).some(msgs => (msgs || []).length > 0);
 
@@ -597,438 +1013,788 @@ const handleGroupImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) =>
 
     if (activeGroups.length > 0 || hasRealMessages) {
       localStorage.setItem('chatGroups', JSON.stringify(activeGroups));
-    //  localStorage.setItem('chatMessages', JSON.stringify(chatMessages));
+      //  localStorage.setItem('chatMessages', JSON.stringify(chatMessages));
     }
   }, [groups, chatMessages]);
 
 
+  useEffect(() => {
+    const meaningfulGroups = groups.filter(g => g.hasStarted);
+    if (meaningfulGroups.length > 0) {
+      localStorage.setItem('chatGroups', JSON.stringify(meaningfulGroups));
+    }
+  }, [groups]);
+
+  useEffect(() => {
+    const savedGroups = localStorage.getItem('chatGroups');
+    // const savedMessages = localStorage.getItem('chatMessages');
+
+    if (savedGroups) setGroups(JSON.parse(savedGroups));
+    // if (savedMessages) setChatMessages(JSON.parse(savedMessages));
+  }, []);
+
+  const fetchGroups = async () => {
+    console.log("Calling fetchGroups with:", userEmail, token);
+    if (token && userEmail) {
+      try {
+        const res = await fetch(`https://localhost/api/v1/chat/groups/user/${userEmail}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        console.log("Response status:", res.status);
+        if (!res.ok) {
+          console.error("Fetch failed:", await res.text());
+          return;
+        }
+
+
+        const data = await res.json();
+        console.log("Fetched groups data:", data);
+        // fetchGroups()
+const groupsWithAvatars = data.map((g: any) => {
+  const memberEmails = (g.members || [])
+    .map((m: any) => (typeof m === 'string' ? m : m?.user_email))
+    .filter(Boolean);
+  return {
+    ...g,
+    members: memberEmails,
+    caseId: g.case_id || g.caseId,
+    group_url: g.group_url || getAvatar(String(g.id || g._id)),
+  };
+});
+//setGroups(groupsWithAvatars);
+
+
+
+        if (Array.isArray(data)) {
+          setGroups(groupsWithAvatars);
+        } else if (Array.isArray(data.groups)) {
+          setGroups(data.groups);
+        } else {
+          console.error("Unexpected group data format:", data);
+          setGroups([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch groups:", err);
+      }
+    } else {
+      console.warn("No token or userEmail, cannot fetch groups.");
+    }
+  };
+
+
+  useEffect(() => {
+    if (!userEmail || !token) return;
+
+    const normalizedEmail = userEmail.trim().toLowerCase();
+    if (normalizedEmail) {
+      fetchGroups();
+    }
+  }, [userEmail, token]);
+
+  const [userId] = useState(() => {
+    try {
+      const token = sessionStorage.getItem("authToken");
+      if (!token) return null;
+
+      const base64Payload = token.split(".")[1];
+      const decodedPayload = JSON.parse(atob(base64Payload)) as JwtPayload;
+      return decodedPayload?.user_id || null;
+    } catch (err) {
+      console.error("❌ Failed to decode token:", err);
+      return null;
+    }
+  });
+
+
+
+
+  // Robust normalizer (no unsafe type assertions)
+  function normalizeIncomingBundle(raw: ServerBundleWire) {
+    const identityKeyEd =
+      raw.identityKey ?? raw.identity_key ?? raw.identityKey; // ed25519 pub
+
+    const spkPublicX =
+      raw.signedPreKey ?? raw.signed_prekey;
+
+    const spkSignature =
+      raw.spkSignature ?? raw.spk_signature;
+
+    const opk =
+      raw.opk ?? (raw.one_time_prekey ? { publicKey: raw.one_time_prekey } : null);
+
+    if (!identityKeyEd) throw new Error("Bundle missing identity key");
+    return { identityKeyEd, spkPublicX, spkSignature, opk };
+  }
+
+
 useEffect(() => {
+  if (!activeChat?.caseId || !token) return;
+
+  connectWebSocket(
+    activeChat.caseId,
+    token,
+    socketRef,
+    reconnectTimeoutRef,
+    async (msg: WebSocketMessage) => {
+      // Only handle messages for the active group
+      if (msg.type !== "new_message" || String(msg.payload.groupId) !== String(activeChat.id)) return;
+
+      const incoming = msg.payload;
+      let displayedText = incoming.content || ""; // Default to content for captions
+      let attachmentsForUI: Message["attachments"] = [];
+      let shared: Uint8Array | undefined;
+
+      try {
+        if (incoming.is_encrypted && incoming.envelope) {
+          const envelope = incoming.envelope as CryptoEnvelopeV1;
+          console.log("Processing encrypted message, groupId:", incoming.groupId);
+
+          // Retrieve or derive shared secret
+          shared = useSharedSecrets.getState().getSharedSecret(String(incoming.groupId));
+          if (!shared) {
+            await sodium.ready;
+            const { ikPriv: ourIKPrivEd, spkPriv: ourSPKPrivX, opks: ourOPKs } = useUserKeys.getState();
+            if (!ourIKPrivEd || !ourSPKPrivX) throw new Error("Missing private keys (IK/SPK) for decryption.");
+
+            const ephPubX = base64ToU8((envelope.ephemeral_pub || "").trim());
+            const opkId: string | undefined = envelope.opk_id;
+            const senderId = incoming.senderEmail || incoming.from || "";
+
+            if (!senderId) throw new Error("Missing sender identity");
+            const raw = await fetchBundle(senderId);
+            const nb = normalizeIncomingBundle(raw);
+
+            const ok =
+              nb.spkSignature &&
+              nb.spkPublicX &&
+              verifySpkSignature(nb.identityKeyEd, nb.spkPublicX, nb.spkSignature);
+            if (!ok) throw new Error("Sender SPK signature invalid");
+
+            const senderIKPubEd = sodium.from_base64(nb.identityKeyEd);
+            const senderIKPubX = sodium.crypto_sign_ed25519_pk_to_curve25519(senderIKPubEd);
+            const ourIKPrivX = sodium.crypto_sign_ed25519_sk_to_curve25519(ourIKPrivEd);
+
+            let ourOPKPrivX: Uint8Array | undefined;
+            if (opkId) {
+              const found = (useUserKeys.getState().opks || []).find(o => o.id === opkId);
+              ourOPKPrivX = found?.priv;
+            }
+
+            shared = await deriveSharedSecretResponder(
+              u8Fresh(ourIKPrivX),
+              u8Fresh(ourSPKPrivX),
+              u8Fresh(ephPubX),
+              u8Fresh(senderIKPubX),
+              ourOPKPrivX ? u8Fresh(ourOPKPrivX) : undefined
+            );
+
+            if (!shared) throw new Error("Failed to derive shared secret");
+            useSharedSecrets.getState().setSharedSecret(String(incoming.groupId), shared);
+          }
+
+          const stableShared = u8Fresh(shared);
+
+          if (incoming.message_type === "attachment") {
+            const bytes = await e2eeDecryptBytes(envelope.ct, envelope.nonce, stableShared);
+            const safeBytes = u8Fresh(bytes);
+            const mime = incoming.file_mime || "application/octet-stream";
+            const blob = new Blob([u8ToArrayBuffer(safeBytes)], { type: mime });
+            const blobUrl = URL.createObjectURL(blob);
+            trackBlobUrl(blobUrl);
+            displayedText = incoming.content || ""; // Use content as caption
+            attachmentsForUI = [{
+              file_name: incoming.file_name || "file",
+              file_type: mime,
+              file_size: incoming.file_size || safeBytes.byteLength,
+              url: blobUrl,
+              isImage: mime.startsWith("image/"),
+            }];
+          } else {
+            displayedText = await e2eeDecryptText(envelope.ct, envelope.nonce, stableShared);
+          }
+
+          if (envelope.opk_id) {
+            try { await useUserKeys.getState().markOPKUsed(envelope.opk_id, true); } catch {}
+          }
+        } else {
+          if (incoming.message_type === "attachment" && incoming.file_url) {
+            const mime = incoming.file_mime || "application/octet-stream";
+            attachmentsForUI = [{
+              file_name: incoming.file_name || "file",
+              file_type: mime,
+              file_size: incoming.file_size || 0,
+              url: incoming.file_url,
+              isImage: mime.startsWith("image/"),
+            }];
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to decrypt incoming message:", err);
+        displayedText = "[Decryption failed]";
+      }
+
+      const mappedMessage: Message = {
+        id: incoming.messageId,
+        user: incoming.senderName,
+        color: incoming.senderEmail === userEmail ? "text-green-400" : "text-blue-400",
+        content: displayedText,
+        time: new Date(incoming.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        status: "read",
+        self: incoming.senderEmail === userEmail,
+        attachments: attachmentsForUI,
+      };
+
+      setChatMessages(prev => {
+        const existing = prev[activeChat.id] || [];
+        if (existing.some(m => m.id === mappedMessage.id)) return prev;
+        return { ...prev, [activeChat.id]: [...existing, mappedMessage] };
+      });
+    },
+    () => setSocketConnected(true),
+    () => setSocketConnected(false),
+    handleTypingStatus
+  );
+
+  return () => {
+    if (reconnectTimeoutRef.current) { clearTimeout(reconnectTimeoutRef.current); reconnectTimeoutRef.current = null; }
+    try { socketRef.current?.close(); } catch {}
+  };
+}, [activeChat?.caseId, activeChat?.id, token, user?.id]);
+
+
+  const handleFileSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+
+    const url = URL.createObjectURL(file);
+    setPreviewFile(file);
+    setPreviewUrl(url);
+    setShowAttachmentPreview(true);
+    setAttachmentMessage("");
+
+    // Store base64 
+    const fileData = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.readAsDataURL(file);
+    });
+
+    setPreviewFileData(fileData);
+  };
   const meaningfulGroups = groups.filter(g => g.hasStarted);
   if (meaningfulGroups.length > 0) {
     localStorage.setItem('chatGroups', JSON.stringify(meaningfulGroups));
   }
-}, [groups]);
 
-  useEffect(() => {
-    const savedGroups = localStorage.getItem('chatGroups');
-   // const savedMessages = localStorage.getItem('chatMessages');
-    
-    if (savedGroups) setGroups(JSON.parse(savedGroups));
-   // if (savedMessages) setChatMessages(JSON.parse(savedMessages));
-  }, []);
 
-const fetchGroups = async () => {
-  console.log("Calling fetchGroups with:", userEmail, token);
-  if (token && userEmail) {
-    try {
-      const res = await fetch(`https://localhost/api/v1/chat/groups/user/${userEmail}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log("Response status:", res.status);
-      if (!res.ok) {
-      console.error("Fetch failed:", await res.text());
-      return;
+// const fetchGroups = async () => {
+//   console.log("Calling fetchGroups with:", userEmail, token);
+//   if (token && userEmail) {
+//     try {
+//       const res = await fetch(`https://localhost/api/v1/chat/groups/user/${userEmail}`, {
+//         headers: { Authorization: `Bearer ${token}` }
+//       });
+//       console.log("Response status:", res.status);
+//       if (!res.ok) {
+//       console.error("Fetch failed:", await res.text());
+//       return;
+
+
+  const handleCancelAttachment = () => {
+    setShowAttachmentPreview(false);
+    setPreviewFile(null);
+    setAttachmentMessage("");
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(""); // <-- only after revoking
+
     }
-
-
-      const data = await res.json();
-      console.log("Fetched groups data:", data);
-      const groupsWithAvatars = data.map((group: Group) => ({
-        ...group,
-        caseId: group.case_id || group.caseId,
-        group_url: group.group_url || getAvatar(group.id.toString()) //  use DB image if present
-      }));
+  };
 
 
 
-      if (Array.isArray(data)) {
-        setGroups(groupsWithAvatars);
-      } else if (Array.isArray(data.groups)) {
-        setGroups(data.groups);
-      } else {
-        console.error("Unexpected group data format:", data);
-        setGroups([]);
-      }
-    } catch (err) {
-      console.error("Failed to fetch groups:", err);
-    }
-  } else {
-    console.warn("No token or userEmail, cannot fetch groups.");
-  }
-};
-
-
-useEffect(() => {
-  if (!userEmail || !token) return;
-
-  const normalizedEmail = userEmail.trim().toLowerCase();
-  if (normalizedEmail) {
-    fetchGroups();
-  }
-}, [userEmail, token]);
-
-const sendMessage = async () => {
-  if (!activeChat || !message.trim()) return;
-
-  try {
-    const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        sender_email: userEmail,
-        sender_name: "You",
-        content: message,
-        message_type: "text"
-      })
-    });
+//       const data = await res.json();
+//       console.log("Fetched groups data:", data);
+//       const groupsWithAvatars = data.map((group: Group) => ({
+//         ...group,
+//         caseId: group.case_id || group.caseId,
+//         group_url: group.group_url || getAvatar(group.id.toString()) //  use DB image if present
+//       }));
 
 
 
-    const newMessage = await res.json();
+//       if (Array.isArray(data)) {
+//         setGroups(groupsWithAvatars);
+//       } else if (Array.isArray(data.groups)) {
+//         setGroups(data.groups);
+//       } else {
+//         console.error("Unexpected group data format:", data);
+//         setGroups([]);
+//       }
+//     } catch (err) {
+//       console.error("Failed to fetch groups:", err);
+//     }
+//   } else {
+//     console.warn("No token or userEmail, cannot fetch groups.");
+//   }
+// };
+
+
+// useEffect(() => {
+//   if (!userEmail || !token) return;
+
+//   const normalizedEmail = userEmail.trim().toLowerCase();
+//   if (normalizedEmail) {
+//     fetchGroups();
+//   }
+// }, [userEmail, token]);
+
+// const sendMessage = async () => {
+//   if (!activeChat || !message.trim()) return;
+
+//   try {
+//     const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/messages`, {
+//       method: 'POST',
+//       headers: {
+//         Authorization: `Bearer ${token}`,
+//         'Content-Type': 'application/json'
+//       },
+//       body: JSON.stringify({
+//         sender_email: userEmail,
+//         sender_name: "You",
+//         content: message,
+//         message_type: "text"
+//       })
+//     });
+
+
+
+//     const newMessage = await res.json();
     
-    // Post-process
-    const processedMessage: Message = {
-      id: newMessage.id,
-      user: newMessage.sender_name || newMessage.sender_email,
-      color: newMessage.sender_email === userEmail ? "text-green-400" : "text-blue-400",
-      content: newMessage.content,
-      time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: "read",
-      self: newMessage.sender_email === userEmail,
-      attachments: (newMessage.attachments && newMessage.attachments.length > 0)
-        ? newMessage.attachments.map((attachment: any) => ({
-            file_name: attachment.file_name,
-            file_type: attachment.file_type,
-            file_size: Number(attachment.file_size?.$numberLong || attachment.file_size || 0),
-            url: attachment.url,
-            hash: attachment.hash,
-            isImage: attachment.file_type.startsWith("image/") ||
-              attachment.url?.match(/\.(png|jpe?g|gif|bmp|webp)$/i)
-          }))
-        : []
-    };
+//     // Post-process
+//     const processedMessage: Message = {
+//       id: newMessage.id,
+//       user: newMessage.sender_name || newMessage.sender_email,
+//       color: newMessage.sender_email === userEmail ? "text-green-400" : "text-blue-400",
+//       content: newMessage.content,
+//       time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+//       status: "read",
+//       self: newMessage.sender_email === userEmail,
+//       attachments: (newMessage.attachments && newMessage.attachments.length > 0)
+//         ? newMessage.attachments.map((attachment: any) => ({
+//             file_name: attachment.file_name,
+//             file_type: attachment.file_type,
+//             file_size: Number(attachment.file_size?.$numberLong || attachment.file_size || 0),
+//             url: attachment.url,
+//             hash: attachment.hash,
+//             isImage: attachment.file_type.startsWith("image/") ||
+//               attachment.url?.match(/\.(png|jpe?g|gif|bmp|webp)$/i)
+//           }))
+//         : []
+//     };
 
-    setChatMessages(prev => ({
-      ...prev,
-      [activeChat.id]: [...(prev[activeChat.id] || []), processedMessage]
-    }));
-    setMessage("");
-    setReplyingTo(null);
+//     setChatMessages(prev => ({
+//       ...prev,
+//       [activeChat.id]: [...(prev[activeChat.id] || []), processedMessage]
+//     }));
+//     setMessage("");
+//     setReplyingTo(null);
 
-  } catch (err) {
-    console.error("Failed to send message:", err);
-  }
-};
-const [userId] = useState(() => {
-  try {
-    const token = sessionStorage.getItem("authToken");
-    if (!token) return null;
+//   } catch (err) {
+//     console.error("Failed to send message:", err);
+//   }
+// };
+// const [userId] = useState(() => {
+//   try {
+//     const token = sessionStorage.getItem("authToken");
+//     if (!token) return null;
 
-    const base64Payload = token.split(".")[1];
-    const decodedPayload = JSON.parse(atob(base64Payload)) as JwtPayload;
-    return decodedPayload?.user_id || null;
-  } catch (err) {
-    console.error("❌ Failed to decode token:", err);
-    return null;
-  }
-});
+//     const base64Payload = token.split(".")[1];
+//     const decodedPayload = JSON.parse(atob(base64Payload)) as JwtPayload;
+//     return decodedPayload?.user_id || null;
+//   } catch (err) {
+//     console.error("❌ Failed to decode token:", err);
+//     return null;
+//   }
+// });
 
 
-const sendWebSocketMessage = async () => {
-  if (!activeChat || !message.trim() || !userId || !userEmail) return;
+// const sendWebSocketMessage = async () => {
+//   if (!activeChat || !message.trim() || !userId || !userEmail) return;
 
-  // persist to database first regardless
-  try {
-    const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        sender_email: userEmail,
-        sender_name: "You",
-        content: message,
-        message_type: "text"
-      })
-    });
+//   // persist to database first regardless
+//   try {
+//     const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/messages`, {
+//       method: 'POST',
+//       headers: {
+//         Authorization: `Bearer ${token}`,
+//         'Content-Type': 'application/json'
+//       },
+//       body: JSON.stringify({
+//         sender_email: userEmail,
+//         sender_name: "You",
+//         content: message,
+//         message_type: "text"
+//       })
+//     });
 
-    const newMessage = await res.json();
+//     const newMessage = await res.json();
     
-    // Post-process the message from the database response
-    const processedMessage: Message = {
-      id: newMessage.id,
-      user: newMessage.sender_name || newMessage.sender_email,
-      color: newMessage.sender_email === userEmail ? "text-green-400" : "text-blue-400",
-      content: newMessage.content,
-      time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: "read",
-      self: newMessage.sender_email === userEmail,
-      attachments: (newMessage.attachments && newMessage.attachments.length > 0)
-        ? newMessage.attachments.map((attachment: any) => ({
-            file_name: attachment.file_name,
-            file_type: attachment.file_type,
-            file_size: Number(attachment.file_size?.$numberLong || attachment.file_size || 0),
-            url: attachment.url,
-            hash: attachment.hash,
-            isImage: attachment.file_type.startsWith("image/") ||
-              attachment.url?.match(/\.(png|jpe?g|gif|bmp|webp)$/i)
-          }))
-        : []
-    };
+//     // Post-process the message from the database response
+//     const processedMessage: Message = {
+//       id: newMessage.id,
+//       user: newMessage.sender_name || newMessage.sender_email,
+//       color: newMessage.sender_email === userEmail ? "text-green-400" : "text-blue-400",
+//       content: newMessage.content,
+//       time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+//       status: "read",
+//       self: newMessage.sender_email === userEmail,
+//       attachments: (newMessage.attachments && newMessage.attachments.length > 0)
+//         ? newMessage.attachments.map((attachment: any) => ({
+//             file_name: attachment.file_name,
+//             file_type: attachment.file_type,
+//             file_size: Number(attachment.file_size?.$numberLong || attachment.file_size || 0),
+//             url: attachment.url,
+//             hash: attachment.hash,
+//             isImage: attachment.file_type.startsWith("image/") ||
+//               attachment.url?.match(/\.(png|jpe?g|gif|bmp|webp)$/i)
+//           }))
+//         : []
+//     };
 
-    // Add to UI
-    setChatMessages(prev => ({
-      ...prev,
-      [activeChat.id]: [...(prev[activeChat.id] || []), processedMessage]
-    }));
+//     // Add to UI
+//     setChatMessages(prev => ({
+//       ...prev,
+//       [activeChat.id]: [...(prev[activeChat.id] || []), processedMessage]
+//     }));
 
-    // send via WebSocket for real-time delivery to others only AFTER persisting
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      const wsMessage: WebSocketMessage = {
-        type: "new_message",
-        payload: {
-          messageId: newMessage.id,
-          text: message.trim(),
-          senderId: userId,
-          senderName: userEmail,
-          groupId: String(activeChat.id), 
-          timestamp: newMessage.created_at,
-        },
-        timestamp: newMessage.created_at,
-        groupId: String(activeChat.id), 
-        userEmail,
-      };
+//     // send via WebSocket for real-time delivery to others only AFTER persisting
+//     if (socketRef.current?.readyState === WebSocket.OPEN) {
+//       const wsMessage: WebSocketMessage = {
+//         type: "new_message",
+//         payload: {
+//           messageId: newMessage.id,
+//           text: message.trim(),
+//           senderId: userId,
+//           senderName: userEmail,
+//           groupId: String(activeChat.id), 
+//           timestamp: newMessage.created_at,
+//         },
+//         timestamp: newMessage.created_at,
+//         groupId: String(activeChat.id), 
+//         userEmail,
+//       };
       
-      socketRef.current.send(JSON.stringify(wsMessage));
-    }
+//       socketRef.current.send(JSON.stringify(wsMessage));
+//     }
 
-  } catch (err) {
-    console.error("Failed to send message:", err);
-    toast.error("Failed to send message");
-  }
+//   } catch (err) {
+//     console.error("Failed to send message:", err);
+//     toast.error("Failed to send message");
+//   }
 
-  setMessage(""); // clear input
-  setReplyingTo(null);
-};
+//   setMessage(""); // clear input
+//   setReplyingTo(null);
+// };
 
-const handleSendMessage = async (e?: React.MouseEvent | React.KeyboardEvent) => {
-  e?.preventDefault();
-  await sendWebSocketMessage();
-};
+// const handleSendMessage = async (e?: React.MouseEvent | React.KeyboardEvent) => {
+//   e?.preventDefault();
+//   await sendWebSocketMessage();
+// };
 
 
-  const handleFileSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  const files = event.target.files;
-  if (!files || files.length === 0) return;
+//   const handleFileSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
+//   const files = event.target.files;
+//   if (!files || files.length === 0) return;
 
-  const file = files[0];
+//   const file = files[0];
 
-  const url = URL.createObjectURL(file);
-  setPreviewFile(file);
-  setPreviewUrl(url);
-  setShowAttachmentPreview(true);
-  setAttachmentMessage("");
+//   const url = URL.createObjectURL(file);
+//   setPreviewFile(file);
+//   setPreviewUrl(url);
+//   setShowAttachmentPreview(true);
+//   setAttachmentMessage("");
 
-  // Store base64 
-  const fileData = await new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target?.result as string);
-    reader.readAsDataURL(file);
-  });
+//   // Store base64 
+//   const fileData = await new Promise<string>((resolve) => {
+//     const reader = new FileReader();
+//     reader.onload = (e) => resolve(e.target?.result as string);
+//     reader.readAsDataURL(file);
+//   });
 
-  setPreviewFileData(fileData);
-};
-  const meaningfulGroups = groups.filter(g => g.hasStarted);
-if (meaningfulGroups.length > 0) {
-  localStorage.setItem('chatGroups', JSON.stringify(meaningfulGroups));
+//   setPreviewFileData(fileData);
+// };
+//   const meaningfulGroups = groups.filter(g => g.hasStarted);
+// if (meaningfulGroups.length > 0) {
+//   localStorage.setItem('chatGroups', JSON.stringify(meaningfulGroups));
+// =======
+// make sure this import (or equivalent) exists somewhere near your other crypto imports:
+// import { encryptBytes } from "src/lib/crypto/aesgcm"; // adjust path to your aesgcm.ts
+// base64url -> Uint8Array
+function unb64url(s: string): Uint8Array {
+  const pad = s.length % 4 === 2 ? "==" : s.length % 4 === 3 ? "=" : "";
+  const base64 = s.replace(/-/g, "+").replace(/_/g, "/") + pad;
+  const bin = atob(base64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+
 }
 
 
-
- const handleCancelAttachment = () => {
-  setShowAttachmentPreview(false);
-  setPreviewFile(null);
-  setAttachmentMessage("");
-
-  if (previewUrl) {
-    URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(""); // <-- only after revoking
-  }
-};
+// Uint8Array -> standard base64 (kept from your snippet)
+function toStdB64(u8: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+  return btoa(s);
+}
 
 const sendAttachment = async () => {
   if (!activeChat || !previewFile) return;
 
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    let base64 = "";
-    if (typeof e.target?.result === "string") {
-      base64 = e.target.result.split(",")[1];
-    } else if (e.target?.result instanceof ArrayBuffer) {
-      base64 = btoa(String.fromCharCode(...new Uint8Array(e.target.result)));
-    }
+  const chatId = String(activeChat.id);
+  const members = activeChat.members || [];
+  const groupId = chatId;
+  const token = sessionStorage.getItem("authToken") || "";
 
-    try {
-      const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/messages`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          sender_email: userEmail,
-          sender_name: "You",
-          content: attachmentMessage,
-          file: base64,
-          fileName: previewFile.name,
-          message_type: "attachment"
-        })
-      });
 
-      const newMessageData = await res.json();
+  let envelope: CryptoEnvelopeV1; // Declare envelope outside try block
+  try {
+    // 1) Ensure shared secret for the group
+    let secret = useSharedSecrets.getState().getSharedSecret(groupId) as Uint8Array | undefined;
+    let ephPubB64u: string | undefined;
+    let opkIdUsed: string | undefined;
 
-      // Build local consistent message
-      const newMessage: Message = {
-        id: newMessageData.id || Date.now(),
-        user: "You",
-        self: true,
-        color: "text-blue-400",
-        content: newMessageData.content || (attachmentMessage || `Shared file: ${previewFile.name}`),
-        time: new Date(newMessageData.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: "sent",
-        attachments: [{
-          file_name: previewFile.name,
-          file_type: previewFile.type,
-          file_size: previewFile.size,
-          url: previewUrl,
-          isImage: previewFile.type.startsWith("image/")
-        }],
-        ...(replyingTo && {
-          replyTo: {
-            id: replyingTo.id,
-            user: replyingTo.user,
-            content: replyingTo.content,
-            ...(replyingTo.attachments?.[0] && {
-              attachment: {
-                name: replyingTo.attachments[0].file_name,
-                type: replyingTo.attachments[0].file_type
-              }
-            })
-          }
-        })
+
+    if (!secret) {
+      const chatForSecret: Chat = {
+        id: chatId,
+        members: members.map(email => ({ id: email, email })),
+        name: activeChat.name,
       };
-
-      setChatMessages(prev => ({
-        ...prev,
-        [activeChat.id]: [...(prev[activeChat.id] || []), newMessage]
-      }));
-
-      setGroups(prev => prev.map(group =>
-        group.id === activeChat.id
-          ? { ...group, lastMessage: newMessage.content, lastMessageTime: "now" }
-          : group
-      ));
-
-    } catch (err) {
-      console.error("Failed to send attachment:", err);
-    } finally {
-      // Cleanup safely
-      setShowAttachmentPreview(false);
-      setPreviewFile(null);
-      setAttachmentMessage("");
-
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-        setPreviewUrl(""); // only after revoking
+      const res = await generateGroupSharedSecretForChat(chatForSecret, token, userId || "");
+      if (!res || !res.sharedSecret) {
+        console.error("Failed to derive group shared secret");
+        toast.error("Failed to establish secure session.");
+        return;
       }
-
-      setReplyingTo(null);
+      secret = res.sharedSecret;
+      ephPubB64u = res.ephemeralPubKey || "";
+      opkIdUsed = res.opkIdUsed;
+      useSharedSecrets.getState().setSharedSecret(groupId, secret);
     }
-  };
-  reader.readAsDataURL(previewFile);
+
+    // 2) Encrypt file bytes
+    const rawBytes = new Uint8Array(await previewFile.arrayBuffer());
+    const { nonce, ciphertext } = await encryptBytes(secret, rawBytes);
+    const ctU8 = unb64url(ciphertext); // Convert base64url to Uint8Array
+    const fileStdB64 = toStdB64(ctU8); // Convert to standard base64
+
+    // 3) Create envelope
+    envelope = {
+      v: 1,
+      algo: "aes-gcm",
+      ephemeral_pub: ephPubB64u || "",
+      ...(opkIdUsed ? { opk_id: opkIdUsed } : {}),
+      nonce,
+      ct: ciphertext
+    };
+
+    // 4) Log payload for debugging
+    console.log("Sending attachment payload:", {
+      file: fileStdB64,
+      fileName: previewFile.name,
+      file_mime: previewFile.type,
+      file_size: previewFile.size,
+      content: attachmentMessage || "",
+      envelope,
+    });
+
+    // 5) Persist message
+    const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sender_email: userEmail,
+        sender_name: "You",
+        message_type: "attachment",
+        is_encrypted: true,
+        file: fileStdB64,
+        fileName: previewFile.name,
+        file_mime: previewFile.type || "application/octet-stream",
+        file_size: previewFile.size,
+        envelope: envelope, // Use full object instead of shorthand
+        content: attachmentMessage || "",
+      })
+    });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      console.error("Failed to send encrypted attachment:", res.status, txt);
+      toast.error("Failed to send attachment.");
+      return;
+    }
+
+    const saved = await res.json();
+    console.log("Backend response:", saved);
+
+    // 6) Broadcast over WebSocket
+    const socket = socketRef.current;
+    if (socket?.readyState === WebSocket.OPEN) {
+      const payload = {
+        type: "new_message",
+        payload: {
+          messageId: saved.id,
+          groupId: chatId,
+          senderEmail: userEmail,
+          senderName: "You",
+          message_type: "attachment",
+          is_encrypted: true,
+          envelope: saved.envelope,
+          file_name: previewFile.name,
+          file_mime: previewFile.type,
+          file_size: previewFile.size,
+          content: saved.content || attachmentMessage || "",
+          timestamp: new Date(saved.created_at || Date.now()).toISOString(),
+        }
+      };
+      console.log("WebSocket broadcast:", payload);
+      socket.send(JSON.stringify(payload));
+    }
+
+    // 7) Optimistic UI
+    const messageBlobUrl = URL.createObjectURL(previewFile);
+    trackBlobUrl(messageBlobUrl);
+
+    const optimistic: Message = {
+      id: saved.id || Date.now(),
+      user: "You",
+      self: true,
+      color: "text-blue-400",
+      content: saved.content || attachmentMessage || `Shared file: ${previewFile.name}`,
+      time: new Date(saved.created_at || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      status: "sent",
+      attachments: [{
+        file_name: previewFile.name,
+        file_type: previewFile.type || "application/octet-stream",
+        file_size: previewFile.size,
+        url: messageBlobUrl,
+        isImage: (previewFile.type || "").startsWith("image/"),
+      }],
+      ...(replyingTo && {
+        replyTo: {
+          id: replyingTo.id,
+          user: replyingTo.user,
+          content: replyingTo.content,
+          ...(replyingTo.attachments?.[0] && {
+            attachment: {
+              name: replyingTo.attachments[0].file_name,
+              type: replyingTo.attachments[0].file_type
+            }
+          })
+        }
+      })
+    };
+
+    setChatMessages(prev => {
+      const cur = prev[activeChat.id] || [];
+      return { ...prev, [activeChat.id]: [...cur, optimistic] };
+    });
+
+    setGroups(prev => prev.map(group =>
+      group.id === activeChat.id
+        ? { ...group, lastMessage: optimistic.content, lastMessageTime: "now" }
+        : group
+    ));
+
+  } catch (err) {
+    console.error("Failed to send attachment:", err);
+    toast.error("Attachment failed.");
+  } finally {
+    setShowAttachmentPreview(false);
+    setPreviewFile(null);
+    setAttachmentMessage("");
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl("");
+    }
+    setReplyingTo(null);
+  }
 };
+
+
+
 
   function getAvatar(_groupId: string): string {
     return ""; // Let the fallback image handle it
   }
 
-const handleCreateGroup = async (e?: React.MouseEvent | React.KeyboardEvent) => {
-  e?.preventDefault();
+  const handleCreateGroup = async (e?: React.MouseEvent | React.KeyboardEvent) => {
+    e?.preventDefault();
 
-  if (!newGroupName.trim() || !selectedCaseId) return;
+    if (!newGroupName.trim() || !selectedCaseId) return;
 
-  try {
-    const res = await fetch('https://localhost/api/v1/chat/groups', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: newGroupName,
-        description: "Group created from frontend",
-        type: "group",
-        case_id: selectedCaseId,
-        created_by: userEmail,
-        members: [{ user_email: userEmail, role: "admin" }],
-        settings: { is_public: false, allow_invites: true },
-        group_url: ""
-      })
-    });
 
-    if (!res.ok) {
-      const errorData = await res.json();
-      console.error("Failed to create group:", errorData);
-      return;
+    try {
+      const res = await fetch('https://localhost/api/v1/chat/groups', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: newGroupName,
+          description: "Group created from frontend",
+          type: "group",
+          case_id: selectedCaseId,
+          created_by: userEmail,
+          members: [{ user_email: userEmail, role: "admin" }],
+          settings: { is_public: false, allow_invites: true },
+          group_url: ""
+        })
+      });
+
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error("Failed to create group:", errorData);
+        return;
+      }
+
+      const createdGroup = await res.json();
+
+      // Assign group_url using getAvatar (based on UUID string)
+      const groupWithAvatar = {
+        ...createdGroup,
+        group_url: createdGroup.group_url || "/default-group-avatar.png",
+        unreadCount: 0,
+        lastMessage: "Group created",
+        lastMessageTime: "now",
+      };
+
+      setGroups(prev => {
+        const updated = [...prev, groupWithAvatar];
+        return updated.sort((a, b) => a.name.localeCompare(b.name));
+      });
+
+      setChatMessages(prev => ({
+        ...prev,
+        [createdGroup.id]: []
+      }));
+
+      setNewGroupName("");
+      setSelectedCaseId("");
+      setShowNewGroupModal(false);
+
+    } catch (error) {
+      console.error("Error creating group:", error);
     }
-
-    const createdGroup = await res.json();
-
-    // Assign group_url using getAvatar (based on UUID string)
-    const groupWithAvatar = {
-      ...createdGroup,
-      group_url: createdGroup.group_url || "/default-group-avatar.png",
-      unreadCount: 0,
-      lastMessage: "Group created",
-      lastMessageTime: "now",
-    };
-
-setGroups(prev => {
-  const updated = [...prev, groupWithAvatar];
-  return updated.sort((a, b) => a.name.localeCompare(b.name));
-});
-
-    setChatMessages(prev => ({
-      ...prev,
-      [createdGroup.id]: []
-    }));
-
-    setNewGroupName("");
-    setSelectedCaseId("");
-    setShowNewGroupModal(false);
-
-  } catch (error) {
-    console.error("Error creating group:", error);
-  }
-};
+  };
 
 
-  // const handleExitGroup = () => {
-  //   if (!activeChat) return;
-    
-  //   setGroups(prev => prev.filter(group => group.id !== activeChat.id));
-  //   setChatMessages(prev => {
-  //     const newMessages = { ...prev };
-  //     delete newMessages[activeChat.id];
-  //     return newMessages;
-  //   });
-  //   setActiveChat(null);
-  //   setShowMoreMenu(false);
-  // };
   const handleReplyToMessage = (message: Message) => {
     setReplyingTo(message);
   };
@@ -1061,7 +1827,11 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
   }
 
   try {
+
+    const token = sessionStorage.getItem("authToken");
+    // Send the request to add the member
     const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/members`, {
+
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1069,7 +1839,7 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
       },
       body: JSON.stringify({
         user_email: newMemberEmail,
-        role: "member"
+        role: "member" // or "admin" if assigning admin role
       })
     });
 
@@ -1078,28 +1848,32 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
       try {
         const err = await res.json();
         message = err?.message || message;
-      } catch {}
+      } catch { }
       toast.error(message);
       return;
     }
 
     const updatedGroup = await res.json();
 
+    // Update the group in the UI
     setGroups(prev =>
       prev.map(group =>
         group.id === updatedGroup.id ? updatedGroup : group
       )
     );
 
+    // Update active chat with new member
     setActiveChat(prev => prev ? {
       ...prev,
       members: [...(Array.isArray(prev.members) ? prev.members : []), newMemberEmail]
     } : null);
 
+    // Remove the new member from the available users list
     setAvailableUsers(prev =>
       prev.filter(u => u.user_email !== newMemberEmail)
     );
 
+    // Send a system message indicating the new member was added
     const systemMessage: Message = {
       id: Date.now(),
       user: "System",
@@ -1115,7 +1889,40 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
     }));
 
     toast.success(`${newMemberEmail} successfully added to the group`);
-    setNewMemberEmail("");
+    setNewMemberEmail(""); // Clear input field
+// Parse current user from session storage
+const userStr = sessionStorage.getItem("user");
+let currentUserId: string | null = null;
+try {
+  const userObj = userStr ? JSON.parse(userStr) : null; // { id, email, ... } expected
+  currentUserId = userObj?.id ?? null;
+} catch {
+  // malformed JSON
+  currentUserId = null;
+}
+
+if (!currentUserId) {
+  toast.error("Could not determine current user. Please sign in again.");
+  return;
+}
+
+// **Shared Secret Management**:
+// Recalculate the shared secret for the entire group with the new member
+const secretResult = await generateGroupSharedSecretForChat(
+  updatedGroup,   // must be of type Chat
+  token || "",
+  currentUserId   // <- pass user id explicitly (per our latest function signature)
+);
+    if (secretResult && secretResult.sharedSecret) {
+      const sharedSecret = secretResult.sharedSecret;
+
+      // Update the shared secret for all members in the group
+      updatedGroup.members.forEach((member: string) => {
+        // Store or share the secret with all members (including the new one)
+        // This could involve sending the updated secret to the server or local state
+        useSharedSecrets.getState().setSharedSecret(member, sharedSecret);
+      });
+    }
 
   } catch (err) {
     console.error("Failed to add member:", err);
@@ -1124,172 +1931,273 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
 };
 
 
-const loadMessages = async (groupId: number) => {
-    if (!activeChat?.id) {
-    console.warn("❌  ID available, skipping message load.");
+
+
+function asEmailList(members: unknown): string[] {
+  if (!Array.isArray(members)) return [];
+  if (members.length === 0) return [];
+  if (typeof members[0] === "string") return members as string[];
+  return (members as Array<{ email?: string; id?: string; name?: string }>)
+    .map(m => m?.email || m?.id || m?.name || "")
+    .filter(Boolean);
+}
+
+function base64ToU8(s: string): Uint8Array {
+  // url-safe -> std
+  const pad = s.length % 4 === 2 ? "==" : s.length % 4 === 3 ? "=" : "";
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + pad;
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function u8Fresh(u8: Uint8Array): Uint8Array {
+  const ab = new ArrayBuffer(u8.byteLength);
+  const copy = new Uint8Array(ab);
+  copy.set(u8);
+  return copy;
+}
+
+function u8ToArrayBuffer(u8: Uint8Array): ArrayBuffer {
+  const ab = new ArrayBuffer(u8.byteLength);
+  new Uint8Array(ab).set(u8);
+  return ab;
+}
+
+
+async function loadMessages(groupId: string) {
+  if (!activeChat?.id) {
+    console.warn("❌ No activeChat ID, skipping message load.");
     return;
   }
+
   try {
     const res = await fetch(`https://localhost/api/v1/chat/groups/${groupId}/messages`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-
     if (!res.ok) {
       console.error("Failed to load messages:", await res.text());
+      setChatMessages(prev => ({ ...prev, [groupId]: [] }));
       return;
     }
 
     const data = await res.json();
-    console.log("Loaded raw messages:", data);
-      if (!Array.isArray(data)) {
-        console.warn("📭 No messages for this group, initializing with empty array.");
-        setChatMessages(prev => ({
-          ...prev,
-          [groupId]: []
-        }));
-        return;
+    console.log("Fetched messages:", data); // Debug log
+    if (!Array.isArray(data)) {
+      setChatMessages(prev => ({ ...prev, [groupId]: [] }));
+      return;
+    }
+
+    await sodium.ready;
+
+    const groupKey = String(groupId);
+    const memberEmails = asEmailList(activeChat.members);
+
+    const chatForSecret: Chat = {
+      id: groupKey,
+      name: activeChat.name,
+      members: memberEmails.map(email => ({ id: email, email })),
+    };
+
+    const messages: Message[] = [];
+
+    for (const msg of data) {
+      console.log("Processing message:", { id: msg.id, content: msg.content, message_type: msg.message_type }); // Debug log
+      let text = msg.content ?? "";
+      let attachmentsForUI: Message["attachments"] = [];
+
+      try {
+        if (msg.is_encrypted && msg.envelope) {
+          const envelope = msg.envelope as CryptoEnvelopeV1;
+          const opkId: string | undefined = envelope.opk_id;
+
+          let shared = useSharedSecrets.getState().getSharedSecret(groupKey);
+
+          if (!shared) {
+            const ephB64u = (envelope.ephemeral_pub || "").trim();
+
+            if (ephB64u) {
+              const { ikPriv: ourIKPrivEd, spkPriv: ourSPKPrivX, opks: ourOPKs } = useUserKeys.getState();
+              if (!ourIKPrivEd || !ourSPKPrivX) throw new Error("Missing private keys (IK/SPK) for decryption.");
+
+              const senderIdentity =
+                msg.sender_email ?? msg.from ?? memberEmails.find(e => e !== userEmail) ?? "";
+              if (!senderIdentity) throw new Error("Cannot determine sender identity to fetch bundle.");
+
+              const raw = await fetchBundle(senderIdentity);
+              const nb = normalizeIncomingBundle(raw);
+              const ok =
+                nb.spkSignature &&
+                nb.spkPublicX &&
+                verifySpkSignature(nb.identityKeyEd, nb.spkPublicX, nb.spkSignature);
+              if (!ok) throw new Error("Sender SPK signature invalid");
+
+              const senderIKPubEd = sodium.from_base64(nb.identityKeyEd);
+              const senderIKPubX = sodium.crypto_sign_ed25519_pk_to_curve25519(senderIKPubEd);
+              const ourIKPrivX = sodium.crypto_sign_ed25519_sk_to_curve25519(ourIKPrivEd);
+
+              let ourOPKPrivX: Uint8Array | undefined;
+              if (opkId) {
+                const found = useUserKeys.getState().opks?.find((o: { id: string; priv: Uint8Array }) => o.id === opkId);
+                ourOPKPrivX = found?.priv;
+              }
+
+              const ephPubX = base64ToU8(ephB64u);
+
+              shared = await deriveSharedSecretResponder(
+                u8Fresh(ourIKPrivX),
+                u8Fresh(ourSPKPrivX),
+                u8Fresh(ephPubX),
+                u8Fresh(senderIKPubX),
+                ourOPKPrivX ? u8Fresh(ourOPKPrivX) : undefined
+              );
+            } else {
+              const jwt = sessionStorage.getItem("authToken") || "";
+              const currentUserId =
+                userId ||
+                (() => {
+                  try {
+                    const [, p] = (jwt || "").split(".");
+                    if (!p) return "";
+                    const j = JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/")));
+                    return j?.user_id || "";
+                  } catch { return ""; }
+                })();
+
+              const resSecret = await generateGroupSharedSecretForChat(chatForSecret, jwt, currentUserId || "");
+              if (!resSecret?.sharedSecret) throw new Error("Group secret derivation failed.");
+              shared = resSecret.sharedSecret;
+            }
+
+            useSharedSecrets.getState().setSharedSecret(groupKey, shared);
+          }
+
+          let stableShared = u8Fresh(shared);
+
+          if ((msg.message_type ?? "text") === "text") {
+            text = await decryptMessage(stableShared, envelope.nonce, envelope.ct);
+          } else if ((msg.message_type ?? "").toLowerCase() === "file" && Array.isArray(msg.attachments) && msg.attachments.length) {
+            const att = msg.attachments[0];
+            const mime = att.file_type || "application/octet-stream";
+            let plainBytes: Uint8Array | undefined;
+
+            if (msg.is_encrypted && msg.envelope?.ct && msg.envelope?.nonce) {
+              plainBytes = await decryptBytes(stableShared, msg.envelope.nonce, msg.envelope.ct);
+            } else if (att.url && !att.is_encrypted) {
+              attachmentsForUI = [{
+                file_name: att.file_name || "file",
+                file_type: mime,
+                file_size: Number(att.file_size || 0),
+                url: att.url,
+                isImage: mime.startsWith("image/"),
+              }];
+              text = msg.content || ""; // Use caption for file messages
+            }
+
+            if (plainBytes) {
+              const blobUrl = URL.createObjectURL(new Blob([u8ToArrayBuffer(plainBytes)], { type: mime }));
+              trackBlobUrl?.(blobUrl);
+              attachmentsForUI = [{
+                file_name: att.file_name || "file",
+                file_type: mime,
+                file_size: Number(att.file_size || plainBytes.byteLength || 0),
+                url: blobUrl,
+                isImage: mime.startsWith("image/"),
+              }];
+            }
+          }
+
+          if (envelope.opk_id) {
+            try { await useUserKeys.getState().markOPKUsed(envelope.opk_id, true); } catch {}
+          }
+        } else {
+          if ((msg.message_type ?? "text") === "text") {
+            text = msg.content ?? "";
+          } else if ((msg.message_type ?? "").toLowerCase() === "file" && Array.isArray(msg.attachments) && msg.attachments.length) {
+            const att = msg.attachments[0];
+            const mime = att.file_type || "application/octet-stream";
+            attachmentsForUI = [{
+              file_name: att.file_name || "file",
+              file_type: mime,
+              file_size: Number(att.file_size || 0),
+              url: att.url,
+              isImage: mime.startsWith("image/"),
+            }];
+            text = msg.content || ""; // Use caption for file messages
+          }
+        }
+      } catch (e) {
+        console.warn("History decrypt failed:", e);
+        text = "[Decryption failed]";
       }
 
-    // Map backend data to your expected frontend Message shape
-const mappedMessages = data.map((msg: any) => {
-  const attachmentData = msg.attachments && msg.attachments[0];
-  return {
-    id: msg.id,
-    user: msg.sender_name || msg.sender_email,
-    color: msg.sender_email === userEmail ? "text-green-400" : "text-blue-400",
-    content: msg.content,
-    time: new Date(msg.created_at.$date || msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    status: "read",
-    self: msg.sender_email === userEmail,
-    attachments: attachmentData ? [{
-      file_name: attachmentData.file_name,
-      file_type: attachmentData.file_type || "image/png", // fallback
-      file_size: Number(attachmentData.file_size?.$numberLong || attachmentData.file_size || 0),
-      url: attachmentData.url,
-      hash: attachmentData.hash,
-      isImage: attachmentData.file_type.startsWith("image/") || 
-        attachmentData.url?.match(/\.(png|jpe?g|gif|bmp|webp)$/i)
-    }] : []
-  };
-});
+      const status: "sent" | "delivered" | "read" =
+        msg?.status?.read ? "read" :
+        msg?.status?.delivered ? "delivered" : "delivered";
 
+      messages.push({
+        id: msg.id,
+        user: msg.sender_name || msg.sender_email,
+        color: msg.sender_email === userEmail ? "text-green-400" : "text-blue-400",
+        content: text,
+        time: new Date(msg.created_at?.$date || msg.created_at)
+          .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        status,
+        self: msg.sender_email === userEmail,
+        attachments: attachmentsForUI,
+      });
+    }
 
-    setChatMessages(prev => ({
-      ...prev,
-      [groupId]: mappedMessages
-    }));
+    setChatMessages(prev => ({ ...prev, [groupId]: messages }));
   } catch (err) {
     console.error("Failed to load messages:", err);
+    setChatMessages(prev => ({ ...prev, [groupId]: [] }));
   }
-};
-
-
-useEffect(() => {
-if (!activeChat?.id) {
-  console.warn("❌ Cannot load messages, no group ID");
-} else {
-  console.log("🔄 Loading messages for group ID:", activeChat.id);
-  loadMessages(activeChat.id);
 }
-}, [activeChat, showAddMembersModal]);
+
 
 useEffect(() => {
-  if (!previewFile) {
-    setPreviewUrl(""); // ensure consistency
-  }
-}, [previewFile]);
-
-// useEffect(() => {
-//   if (!activeChat?.caseId) return;
-
-//   connectWebSocket(activeChat.caseId); // only once per case
-
-//   return () => {
-//     if (socketRef.current) {
-//       socketRef.current.close();
-//       socketRef.current = null;
-//     }
-//   };
-// }, [activeChat?.caseId]);
-useEffect(() => {
-  if (!activeChat?.caseId || !token) return;
-
-  connectWebSocket(
-    activeChat.caseId,
-    token,
-    socketRef,
-    reconnectTimeoutRef,
-    (msg) => {
-      if (msg.type === "new_message" && msg.payload.groupId === String(activeChat.id)) {
-        const incoming = msg.payload;
-
-        const mappedMessage: Message = {
-          id: incoming.messageId,
-          user: incoming.senderName || incoming.senderId,
-          color: incoming.senderId === userId ? "text-green-400" : "text-blue-400",
-          content: incoming.text,
-          time: new Date(incoming.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          status: "read",
-          self: incoming.senderId === userId,
-          attachments: incoming.attachments || []
-        };
-
-        setChatMessages(prev => {
-          const existing = prev[activeChat.id] || [];
-          const alreadyExists = existing.some(m => m.id === mappedMessage.id);
-          if (alreadyExists) return prev;
-
-          return {
-            ...prev,
-            [activeChat.id]: [...existing, mappedMessage]
-          };
-        });
-      }
-    },
-    () => setSocketConnected(true),
-    () => setSocketConnected(false),
-    handleTypingStatus // ✅ pass handler here
-  );
-}, [activeChat?.caseId, token]);
-
-
-const updateGroup = async () => {
-  if (!activeChat) {
-    console.error("No active chat selected for update.");
+  if (!activeChat?.id || chatMessages[activeChat.id]?.length > 0) {
+    console.warn("Skipping loadMessages as messages are already present");
     return;
   }
-  try {
-    await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}`, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: editGroupName,
-        description: editDescription,
-        settings: { is_public: editIsPublic }
-      })
-    });
 
-    await fetchGroups(); // refresh your groups list
-    setShowEditGroupModal(false);
-  } catch (err) {
-    console.error("Failed to update group:", err);
+  loadMessages(activeChat.id);
+}, [activeChat?.id, chatMessages]);
+
+useEffect(() => {
+  if (!activeChat?.id || chatMessages[activeChat.id]?.length > 0) {
+    console.warn("Skipping loadMessages as messages are already present");
+    return;
   }
-};
+
+  const updateGroup = async () => {
+    try {
+      await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: editGroupName,
+          description: editDescription,
+          settings: { is_public: editIsPublic }
+        })
+      });
+
+      await fetchGroups(); // refresh your groups list
+      setShowEditGroupModal(false);
+    } catch (err) {
+      console.error("Failed to update group:", err);
+    }
+  };
+
+  updateGroup();
+}, [/* your dependencies */]);
 
 
-const removeGroupLocally = (groupId: number) => {
-  setGroups(prev => prev.filter(group => group.id !== groupId));
-  setChatMessages(prev => {
-    const updated = { ...prev };
-    delete updated[groupId];
-    return updated;
-  });
-  setActiveChat(null);
-  setShowMoreMenu(false);
-};
 
 
 const handleLeaveGroup = async () => {
@@ -1300,7 +2208,7 @@ const handleLeaveGroup = async () => {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    removeGroupLocally(activeChat.id);
+    removeGroupLocally(Number(activeChat.id));
     console.log("You left the group successfully!"); 
   } catch (err) {
     console.error("Failed to leave group:", err);
@@ -1338,50 +2246,141 @@ useEffect(() => {
 
   fetchCollaborators();
 }, [activeChat, token]);
+// =======
+//   console.log("🔄 Loading messages for group ID:", activeChat.id);
+//   loadMessages(String(activeChat.id));
+// }, [activeChat]);
+// >>>>>>> feature/end-2-end-encryption/secureChat
 
 useEffect(() => {
+  if (activeChat) return; // Skip if activeChat is already set (prevents reset on groups update)
   const storedChat = localStorage.getItem("activeChat");
   if (storedChat) {
     const parsed = JSON.parse(storedChat);
-    // Ensure it matches current group IDs
     const match = groups.find(g => g.id === parsed.id);
     if (match) {
       setActiveChat(parsed);
     }
   }
 }, [groups]);
+  useEffect(() => {
+    if (!previewFile) {
+      setPreviewUrl(""); // ensure consistency
+    }
+  }, [previewFile]);
 
-const handleOpenAddMembersModal = async () => {
-  if (!activeChat?.caseId) {
-    console.warn("❌ No caseId available in activeChat");
-    return;
-  }
 
-  try {
-    const res = await fetch(`https://localhost/api/v1/cases/${activeChat.caseId}/collaborators`, {
-      headers: { Authorization: `Bearer ${token}` }
+
+
+
+  const updateGroup = async () => {
+    if (!activeChat) {
+      console.error("No active chat selected for update.");
+      return;
+    }
+    try {
+      await fetch(`http://localhost:8080/api/v1/chat/groups/${activeChat.id}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: editGroupName,
+          description: editDescription,
+          settings: { is_public: editIsPublic }
+        })
+      });
+
+      await fetchGroups(); // refresh your groups list
+      setShowEditGroupModal(false);
+    } catch (err) {
+      console.error("Failed to update group:", err);
+    }
+  };
+
+
+  const removeGroupLocally = (groupId: number) => {
+    setGroups(prev => prev.filter(group => String(group.id) !== String(groupId)));
+    setChatMessages(prev => {
+      const updated = { ...prev };
+      delete updated[groupId];
+      return updated;
+
     });
+    setActiveChat(null);
+    setShowMoreMenu(false);
+  };
 
-    if (!res.ok) {
-      console.error("❌ Failed to fetch collaborators:", await res.text());
+
+
+  useEffect(() => {
+    if (!activeChat || !activeChat.caseId) return;
+
+    const fetchCollaborators = async () => {
+      try {
+        const res = await fetch(`https://localhost/api/v1/cases/${activeChat.caseId}/collaborators`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+          console.error("Failed to fetch collaborators:", await res.text());
+          return;
+        }
+
+        const data = await res.json();
+        console.log("Fetched collaborators:", data);
+
+        // Ensure collaborators match the structure: { user_email: string, role: string }
+        const formatted = (data.data || []).map((collab: any) => ({
+          user_email: collab.email,
+          role: collab.role || "member"
+        }));
+        console.log("✅ availableUsers after fetch:", formatted);
+
+        setAvailableUsers(formatted);
+      } catch (err) {
+        console.error("Failed to fetch collaborators:", err);
+      }
+    };
+
+    fetchCollaborators();
+  }, [activeChat, token]);
+
+
+
+  const handleOpenAddMembersModal = async () => {
+    if (!activeChat?.caseId) {
+      console.warn("❌ No caseId available in activeChat");
       return;
     }
 
-    const data = await res.json();
-    console.log("✅ Fetched collaborators:", data);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/cases/${activeChat.caseId}/collaborators`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    const formatted = (data.data || []).map((collab: any) => ({
-      user_email: collab.email,
-      role: collab.role || "member"
-    }));
+      if (!res.ok) {
+        console.error("❌ Failed to fetch collaborators:", await res.text());
+        return;
+      }
 
-    setAvailableUsers(formatted);
-    setShowAddMembersModal(true);
-    setShowMoreMenu(false);
-  } catch (err) {
-    console.error("❌ Error fetching collaborators:", err);
-  }
-};
+      const data = await res.json();
+      console.log("✅ Fetched collaborators:", data);
+
+      const formatted = (data.data || []).map((collab: any) => ({
+        user_email: collab.email,
+        role: collab.role || "member"
+      }));
+
+      setAvailableUsers(formatted);
+      setShowAddMembersModal(true);
+      setShowMoreMenu(false);
+    } catch (err) {
+      console.error("❌ Error fetching collaborators:", err);
+    }
+  };
+
 
 
 
@@ -1396,157 +2395,162 @@ const handleDeleteGroup = async () => {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    removeGroupLocally(activeChat.id);
-    console.log("Group deleted successfully!"); 
-  } catch (err) {
-    console.error("Failed to delete group:", err);
-  }
-};
+
+      removeGroupLocally(Number(activeChat.id));
+      console.log("Group deleted successfully!");
+    } catch (err) {
+      console.error("Failed to delete group:", err);
+    }
+  };
 
 
 
-  const MessageComponent = ({ msg }: { msg: Message }) => (
-    <div className={`flex ${msg.self ? "justify-end" : "justify-start"} group`}>
-      <div
-        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative ${
-          msg.self
-            ? "bg-blue-600 text-white"
-            : "bg-muted text-foreground"
-        }`}
-      >
-        {/* Reply preview */}
-        {msg.replyTo && (
-          <div className={`mb-2 p-2 rounded border-l-4 ${
-            msg.self ? 'border-white/30 bg-white/10' : 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-          }`}>
-            <p className={`text-xs font-semibold ${msg.self ? 'text-white/80' : 'text-blue-600'}`}>
-              {msg.replyTo.user}
-            </p>
-            <p className={`text-xs truncate ${msg.self ? 'text-white/70' : 'text-muted-foreground'}`}>
-              {msg.replyTo.attachment 
-                ? `📎 ${msg.replyTo.attachment.name}`
-                : msg.replyTo.content
-              }
-            </p>
-          </div>
-        )}
-
-        {!msg.self && (
-          <p className={`text-xs font-bold ${msg.color} mb-1`}>
-            {msg.user}
-          </p>
-        )}
-
-        {/* Attachment preview */}
-        {msg.attachments?.map((attachment, idx) => (
-  <div key={idx} className="mb-2">
-    {attachment.file_type.startsWith("image/") ? (
-      <div className="relative">
-        <img
-          src={attachment.url}
-          alt={attachment.file_name}
-          className="max-w-full h-auto rounded cursor-pointer hover:opacity-90 transition-opacity"
-          onClick={() => attachment.url && handleImageClick(attachment.url)}
-        />
-        <button
-          onClick={() => attachment.url && handleImageClick(attachment.url)}
-          className="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-1 rounded-full hover:bg-opacity-70 transition-all"
+const MessageComponent = ({ msg }: { msg: Message }) => (
+  <div className={`flex ${msg.self ? "justify-end" : "justify-start"} group`}>
+    <div
+      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative ${msg.self ? "bg-blue-600 text-white" : "bg-muted text-foreground"}`}
+    >
+      {/* Reply preview */}
+      {msg.replyTo && (
+        <div
+          className={`mb-2 p-2 rounded border-l-4 ${msg.self ? "border-white/30 bg-white/10" : "border-blue-400 bg-blue-50 dark:bg-blue-900/20"}`}
         >
-          <Eye className="w-4 h-4" />
-        </button>
-      </div>
-    ) : (
-      <div className={`p-3 rounded border ${msg.self ? 'bg-black/20 border-white/20' : 'bg-accent border-border'}`}>
-        <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5" />
-          <div className="flex-1 min-w-0">
-            <p className="font-medium truncate text-sm">{attachment.file_name}</p>
-            <p className="text-xs opacity-70">{(attachment.file_size / 1024).toFixed(1)} KB</p>
-          </div>
-          <a href={attachment.url} download className="p-1 hover:bg-black/20 rounded">
-            <Download className="w-4 h-4" />
-          </a>
+          <p className={`text-xs font-semibold ${msg.self ? "text-white/80" : "text-blue-600"}`}>
+            {msg.replyTo.user}
+          </p>
+          <p className={`text-xs truncate ${msg.self ? "text-white/70" : "text-muted-foreground"}`}>
+            {msg.replyTo.attachment ? `📎 ${msg.replyTo.attachment.name}` : msg.replyTo.content}
+          </p>
         </div>
-      </div>
-    )}
-  </div>
-))}
+      )}
 
+      {/* Sender name (for incoming only) */}
+      {!msg.self && (
+        <p className={`text-xs font-bold ${msg.color} mb-1`}>{msg.user}</p>
+      )}
 
-        <p className="text-sm">{msg.content}</p>
-        
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-xs opacity-70">{msg.time}</span>
-          <div className="flex items-center gap-1">
-            {msg.self && getStatusIcon(msg.status)}
-            {!msg.self && (
-              <button
-                onClick={() => handleReplyToMessage(msg)}
-                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/20 rounded transition-all"
-                title="Reply"
-              >
-                <Reply className="w-3 h-3" />
-              </button>
+      {/* Attachments */}
+      {Array.isArray(msg.attachments) &&
+        msg.attachments.map((attachment, idx) => (
+          <div key={idx} className="mb-2">
+            {attachment.file_type?.startsWith?.("image/") ? (
+              <div className="relative">
+                <img
+                  src={attachment.url}
+                  alt={attachment.file_name}
+                  className="max-w-full h-auto rounded cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => attachment.url && handleImageClick(attachment.url)}
+                />
+                <button
+                  onClick={() => attachment.url && handleImageClick(attachment.url)}
+                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-all"
+                  title="Preview"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className={`p-3 rounded border ${msg.self ? "bg-black/20 border-white/20" : "bg-accent border-border"}`}>
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate text-sm">{attachment.file_name}</p>
+                    <p className="text-xs opacity-70">
+                      {Number.isFinite(attachment.file_size) ? `${(attachment.file_size / 1024).toFixed(1)} KB` : ""}
+                    </p>
+                  </div>
+                  {attachment.url && (
+                    <a href={attachment.url} download className="p-1 hover:bg-black/20 rounded" title="Download">
+                      <Download className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
             )}
           </div>
+        ))}
+
+      {/* Message Content */}
+      {msg.content && ( // Only render if content exists
+        <div className="text-sm">
+          <p>{msg.content}</p>
+        </div>
+      )}
+
+      {/* Footer: time + actions */}
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-xs opacity-70">{msg.time}</span>
+        <div className="flex items-center gap-1">
+          {msg.self && getStatusIcon(msg.status)}
+          {!msg.self && (
+            <button
+              onClick={() => handleReplyToMessage(msg)}
+              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-black/20 rounded transition-all"
+              title="Reply"
+            >
+              <Reply className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
     </div>
-  );
+  </div>
+);
+
 
 
   return (
     <div className="bg-background flex w-full h-screen text-foreground relative">
       {/* Main Sidebar - Fixed positioning without overlay */}
       {hasMounted && (
-      <div className={`fixed z-30 top-0 left-0 h-full w-72 bg-card border-r border-border transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="p-6">
-          {/* Logo */}
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-lg overflow-hidden">
-              <img
-                src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
-                alt="AEGIS Logo"
-                className="w-full h-full object-cover"
-              />
+        <div className={`fixed z-30 top-0 left-0 h-full w-72 bg-card border-r border-border transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <div className="p-6">
+            {/* Logo */}
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 rounded-lg overflow-hidden">
+                <img
+                  src="https://c.animaapp.com/mawlyxkuHikSGI/img/image-5.png"
+                  alt="AEGIS Logo"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <span className="font-bold text-foreground text-xl">AEGIS</span>
             </div>
-            <span className="font-bold text-foreground text-xl">AEGIS</span>
-          </div>
 
-          {/* Navigation */}
-          <nav className="space-y-2">
-            <Link to="/dashboard"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
-              <Home className="w-5 h-5" />
-              Dashboard
-            </button></Link>
-            <Link to="/case-management"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
-              <Folder className="w-5 h-5" />
-              Case Management
-            </button></Link>
-            <Link to="/evidence-viewer"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
-              <FileText className="w-5 h-5" />
-              Evidence Viewer
-            </button></Link>
-            <button className="w-full flex items-center gap-3 text-left px-4 py-2 bg-muted hover:bg-accent rounded-lg">
-              <MessageSquare className="w-5 h-5" />
-              Secure Chat
-            </button>
-                          {isDFIRAdmin && (
-              <Link to="/report-dashboard"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
-              <ClipboardList className="w-5 h-5" />
-              Case Reports
-            </button></Link>
-            )}
-          </nav>
-        </div>
-      </div>)}
-        {/* Overlay */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-20"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
+            {/* Navigation */}
+            <nav className="space-y-2">
+              <Link to="/dashboard"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
+                <Home className="w-5 h-5" />
+                Dashboard
+              </button></Link>
+              <Link to="/case-management"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
+                <Folder className="w-5 h-5" />
+                Case Management
+              </button></Link>
+              <Link to="/evidence-viewer"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
+                <FileText className="w-5 h-5" />
+                Evidence Viewer
+              </button></Link>
+              <button className="w-full flex items-center gap-3 text-left px-4 py-2 bg-muted hover:bg-accent rounded-lg">
+                <MessageSquare className="w-5 h-5" />
+                Secure Chat
+              </button>
+              {isDFIRAdmin && (
+                <Link to="/report-dashboard"><button className="w-full flex items-center gap-3 text-left px-4 py-2 hover:bg-muted rounded-lg">
+                  <ClipboardList className="w-5 h-5" />
+                  Case Reports
+                </button></Link>
+              )}
+            </nav>
+          </div>
+        </div>)}
+      {/* Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-20"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* Chat Layout - Adjusted margin for sidebar */}
       <div className={`flex flex-1 h-screen transition-all duration-300 ${sidebarOpen ? 'ml-72' : 'ml-0'}`}>
@@ -1569,7 +2573,7 @@ const handleDeleteGroup = async () => {
                 <Plus className="w-6 h-6" />
               </button>
             </div>
-            
+
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -1597,9 +2601,8 @@ const handleDeleteGroup = async () => {
                   setChatSearchQuery("");
                   setReplyingTo(null);
                 }}
-                className={`p-4 border-b border-border cursor-pointer hover:bg-muted transition-colors ${
-                  activeChat?.id === group.id ? "bg-accent" : ""
-                }`}
+                className={`p-4 border-b border-border cursor-pointer hover:bg-muted transition-colors ${activeChat?.id === group.id ? "bg-accent" : ""
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition" onClick={handleGroupImageClick}>
@@ -1710,16 +2713,16 @@ const handleDeleteGroup = async () => {
 
                     </div>
                     <div className="relative" ref={moreMenuRef}>
-                      <button 
+                      <button
                         onClick={() => setShowMoreMenu(!showMoreMenu)}
                         className="text-muted-foreground hover:text-foreground"
                       >
                         <MoreVertical className="w-5 h-5" />
                       </button>
-                      
+
                       {/* More Menu Dropdown */}
                       {showMoreMenu && (
-                      <div className="absolute right-0 top-8 bg-background border border-border rounded-lg shadow-lg py-2 w-48 z-50">
+                        <div className="absolute right-0 top-8 bg-background border border-border rounded-lg shadow-lg py-2 w-48 z-50">
                           <button
                             onClick={() => {
                               setShowChatSearch(true);
@@ -1731,25 +2734,25 @@ const handleDeleteGroup = async () => {
                             Search
                           </button>
                           <button
-                          onClick={handleOpenAddMembersModal}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted"
-                        >
-                          <Users className="w-4 h-4" />
-                          Add Members
-                        </button>
+                            onClick={handleOpenAddMembersModal}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted"
+                          >
+                            <Users className="w-4 h-4" />
+                            Add Members
+                          </button>
 
                           <button
-                                onClick={() => {
-                                if (window.confirm("Are you sure you want to leave this group?")) {
-                                  handleLeaveGroup();
-                                }
-                              }}
+                            onClick={() => {
+                              if (window.confirm("Are you sure you want to leave this group?")) {
+                                handleLeaveGroup();
+                              }
+                            }}
                             className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted text-red-400"
                           >
                             <LogOut className="w-4 h-4" />
                             Exit Group
                           </button>
-                              <button
+                          <button
                             onClick={() => {
                               if (window.confirm("Are you sure you want to delete this group for everyone?")) {
                                 handleDeleteGroup();
@@ -1777,6 +2780,7 @@ const handleDeleteGroup = async () => {
                 <div ref={chatEndRef} />
               </div>
 
+
               {/* Reply Preview */}
               {replyingTo && (
                 <div className="px-4 py-2 bg-muted border-t border-border">
@@ -1802,55 +2806,55 @@ const handleDeleteGroup = async () => {
                 </div>
               )}
 
-         {/* ✅ Message Input + Typing Indicator */}
-<div className="p-4 border-t border-border bg-card">
-  {/* Typing Indicator for other users */}
-  {typingUsers[activeChat?.id]?.filter((email) => email !== userEmail).length > 0 && (
-    <div className="text-sm text-muted-foreground mb-1 ml-2">
-      {typingUsers[activeChat.id]
-        .filter((email) => email !== userEmail)
-        .join(", ")}{" "}
-      {typingUsers[activeChat.id].length > 2 ? "are" : "is"} typing...
-    </div>
-  )}
+              {/* ✅ Message Input + Typing Indicator */}
+              <div className="p-4 border-t border-border bg-card">
+                {/* Typing Indicator for other users */}
+                {typingUsers[activeChat?.id]?.filter((email) => email !== userEmail).length > 0 && (
+                  <div className="text-sm text-muted-foreground mb-1 ml-2">
+                    {typingUsers[activeChat.id]
+                      .filter((email) => email !== userEmail)
+                      .join(", ")}{" "}
+                    {typingUsers[activeChat.id].length > 2 ? "are" : "is"} typing...
+                  </div>
+                )}
 
-  {/* Input Row */}
-  <div className="flex items-center gap-2">
-    <button
-      onClick={() => fileInputRef.current?.click()}
-      className="p-3 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-      title="Attach file"
-    >
-      <Paperclip className="w-5 h-5" />
-    </button>
-    <input
-      ref={fileInputRef}
-      type="file"
-      onChange={handleFileSelection}
-      className="hidden"
-      accept="*/*"
-    />
-    <input
-      type="text"
-      value={message}
-      onChange={(e) => {
-        setMessage(e.target.value);
-        sendTypingNotification("typing_start");
-      }}
-      onBlur={() => sendTypingNotification("typing_stop")}
-      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(e)}
-      placeholder="Type a secure message..."
-      className="flex-1 p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
-    />
-    <button
-      onClick={handleSendMessage}
-      className="px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center justify-center transition-colors"
-    >
-      <Send className="w-5 h-5" />
-    </button>
-  </div>
-</div>
-{/* ✅ Old Message Input (Preserved) */}
+                {/* Input Row */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-3 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                    title="Attach file"
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileSelection}
+                    className="hidden"
+                    accept="*/*"
+                  />
+                  <input
+                    type="text"
+                    value={message}
+                    onChange={(e) => {
+                      setMessage(e.target.value);
+                      sendTypingNotification("typing_start");
+                    }}
+                    onBlur={() => sendTypingNotification("typing_stop")}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(e)}
+                    placeholder="Type a secure message..."
+                    className="flex-1 p-3 rounded-lg bg-muted text-foreground border border-border placeholder-muted-foreground"
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    className="px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center justify-center transition-colors"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              {/* ✅ Old Message Input (Preserved) */}
 
             </>
           ) : (
@@ -1867,7 +2871,7 @@ const handleDeleteGroup = async () => {
       {/* Attachment Preview Modal */}
       {showAttachmentPreview && previewFile && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-<div className="rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border-[3px] border-border bg-background shadow-xl">
+          <div className="rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border-[3px] border-border bg-background shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-foreground text-lg mb-4">Send Attachment</h3>
               <button
@@ -1881,24 +2885,24 @@ const handleDeleteGroup = async () => {
             {/* File Preview */}
             <div className="mb-4">
               {previewFile.type.startsWith('image/') ? (
-                 // Fixed size image preview container
-            <div className="w-full h-64 overflow-hidden rounded-lg border border-border bg-muted flex items-center justify-center">
-            <img
-              src={previewUrl}
-              alt={previewFile.name}
-              className="max-w-full max-h-full object-contain"
-            />
-            </div>
+                // Fixed size image preview container
+                <div className="w-full h-64 overflow-hidden rounded-lg border border-border bg-muted flex items-center justify-center">
+                  <img
+                    src={previewUrl}
+                    alt={previewFile.name}
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
               ) : (
-               // Fixed size file preview
-              <div className="w-full h-32 p-4 bg-muted rounded-lg border border-border flex items-center justify-center">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-12 h-12 text-blue-500 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{previewFile.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {(previewFile.size / 1024).toFixed(1)} KB
-                    </p>
+                // Fixed size file preview
+                <div className="w-full h-32 p-4 bg-muted rounded-lg border border-border flex items-center justify-center">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-12 h-12 text-blue-500 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{previewFile.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {(previewFile.size / 1024).toFixed(1)} KB
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -2036,7 +3040,7 @@ const handleDeleteGroup = async () => {
       {/* Add Members Modal */}
       {showAddMembersModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border-[3px] border-border bg-background shadow-xl">
+          <div className="rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto border-[3px] border-border bg-background shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold">Add Members</h3>
               <button
@@ -2051,63 +3055,63 @@ const handleDeleteGroup = async () => {
             <div className="mb-4">
               <h4 className="text-sm font-semibold text-muted-foreground mb-2">Current Members</h4>
               <div className="space-y-1 max-h-32 overflow-y-auto">
-             {activeChat?.members.map((member: string | { user_email: string; role: string }, index: number) => {
-              const email = typeof member === "string" ? member : member.user_email;
+                {activeChat?.members.map((member: string | { user_email: string; role: string }, index: number) => {
+                  const email = typeof member === "string" ? member : member.user_email;
 
-              return (
-                <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded text-sm">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                  <span>{email}</span>
-                  {email === userEmail && (
-                    <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">You</span>
-                  )}
-                </div>
-              );
-            })}
+                  return (
+                    <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded text-sm">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <span>{email}</span>
+                      {email === userEmail && (
+                        <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">You</span>
+                      )}
+                    </div>
+                  );
+                })}
 
 
               </div>
             </div>
 
-           {/* Add New Member */}
-          <div className="mb-4">
-            <h4 className="text-sm font-semibold text-muted-foreground mb-2">Add New Member</h4>
+            {/* Add New Member */}
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-muted-foreground mb-2">Add New Member</h4>
 
-            <div className="space-y-3">
-              <select
-                value={newMemberEmail}
-                onChange={(e) => setNewMemberEmail(e.target.value)}
-                className="w-full p-3 rounded-lg bg-muted text-foreground border border-border"
-              >
-                <option value="">-- Select a collaborator --</option>
+              <div className="space-y-3">
+                <select
+                  value={newMemberEmail}
+                  onChange={(e) => setNewMemberEmail(e.target.value)}
+                  className="w-full p-3 rounded-lg bg-muted text-foreground border border-border"
+                >
+                  <option value="">-- Select a collaborator --</option>
 
-                {availableUsers &&
-                  activeChat?.members &&
-                  availableUsers.filter(userObj =>
-                    !activeChat.members.includes(userObj.user_email)
-                  ).length === 0 && (
-                    <option disabled value="">
-                      No available collaborators
-                    </option>
-                  )}
-
-                {availableUsers &&
-                  activeChat?.members &&
-                  availableUsers
-                    .filter(userObj =>
+                  {availableUsers &&
+                    activeChat?.members &&
+                    availableUsers.filter(userObj =>
                       !activeChat.members.includes(userObj.user_email)
-                    )
-                    .map(userObj => (
-                      <option key={userObj.user_email} value={userObj.user_email}>
-                        {userObj.user_email} ({userObj.role})
+                    ).length === 0 && (
+                      <option disabled value="">
+                        No available collaborators
                       </option>
-                    ))}
-              </select>
+                    )}
+
+                  {availableUsers &&
+                    activeChat?.members &&
+                    availableUsers
+                      .filter(userObj =>
+                        !activeChat.members.includes(userObj.user_email)
+                      )
+                      .map(userObj => (
+                        <option key={userObj.user_email} value={userObj.user_email}>
+                          {userObj.user_email} ({userObj.role})
+                        </option>
+                      ))}
+                </select>
 
 
-        
 
-                
+
+
                 {/* Quick Add Suggestions */}
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">Quick Add:</p>
@@ -2122,7 +3126,7 @@ const handleDeleteGroup = async () => {
                         >
                           {userObj.user_email} ({userObj.role})
                         </button>
-                    ))}
+                      ))}
 
                   </div>
                 </div>
@@ -2151,47 +3155,47 @@ const handleDeleteGroup = async () => {
       )}
       {/* Edit Group Modal */}
       {showEditGroupModal && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div className="rounded-lg p-6 w-full max-w-md bg-background shadow-xl border-[3px] border-border">
-      <h3 className="text-xl font-bold mb-4">Edit Group</h3>
-      <input
-        type="text"
-        value={editGroupName}
-        onChange={(e) => setEditGroupName(e.target.value)}
-        placeholder="Group name"
-        className="w-full mb-3 p-3 rounded bg-muted border border-border"
-      />
-      <textarea
-        value={editDescription}
-        onChange={(e) => setEditDescription(e.target.value)}
-        placeholder="Description"
-        className="w-full mb-3 p-3 rounded bg-muted border border-border"
-      />
-      <label className="flex items-center gap-2 mb-4">
-        <input
-          type="checkbox"
-          checked={editIsPublic}
-          onChange={() => setEditIsPublic(!editIsPublic)}
-        />
-        Public group
-      </label>
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => setShowEditGroupModal(false)}
-          className="px-4 py-2 text-muted-foreground hover:text-foreground"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={updateGroup}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white"
-        >
-          Save
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="rounded-lg p-6 w-full max-w-md bg-background shadow-xl border-[3px] border-border">
+            <h3 className="text-xl font-bold mb-4">Edit Group</h3>
+            <input
+              type="text"
+              value={editGroupName}
+              onChange={(e) => setEditGroupName(e.target.value)}
+              placeholder="Group name"
+              className="w-full mb-3 p-3 rounded bg-muted border border-border"
+            />
+            <textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Description"
+              className="w-full mb-3 p-3 rounded bg-muted border border-border"
+            />
+            <label className="flex items-center gap-2 mb-4">
+              <input
+                type="checkbox"
+                checked={editIsPublic}
+                onChange={() => setEditIsPublic(!editIsPublic)}
+              />
+              Public group
+            </label>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowEditGroupModal(false)}
+                className="px-4 py-2 text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={updateGroup}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
     </div>

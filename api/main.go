@@ -5,6 +5,7 @@ import (
 	"aegis-api/services_/admin/delete_user"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net/http"
@@ -61,12 +62,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"aegis-api/internal/x3dh"
+
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func InitCollections(db *mongo.Database) {
-	chat.MessageCollection = db.Collection("chat_messages")
+	websocket.MessageCollection = db.Collection("chat_messages")
 }
 
 /*
@@ -233,7 +236,7 @@ func main() {
 	// Create and start WebSocket hub
 	notificationService := notification.NewNotificationService(db.DB)
 
-	hub := websocket.NewHub(notificationService)
+	hub := websocket.NewHub(notificationService, mongoDatabase)
 	go hub.Run()
 
 	// ─── Repositories ───────────────────────────────────────────
@@ -377,7 +380,7 @@ func main() {
 
 	// ─── Messages / WebSocket ───────────────────────────────────
 	messageRepo := messages.NewMessageRepository(db.DB)
-	messageHub := websocket.NewHub(notificationService)
+	messageHub := websocket.NewHub(notificationService, mongoDatabase)
 	go messageHub.Run()
 
 	messageService := messages.NewMessageService(*messageRepo, messageHub)
@@ -523,6 +526,27 @@ func main() {
 	healthService := &health.Service{Repo: repo}
 	healthHandler := &handlers.HealthHandler{Service: healthService}
 
+	// --- X3DH: keystore + crypto + auditor + service -----------------
+	x3dhStore := x3dh.NewPostgresKeyStore(sqlDB)
+
+	// AES key (32 bytes for AES-256) – supply via env, base64-encoded
+	aesKeyB64 := os.Getenv("X3DH_AES_KEY_B64")
+	if aesKeyB64 == "" {
+		log.Fatal("❌ X3DH_AES_KEY_B64 not set")
+	}
+	aesKey, err := base64.StdEncoding.DecodeString(aesKeyB64)
+	if err != nil || len(aesKey) != 32 {
+		log.Fatal("❌ X3DH_AES_KEY_B64 must be base64 for 32 bytes (AES-256)")
+	}
+
+	cryptoSvc, err := x3dh.NewAESGCMCryptoService(aesKey)
+	if err != nil {
+		log.Fatalf("❌ AESGCM init failed: %v", err)
+	}
+
+	x3dhAuditor := x3dh.NewMongoAuditLogger(mongoDatabase)
+	x3dhService := x3dh.NewBundleService(x3dhStore, cryptoSvc, x3dhAuditor)
+
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -560,7 +584,11 @@ func main() {
 		timelineAIHandler,
 		evidenceHandler,
 		chainOfCustodyHandler,
+
 		healthHandler,
+
+		x3dhService, // X3DH Service
+
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────
