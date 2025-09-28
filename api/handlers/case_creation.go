@@ -46,9 +46,10 @@ type CaseServices struct {
 	//listCase           *ListCases.Service
 	// updateCaseStatus   *case_status_update.CaseStatusService
 	// getCollaborators   *get_collaborators.Service
-	listCase   *ListCases.Service
-	listActive *ListActiveCases.Service
-	listClosed *ListClosedCases.Service
+	listCase     *ListCases.Service
+	listActive   *ListActiveCases.Service
+	listClosed   *ListClosedCases.Service
+	listArchived *listArchiveCases.ArchiveCaseService // ✅ added here
 
 	assignCase *case_assign.CaseAssignmentService
 	// removeCollaborator *remove_user_from_case.Service
@@ -60,7 +61,8 @@ func NewCaseServices(
 	listCase *ListCases.Service,
 	listActive *ListActiveCases.Service,
 	assignCase *case_assign.CaseAssignmentService,
-	listClosed *ListClosedCases.Service, // ✅ added here
+	listClosed *ListClosedCases.Service,
+	listArchived *listArchiveCases.ArchiveCaseService,
 	updateCaseService *update_case.Service,
 ) *CaseServices {
 	return &CaseServices{
@@ -68,7 +70,8 @@ func NewCaseServices(
 		listCase:          listCase,
 		listActive:        listActive,
 		assignCase:        assignCase,
-		listClosed:        listClosed, // ✅ assigned here
+		listClosed:        listClosed,
+		listArchived:      listArchived, // ✅ added here
 		UpdateCaseService: updateCaseService,
 	}
 }
@@ -79,6 +82,9 @@ func (s *CaseServices) ListActiveCases(userID string, tenantID string, teamID st
 
 func (s *CaseServices) ListClosedCases(userID string, tenantID string, teamID string) ([]ListClosedCases.ClosedCase, error) {
 	return s.listClosed.ListClosedCases(userID, tenantID, teamID)
+}
+func (s *CaseServices) ListArchivedCases(userID string, tenantID string, teamID string) ([]listArchiveCases.ArchivedCase, error) {
+	return s.listArchived.ListArchivedCases(userID, tenantID, teamID)
 }
 
 func (s *CaseServices) GetAllCases(userID string) ([]ListCases.Case, error) {
@@ -93,6 +99,7 @@ type CaseServiceInterface interface {
 	GetCaseByID(caseID string, tenantID string) (*ListCases.Case, error)
 	UnassignUserFromCase(assignerID *gin.Context, assigneeID, caseID uuid.UUID) error // ← Add this
 	ListClosedCases(userID string, tenantID string, teamID string) ([]ListClosedCases.ClosedCase, error)
+	ListArchivedCases(userID string, tenantID string, teamID string) ([]listArchiveCases.ArchivedCase, error)
 }
 
 func NewCaseHandler(
@@ -108,14 +115,15 @@ func NewCaseHandler(
 ) *CaseHandler {
 	return &CaseHandler{
 
-		CaseService:            caseService,
-		ListCasesService:       listCasesService,
-		ListActiveCasesServ:    listActiveCasesService,
-		ListClosedCasesService: listClosedCasesService,
-		auditLogger:            auditLogger,
-		UserRepo:               userRepo, // Assign UserRepo
-		UpdateCaseService:      updateCaseService,
-		Cache:                  cacheClient,
+		CaseService:              caseService,
+		ListCasesService:         listCasesService,
+		ListActiveCasesServ:      listActiveCasesService,
+		ListClosedCasesService:   listClosedCasesService,
+		ListArchivedCasesService: listArchivedCasesService, // Assign ListArchivedCasesService
+		auditLogger:              auditLogger,
+		UserRepo:                 userRepo, // Assign UserRepo
+		UpdateCaseService:        updateCaseService,
+		Cache:                    cacheClient,
 	}
 }
 

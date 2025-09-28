@@ -15,16 +15,27 @@ import (
 // Add the CaseHandler struct definition if not present, or update it:
 
 func getActorFromContext(c *gin.Context) auditlog.Actor {
-	userID, _ := c.Get("userID")
-	userRole, _ := c.Get("userRole")
-	email, _ := c.Get("email")
+	userIDVal, _ := c.Get("userID")
+	userRoleVal, _ := c.Get("userRole")
+	emailVal, _ := c.Get("email")
+
+	var userID, userRole, email string
+	if v, ok := userIDVal.(string); ok && v != "" {
+		userID = v
+	}
+	if v, ok := userRoleVal.(string); ok && v != "" {
+		userRole = v
+	}
+	if v, ok := emailVal.(string); ok && v != "" {
+		email = v
+	}
 
 	return auditlog.Actor{
-		ID:        userID.(string),
-		Role:      userRole.(string),
+		ID:        userID,
+		Role:      userRole,
 		IPAddress: c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
-		Email:     email.(string),
+		Email:     email,
 	}
 }
 
@@ -156,6 +167,10 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 	tenantID := c.GetString("tenantID")
 	actor := getActorFromContext(c)
 
+	// Get user and team from context
+	userID := c.GetString("userID")
+	teamID := c.GetString("teamID")
+
 	status := c.Query("status")
 	priority := c.Query("priority")
 	createdBy := c.Query("created_by")
@@ -165,8 +180,9 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 	order := c.Query("order")
 	progress := c.Query("progress")
 
+	// Always filter by user/team access
 	cases, err := h.ListCasesService.GetFilteredCases(
-		tenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order,
+		tenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order, userID, teamID,
 	)
 	if err != nil {
 		fmt.Printf("[GetFilteredCasesHandler] failed: %v\n", err)
@@ -184,6 +200,8 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 					"sortBy":    sortBy,
 					"order":     order,
 					"progress":  progress,
+					"userID":    userID,
+					"teamID":    teamID,
 				},
 			},
 			Service:     "case",
@@ -208,6 +226,8 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 				"sortBy":    sortBy,
 				"order":     order,
 				"progress":  progress,
+				"userID":    userID,
+				"teamID":    teamID,
 			},
 		},
 		Service:     "case",
@@ -300,10 +320,32 @@ func (h *CaseHandler) GetCaseByIDHandler(c *gin.Context) {
 // GET /cases/archived
 func (h *CaseHandler) ListArchivedCasesHandler(c *gin.Context) {
 	actor := getActorFromContext(c)
-	userID, _ := c.Get("userID")
-	tenantID, _ := c.Get("tenantID")
-	teamID, _ := c.Get("teamID")
-	cases, err := h.ListArchivedCasesService.ListArchivedCases(userID.(string), tenantID.(string), teamID.(string))
+
+	userIDVal, ok := c.Get("userID")
+	if !ok || userIDVal == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "userID missing"})
+		return
+	}
+	tenantIDVal, ok := c.Get("tenantID")
+	if !ok || tenantIDVal == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenantID missing"})
+		return
+	}
+	teamIDVal, ok := c.Get("teamID")
+	if !ok || teamIDVal == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "teamID missing"})
+		return
+	}
+
+	userID, ok1 := userIDVal.(string)
+	tenantID, ok2 := tenantIDVal.(string)
+	teamID, ok3 := teamIDVal.(string)
+	if !ok1 || !ok2 || !ok3 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid context values"})
+		return
+	}
+
+	cases, err := h.ListArchivedCasesService.ListArchivedCases(userID, tenantID, teamID)
 	if err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action:      "LIST_ARCHIVED_CASES",

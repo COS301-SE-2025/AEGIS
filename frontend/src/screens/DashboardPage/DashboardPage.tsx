@@ -69,6 +69,7 @@ const [closedCases, setClosedCases] = useState<CaseCard[]>([]);
 const [archivedCases, setArchivedCases] = useState<CaseCard[]>([]);
 const [evidenceCount, setEvidenceCount] = useState(0);
 const [evidenceError, setEvidenceError] = useState<string | null>(null);
+const [refreshCases, setRefreshCases] = useState(0);
 const [searchQuery, setSearchQuery] = useState("");
   const unread = useUnreadCount();
 
@@ -173,9 +174,8 @@ useEffect(() => {
       } else if (activeTab === "closed") {
         endpoint = "https://localhost/api/v1/cases/closed";
         responseKey = "closed_cases";
-      }
-      else if (activeTab === "archived") {
-        endpoint = "http://localhost:8080/api/v1/cases/archived";
+      } else if (activeTab === "archived") {
+        endpoint = "https://localhost/api/v1/cases/archived";
         responseKey = "archived_cases";
       }
 
@@ -185,12 +185,30 @@ useEffect(() => {
         },
       });
 
+      if (res.status === 304) {
+        setCaseCards([]);
+        return;
+      }
       if (!res.ok) throw new Error(`Failed to load ${activeTab} cases`);
-      const data = await res.json();
+
+let data = {};
+try {
+  const text = await res.text();
+
+  if (text && (text.trim().startsWith("{") || text.trim().startsWith("["))) {
+    data = JSON.parse(text);
+  } else {
+    data = {};
+  }
+} catch (e) {
+  console.error("Failed to parse JSON for", activeTab, "cases:", e);
+  setCaseCards([]);
+  return;
+}
 
       console.log(`Fetched ${activeTab} cases:`, data);
 
-      const rawCases = data[responseKey] || [];
+      const rawCases = (data as any)[responseKey] || [];
 
       const mappedCases = rawCases.map((c: any) => ({
         id: c.id,
@@ -216,7 +234,7 @@ useEffect(() => {
   };
 
   fetchCases();
-}, [activeTab]);
+}, [activeTab, refreshCases]);
 
 useEffect(() => {
   const token = sessionStorage.getItem("authToken");
@@ -335,52 +353,59 @@ useEffect(() => {
 }, []);
 
 
-                            useEffect(() => {
-                              const fetchCasesCount = async () => {
-                              const token = sessionStorage.getItem("authToken") || "";
+useEffect(() => {
+  const fetchCasesCount = async () => {
+    const token = sessionStorage.getItem("authToken") || "";
 
     try {
-      const [openRes, closedRes] = await Promise.all([
+      const [openRes, ongoingRes, closedRes, archivedRes] = await Promise.all([
         fetch("https://localhost/api/v1/cases/filter?status=open", {
+          headers: { "Authorization": `Bearer ${token}` }
+        }),
+        fetch("https://localhost/api/v1/cases/filter?status=ongoing", {
           headers: { "Authorization": `Bearer ${token}` }
         }),
         fetch("https://localhost/api/v1/cases/filter?status=closed", {
           headers: { "Authorization": `Bearer ${token}` }
         }),
+        fetch("https://localhost/api/v1/cases/filter?status=archived", {
+          headers: { "Authorization": `Bearer ${token}` }
+        }),
       ]);
 
-                                const openData = await openRes.json();
-                                const closedData = await closedRes.json();
-                                const archivedData = await archivedRes.json();
+      const openData = await openRes.json();
+      const ongoingData = await ongoingRes.json();
+      const closedData = await closedRes.json();
+      const archivedData = await archivedRes.json();
 
-                                setOpenCases(openData.cases || []);
-                                setClosedCases(closedData.cases || []);
-                                setArchivedCases(archivedData.cases || []);
+      // Merge open and ongoing cases
+      setOpenCases([...(openData.cases || []), ...(ongoingData.cases || [])]);
+      setClosedCases(closedData.cases || []);
+      setArchivedCases(archivedData.cases || []);
 
-                                // Update tile values
-                                setAvailableTiles(prev => prev.map(tile => {
-                                  switch(tile.id) {
-                                    case 'ongoing-cases':
-                                      return { ...tile, value: (openData.cases || []).length.toString() };
-                                    case 'closed-cases':
-                                      return { ...tile, value: (closedData.cases || []).length.toString() };
-                                    case 'evidence-count':
-                                      // Only update if evidenceCount is still zero (not set by backend)
-                                      return tile.value === "0"
-                                        ? { ...tile, value: evidenceCount.toString() }
-                                        : tile;
-                                    default:
-                                      return tile;
-                                  }
-                                }));
+      // Update tile values
+      setAvailableTiles(prev => prev.map(tile => {
+        switch(tile.id) {
+          case 'ongoing-cases':
+            return { ...tile, value: ([...(openData.cases || []), ...(ongoingData.cases || [])]).length.toString() };
+          case 'closed-cases':
+            return { ...tile, value: (closedData.cases || []).length.toString() };
+          case 'evidence-count':
+            return tile.value === "0"
+              ? { ...tile, value: evidenceCount.toString() }
+              : tile;
+          default:
+            return tile;
+        }
+      }));
 
-                              } catch (error) {
-                                console.error("Failed to fetch cases:", error);
-                              }
-                            };
+    } catch (error) {
+      console.error("Failed to fetch cases:", error);
+    }
+  };
 
-                            fetchCasesCount();
-                          }, []);
+  fetchCasesCount();
+}, []);                            
 
 // Define getIcon ABOVE the .map
 const getIcon = (action: string) => {
@@ -496,6 +521,7 @@ const handleSaveCase = async () => {
       newTab = "active";
     }
     setActiveTab(newTab);
+    setRefreshCases(prev => prev + 1); // Trigger a refresh to sync with backend
 
     // Update dashboard tile counts immediately
     setAvailableTiles(prev => prev.map(tile => {
@@ -675,7 +701,7 @@ useEffect(() => {
               {user?.image_url ? (
                 <img
                   src={
-                    user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                    user.image_url.startsWith("https") || user.image_url.startsWith("data:")
                       ? user.image_url
                       : `https://localhost${user.image_url}`
                   }
@@ -750,16 +776,14 @@ useEffect(() => {
                 )}
               </Link>
 
-              <Link to="/settings">
-                <button className="p-2 text-muted-foreground hover:text-white transition-colors">
-                  <Settings className="w-6 h-6" />
-                </button>
+             <Link to="/settings">
+                <Settings className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
               </Link>
               <Link to="/profile">
                 {user?.image_url ? (
                   <img
                     src={
-                      user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                      user.image_url.startsWith("https") || user.image_url.startsWith("data:")
                         ? user.image_url
                         : `https://localhost${user.image_url}`
                     }
@@ -923,7 +947,7 @@ useEffect(() => {
                       : "bg-primary/10 text-primary border border-primary"
                   )}
                 >
-                  Active Cases ({(openCases as CaseCard[]).filter(c => c.status === "open" || c.status === "ongoing").length})
+                  Active Cases ({openCases.length})
                 </button>
                 <button
                   onClick={() => setActiveTab("archived")}

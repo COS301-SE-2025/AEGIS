@@ -18,7 +18,7 @@ type ListCasesService interface {
 	//ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
 	GetAllCases(tenantID string) ([]ListCases.Case, error)
 	GetCasesByUser(userID string, tenantID string) ([]ListCases.Case, error)
-	GetFilteredCases(TenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order string) ([]ListCases.Case, error)
+	GetFilteredCases(TenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order string, userID, teamID string) ([]ListCases.Case, error)
 	GetCaseByID(caseID string, tenantID string) (*ListCases.Case, error)
 }
 
