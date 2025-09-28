@@ -10,25 +10,61 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Updated to latest version
 
       - name: Deploy over SSH
-        uses: appleboy/ssh-action@v0.1.6
+        uses: appleboy/ssh-action@v1.0.3 # Updated to latest version
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_SSH_PORT }}
           script: |
+            # Create project directory if it doesn't exist
+            mkdir -p /home/${{ secrets.SERVER_USER }}/AEGIS
             cd /home/${{ secrets.SERVER_USER }}/AEGIS
-            git pull origin main
 
-            echo "Pulled latest code"
+            # Initialize git repository if it doesn't exist
+            if [ ! -d ".git" ]; then
+              echo "Initializing git repository..."
+              git init
+              git remote add origin https://github.com/COS301-SE-2025/AEGIS.git
+            fi
 
-            echo "Stopping existing containers..."
-            docker-compose down
+            # Ensure we're on the main branch and pull latest changes
+            echo "Fetching latest code..."
+            git fetch origin main
+            git reset --hard origin/main
 
-            echo "Building and starting fresh containers..."
-            docker-compose up -d --build
+            echo "Successfully pulled latest code"
 
-            echo "Deployment complete!"
+            # Check if docker-compose file exists
+            if [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ]; then
+              echo "Found docker-compose configuration"
+              
+              echo "Stopping existing containers..."
+              docker-compose down --remove-orphans || true
+              
+              echo "Cleaning up unused Docker resources..."
+              docker system prune -f
+              
+              echo "Building and starting fresh containers..."
+              docker-compose up -d --build
+              
+              echo "Checking container status..."
+              docker-compose ps
+              
+            else
+              echo "Warning: No docker-compose.yml or docker-compose.yaml found in the repository"
+              echo "Available files in current directory:"
+              ls -la
+              
+              # Alternative: If you're using Docker without compose
+              # Uncomment and modify as needed:
+              # echo "Building Docker image..."
+              # docker build -t aegis-app .
+              # echo "Running Docker container..."
+              # docker run -d --name aegis-container -p 80:3000 aegis-app
+            fi
+
+            echo "Deployment script completed!"
