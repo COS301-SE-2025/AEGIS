@@ -125,7 +125,7 @@ func (s *BundleService) GetBundle(ctx context.Context, userID string) (*BundleRe
 	}
 	var opkPub, opkID string
 	if opk != nil {
-		opkPub, opkID = opk.PublicKey, opk.KeyID // return client key id
+		opkPub, opkID = opk.PublicKey, opk.ID // return client key id
 	}
 	s.logAudit(ctx, userID, "GET_BUNDLE", "success", "Fetched X3DH bundle", bson.M{
 		"has_opk": opk != nil,

@@ -78,7 +78,7 @@ func (s *PostgresKeyStore) ConsumeOneTimePreKey(ctx context.Context, userID stri
 
 	var opk OneTimePreKey
 	opk.UserID = userID
-	if err := row.Scan(&opk.ID, &opk.KeyID, &opk.PublicKey); err != nil {
+	if err := row.Scan(&opk.ID, &opk.ID, &opk.PublicKey); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNoOPKsAvailable
 		}
