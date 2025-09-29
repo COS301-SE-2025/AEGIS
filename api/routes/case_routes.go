@@ -158,6 +158,9 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		// ─── Health Checks ──────────────────────────────
 		RegisterHealthRoutes(protected, h.HealthHandler)
 
+		// ─── Encryption Routes ──────────────────────────────
+		RegisterEncryptionRoutes(protected, h.EncryptionHandler)
+
 	}
 	return router
 }
