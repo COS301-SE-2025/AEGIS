@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Calendar, Clock, Paperclip, Tag, Edit2, Save, X, FileText, Download, Eye, Shield, AlertTriangle, CheckCircle, Brain, Lightbulb, Zap, Target, TrendingUp, Sparkles } from "lucide-react";
+import { Plus, Calendar, Clock, Paperclip, Tag, Edit2, Save, X, FileText, Download, Eye, Shield, AlertTriangle, CheckCircle, Brain, Lightbulb, Zap, Target, Sparkles } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
@@ -233,19 +233,18 @@ export function InvestigationTimeline({
   const [editDescription, setEditDescription] = useState("");
   const [expandedEvidence, setExpandedEvidence] = useState<{[key: string]: boolean}>({});
   const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
-  const [evidenceLoading, setEvidenceLoading] = useState(false);
-  const [evidenceError, setEvidenceError] = useState<string | null>(null);
+  const [, setEvidenceLoading] = useState(false);
+  const [, setEvidenceError] = useState<string | null>(null);
 
   // AI-related states
-  const [aiSuggestions, setAiSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [, setAiSuggestions] = useState([]);
+  const [, setShowSuggestions] = useState(false);
+  const [, setIsLoadingSuggestions] = useState(false);
   const [aiRecommendedSeverity, setAiRecommendedSeverity] = useState("");
   const [aiRecommendedTags, setAiRecommendedTags] = useState([]);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [nextStepSuggestions, setNextStepSuggestions] = useState([]);
-  const [aiStatus, setAiStatus] = useState({ online: false, loading: false });
-  const [wordSuggestions, setWordSuggestions] = useState<string[]>([]);
+  const [wordSuggestions, ] = useState<string[]>([]);
   const [sentenceCompletions, setSentenceCompletions] = useState<string[]>([]);
   const [showWordSuggestions, setShowWordSuggestions] = useState(false);
   const [showSentenceCompletions, setShowSentenceCompletions] = useState(false);
@@ -274,25 +273,7 @@ export function InvestigationTimeline({
     []
   );
 
-const debouncedGetWordSuggestions = useCallback(
-  debounce(async (text: string) => {
-    if (text.length > 2) { // Trigger after 3 characters
-      try {
-        const result = await aiService.getWordSuggestions(text);
-        if (result.success) {
-          setWordSuggestions(result.suggestions || []);
-          setShowWordSuggestions(true);
-        }
-      } catch (error) {
-        console.error('Error getting word suggestions:', error);
-      }
-    } else {
-      setWordSuggestions([]);
-      setShowWordSuggestions(false);
-    }
-  }, 500), // Shorter delay for word suggestions
-  []
-);
+
 
   // Get AI recommendations when description changes
   useEffect(() => {
@@ -350,11 +331,6 @@ const debouncedGetWordSuggestions = useCallback(
     }
   };
 
-  const applySuggestion = (suggestion: string) => {
-    setNewEventDescription(suggestion);
-    setShowSuggestions(false);
-    setAiSuggestions([]);
-  };
 
   const applyAISeverity = () => {
     if (aiRecommendedSeverity) {

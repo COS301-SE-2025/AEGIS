@@ -183,7 +183,7 @@ export async function generateGroupSharedSecretForChat(
 
     // Fetch current user's bundle (adjust endpoint as needed)
     const resp = await fetch(
-      `http://localhost:8080/api/v1/x3dh/bundle/${encodeURIComponent(currentUserId)}`,
+      `https://localhost/api/v1/x3dh/bundle/${encodeURIComponent(currentUserId)}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     if (!resp.ok) {

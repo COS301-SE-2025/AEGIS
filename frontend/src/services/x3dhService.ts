@@ -22,7 +22,7 @@ export type BundleResponse = {
   opkId?: string;
 };
 
-const API = (import.meta as any).env?.VITE_API_BASE?.replace(/\/$/, "") || "http://localhost:8080";
+const API = (import.meta as any).env?.VITE_API_BASE?.replace(/\/$/, "") || "https://localhost";
 const X3DH_BASE = `${API}/api/v1/x3dh`;
 
 function authHeaders() {
