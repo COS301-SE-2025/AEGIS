@@ -46,9 +46,10 @@ import (
 
 	"aegis-api/services_/timeline"
 
-	"aegis-api/pkg/encryption"
+	
 	"aegis-api/services_/health"
 	"aegis-api/services_/user/profile"
+	"aegis-api/pkg/encryption"
 
 	//"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -81,6 +82,19 @@ func main() {
 		log.Fatal("❌ JWT_SECRET_KEY not set in environment")
 	}
 	middleware.SetJWTSecret([]byte(jwtSecret))
+
+	 
+    // ─── Encryption at rest Service  ─────────────
+    if err := encryption.InitializeService(); err != nil {
+        log.Fatalf("Failed to initialize encryption at rest service: %v", err)
+    }
+    
+    log.Println("✅ Encryption at rest  service initialized successfully")
+
+	encHandler := &handlers.EncryptionHandler{
+    Service: encryption.GetService(),
+	}
+
 
 	// ─── Initialize Database ────────────────────────────────────
 	if err := db.InitDB(); err != nil {
@@ -412,6 +426,8 @@ func main() {
 	healthService := &health.Service{Repo: repo}
 	healthHandler := &handlers.HealthHandler{Service: healthService}
 
+
+
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
 		adminHandler,
@@ -449,6 +465,7 @@ func main() {
 		evidenceHandler,
 		chainOfCustodyHandler,
 		healthHandler,
+		encHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────
