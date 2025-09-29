@@ -31,21 +31,5 @@ func (r *GormRepository) FindEvidenceByID(id uuid.UUID) (*Evidence, error) {
 func (r *GormRepository) FindEvidenceByCaseID(caseID uuid.UUID) ([]Evidence, error) {
 	var evidences []Evidence
 	err := r.db.Where("case_id = ?", caseID).Find(&evidences).Error
-
 	return evidences, err
-}
-
-// AppendEvidenceLog inserts a new evidence log record (append-only)
-func (r *GormRepository) AppendEvidenceLog(log *EvidenceLog) error {
-	return r.db.Create(log).Error
-}
-
-func (r *GormRepository) GetLastEvidenceLog(evidenceID uuid.UUID) (*EvidenceLog, error) {
-	var lastLog EvidenceLog
-	err := r.db.Where("evidence_id = ?", evidenceID).Order("created_at DESC").First(&lastLog).Error
-
-	if err != nil {
-		return nil, err
-	}
-	return &lastLog, nil
 }

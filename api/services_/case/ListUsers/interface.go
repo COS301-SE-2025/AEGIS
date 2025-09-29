@@ -8,12 +8,12 @@ import (
 
 type ListUserService interface {
 	ListUsers(ctx context.Context) ([]User, error)
-	ListUsersByTenant(ctx context.Context, tenantID uuid.UUID, page int, pageSize int) ([]User, int64, error)
+	ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]User, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*User, error)
 }
 
 type ListUserRepository interface {
 	GetAllUsers(ctx context.Context) ([]User, error)
-	GetUsersByTenant(ctx context.Context, tenantID uuid.UUID, page int, pageSize int) ([]User, int64, error)
+	GetUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]User, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*User, error)
 }

@@ -42,17 +42,14 @@ useEffect(() => {
 
     if (mode === "case") {
       if (!selectedCase) return;
-      endpoint = `https://localhost/api/v1/tenants/${tenantId}/cases/${selectedCase}/ioc-graph`;
+      endpoint = `http://localhost:8080/api/v1/tenants/${tenantId}/cases/${selectedCase}/ioc-graph`;
     } else {
-      endpoint = `https://localhost/api/v1/tenants/${tenantId}/ioc-graph`;
+      endpoint = `http://localhost:8080/api/v1/tenants/${tenantId}/ioc-graph`;
     }
 
     try {
       const res = await fetch(endpoint, {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": token ?`Bearer ${token}` : "",
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(res.statusText);
 

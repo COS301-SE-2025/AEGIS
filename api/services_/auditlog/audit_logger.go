@@ -17,17 +17,8 @@ func NewAuditLogger(mongo MongoLoggerInterface, zap ZapLoggerInterface) *AuditLo
 	return &AuditLogger{mongo: mongo, zap: zap}
 }
 func (a *AuditLogger) Log(ctx *gin.Context, log AuditLog) error {
-	// Debug: Incoming log
-	// Debug logging removed because ZapLoggerInterface does not define Debug method
-
 	// Mongo log (persistent)
 	if err := a.mongo.Log(ctx, log); err != nil {
-		a.zap.Log(AuditLog{
-			Timestamp:   time.Now(),
-			Action:      "ERROR",
-			Description: fmt.Sprintf("Failed to persist audit log to Mongo: %v", err),
-			Metadata:    map[string]string{},
-		})
 		return err
 	}
 

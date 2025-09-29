@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	x3dh "aegis-api/internal/x3dh"
 	"aegis-api/middleware"
 	"aegis-api/pkg/websocket"
 	"aegis-api/services_/auditlog"
@@ -12,7 +11,6 @@ import (
 	"aegis-api/structs"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -45,7 +43,6 @@ type Handler struct {
 	EvidenceService           EvidenceServiceInterface
 	UserService               UserServiceInterface
 	CaseHandler               *CaseHandler
-	CaseDeletionHandler       *CaseDeletionHandler
 	CaseListHandler           *CaseListHandler
 	UploadHandler             *UploadHandler
 	DownloadHandler           *DownloadHandler
@@ -66,7 +63,7 @@ type Handler struct {
 	TenantRepo                registration.TenantRepository
 	UserRepo                  registration.UserRepository // Optional, if you have a user repository
 	NotificationService       *notification.NotificationService
-	HealthHandler             *HealthHandler
+	HealthHandler			*HealthHandler
 
 	ReportHandler       *ReportHandler       // Optional: Report generation handler
 	ReportStatusHandler *ReportStatusHandler // Optional: Report status update handler
@@ -78,7 +75,6 @@ type Handler struct {
 	TimelineAIHandler     *TimelineAIHandler
 	EvidenceHandler       *EvidenceHandler
 	ChainOfCustodyHandler *ChainOfCustodyHandler
-	X3DHService           *x3dh.BundleService // Add this
 }
 
 func NewHandler(
@@ -88,7 +84,6 @@ func NewHandler(
 	evidenceSvc EvidenceServiceInterface,
 	userSvc UserServiceInterface,
 	caseHandler *CaseHandler,
-	caseDeletionHandler *CaseDeletionHandler,
 	uploadHandler *UploadHandler,
 	downloadHandler *DownloadHandler, // Optional, if you have a download handler
 	metadataHandler *MetadataHandler, // Optional, if you have a metadata handler
@@ -118,10 +113,7 @@ func NewHandler(
 
 	EvidenceHandler *EvidenceHandler,
 	ChainOfCustodyHandler *ChainOfCustodyHandler,
-
 	healthHandler *HealthHandler,
-
-	x3dhService *x3dh.BundleService,
 
 ) *Handler {
 	return &Handler{
@@ -131,7 +123,6 @@ func NewHandler(
 		EvidenceService:           evidenceSvc,
 		UserService:               userSvc,
 		CaseHandler:               caseHandler,
-		CaseDeletionHandler:       caseDeletionHandler,
 		UploadHandler:             uploadHandler,
 		DownloadHandler:           downloadHandler,
 		MetadataHandler:           metadataHandler,
@@ -162,8 +153,6 @@ func NewHandler(
 		EvidenceHandler:       EvidenceHandler,
 		ChainOfCustodyHandler: ChainOfCustodyHandler,
 		HealthHandler:         healthHandler,
-
-		X3DHService: x3dhService,
 	}
 }
 
@@ -172,12 +161,10 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 	for k, v := range c.Request.Header {
 		fmt.Printf("[DEBUG] Header: %s = %v\n", k, v)
 	}
-
 	var req struct {
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fmt.Printf("[DEBUG] Body bind error: %v\n", err)
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
@@ -186,21 +173,16 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 		})
 		return
 	}
-
 	fmt.Printf("[DEBUG] Body: email=%s, password=%s\n", req.Email, req.Password)
 
-	// Add detailed error handling around the service call
 	resp, err := h.authService.Login(req.Email, req.Password)
+	status := "SUCCESS"
 	if err != nil {
-		// Log the actual error details
-		fmt.Printf("[ERROR] Login service error: %v\n", err)
-		fmt.Printf("[ERROR] Error type: %T\n", err)
-
-		status := "FAILED"
+		status = "FAILED"
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action: "LOGIN_ATTEMPT",
 			Actor: auditlog.Actor{
-				ID:   "",
+				ID:   "", // Unknown until login successful
 				Role: "",
 			},
 			Target: auditlog.Target{
@@ -209,26 +191,16 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 			},
 			Service:     "auth",
 			Status:      status,
-			Description: fmt.Sprintf("Failed login attempt: %v", err),
+			Description: "Failed login attempt",
 		})
-
-		// Return 500 if it's an unexpected error, 401 for auth failures
-		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "not found") {
-			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
-				Error:   "authentication_failed",
-				Message: "Invalid email or password",
-			})
-		} else {
-			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
-				Error:   "internal_error",
-				Message: "An internal error occurred",
-			})
-		}
+		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+			Error:   "authentication_failed",
+			Message: "Invalid email or password",
+		})
 		return
 	}
 
 	// Log successful attempt
-	status := "SUCCESS"
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action: "LOGIN_ATTEMPT",
 		Actor: auditlog.Actor{

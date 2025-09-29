@@ -64,12 +64,11 @@ const [updatedTitle, setUpdatedTitle] = useState("");
 const [updatedDescription, setUpdatedDescription] = useState("");
 
 
-const [openCases, setOpenCases] = useState<CaseCard[]>([]);
-const [closedCases, setClosedCases] = useState<CaseCard[]>([]);
-const [archivedCases, setArchivedCases] = useState<CaseCard[]>([]);
+const [openCases, setOpenCases] = useState([]);
+const [closedCases, setClosedCases] = useState([]);
+const [archivedCases] = useState([]); // <-- Add this line
 const [evidenceCount, setEvidenceCount] = useState(0);
 const [evidenceError, setEvidenceError] = useState<string | null>(null);
-const [refreshCases, setRefreshCases] = useState(0);
 const [searchQuery, setSearchQuery] = useState("");
   const unread = useUnreadCount();
 
@@ -169,14 +168,11 @@ useEffect(() => {
       let responseKey = "";
 
       if (activeTab === "active") {
-        endpoint = "https://localhost/api/v1/cases/active";
+        endpoint = "http://localhost:8080/api/v1/cases/active";
         responseKey = "cases";
       } else if (activeTab === "closed") {
-        endpoint = "https://localhost/api/v1/cases/closed";
+        endpoint = "http://localhost:8080/api/v1/cases/closed";
         responseKey = "closed_cases";
-      } else if (activeTab === "archived") {
-        endpoint = "https://localhost/api/v1/cases/archived";
-        responseKey = "archived_cases";
       }
 
       const res = await fetch(endpoint, {
@@ -185,30 +181,12 @@ useEffect(() => {
         },
       });
 
-      if (res.status === 304) {
-        setCaseCards([]);
-        return;
-      }
       if (!res.ok) throw new Error(`Failed to load ${activeTab} cases`);
-
-let data = {};
-try {
-  const text = await res.text();
-
-  if (text && (text.trim().startsWith("{") || text.trim().startsWith("["))) {
-    data = JSON.parse(text);
-  } else {
-    data = {};
-  }
-} catch (e) {
-  console.error("Failed to parse JSON for", activeTab, "cases:", e);
-  setCaseCards([]);
-  return;
-}
+      const data = await res.json();
 
       console.log(`Fetched ${activeTab} cases:`, data);
 
-      const rawCases = (data as any)[responseKey] || [];
+      const rawCases = data[responseKey] || [];
 
       const mappedCases = rawCases.map((c: any) => ({
         id: c.id,
@@ -216,7 +194,6 @@ try {
         team_name: c.team_name,
         creator: c.created_by,
         priority: c.priority,
-        status: c.status,
         description: c.description,
         lastActivity: c.created_at,
         investigation_stage: c.investigation_stage || "Triage",
@@ -234,7 +211,7 @@ try {
   };
 
   fetchCases();
-}, [activeTab, refreshCases]);
+}, [activeTab]);
 
 useEffect(() => {
   const token = sessionStorage.getItem("authToken");
@@ -258,7 +235,7 @@ useEffect(() => {
 
   const fetchEvidenceCount = async () => {
     try {
-      const res = await fetch(`https://localhost/api/v1/evidence/count/${tenantId}`, {
+      const res = await fetch(`http://localhost:8080/api/v1/evidence/count/${tenantId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -328,7 +305,7 @@ useEffect(() => {
   const fetchRecentActivities = async () => {
     try {
       const token = sessionStorage.getItem("authToken") || "";
-      const res = await fetch(`https://localhost/api/v1/auditlogs/recent/${user.id}`, {
+      const res = await fetch(`http://localhost:8080/api/v1/auditlogs/recent/${user.id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -358,39 +335,30 @@ useEffect(() => {
     const token = sessionStorage.getItem("authToken") || "";
 
     try {
-      const [openRes, ongoingRes, closedRes, archivedRes] = await Promise.all([
-        fetch("https://localhost/api/v1/cases/filter?status=open", {
+      const [openRes, closedRes] = await Promise.all([
+        fetch("http://localhost:8080/api/v1/cases/filter?status=open", {
           headers: { "Authorization": `Bearer ${token}` }
         }),
-        fetch("https://localhost/api/v1/cases/filter?status=ongoing", {
-          headers: { "Authorization": `Bearer ${token}` }
-        }),
-        fetch("https://localhost/api/v1/cases/filter?status=closed", {
-          headers: { "Authorization": `Bearer ${token}` }
-        }),
-        fetch("https://localhost/api/v1/cases/filter?status=archived", {
+        fetch("http://localhost:8080/api/v1/cases/filter?status=closed", {
           headers: { "Authorization": `Bearer ${token}` }
         }),
       ]);
 
       const openData = await openRes.json();
-      const ongoingData = await ongoingRes.json();
       const closedData = await closedRes.json();
-      const archivedData = await archivedRes.json();
 
-      // Merge open and ongoing cases
-      setOpenCases([...(openData.cases || []), ...(ongoingData.cases || [])]);
+      setOpenCases(openData.cases || []);
       setClosedCases(closedData.cases || []);
-      setArchivedCases(archivedData.cases || []);
 
       // Update tile values
       setAvailableTiles(prev => prev.map(tile => {
         switch(tile.id) {
           case 'ongoing-cases':
-            return { ...tile, value: ([...(openData.cases || []), ...(ongoingData.cases || [])]).length.toString() };
+            return { ...tile, value: (openData.cases || []).length.toString() };
           case 'closed-cases':
             return { ...tile, value: (closedData.cases || []).length.toString() };
           case 'evidence-count':
+            // Only update if evidenceCount is still zero (not set by backend)
             return tile.value === "0"
               ? { ...tile, value: evidenceCount.toString() }
               : tile;
@@ -405,7 +373,8 @@ useEffect(() => {
   };
 
   fetchCasesCount();
-}, []);                            
+}, []);
+
 
 // Define getIcon ABOVE the .map
 const getIcon = (action: string) => {
@@ -435,7 +404,7 @@ const handleSaveCase = async () => {
   const token = sessionStorage.getItem("authToken") || "";
   
   try {
-    const res = await fetch(`https://localhost/api/v1/cases/${editingCase.id}`, {
+    const res = await fetch(`http://localhost:8080/api/v1/cases/${editingCase.id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -454,10 +423,9 @@ const handleSaveCase = async () => {
     const data = await res.json();
     console.log("Case updated:", data);
 
-    // Remove the edit modal
     setEditingCase(null);
 
-    // Update the caseCards list locally
+    //  Update the list locally using backend progress value
     setCaseCards(prev =>
       prev.map(c =>
         c.id === editingCase.id
@@ -467,85 +435,13 @@ const handleSaveCase = async () => {
               description: updatedDescription,
               status: updatedStatus,
               investigation_stage: updatedStage,
-              progress: getProgressForStage(updatedStage),
+              progress: getProgressForStage(updatedStage), // Update progress based on stage
             }
           : c
       )
     );
 
-    // Update openCases state to always reflect cases with status 'open' or 'ongoing'
-    setOpenCases(prev => {
-      const filtered = prev.filter(c => c.id !== editingCase.id);
-      if (updatedStatus === "open" || updatedStatus === "ongoing") {
-        return [
-          ...filtered,
-          {
-            ...editingCase!,
-            title: updatedTitle,
-            description: updatedDescription,
-            status: updatedStatus,
-            investigation_stage: updatedStage,
-            progress: getProgressForStage(updatedStage),
-          },
-        ];
-      }
-      return filtered;
-    });
-
-    // Update closedCases state to always reflect cases with status 'closed'
-    setClosedCases(prev => {
-      const filtered = prev.filter(c => c.id !== editingCase.id);
-      if (updatedStatus === "closed") {
-        return [
-          ...filtered,
-          {
-            ...editingCase!,
-            title: updatedTitle,
-            description: updatedDescription,
-            status: updatedStatus,
-            investigation_stage: updatedStage,
-            progress: getProgressForStage(updatedStage),
-          },
-        ];
-      }
-      return filtered;
-    });
-
-    // If status changed, switch tab so the card moves immediately
-    let newTab = "active";
-    if (updatedStatus === "closed") {
-      newTab = "closed";
-    } else if (updatedStatus === "archived") {
-      newTab = "archived";
-    } else if (updatedStatus === "open" || updatedStatus === "ongoing") {
-      newTab = "active";
-    }
-    setActiveTab(newTab);
-    setRefreshCases(prev => prev + 1); // Trigger a refresh to sync with backend
-
-    // Update dashboard tile counts immediately
-    setAvailableTiles(prev => prev.map(tile => {
-      let count = parseInt(tile.value, 10);
-      // Ongoing cases
-      if (tile.id === "ongoing-cases") {
-        if (editingCase?.status === "open" || editingCase?.status === "ongoing") count--;
-        if (newTab === "active") count++;
-        return { ...tile, value: Math.max(count, 0).toString() };
-      }
-      // Closed cases
-      if (tile.id === "closed-cases") {
-        if (editingCase?.status === "closed") count--;
-        if (newTab === "closed") count++;
-        return { ...tile, value: Math.max(count, 0).toString() };
-      }
-      // Archived cases (if you have a tile for it)
-      if (tile.id === "archived-cases") {
-        if (editingCase?.status === "archived") count--;
-        if (newTab === "archived") count++;
-        return { ...tile, value: Math.max(count, 0).toString() };
-      }
-      return tile;
-    }));
+    //alert("Case updated successfully!");
   } catch (err) {
     console.error("Error updating case:", err);
    // alert("Failed to update case");
@@ -582,7 +478,7 @@ const handleSaveCase = async () => {
     const fetchProfile = async () => {
       try {
         const token = sessionStorage.getItem("authToken");
-        const res = await fetch(`https://localhost/api/v1/profile/${user?.id}`, {
+        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -701,9 +597,9 @@ useEffect(() => {
               {user?.image_url ? (
                 <img
                   src={
-                    user.image_url.startsWith("https") || user.image_url.startsWith("data:")
+                    user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `https://localhost${user.image_url}`
+                      : `http://localhost:8080${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -776,16 +672,18 @@ useEffect(() => {
                 )}
               </Link>
 
-             <Link to="/settings">
-                <Settings className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
+              <Link to="/settings">
+                <button className="p-2 text-muted-foreground hover:text-white transition-colors">
+                  <Settings className="w-6 h-6" />
+                </button>
               </Link>
               <Link to="/profile">
                 {user?.image_url ? (
                   <img
                     src={
-                      user.image_url.startsWith("https") || user.image_url.startsWith("data:")
+                      user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `https://localhost${user.image_url}`
+                        : `http://localhost:8080${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"
@@ -972,13 +870,11 @@ useEffect(() => {
                   Closed Cases ({closedCases.length})
                 </button>
               </div>
-              {isDFIRAdmin && (
-                <Link to="/create-case">
-                  <button className="bg-primary text-primary-foreground text-sm px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
-                    Create Case
-                  </button>
-                </Link>
-              )}
+              <Link to="/create-case">
+                <button className="bg-primary text-primary-foreground text-sm px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                  Create Case
+                </button>
+              </Link>
             </div>
 
             {caseCards.length === 0 ? (
@@ -1001,31 +897,30 @@ useEffect(() => {
                       className="relative flex flex-col justify-between items-center w-[460px] h-[450px] p-4 bg-card border border-border rounded-lg shadow"
                     >
                       <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2 z-10">
-                        {/* Edit and Delete buttons are disabled in Archived tab */}
-                        {activeTab !== "archived" ? (
-                          <>
-                            <button
-                              onClick={() => {
-                                setEditingCase(card);
-                                setUpdatedStatus(card.status || "open");
-                                setUpdatedStage(card.investigation_stage || "Triage");
-                                setUpdatedTitle(card.title);
-                                setUpdatedDescription(card.description);
-                              }}
-                              className="text-muted-foreground hover:text-primary transition-colors"
-                              title="Edit Case"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={async () => {
-                                const confirmed = window.confirm("Are you sure you want to archive this case?");
-                                if (!confirmed) return;
+                        {/* Edit button (below) */}
+                        <button
+                          onClick={() => {
+                            setEditingCase(card);
+                            setUpdatedStatus(card.status || "open");
+                            setUpdatedStage(card.investigation_stage || "Triage");
+                            setUpdatedTitle(card.title);
+                            setUpdatedDescription(card.description);
+                          }}
+                          className="text-muted-foreground hover:text-primary transition-colors"
+                          title="Edit Case"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        {/* Delete button  */}
+                        <button
+                          onClick={async () => {
+                            const confirmed = window.confirm("Are you sure you want to archive this case?");
+                            if (!confirmed) return;
 
-                                const token = sessionStorage.getItem("authToken") || "";
+                            const token = sessionStorage.getItem("authToken") || "";
 
                             try {
-                              const res = await fetch(`https://localhost/api/v1/cases/${card.id}`, {
+                              const res = await fetch(`http://localhost:8080/api/v1/cases/${card.id}`, {
                                 method: "PATCH",
                                 headers: {
                                   "Content-Type": "application/json",
@@ -1034,39 +929,22 @@ useEffect(() => {
                                 body: JSON.stringify({ status: "archived" }),
                               });
 
-                                  if (res.ok) {
-                                    // Move card to archived tab and update status locally
-                                    setCaseCards(prev => prev.filter(c => c.id !== card.id));
-                                    setOpenCases((prev: CaseCard[]) => prev
-                                      .filter(c => c.id !== card.id)
-                                      .filter(c => c.status === "open" || c.status === "ongoing")
-                                    );
-                                    setArchivedCases((prev: CaseCard[]) => [...prev, { ...card, status: "archived" }]);
-                                    setActiveTab("archived");
-                                  } else {
-                                    // alert("Failed to archive the case.");
-                                  }
-                                } catch (error) {
-                                  console.error("Archive error:", error);
-                                  //alert("An error occurred.");
-                                }
-                              }}
-                              className="text-muted-foreground hover:text-red-500 transition-colors"
-                              title="Archive Case"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button disabled className="text-muted-foreground opacity-50 cursor-not-allowed" title="Edit disabled">
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button disabled className="text-muted-foreground opacity-50 cursor-not-allowed" title="Delete disabled">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
+                              if (res.ok) {
+                                setCaseCards(prev => prev.filter(c => c.id !== card.id));
+                              } else {
+                               // alert("Failed to archive the case.");
+                              }
+                            } catch (error) {
+                              console.error("Archive error:", error);
+                              //alert("An error occurred.");
+                            }
+                          }}
+                          className="text-muted-foreground hover:text-red-500 transition-colors"
+                          title="Archive Case"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+
                       </div>
 
                       <img
@@ -1110,26 +988,10 @@ useEffect(() => {
                           <span className="text-muted-foreground capitalize">{card.priority}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span
-                            className={cn(
-                              "w-2 h-2 rounded-full",
-                              card.status === "open"
-                                ? "bg-blue-400"
-                                : card.status === "ongoing"
-                                ? "bg-yellow-400"
-                                : card.status === "closed"
-                                ? "bg-green-500"
-                                : card.status === "archived"
-                                ? "bg-gray-500"
-                                : card.status === "under_review"
-                                ? "bg-purple-500"
-                                : "bg-muted"
-                            )}
-                          ></span>
-                          <span className="text-muted-foreground capitalize">{card.status ? card.status.replace(/_/g, " ") : "Unknown"}</span>
+                          <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                          <span className="text-muted-foreground">Ongoing</span>
                         </div>
                       </div>
-                        
                       <Progress
                         value={card.progress}
                         className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
@@ -1233,19 +1095,17 @@ useEffect(() => {
                       </Link>
                     </div>
 
-                    {/* Assign Members Button (DFIR Admin only) */}
-                    {isDFIRAdmin && (
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-muted-foreground mb-1">
-                          Assign Members
-                        </label>
-                        <Link to={`/assign-case-members/${editingCase.id}`} className="inline-block w-full">
-                          <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 text-sm transition-colors">
-                            Go to Assign Members Page
-                          </button>
-                        </Link>
-                      </div>
-                    )}
+                    {/* Assign Members Button */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-muted-foreground mb-1">
+                        Assign Members
+                      </label>
+                      <Link to={`/assign-case-members/${editingCase.id}`} className="inline-block w-full">
+                        <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 text-sm transition-colors">
+                          Go to Assign Members Page
+                        </button>
+                      </Link>
+                    </div>
 
                     {/* Action Buttons */}
                     <div className="flex justify-end gap-3 pt-2">

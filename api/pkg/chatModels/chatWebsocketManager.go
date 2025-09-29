@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -147,43 +147,66 @@ func (w *webSocketManager) BroadcastToCase(caseID string, message WebSocketMessa
 // HandleConnection upgrades HTTP connection to WebSocket and manages it
 var jwtSecret = []byte(os.Getenv("JWT_SECRET_KEY"))
 
-func (w *webSocketManager) HandleConnection(wr http.ResponseWriter, r *http.Request, c *gin.Context) error {
-	// ✅ USE THE GIN CONTEXT instead of re-validating the token
-	userID := c.GetString("userID")
-	userEmail := c.GetString("email")
-	//tenantID := c.GetString("tenantID")
-
-	// Check if authentication was already done by middleware
-	if userID == "" || userEmail == "" {
-		http.Error(wr, "Authentication required", http.StatusUnauthorized)
-		return fmt.Errorf("user not authenticated in context")
+func (w *webSocketManager) HandleConnection(wr http.ResponseWriter, r *http.Request) error {
+	// 1. Extract token from query params
+	tokenStr := r.URL.Query().Get("token")
+	if tokenStr == "" {
+		http.Error(wr, "Missing token", http.StatusUnauthorized)
+		return fmt.Errorf("missing JWT token")
 	}
 
-	log.Printf("✅ WebSocket connection for user %s (%s)", userEmail, userID)
+	// 2. Parse and validate token
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		// Validate signing method
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		http.Error(wr, "Invalid token", http.StatusUnauthorized)
+		return fmt.Errorf("invalid JWT: %w", err)
+	}
 
-	// ✅ Get groupID from query param
+	// 3. Extract claims
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		http.Error(wr, "Invalid claims", http.StatusUnauthorized)
+		return fmt.Errorf("invalid JWT claims")
+	}
+
+	// 4. Extract userEmail from claims
+	userEmailRaw, ok := claims["email"]
+	if !ok {
+		http.Error(wr, "Missing email in token", http.StatusUnauthorized)
+		return fmt.Errorf("email not found in token claims")
+	}
+	userEmail := fmt.Sprint(userEmailRaw)
+
+	// 5. Validate user exists
+	exists, err := w.userService.ValidateUserExists(context.Background(), userEmail)
+	if err != nil {
+		return fmt.Errorf("failed to validate user: %w", err)
+	}
+	if !exists {
+		http.Error(wr, "User not found", http.StatusUnauthorized)
+		return fmt.Errorf("user not found: %s", userEmail)
+	}
+
+	// ✅ 5.5 Get groupID from query param
 	groupID := r.URL.Query().Get("groupId")
 	if groupID == "" {
 		http.Error(wr, "Missing groupId", http.StatusBadRequest)
 		return fmt.Errorf("groupId query param is required")
 	}
 
-	// ✅ Get caseID from URL path (since it's /cases/:caseId)
-	caseID := c.Param("caseId")
-	if caseID == "" {
-		http.Error(wr, "Missing caseId", http.StatusBadRequest)
-		return fmt.Errorf("caseId path parameter is required")
-	}
-
-	//tenantID = "" // Not used in this example, but could be validated
-
-	// ✅ Upgrade to WebSocket
+	// 6. Upgrade to WebSocket
 	conn, err := w.upgrader.Upgrade(wr, r, nil)
 	if err != nil {
 		return fmt.Errorf("failed to upgrade connection: %w", err)
 	}
 
-	// ✅ Register connection
+	// 7. Register connection
 	w.mutex.Lock()
 	if existingConn, exists := w.connections[userEmail]; exists {
 		existingConn.Close()
@@ -191,18 +214,24 @@ func (w *webSocketManager) HandleConnection(wr http.ResponseWriter, r *http.Requ
 	w.connections[userEmail] = conn
 	w.mutex.Unlock()
 
-	// ✅ Add user to group
+	log.Printf("✅ User %s connected via WebSocket", userEmail)
+	caseID := r.URL.Query().Get("caseId") // Also add this above the call
+	if caseID == "" {
+		http.Error(wr, "Missing caseId", http.StatusBadRequest)
+		return fmt.Errorf("caseId query param is required")
+	}
+
 	if err := w.AddUserToGroup(userEmail, groupID, caseID, conn); err != nil {
 		log.Printf("Failed to add user %s to group %s: %v", userEmail, groupID, err)
 	}
 
-	log.Printf("✅ User %s connected via WebSocket to group %s, case %s", userEmail, groupID, caseID)
+	log.Printf("✅ User %s connected via WebSocket to group %s", userEmail, groupID)
 
-	// ✅ Start listener & ping routines
+	// 8. Start listener & ping routines
 	go w.handleConnectionMessages(userEmail, groupID, conn)
 	go w.pingConnection(userEmail, conn)
 
-	// ✅ Optionally deliver queued messages
+	// 9. Optionally deliver queued messages
 	go w.deliverQueuedMessages(userEmail)
 
 	return nil
@@ -710,7 +739,7 @@ func (w *webSocketManager) deliverQueuedMessages(userEmail string) {
 
 	for _, msg := range messages {
 		event := WebSocketMessage{
-			Type:      MessageType(EventNewMessage),
+			Type:      NewMessageType,
 			GroupID:   msg.GroupID.Hex(),
 			UserEmail: msg.SenderEmail,
 			Payload:   msg,

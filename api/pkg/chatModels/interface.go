@@ -5,7 +5,6 @@ import (
 	"mime/multipart"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -65,7 +64,7 @@ type WebSocketManager interface {
 	AddUserToGroup(userEmail string, groupID, caseID string, conn *websocket.Conn) error
 	RemoveUserFromGroup(userEmail, groupID string) error
 	GetActiveUsers(groupID string) []string
-	HandleConnection(wr http.ResponseWriter, r *http.Request, c *gin.Context) error
+	HandleConnection(wr http.ResponseWriter, r *http.Request) error
 	BroadcastToCase(caseID string, message WebSocketMessage) error
 	AddConnection(userID, caseID string, conn *websocket.Conn)
 }

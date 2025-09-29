@@ -87,7 +87,7 @@ export function CreateCaseForm(): JSX.Element {
   setForm(prev => ({ ...prev, tenantId: decoded.tenant_id }));
 
   // Use team_id here, NOT tenant_id
-axios.get<{ id: string; name: string }>(`https://localhost/api/v1/teams/${decoded.team_id}`)
+axios.get<{ id: string; name: string }>(`http://localhost:8080/api/v1/teams/${decoded.team_id}`)
   .then((res) => {
     setTeams([res.data]);  // wrap in array so you can map safely
   })
@@ -141,7 +141,7 @@ const payload = {
 
     try {
       const response = await axios.post(
-  "https://localhost/api/v1/cases",
+  "http://localhost:8080/api/v1/cases",
   payload,
   {
     headers: {

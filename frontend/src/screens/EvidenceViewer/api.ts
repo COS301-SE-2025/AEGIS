@@ -10,12 +10,12 @@ interface EvidenceMetadata {
   priority?: string;
 }
 
-const baseURL = "https://localhost/api/v1";
+const baseURL = "http://localhost:8080/api/v1";
 
 // EvidenceViewer/api.ts
 export async function fetchEvidenceByCaseId(caseId: string) {
   const token = sessionStorage.getItem("authToken") || "";
-  const res = await fetch(`https://localhost/api/v1/evidence-metadata/case/${caseId}`, {
+  const res = await fetch(`http://localhost:8080/api/v1/evidence-metadata/case/${caseId}`, {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
@@ -61,7 +61,7 @@ export async function createThread(data: {
 }) {
   const token = sessionStorage.getItem("authToken") || "";
 
-  const res = await fetch(`https://localhost/api/v1/threads`, {
+  const res = await fetch(`http://localhost:8080/api/v1/threads`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -77,7 +77,7 @@ export async function createThread(data: {
 
 export async function fetchThreadsByFile(fileID: string) {
   const token = sessionStorage.getItem("authToken");
-  const res = await fetch(`https://localhost/api/v1/threads/file/${fileID}`, {
+  const res = await fetch(`http://localhost:8080/api/v1/threads/file/${fileID}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -90,7 +90,7 @@ export async function fetchThreadsByFile(fileID: string) {
 // export async function sendThreadMessage(threadId: string, body: any) {
 //   const token = sessionStorage.getItem("authToken");
 
-//   const res = await fetch(`https://localhost/api/v1/threads/${threadId}/messages`, {
+//   const res = await fetch(`http://localhost:8080/api/v1/threads/${threadId}/messages`, {
 //     method: "POST",
 //     headers: {
 //       "Content-Type": "application/json",
@@ -106,7 +106,7 @@ export async function fetchThreadsByFile(fileID: string) {
 export async function sendThreadMessage(threadId: string, body: any) {
   const token = sessionStorage.getItem("authToken");
 
-  const res = await fetch(`https://localhost/api/v1/threads/${threadId}/messages`, {
+  const res = await fetch(`http://localhost:8080/api/v1/threads/${threadId}/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -130,7 +130,7 @@ export async function sendThreadMessage(threadId: string, body: any) {
 
 export async function fetchThreadMessages(threadID: string) {
   const token = sessionStorage.getItem("authToken");
-  const res = await fetch(`https://localhost/api/v1/threads/${threadID}/messages`, {
+  const res = await fetch(`http://localhost:8080/api/v1/threads/${threadID}/messages`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -150,7 +150,7 @@ export async function createAnnotationThread(data: {
 }) {
   const token = sessionStorage.getItem("authToken");
 
-  const res = await fetch("https://localhost/api/v1/threads", {
+  const res = await fetch("http://localhost:8080/api/v1/threads", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -88,26 +88,15 @@ func (s *Service) GetCasesByUser(userID string, tenantID string) ([]Case, error)
 	return result, nil
 }
 
-func (s *Service) GetFilteredCases(
-	TenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order, userID, teamID string,
-) ([]Case, error) {
+func (s *Service) GetFilteredCases(TenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order string) ([]Case, error) {
 	var tenantUUID uuid.UUID
-	var teamUUID uuid.UUID
 	var err error
-
 	if TenantID != "" {
 		tenantUUID, err = uuid.Parse(TenantID)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if teamID != "" {
-		teamUUID, err = uuid.Parse(teamID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	filter := CaseFilter{
 		TenantID:  tenantUUID,
 		Status:    status,
@@ -117,11 +106,10 @@ func (s *Service) GetFilteredCases(
 		TitleTerm: titleTerm,
 		SortBy:    sortBy,
 		SortOrder: order,
-		UserID:    userID,
-		TeamID:    teamUUID, // Now correct type
 	}
 	return s.repo.QueryCases(filter)
 }
+
 func (s *Service) GetCaseByID(caseID string, tenantID string) (*Case, error) {
 	c, err := s.repo.GetCaseByID(caseID, tenantID)
 	if err != nil {

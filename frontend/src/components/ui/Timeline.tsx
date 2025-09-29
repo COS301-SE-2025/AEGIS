@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Calendar, Clock, Paperclip, Tag, Edit2, Save, X, FileText, Download, Eye, Shield, AlertTriangle, CheckCircle, Brain, Lightbulb, Zap, Target, Sparkles } from "lucide-react";
+import { Plus, Calendar, Clock, Paperclip, Tag, Edit2, Save, X, FileText, Download, Eye, Shield, AlertTriangle, CheckCircle, Brain, Lightbulb, Zap, Target, TrendingUp, Sparkles } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 
-const BASE_URL = "https://localhost/api/v1";
+const BASE_URL = "http://localhost:8080/api/v1";
 const LOCAL_AI_URL = "http://localhost:5000/api/v1"; // Our Flask app
 
 
@@ -233,18 +233,19 @@ export function InvestigationTimeline({
   const [editDescription, setEditDescription] = useState("");
   const [expandedEvidence, setExpandedEvidence] = useState<{[key: string]: boolean}>({});
   const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
-  const [, setEvidenceLoading] = useState(false);
-  const [, setEvidenceError] = useState<string | null>(null);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [evidenceError, setEvidenceError] = useState<string | null>(null);
 
   // AI-related states
-  const [, setAiSuggestions] = useState([]);
-  const [, setShowSuggestions] = useState(false);
-  const [, setIsLoadingSuggestions] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [aiRecommendedSeverity, setAiRecommendedSeverity] = useState("");
   const [aiRecommendedTags, setAiRecommendedTags] = useState([]);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [nextStepSuggestions, setNextStepSuggestions] = useState([]);
-  const [wordSuggestions, ] = useState<string[]>([]);
+  const [aiStatus, setAiStatus] = useState({ online: false, loading: false });
+  const [wordSuggestions, setWordSuggestions] = useState<string[]>([]);
   const [sentenceCompletions, setSentenceCompletions] = useState<string[]>([]);
   const [showWordSuggestions, setShowWordSuggestions] = useState(false);
   const [showSentenceCompletions, setShowSentenceCompletions] = useState(false);
@@ -273,7 +274,25 @@ export function InvestigationTimeline({
     []
   );
 
-
+const debouncedGetWordSuggestions = useCallback(
+  debounce(async (text: string) => {
+    if (text.length > 2) { // Trigger after 3 characters
+      try {
+        const result = await aiService.getWordSuggestions(text);
+        if (result.success) {
+          setWordSuggestions(result.suggestions || []);
+          setShowWordSuggestions(true);
+        }
+      } catch (error) {
+        console.error('Error getting word suggestions:', error);
+      }
+    } else {
+      setWordSuggestions([]);
+      setShowWordSuggestions(false);
+    }
+  }, 500), // Shorter delay for word suggestions
+  []
+);
 
   // Get AI recommendations when description changes
   useEffect(() => {
@@ -331,6 +350,11 @@ export function InvestigationTimeline({
     }
   };
 
+  const applySuggestion = (suggestion: string) => {
+    setNewEventDescription(suggestion);
+    setShowSuggestions(false);
+    setAiSuggestions([]);
+  };
 
   const applyAISeverity = () => {
     if (aiRecommendedSeverity) {
@@ -553,15 +577,13 @@ export function InvestigationTimeline({
   }, [caseId]);
 
   return (
-    <div className="bg-card border border rounded-lg p-8 text-foreground min-h-screen max-w-7xl mx-auto shadow-lg">
+    <div className="bg-card border border rounded-lg p-8 text-foreground min-h-screen max-w-6xl mx-auto shadow-lg">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <h2 className="text-2xl font-semibold text-foreground flex items-center gap-2">
             <Calendar className="text-blue-400" size={24} />
             Investigation Timeline
           </h2>
-        </div>
-        <div className="flex items-center gap-6">
           <button
             onClick={() => setShowAIPanel(!showAIPanel)}
             className="flex items-center gap-2 px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-200"
@@ -569,14 +591,14 @@ export function InvestigationTimeline({
             <Brain size={16} />
             AI Assistant
           </button>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary transition-all duration-200 shadow-lg hover:shadow-blue-500/25"
-          >
-            <Plus size={18} />
-            Add Event
-          </button>
         </div>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary transition-all duration-200 shadow-lg hover:shadow-blue-500/25"
+        >
+          <Plus size={18} />
+          Add Event
+        </button>
       </div>
 
       {/* AI Assistant Panel */}

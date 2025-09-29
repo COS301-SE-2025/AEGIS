@@ -54,7 +54,6 @@ func doMultipartRequest(t *testing.T, method, url string, fields map[string]stri
 
 func Test_EvidenceUpload_Success(t *testing.T) {
 	caseID := uuid.New()
-	setupCaseForTest(t, caseID)
 	insertCaseRow(t, caseID)
 
 	// file content

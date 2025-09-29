@@ -8,7 +8,7 @@ const updateProfile = async ({ id, name, email, imageBase64 }) => {
     imageBase64: imageBase64 || "", // Ensure it's a string, not undefined
   };
 
-  const response = await fetch("https://localhost/api/v1/profile", {
+  const response = await fetch("http://localhost:8080/api/v1/profile", {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

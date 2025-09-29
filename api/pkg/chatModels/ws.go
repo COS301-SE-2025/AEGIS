@@ -56,48 +56,23 @@ type LastMessage struct {
 	MessageType string             `bson:"message_type" json:"message_type"`
 }
 type NewMessagePayload struct {
-	MessageID   string `json:"messageId"`
-	GroupID     string `json:"groupId"`
-	SenderEmail string `json:"senderEmail"`
-	SenderName  string `json:"senderName"`
-	Timestamp   string `json:"timestamp"`
-
-	// Plaintext path
-	Text string `json:"text,omitempty"`
-
-	// Encrypted path
-	IsEncrypted bool              `json:"is_encrypted"`
-	Envelope    *CryptoEnvelopeV1 `json:"envelope,omitempty"`
-
+	MessageID   string        `json:"messageId"`
+	Text        string        `json:"text"`
+	SenderID    string        `json:"senderId"`
+	SenderName  string        `json:"senderName"`
+	GroupID     string        `json:"groupId"`
+	Timestamp   string        `json:"timestamp"`
 	Attachments []*Attachment `json:"attachments,omitempty"`
-}
-type CryptoEnvelopeV1 struct {
-	V            int     `bson:"v"             json:"v"`             // 1
-	Algo         string  `bson:"algo"          json:"algo"`          // "aes-gcm"
-	EphemeralPub string  `bson:"ephemeral_pub" json:"ephemeral_pub"` // base64 x25519 (optional but useful)
-	OPKID        *string `bson:"opk_id,omitempty" json:"opk_id,omitempty"`
-	Nonce        string  `bson:"nonce"         json:"nonce"` // base64
-	CT           string  `bson:"ct"            json:"ct"`    // base64 ciphertext
 }
 
 // Message represents a chat message
-// pkg/chatModels/models.go
-
 type Message struct {
-	ID          string             `bson:"_id,omitempty" json:"id"`
-	GroupID     primitive.ObjectID `bson:"group_id" json:"group_id"`
-	SenderEmail string             `bson:"sender_email" json:"sender_email"`
-	SenderName  string             `bson:"sender_name" json:"sender_name"`
-
-	// Plaintext only when not encrypted
-	Content string `bson:"content,omitempty" json:"content,omitempty"`
-
-	MessageType string `bson:"message_type" json:"message_type"` // "text","image","file","system"
-
-	// 🔐 NEW: E2EE
-	IsEncrypted bool              `bson:"is_encrypted" json:"is_encrypted"`
-	Envelope    *CryptoEnvelopeV1 `bson:"envelope,omitempty" json:"envelope,omitempty"`
-
+	ID            string                 `bson:"_id,omitempty" json:"id"`
+	GroupID       primitive.ObjectID     `bson:"group_id" json:"group_id"`
+	SenderEmail   string                 `bson:"sender_email" json:"sender_email"`
+	SenderName    string                 `bson:"sender_name" json:"sender_name"`
+	Content       string                 `bson:"content" json:"content"`
+	MessageType   string                 `bson:"message_type" json:"message_type"` // "text", "image", "file", "system"
 	Attachments   []*Attachment          `bson:"attachments,omitempty" json:"attachments,omitempty"`
 	ReplyTo       *primitive.ObjectID    `bson:"reply_to,omitempty" json:"reply_to,omitempty"`
 	Mentions      []string               `bson:"mentions,omitempty" json:"mentions,omitempty"`
@@ -125,17 +100,12 @@ type ReadReceipt struct {
 
 // Attachment represents a file attachment
 type Attachment struct {
-	ID       string `bson:"id" json:"id"`
-	FileName string `bson:"file_name" json:"file_name"`
-	FileType string `bson:"file_type" json:"file_type"`
-	FileSize int64  `bson:"file_size" json:"file_size"`
-	URL      string `bson:"url" json:"url"`
-	Hash     string `bson:"hash,omitempty" json:"hash,omitempty"`
-
-	// 🔐 NEW: E2EE for file bytes
-	IsEncrypted bool              `bson:"is_encrypted" json:"is_encrypted"`
-	Envelope    *CryptoEnvelopeV1 `bson:"envelope,omitempty" json:"envelope,omitempty"`
-
+	ID       string                 `bson:"id" json:"id"`
+	FileName string                 `bson:"file_name" json:"file_name"`
+	FileType string                 `bson:"file_type" json:"file_type"`
+	FileSize int64                  `bson:"file_size" json:"file_size"`
+	URL      string                 `bson:"url" json:"url"`
+	Hash     string                 `bson:"hash,omitempty" json:"hash,omitempty"` // IPFS hash
 	Metadata map[string]interface{} `bson:"metadata,omitempty" json:"metadata,omitempty"`
 }
 
@@ -214,23 +184,4 @@ type UserPresenceEvent struct {
 	UserEmail string `json:"user_email"`
 	Status    string `json:"status"` // "online", "offline", "away"
 	LastSeen  *int64 `json:"last_seen,omitempty"`
-}
-
-type CreateMessageRequest struct {
-	SenderEmail string `json:"sender_email"`
-	SenderName  string `json:"sender_name"`
-	MessageType string `json:"message_type"` // "text" | "file" | ...
-	IsEncrypted bool   `json:"is_encrypted"`
-	Content     string `json:"content,omitempty"`
-
-	// Inline ciphertext path (std base64 of ciphertext):
-	File     string `json:"file,omitempty"` // std-base64 CIPHERTEXT (not plaintext)
-	FileName string `json:"fileName,omitempty"`
-	FileMime string `json:"file_mime,omitempty"`
-	FileSize int64  `json:"file_size,omitempty"`
-
-	// External ciphertext path (URL already points to ciphertext):
-	Attachments []*Attachment `json:"attachments,omitempty"`
-
-	Envelope *CryptoEnvelopeV1 `json:"envelope,omitempty"`
 }

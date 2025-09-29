@@ -57,8 +57,6 @@ type CaseFilter struct {
 	SortBy    string
 	SortOrder string
 	TenantID  uuid.UUID // ← new
-	UserID    string    // ← new
-	TeamID    uuid.UUID // ← new
 }
 
 // Service provides operations for listing and filtering cases.

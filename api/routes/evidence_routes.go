@@ -1,17 +1,15 @@
 package routes
 
 import (
+	"github.com/gin-gonic/gin"
 	"aegis-api/handlers"
 	"aegis-api/middleware"
-
-	"github.com/gin-gonic/gin"
 )
 
 func RegisterEvidenceRoutes(
 	r *gin.RouterGroup,
 	viewerHandler *handlers.EvidenceViewerHandler,
 	tagHandler *handlers.EvidenceTagHandler,
-	metadataHandler *handlers.MetadataHandler,
 	permChecker middleware.PermissionChecker,
 ) {
 	// ─── Evidence Viewer ──────────────
@@ -21,7 +19,6 @@ func RegisterEvidenceRoutes(
 	evidence.GET("/:evidence_id", viewerHandler.GetEvidenceByID)
 	evidence.GET("/search", viewerHandler.SearchEvidence)
 	evidence.POST("/case/:case_id/filter", viewerHandler.GetFilteredEvidence)
-	evidence.GET("/:evidence_id/verify-chain", metadataHandler.VerifyEvidenceChain)
 
 	// ─── Evidence Tags ────────────────
 	// All tagging requires evidence:tag permission

@@ -62,7 +62,7 @@ func TestGetFilteredCases_ByStatus(t *testing.T) {
 			f.TitleTerm == ""
 	})).Return(expected, nil)
 
-	results, err := service.GetFilteredCases("", "open", "", validUID, "", "", "", "", "", "")
+	results, err := service.GetFilteredCases("", "open", "", validUID, "", "", "", "")
 
 	assert.NoError(t, err)
 	assert.Len(t, results, 1)
@@ -85,7 +85,7 @@ func TestGetFilteredCases_ByPriority(t *testing.T) {
 			f.TitleTerm == ""
 	})).Return(expected, nil)
 
-	results, err := service.GetFilteredCases("", "", "medium", "", "", "", "", "", "", "")
+	results, err := service.GetFilteredCases("", "", "medium", "", "", "", "", "")
 
 	assert.NoError(t, err)
 	assert.Len(t, results, 1)
@@ -107,7 +107,7 @@ func TestGetFilteredCases_ByTeam(t *testing.T) {
 			f.TitleTerm == ""
 	})).Return(expected, nil)
 
-	results, err := service.GetFilteredCases("", "", "", "", "SOC Team", "", "", "", "", "")
+	results, err := service.GetFilteredCases("", "", "", "", "SOC Team", "", "", "")
 
 	assert.NoError(t, err)
 	assert.Len(t, results, 1)
@@ -136,7 +136,7 @@ func TestGetFilteredCases_CombinedFilters(t *testing.T) {
 			f.TitleTerm == "incident"
 	})).Return(expected, nil)
 
-	results, err := service.GetFilteredCases("", "open", "high", parsedUID.String(), "SOC Team", "incident", "", "", "", "")
+	results, err := service.GetFilteredCases("", "open", "high", parsedUID.String(), "SOC Team", "incident", "", "")
 
 	assert.NoError(t, err)
 	assert.Len(t, results, 1)
@@ -150,9 +150,11 @@ func TestGetFilteredCases_InvalidSortAndOrder(t *testing.T) {
 	mockRepo := new(MockCaseQueryRepository)
 	service := ListCases.NewListCasesService(mockRepo)
 
-	mockRepo.On("QueryCases", mock.AnythingOfType("ListCases.CaseFilter")).Return([]ListCases.Case{}, nil)
+	mockRepo.On("QueryCases", mock.MatchedBy(func(f ListCases.CaseFilter) bool {
+		return f.SortBy == "invalid_field" && f.SortOrder == "invalid_order"
+	})).Return([]ListCases.Case{}, nil)
 
-	results, err := service.GetFilteredCases("", "", "", "", "", "", "invalid_field", "invalid_order", "", "")
+	results, err := service.GetFilteredCases("", "", "", "", "", "", "invalid_field", "invalid_order")
 
 	assert.NoError(t, err)
 	assert.Empty(t, results)
@@ -167,7 +169,7 @@ func TestGetFilteredCases_NoFilters(t *testing.T) {
 
 	mockRepo.On("QueryCases", mock.Anything).Return(expected, nil)
 
-	results, err := service.GetFilteredCases("", "", "", "", "", "", "", "", "", "")
+	results, err := service.GetFilteredCases("", "", "", "", "", "", "", "")
 
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, len(results), 2)
@@ -199,7 +201,7 @@ func TestGetFilteredCases_TitleSearchMatch(t *testing.T) {
 			return f.TitleTerm == tt.term && f.TeamName == ""
 		})).Return(cases, nil)
 
-		results, err := service.GetFilteredCases("", "", "", "", "", tt.term, "", "", "", "")
+		results, err := service.GetFilteredCases("", "", "", "", "", tt.term, "", "")
 		assert.NoError(t, err)
 		assert.Equal(t, tt.expected, len(results), "Failed for term: %s", tt.term)
 

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"aegis-api/handlers"
-	x3dh "aegis-api/internal/x3dh"
 	"aegis-api/middleware"
 
 	"github.com/gin-contrib/cors"
@@ -45,7 +44,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 	auth.POST("/accept-terms", h.AdminService.AcceptTerms)
 
 	// ─── Registration ────────────────────────────────
-	api.POST("/register", middleware.AuthMiddleware(), middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.AdminService.RegisterUser)
+	api.POST("/register", middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.AdminService.RegisterUser)
 	api.POST("/register/tenant", middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.AdminService.RegisterTenantUser)
 	api.POST("/register/team", middleware.AuthMiddleware(), middleware.RequireRole("Tenant Admin"), h.AdminService.RegisterTeamUser)
 	api.GET("/teams/:id", h.GetTeamByID)
@@ -59,7 +58,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 	//________AI Routes________
 	timelineAIGroup := api.Group("/ai")
 	{
-
 		timelineAIGroup.POST("/suggestions", middleware.AuthMiddleware(), h.TimelineAIHandler.GetEventSuggestions)
 		timelineAIGroup.POST("/severity", middleware.AuthMiddleware(), h.TimelineAIHandler.GetSeverityRecommendation)
 		timelineAIGroup.POST("/tags", middleware.AuthMiddleware(), h.TimelineAIHandler.GetTagSuggestions)
@@ -71,7 +69,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		//timelineAIGroup.POST("/feedback", middleware.AuthMiddleware(), h.TimelineAIHandler.SubmitFeedback)
 		//timelineAIGroup.GET("/model-status", middleware.AuthMiddleware(), h.TimelineAIHandler.GetModelStatus)
 		//timelineAIGroup.POST("/update-model-config", middleware.AuthMiddleware(), middleware.RequireRole("DFIR Admin"), h.TimelineAIHandler.UpdateModelConfig)
-
 	}
 
 	// ─── Protected Routes ────────────────────────────
@@ -86,10 +83,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.POST("/cases/unassign", h.CaseHandler.UnassignUserFromCase)
 		protected.GET("/cases/closed", h.CaseHandler.ListClosedCasesHandler)
 		protected.PATCH("/cases/:case_id", h.CaseHandler.UpdateCaseHandler)
-		// Archive case (move to archived tab)
-		protected.PATCH("/cases/:case_id/archive", h.CaseDeletionHandler.ArchiveCaseHandler)
-		// List archived cases
-		protected.GET("/cases/archived", h.CaseHandler.ListArchivedCasesHandler)
 
 		// ─── New List / Filter Cases ──────────────────
 		protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)
@@ -99,7 +92,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 		protected.GET("/tenants/:tenantId/cases/:case_id/ioc-graph", middleware.AuthMiddleware(), h.IOCHandler.GetCaseIOCGraph)
 		protected.POST("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.AddIOCToCase)
-		protected.GET("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.GetIOCsByCase)
 		// ______timeline routes______________
 		// List all events for a case
 		protected.GET("/cases/:case_id/timeline", middleware.AuthMiddleware(), h.TimelineHandler.ListByCase)
@@ -124,8 +116,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.GET("/evidence/count/:tenantId", h.EvidenceHandler.GetEvidenceCount)
 		// ─── Admin: Users ────────────────────────────
 		protected.GET("/users", h.AdminService.ListUsers)
-		protected.GET("tenants/:tenantId/users", middleware.AuthMiddleware(), h.AdminService.ListUsersByTenant)
-		protected.DELETE("/users/:userId", h.AdminService.DeleteUserHandler)
 
 		// ─── Profile Routes ──────────────────────────
 		protected.GET("/profile/:userID", h.ProfileHandler.GetProfileHandler)
@@ -142,8 +132,6 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.DELETE("/notifications/delete", h.DeleteNotifications)
 		protected.POST("/notifications/archive", h.ArchiveNotifications)
 
-		x3dhGroup := api.Group("/x3dh")
-		x3dh.RegisterX3DHHandlers(x3dhGroup, h.X3DHService)
 		// RegisterMessageRoutes(protected, h.MessageService, auditLogger)
 		// ─── Thread Messaging ────────────────────────
 
@@ -155,7 +143,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		RegisterChatRoutes(protected, h.ChatHandler)
 
 		// ─── Evidence Viewer + Tagging ────────────────
-		RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.MetadataHandler, h.PermissionChecker)
+		RegisterEvidenceRoutes(protected, h.EvidenceViewerHandler, h.EvidenceTagHandler, h.PermissionChecker)
 
 		RegisterCaseTagRoutes(protected, h.CaseTagHandler, h.PermissionChecker)
 

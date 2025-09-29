@@ -21,7 +21,7 @@ export const TenantAdminDashboard = () => {
         const fetchProfile = async () => {
           try {
             const token = sessionStorage.getItem("authToken");
-            const res = await fetch(`https://localhost/api/v1/profile/${user?.id}`, {
+            const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
@@ -86,7 +86,7 @@ export const TenantAdminDashboard = () => {
               src={
               user.image_url.startsWith("http") || user.image_url.startsWith("data:")
               ? user.image_url
-              : `https://localhost${user.image_url}`
+              : `http://localhost:8080${user.image_url}`
               }
             alt="Profile"
             className="w-10 h-10 rounded-full object-cover"

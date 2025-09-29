@@ -25,7 +25,7 @@ export const ProfilePage = () => {
     const fetchProfile = async () => {
       try {
         const token = sessionStorage.getItem("authToken");
-        const res = await fetch(`https://localhost/api/v1/profile/${user?.id}`, {
+        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -127,7 +127,7 @@ const toggleEdit = async () => {
       reader.readAsDataURL(e.target.files[0]);
     }
   };
-const backendBaseURL = "https://localhost";
+const backendBaseURL = "http://localhost:8080";
   return (
     <div className="min-h-screen bg-background text-foreground p-10 transition-colors">
       <h1 className="text-3xl font-bold mb-8">Profile</h1>

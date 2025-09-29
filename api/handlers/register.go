@@ -32,8 +32,6 @@ type AdminServiceInterface interface {
 	VerifyEmail(c *gin.Context)
 	AcceptTerms(c *gin.Context)
 	ListUsers(c *gin.Context)
-	ListUsersByTenant(c *gin.Context)
-	DeleteUserHandler(c *gin.Context)
 	CreateTenant(c *gin.Context)
 	CreateTeam(c *gin.Context)
 }

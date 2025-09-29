@@ -18,10 +18,10 @@ type SignedPreKey struct {
 
 // OneTimePreKey represents a single-use key available for X3DH handshake
 type OneTimePreKey struct {
-	ID        string // DB row id (uuid)
-	UserID    string
-	KeyID     string // client-supplied id
-	PublicKey string
-	IsUsed    bool
-	CreatedAt string
+	ID         string // Unique ID (e.g. UUID)
+	UserID     string
+	PublicKey  string
+	PrivateKey string // Encrypted
+	IsUsed     bool
+	CreatedAt  string
 }

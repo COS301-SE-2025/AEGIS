@@ -3,9 +3,8 @@ package messages
 import (
 	"time"
 
-	"aegis-api/pkg/encryption"
-
 	"github.com/google/uuid"
+	"aegis-api/pkg/encryption"
 	gorm "gorm.io/gorm"
 )
 
@@ -42,12 +41,13 @@ func (m *ThreadMessage) AfterFind(tx *gorm.DB) (err error) {
 	if m.Message != "" {
 		decrypted, err := encryption.Decrypt(m.Message)
 		if err != nil {
-			m.Message = decrypted
+			return err
 		}
-
+		m.Message = decrypted
 	}
 	return nil
 }
+
 
 // MessageMention represents a mention in a thread message.
 type MessageMention struct {
@@ -64,3 +64,5 @@ type MessageReaction struct {
 	Reaction  string    `gorm:"not null"`
 	CreatedAt time.Time
 }
+
+

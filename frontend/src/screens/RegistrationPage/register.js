@@ -43,14 +43,11 @@ const handleChange = (e) => {
 
   const newFormData = { ...formData, [id]: value };
 
-  // Auto-generate password: random 8-character alphanumeric string
+  // Auto-generate password from full name
   if (id === "full_name") {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let randomPassword = '';
-    for (let i = 0; i < 8; i++) {
-      randomPassword += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    newFormData.password = randomPassword;
+    const firstName = value.trim().split(" ")[0];
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    newFormData.password = `${firstName}${randomNum}`;
   }
 
   setFormData(newFormData);
@@ -66,7 +63,7 @@ const handleChange = (e) => {
         setErrors({ general: "No auth token found, please login again" });
         return;
       }
-      const res = await fetch("https://localhost/api/v1/register", {
+      const res = await fetch("http://localhost:8080/api/v1/register", {
          method: "POST",
         headers: {
           "Content-Type": "application/json",

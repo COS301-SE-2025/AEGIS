@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"aegis-api/cache"
 	"aegis-api/services_/auditlog"
 	update_case "aegis-api/services_/case/case_update"
 	"net/http"
@@ -83,17 +82,6 @@ func (h *CaseHandler) UpdateCaseHandler(c *gin.Context) {
 		Status:      "SUCCESS",
 		Description: "Case details updated successfully",
 	})
-
-	// ✅ Invalidate cache entries affected by this update
-	ctx := c.Request.Context()
-	caseID := req.CaseID
-	tenantStr := tenantID
-
-	cache.InvalidateCaseHeader(ctx, h.Cache, tenantStr, caseID)
-	cache.InvalidateCaseCollabs(ctx, h.Cache, tenantStr, caseID) // if collaborators can change
-	cache.InvalidateTenantLists(ctx, h.Cache, tenantStr)
-	cache.InvalidateDashboardTotals(ctx, h.Cache, tenantID, userID) // the viewer(s) impacted
-	cache.InvalidateEvidenceCount(c.Request.Context(), h.Cache, tenantID)
 
 	c.JSON(http.StatusOK, res)
 }

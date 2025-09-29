@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 
-	"aegis-api/cache"
 	"aegis-api/services_/auditlog"
 
 	"github.com/gin-gonic/gin"
@@ -197,25 +196,8 @@ func (h *CaseHandler) AssignUserToCase(c *gin.Context) {
 		},
 		Service:     "case",
 		Status:      "SUCCESS",
-		Description: fmt.Sprintf("Assigned %s to case %s as %s.", assigneeID.String(), caseID.String(), req.Role),
+		Description: "User assigned to case successfully",
 	})
-	// ---- CACHE INVALIDATION (after successful assignment) ----
-	tenantStr := assignerTenantUUID.String()
-	caseStr := caseID.String()
-	assigneeStr := assigneeID.String()
-	ctx := c.Request.Context()
-
-	// Collaborators of the case
-	cache.InvalidateCaseCollabs(ctx, h.Cache, tenantStr, caseStr)
-
-	// Lists filtered by user (the assignee just gained this case)
-	cache.InvalidateByUserLists(ctx, h.Cache, tenantStr, assigneeStr)
-
-	// Tenant lists that might display this case (active/all/closed)
-	cache.InvalidateTenantLists(ctx, h.Cache, tenantStr)
-
-	// If your case header payload shows assignees or counts, nuke it too:
-	cache.InvalidateCaseHeader(ctx, h.Cache, tenantStr, caseStr)
 
 	c.JSON(http.StatusOK, gin.H{"message": "user assigned to case successfully"})
 }
@@ -307,22 +289,8 @@ func (h *CaseHandler) UnassignUserFromCase(c *gin.Context) {
 		},
 		Service:     "case",
 		Status:      "SUCCESS",
-		Description: fmt.Sprintf("Removed %s from case %s.", assigneeID.String(), caseID.String()),
+		Description: "User unassigned from case successfully",
 	})
-	// ---- CACHE INVALIDATION (after successful unassignment) ----
-	tenantIDv, ok := c.Get("tenantID")
-	if ok {
-		tenantStr := tenantIDv.(string)
-		caseStr := caseID.String()
-		assigneeStr := assigneeID.String()
-		ctx := c.Request.Context()
-
-		cache.InvalidateCaseCollabs(ctx, h.Cache, tenantStr, caseStr)
-		cache.InvalidateByUserLists(ctx, h.Cache, tenantStr, assigneeStr)
-		cache.InvalidateTenantLists(ctx, h.Cache, tenantStr)
-		cache.InvalidateCaseHeader(ctx, h.Cache, tenantStr, caseStr) // if header exposes assignees
-	}
-	// ---- END INVALIDATION ----
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":     "user unassigned from case successfully",

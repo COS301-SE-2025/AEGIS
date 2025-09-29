@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -48,66 +47,41 @@ func SendJSONMessage(hub *Hub, caseID string, messageType string, payload interf
 }
 
 func SaveMessageToDB(payload chatModels.NewMessagePayload) error {
-	// Guard
-	if MessageCollection == nil {
-		log.Println("[WS] MessageCollection is nil; skipping DB persist")
-		return nil
-	}
-
-	// Timestamp
-	created, err := time.Parse(time.RFC3339, payload.Timestamp)
+	parsedTime, err := time.Parse(time.RFC3339, payload.Timestamp)
 	if err != nil {
-		log.Printf("[WS] invalid timestamp %q: %v; using time.Now()", payload.Timestamp, err)
-		created = time.Now().UTC()
+		return err
 	}
 
-	// GroupID
-	var groupID primitive.ObjectID
+	groupID := primitive.NewObjectID()
 	if payload.GroupID != "" {
-		if gid, err := primitive.ObjectIDFromHex(payload.GroupID); err == nil {
-			groupID = gid
-		} else {
-			log.Printf("[WS] invalid group ID %q: %v; generating new ObjectID()", payload.GroupID, err)
-			groupID = primitive.NewObjectID()
+		var err error
+		// Convert the GroupID string to a primitive ObjectID
+		groupID, err = primitive.ObjectIDFromHex(payload.GroupID)
+		if err != nil {
+			return fmt.Errorf("invalid group ID: %w", err)
 		}
-	} else {
-		groupID = primitive.NewObjectID()
 	}
 
-	// Derive message type
-	msgType := "text"
-	if len(payload.Attachments) > 0 {
-		msgType = "file"
-	}
-
-	// Build doc — ciphertext path vs plaintext path
-	doc := chatModels.Message{
-		ID:          payload.MessageID, // string _id is OK in Mongo
+	message := chatModels.Message{
+		ID:          payload.MessageID,
 		GroupID:     groupID,
-		SenderEmail: payload.SenderEmail, // ✅ use SenderEmail (not SenderID/SenderName)
+		SenderEmail: payload.SenderName,
 		SenderName:  payload.SenderName,
-		MessageType: msgType,
-		IsEncrypted: payload.IsEncrypted,
-		Envelope:    payload.Envelope, // may be nil if plaintext
-
-		// plaintext content only when not encrypted
-		Content:     "",
-		Status:      chatModels.MessageStatus{Sent: created},
-		CreatedAt:   created,
-		UpdatedAt:   created,
+		Content:     payload.Text,
+		CreatedAt:   parsedTime,
+		UpdatedAt:   parsedTime,
 		IsDeleted:   false,
-		Attachments: payload.Attachments, // if you extended with envelope, it passes through
+		Status: chatModels.MessageStatus{
+			Sent: parsedTime,
+		},
+		MessageType: "text",
 	}
 
-	if !payload.IsEncrypted {
-		doc.Content = payload.Text
+	if len(payload.Attachments) > 0 {
+		message.Attachments = payload.Attachments
+		message.MessageType = "file"
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	if _, err := MessageCollection.InsertOne(ctx, doc); err != nil {
-		return fmt.Errorf("insert message: %w", err)
-	}
-	return nil
+	_, err = MessageCollection.InsertOne(context.Background(), message)
+	return err
 }

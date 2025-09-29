@@ -35,11 +35,6 @@ func (m *MockMetadataService) FindEvidenceByID(id uuid.UUID) (*metadata.Evidence
 	return args.Get(0).(*metadata.Evidence), args.Error(1)
 }
 
-func (m *MockMetadataService) VerifyEvidenceLogChain(evidenceID uuid.UUID) (bool, string, error) {
-	args := m.Called(evidenceID)
-	return args.Bool(0), args.String(1), args.Error(2)
-}
-
 // ─── Fake Mongo Logger for Audit ───────────────────────
 type FakeMongoLogger struct{}
 
@@ -59,7 +54,7 @@ func setupTestRouter(service *MockMetadataService) (*gin.Engine, *httptest.Respo
 	zapLogger := auditlog.NewZapLogger()
 	auditLogger := auditlog.NewAuditLogger(fakeMongo, zapLogger)
 
-	handler := handlers.NewMetadataHandler(service, auditLogger, nil)
+	handler := handlers.NewMetadataHandler(service, auditLogger)
 
 	router.GET("/evidence/:id", func(c *gin.Context) {
 		c.Set("userID", "test-user-id")

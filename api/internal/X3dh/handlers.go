@@ -1,7 +1,6 @@
 package x3dh
 
 import (
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -46,13 +45,6 @@ func registerSPKRotationHandler(rg *gin.RouterGroup, bundleService *BundleServic
 
 // RegisterX3DHHandlers registers X3DH-related routes
 func RegisterX3DHHandlers(rg *gin.RouterGroup, bundleService *BundleService) {
-	// log every request under /x3dh
-	rg.Use(func(c *gin.Context) {
-		log.Printf("[x3dh] %s %s", c.Request.Method, c.FullPath())
-		c.Next()
-	})
-	registerSPKRotationHandler(rg, bundleService)
-
 	// GET bundle (already exists)
 	rg.GET("/bundle/:user_id", func(c *gin.Context) {
 		userID := c.Param("user_id")
@@ -77,17 +69,15 @@ func RegisterX3DHHandlers(rg *gin.RouterGroup, bundleService *BundleService) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		log.Printf("[x3dh] register-bundle userId=%s opks=%d", req.UserID, len(req.OneTimePreKeys))
+
 		if err := bundleService.StoreBundle(c.Request.Context(), req); err != nil {
-			log.Printf("[x3dh] StoreBundle failed for user %s: %v", req.UserID, err) // <── ADD THIS
 			if strings.Contains(err.Error(), "duplicate key") {
 				c.JSON(http.StatusConflict, gin.H{"error": "bundle already exists"})
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) // <── Return real error
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
-
 		c.JSON(http.StatusCreated, gin.H{"status": "bundle stored successfully"})
 	})
 
@@ -111,12 +101,12 @@ func RegisterX3DHHandlers(rg *gin.RouterGroup, bundleService *BundleService) {
 	rg.POST("/refill-opks", func(c *gin.Context) {
 		var req RefillOPKRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request", "detail": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+
 		if err := bundleService.RefillOPKs(c.Request.Context(), req.UserID, req.OPKs); err != nil {
-			log.Printf("[x3dh] refill-opks error user=%s err=%v", req.UserID, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "refill_failed", "detail": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 

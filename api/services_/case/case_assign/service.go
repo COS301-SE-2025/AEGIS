@@ -57,7 +57,7 @@ func (s *CaseAssignmentService) AssignUserToCase(
 	}
 
 	// Step 4: Check if the case is active by checking its Status
-	if caseDetails.Status != "open" && caseDetails.Status != "ongoing" {
+	if caseDetails.Status != "open" { // Check if status is "open" to indicate it's active
 		return fmt.Errorf("case with ID %s is not active", caseID)
 	}
 

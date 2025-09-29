@@ -59,7 +59,7 @@ if (!caseId) {
     console.log("Uploading evidence for case:", currentCase.ID, "by user:", user.id);
 
     try {
-      await axios.post("https://localhost/api/v1/evidence", formData, {
+      await axios.post("http://localhost:8080/api/v1/evidence", formData, {
   headers: {
     "Content-Type": "multipart/form-data",
     "Authorization": `Bearer ${sessionStorage.getItem("authToken") || ""}`

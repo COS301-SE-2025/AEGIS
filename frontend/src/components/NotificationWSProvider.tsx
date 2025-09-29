@@ -61,7 +61,7 @@ export default function NotificationsWSProvider() {
     // IMPORTANT: confirm this path is correct.
     // Your logs say server logs: “WebSocket route hit … in case <id>”
     // If the server expects a CASE ID, do not pass a tenantId here.
-    const ws = new WebSocket(`wss://localhost:8443/ws/cases/${tenantId}?token=${token}`);
+    const ws = new WebSocket(`ws://localhost:8080/ws/cases/${tenantId}?token=${token}`);
     wsRef.current = ws;
 
     ws.onopen = () => console.log("[WS] notifications connected");

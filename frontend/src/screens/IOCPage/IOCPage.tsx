@@ -70,19 +70,17 @@ export const IOCPage = () => {
         setLoading(true);
 
         // GET Case details
-        await axios.get<Case>(`https://localhost/api/v1/cases/${case_id}`, {
+        await axios.get<Case>(`http://localhost:8080/api/v1/cases/${case_id}`, {
           headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
         });
         // Removed setCaseName since caseName is unused
 
         // GET IOCs for case
-        const iocRes = await axios.get<IOC[]>(`https://localhost/api/v1/cases/${case_id}/iocs`, {
+        const iocRes = await axios.get<IOC[]>(`http://localhost:8080/api/v1/cases/${case_id}/iocs`, {
           headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
         });
 
@@ -120,7 +118,7 @@ export const IOCPage = () => {
       setLoading(true);
 
       const res = await axios.post<IOC>(
-        `https://localhost/api/v1/cases/${case_id}/iocs`,
+        `http://localhost:8080/api/v1/cases/${case_id}/iocs`,
         { type, value },
         {
           headers: {

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -18,7 +17,7 @@ import (
 
 // mockSlidingWindowRedisClient simulates Redis sorted set operations for sliding window rate limiting
 type mockSlidingWindowRedisClient struct {
-	mu        sync.RWMutex // Add mutex for thread safety
+	// key -> slice of timestamps
 	data      map[string][]int64
 	windowSec int64
 }
@@ -28,9 +27,6 @@ func newMockSlidingWindowRedisClient() *mockSlidingWindowRedisClient {
 }
 
 func (m *mockSlidingWindowRedisClient) ZAdd(ctx context.Context, key string, members ...redis.Z) *redis.IntCmd {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	now := time.Now().Unix()
 	for _, member := range members {
 		ts, ok := member.Member.(int64)
@@ -43,10 +39,9 @@ func (m *mockSlidingWindowRedisClient) ZAdd(ctx context.Context, key string, mem
 	cmd.SetVal(int64(len(members)))
 	return cmd
 }
-func (m *mockSlidingWindowRedisClient) ZCard(ctx context.Context, key string) *redis.IntCmd {
-	m.mu.RLock() // Read lock only
-	defer m.mu.RUnlock()
 
+func (m *mockSlidingWindowRedisClient) ZCard(ctx context.Context, key string) *redis.IntCmd {
+	// Only count timestamps within the window, do not mutate m.data
 	now := time.Now().Unix()
 	windowSec := m.windowSec
 	min := now - windowSec
@@ -62,9 +57,7 @@ func (m *mockSlidingWindowRedisClient) ZCard(ctx context.Context, key string) *r
 }
 
 func (m *mockSlidingWindowRedisClient) ZRemRangeByScore(ctx context.Context, key, min, max string) *redis.IntCmd {
-	m.mu.Lock() // Lock for writing
-	defer m.mu.Unlock()
-
+	// Remove timestamps <= minInt (simulate sliding window cleanup)
 	minInt, _ := parseScore(min)
 	filtered := []int64{}
 	for _, ts := range m.data[key] {
@@ -178,32 +171,32 @@ func TestIPThrottleMiddleware(t *testing.T) {
 	router := gin.New()
 	limit := 3
 	window := time.Second
-
-	// Add mock Redis client
 	mockRedis := newMockSlidingWindowRedisClient()
 	mockRedis.windowSec = int64(window.Seconds())
 	orig := middleware.RedisClient
 	middleware.RedisClient = mockRedis
 	defer func() { middleware.RedisClient = orig }()
-
-	router.Use(middleware.IPThrottleMiddleware(limit, window, nil)) // Pass nil here is fine now
+	router.Use(middleware.IPThrottleMiddleware(limit, window, nil))
 	router.GET("/test", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "ok"})
 	})
 	req, _ := http.NewRequest("GET", "/test", nil)
 	req.RemoteAddr = "1.2.3.4:12345"
-
 	for i := 0; i < limit; i++ {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 		assert.Equal(t, 200, w.Code)
 		time.Sleep(10 * time.Millisecond)
 	}
-
 	// The next request should be throttled
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(t, 429, w.Code)
+	// After window, should allow again
+	time.Sleep(window)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, 200, w.Code)
 }
 
 // errorRedisClient mocks Redis and always returns an error
@@ -293,8 +286,9 @@ func TestRateLimitMiddleware_MissingUserID(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/test", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	assert.Equal(t, 503, w.Code) // Change from 401 to 503
+	assert.Equal(t, 401, w.Code)
 }
+
 func TestRateLimitMiddleware_RedisFailure(t *testing.T) {
 	// Sliding window logic cannot be mocked with errorRedisClient, so skip this test
 	t.Skip("Redis error test skipped: sliding window logic requires real Redis client.")
@@ -335,10 +329,9 @@ func TestRateLimitMiddleware_ConcurrentRequests(t *testing.T) {
 	}
 	success, throttled := 0, 0
 	for _, code := range codes {
-		switch code {
-		case 200:
+		if code == 200 {
 			success++
-		case 429:
+		} else if code == 429 {
 			throttled++
 		}
 	}
