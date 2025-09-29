@@ -5,6 +5,7 @@ import (
 	"aegis-api/handlers"
 	routesPkg "aegis-api/routes"
 	report "aegis-api/services_/report"
+	reportai "aegis-api/services_/report/report_ai_assistance"
 	"context"
 	"database/sql"
 	_ "embed"
@@ -61,7 +62,8 @@ func buildRouter() *gin.Engine {
 	// existing report wiring...
 	pgRepo := report.NewReportRepository(pgDB)
 	mRepo := report.NewReportMongoRepo(mongoColl)
-	svc := report.NewReportService(pgRepo, mRepo)
+	sectionRepo := reportai.NewGormReportSectionRepo(pgDB) // Use the correct constructor for sectionRepo
+	svc := report.NewReportService(pgRepo, mRepo, sectionRepo)
 	h := handlers.NewReportHandler(svc)
 
 	r := gin.New()
@@ -78,7 +80,13 @@ func buildRouter() *gin.Engine {
 	registerGraphicalMappingTestEndpoints(r)
 
 	// ---- Chat (add this) ----
-	chatRepo := chatrepo.NewChatRepository(mongoDB) // creates indexes internally
+	// Initialize the necessary parameters for the ChatRepository
+	// pgDb := createTestPGDB()                               // create PostgreSQL DB instance (mock or real)
+	// hub := createTestWebSocketHub()                        // create WebSocket Hub instance (mock or real)
+	// notificationService := createTestNotificationService() // create NotificationService instance (mock or real)
+
+	chatRepo := chatrepo.NewChatRepository(mongoDB, nil, nil, nil) // Create ChatRepo with required args
+
 	chatSev := chatrepo.NewChatService(chatRepo, nil, nil)
 
 	// OPTION A: if you have a Chat service layer:
@@ -127,12 +135,14 @@ func startPostgres(ctx context.Context) (*postgres.PostgresContainer, *sql.DB, *
 					"host=%s port=%s user=app_user password=password dbname=app_database sslmode=disable",
 					host, port.Port(),
 				)
-			}).WithStartupTimeout(2*time.Minute),
+			}).WithStartupTimeout(5*time.Minute), // Increased timeout
 		),
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("start pg: %w", err)
 	}
+
+	// Continue with the rest of your code...
 
 	connStr, err := container.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {

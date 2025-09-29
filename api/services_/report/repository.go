@@ -12,7 +12,7 @@ import (
 
 type ReportRepository interface {
 	SaveReport(ctx context.Context, report *Report) error
-	GetByID(ctx context.Context, reportID uuid.UUID) (*Report, error)
+	GetByID(ctx context.Context, reportID string) (*Report, error)
 	GetAllReports(ctx context.Context) ([]Report, error)
 	GetReportsByCaseID(ctx context.Context, caseID uuid.UUID) ([]ReportWithDetails, error)
 	GetReportsByEvidenceID(ctx context.Context, evidenceID uuid.UUID) ([]Report, error)
@@ -73,13 +73,25 @@ func (repo *ReportsRepoImpl) SaveReport(ctx context.Context, report *Report) err
 	return repo.DB.WithContext(ctx).Create(report).Error
 }
 
-func (repo *ReportsRepoImpl) GetByID(ctx context.Context, reportID uuid.UUID) (*Report, error) {
+func (repo *ReportsRepoImpl) GetByID(ctx context.Context, reportID string) (*Report, error) {
 	var report Report
-	err := repo.DB.WithContext(ctx).First(&report, "id = ?", reportID).Error
-	if err != nil {
-		return nil, err
+	// Try to parse as UUID, fallback to hex string for Mongo
+	if len(reportID) == 36 {
+		// UUID format
+		id, err := uuid.Parse(reportID)
+		if err != nil {
+			return nil, err
+		}
+		err = repo.DB.WithContext(ctx).First(&report, "id = ?", id).Error
+		if err != nil {
+			return nil, err
+		}
+		return &report, nil
 	}
-	return &report, nil
+	// Otherwise, treat as hex string (MongoID)
+	// If you have a MongoDB lookup, implement here
+	// For now, return error for non-UUID
+	return nil, errors.New("unsupported reportID format for SQL lookup")
 }
 
 func (repo *ReportsRepoImpl) GetAllReports(ctx context.Context) ([]Report, error) {

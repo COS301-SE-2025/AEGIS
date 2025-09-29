@@ -24,6 +24,16 @@ type ChatGroup struct {
 	GroupURL    string             `bson:"group_url,omitempty" json:"group_url,omitempty"`
 }
 
+// models.go (add near other types)
+type CryptoEnvelopeV1 struct {
+	V            int     `bson:"v"             json:"v"`             // 1
+	Algo         string  `bson:"algo"          json:"algo"`          // "aes-gcm"
+	EphemeralPub string  `bson:"ephemeral_pub" json:"ephemeral_pub"` // base64 x25519 (optional but useful)
+	OPKID        *string `bson:"opk_id,omitempty" json:"opk_id,omitempty"`
+	Nonce        string  `bson:"nonce"         json:"nonce"` // base64
+	CT           string  `bson:"ct"            json:"ct"`    // base64 ciphertext
+}
+
 // Member represents a group member
 type Member struct {
 	UserID      string    `bson:"user_id" json:"user_id"` // ✅ Add for notifications
@@ -56,23 +66,38 @@ type LastMessage struct {
 	MessageType string             `bson:"message_type" json:"message_type"`
 }
 type NewMessagePayload struct {
-	MessageID   string        `json:"messageId"`
-	Text        string        `json:"text"`
-	SenderID    string        `json:"senderId"`
-	SenderName  string        `json:"senderName"`
-	GroupID     string        `json:"groupId"`
-	Timestamp   string        `json:"timestamp"`
+	MessageID   string `json:"messageId"`
+	GroupID     string `json:"groupId"`
+	SenderEmail string `json:"senderEmail"`
+	SenderName  string `json:"senderName"`
+	Timestamp   string `json:"timestamp"`
+
+	// Plaintext path
+	Text string `json:"text,omitempty"`
+
+	// Encrypted path
+	IsEncrypted bool              `json:"is_encrypted"`
+	Envelope    *CryptoEnvelopeV1 `json:"envelope,omitempty"`
+
 	Attachments []*Attachment `json:"attachments,omitempty"`
 }
 
 // Message represents a chat message
+// Message represents a chat message
 type Message struct {
-	ID            string                 `bson:"_id,omitempty" json:"id"`
-	GroupID       primitive.ObjectID     `bson:"group_id" json:"group_id"`
-	SenderEmail   string                 `bson:"sender_email" json:"sender_email"`
-	SenderName    string                 `bson:"sender_name" json:"sender_name"`
-	Content       string                 `bson:"content" json:"content"`
-	MessageType   string                 `bson:"message_type" json:"message_type"` // "text", "image", "file", "system"
+	ID          string             `bson:"_id,omitempty" json:"id"`
+	GroupID     primitive.ObjectID `bson:"group_id" json:"group_id"`
+	SenderEmail string             `bson:"sender_email" json:"sender_email"`
+	SenderName  string             `bson:"sender_name" json:"sender_name"`
+
+	// PLAINTEXT content ONLY when is_encrypted=false
+	Content     string `bson:"content,omitempty" json:"content,omitempty"`
+	MessageType string `bson:"message_type" json:"message_type"` // "text","image","file","system"
+
+	// NEW: E2EE flags & envelope
+	IsEncrypted bool              `bson:"is_encrypted" json:"is_encrypted"`
+	Envelope    *CryptoEnvelopeV1 `bson:"envelope,omitempty" json:"envelope,omitempty"`
+
 	Attachments   []*Attachment          `bson:"attachments,omitempty" json:"attachments,omitempty"`
 	ReplyTo       *primitive.ObjectID    `bson:"reply_to,omitempty" json:"reply_to,omitempty"`
 	Mentions      []string               `bson:"mentions,omitempty" json:"mentions,omitempty"`
@@ -100,12 +125,17 @@ type ReadReceipt struct {
 
 // Attachment represents a file attachment
 type Attachment struct {
-	ID       string                 `bson:"id" json:"id"`
-	FileName string                 `bson:"file_name" json:"file_name"`
-	FileType string                 `bson:"file_type" json:"file_type"`
-	FileSize int64                  `bson:"file_size" json:"file_size"`
-	URL      string                 `bson:"url" json:"url"`
-	Hash     string                 `bson:"hash,omitempty" json:"hash,omitempty"` // IPFS hash
+	ID       string `bson:"id" json:"id"`
+	FileName string `bson:"file_name" json:"file_name"`
+	FileType string `bson:"file_type" json:"file_type"`
+	FileSize int64  `bson:"file_size" json:"file_size"`
+	URL      string `bson:"url" json:"url"`
+	Hash     string `bson:"hash,omitempty" json:"hash,omitempty"`
+
+	// NEW: encrypted file support
+	IsEncrypted bool              `bson:"is_encrypted" json:"is_encrypted"`
+	Envelope    *CryptoEnvelopeV1 `bson:"envelope,omitempty" json:"envelope,omitempty"`
+
 	Metadata map[string]interface{} `bson:"metadata,omitempty" json:"metadata,omitempty"`
 }
 
@@ -126,6 +156,8 @@ type User struct {
 	Avatar   string     `bson:"avatar,omitempty" json:"avatar,omitempty"`
 	Status   string     `bson:"status,omitempty" json:"status,omitempty"` // "online", "offline", "away"
 	LastSeen *time.Time `bson:"last_seen,omitempty" json:"last_seen,omitempty"`
+	TenantID string     `bson:"tenant_id,omitempty" json:"tenant_id,omitempty"` // New field
+	TeamID   string     `bson:"team_id,omitempty" json:"team_id,omitempty"`
 }
 
 // EventType represents different types of real-time events
@@ -146,6 +178,8 @@ const (
 	EventMarkNotificationRead EventType = "mark_notification_read"
 	EventArchiveNotification  EventType = "archive_notification"
 	EventDeleteNotification   EventType = "delete_notification"
+	EventNotificationSync     EventType = "notification_sync"
+	EventUnreadCount          EventType = "unread_count"
 )
 
 type MarkReadPayload struct {

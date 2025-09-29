@@ -26,7 +26,7 @@ func TestChat_GetUserGroups(t *testing.T) {
 	ctx, cancel := context.WithTimeout(tcCtx, 15*time.Second)
 	defer cancel()
 
-	repo := chat.NewChatRepository(mongoDB)
+	repo := chat.NewChatRepository(mongoDB, nil, nil, nil)
 
 	user := "user@example.com"
 	other := "other@example.com"
@@ -64,7 +64,7 @@ func TestChat_CreateMessage_And_GetMessages(t *testing.T) {
 	ctx, cancel := context.WithTimeout(tcCtx, 15*time.Second)
 	defer cancel()
 
-	repo := chat.NewChatRepository(mongoDB)
+	repo := chat.NewChatRepository(mongoDB, nil, nil, nil)
 
 	// Create a group first (raw insert so we don't depend on struct layout)
 	groupID := primitive.NewObjectID()
@@ -104,7 +104,7 @@ func TestChat_MarkAsRead_And_UnreadCount(t *testing.T) {
 	ctx, cancel := context.WithTimeout(tcCtx, 15*time.Second)
 	defer cancel()
 
-	repo := chat.NewChatRepository(mongoDB)
+	repo := chat.NewChatRepository(mongoDB, nil, nil, nil)
 
 	// Group
 	groupID := primitive.NewObjectID()
@@ -152,7 +152,7 @@ func TestChat_UpdateGroupImage_And_DeleteMessage(t *testing.T) {
 	ctx, cancel := context.WithTimeout(tcCtx, 15*time.Second)
 	defer cancel()
 
-	repo := chat.NewChatRepository(mongoDB)
+	repo := chat.NewChatRepository(mongoDB, nil, nil, nil)
 
 	// Group
 	groupID := primitive.NewObjectID()

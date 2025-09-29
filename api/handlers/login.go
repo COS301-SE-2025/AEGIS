@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	x3dh "aegis-api/internal/x3dh"
 	"aegis-api/middleware"
 	"aegis-api/pkg/websocket"
 	"aegis-api/services_/auditlog"
@@ -9,7 +10,9 @@ import (
 	"aegis-api/services_/auth/reset_password"
 	"aegis-api/services_/notification"
 	"aegis-api/structs"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -42,6 +45,8 @@ type Handler struct {
 	EvidenceService           EvidenceServiceInterface
 	UserService               UserServiceInterface
 	CaseHandler               *CaseHandler
+	CaseDeletionHandler       *CaseDeletionHandler
+	CaseListHandler           *CaseListHandler
 	UploadHandler             *UploadHandler
 	DownloadHandler           *DownloadHandler
 	MetadataHandler           *MetadataHandler
@@ -61,14 +66,19 @@ type Handler struct {
 	TenantRepo                registration.TenantRepository
 	UserRepo                  registration.UserRepository // Optional, if you have a user repository
 	NotificationService       *notification.NotificationService
+	HealthHandler             *HealthHandler
 
 	ReportHandler       *ReportHandler       // Optional: Report generation handler
 	ReportStatusHandler *ReportStatusHandler // Optional: Report status update handler
 
+	ReportAIHandler *ReportAIHandler
+
 	IOCHandler            *IOCHandler
 	TimelineHandler       *TimelineHandler
+	TimelineAIHandler     *TimelineAIHandler
 	EvidenceHandler       *EvidenceHandler
 	ChainOfCustodyHandler *ChainOfCustodyHandler
+	X3DHService           *x3dh.BundleService // Add this
 }
 
 func NewHandler(
@@ -78,6 +88,7 @@ func NewHandler(
 	evidenceSvc EvidenceServiceInterface,
 	userSvc UserServiceInterface,
 	caseHandler *CaseHandler,
+	caseDeletionHandler *CaseDeletionHandler,
 	uploadHandler *UploadHandler,
 	downloadHandler *DownloadHandler, // Optional, if you have a download handler
 	metadataHandler *MetadataHandler, // Optional, if you have a metadata handler
@@ -100,10 +111,17 @@ func NewHandler(
 
 	reportHandler *ReportHandler, // Optional: Report generation handler
 	reportStatusHandler *ReportStatusHandler, // Optional: Report status update handler
+	ReportAIHandler *ReportAIHandler,
 	IOCHandler *IOCHandler,
 	TimelineHandler *TimelineHandler,
+	TimelineAIHandler *TimelineAIHandler,
+
 	EvidenceHandler *EvidenceHandler,
 	ChainOfCustodyHandler *ChainOfCustodyHandler,
+
+	healthHandler *HealthHandler,
+
+	x3dhService *x3dh.BundleService,
 
 ) *Handler {
 	return &Handler{
@@ -113,6 +131,7 @@ func NewHandler(
 		EvidenceService:           evidenceSvc,
 		UserService:               userSvc,
 		CaseHandler:               caseHandler,
+		CaseDeletionHandler:       caseDeletionHandler,
 		UploadHandler:             uploadHandler,
 		DownloadHandler:           downloadHandler,
 		MetadataHandler:           metadataHandler,
@@ -135,21 +154,32 @@ func NewHandler(
 
 		ReportHandler:       reportHandler,       // Optional: Report generation handler
 		ReportStatusHandler: reportStatusHandler, // Optional: Report status update handler
+		ReportAIHandler:     ReportAIHandler,
 
 		IOCHandler:            IOCHandler,
 		TimelineHandler:       TimelineHandler,
+		TimelineAIHandler:     TimelineAIHandler,
 		EvidenceHandler:       EvidenceHandler,
 		ChainOfCustodyHandler: ChainOfCustodyHandler,
+		HealthHandler:         healthHandler,
+
+		X3DHService: x3dhService,
 	}
 }
 
 func (h *AuthHandler) LoginHandler(c *gin.Context) {
+	// Debug: Print all request headers
+	for k, v := range c.Request.Header {
+		fmt.Printf("[DEBUG] Header: %s = %v\n", k, v)
+	}
+
 	var req struct {
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("[DEBUG] Body bind error: %v\n", err)
 		c.JSON(http.StatusBadRequest, structs.ErrorResponse{
 			Error:   "invalid_request",
 			Message: err.Error(),
@@ -157,14 +187,20 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("[DEBUG] Body: email=%s, password=%s\n", req.Email, req.Password)
+
+	// Add detailed error handling around the service call
 	resp, err := h.authService.Login(req.Email, req.Password)
-	status := "SUCCESS"
 	if err != nil {
-		status = "FAILED"
+		// Log the actual error details
+		fmt.Printf("[ERROR] Login service error: %v\n", err)
+		fmt.Printf("[ERROR] Error type: %T\n", err)
+
+		status := "FAILED"
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action: "LOGIN_ATTEMPT",
 			Actor: auditlog.Actor{
-				ID:   "", // Unknown until login successful
+				ID:   "",
 				Role: "",
 			},
 			Target: auditlog.Target{
@@ -173,16 +209,26 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 			},
 			Service:     "auth",
 			Status:      status,
-			Description: "Failed login attempt",
+			Description: fmt.Sprintf("Failed login attempt: %v", err),
 		})
-		c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
-			Error:   "authentication_failed",
-			Message: "Invalid email or password",
-		})
+
+		// Return 500 if it's an unexpected error, 401 for auth failures
+		if strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
+				Error:   "authentication_failed",
+				Message: "Invalid email or password",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, structs.ErrorResponse{
+				Error:   "internal_error",
+				Message: "An internal error occurred",
+			})
+		}
 		return
 	}
 
 	// Log successful attempt
+	status := "SUCCESS"
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action: "LOGIN_ATTEMPT",
 		Actor: auditlog.Actor{

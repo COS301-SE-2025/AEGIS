@@ -12,9 +12,10 @@ func (p *DBPermissionChecker) RoleHasPermission(role string, permission string) 
 	var exists bool
 	err := p.DB.QueryRow(`
 		SELECT EXISTS (
-			SELECT 1 FROM role_permissions
-			WHERE role = $1 AND permission = $2
-		)
+			SELECT 1 FROM enum_role_permissions rp
+			JOIN permissions p ON rp.permission_id = p.id
+			WHERE rp.role = $1 AND p.name = $2
+			)
 	`, role, permission).Scan(&exists)
 	return exists, err
 }

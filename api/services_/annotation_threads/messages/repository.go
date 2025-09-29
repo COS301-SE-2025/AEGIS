@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -95,4 +96,12 @@ func (r *MessageRepository) AddMentions(messageID uuid.UUID, mentions []uuid.UUI
 	}
 
 	return r.DB.Create(&mentionRows).Error
+}
+
+func (r *MessageRepository) GetMessagesByThreadID(threadID string) ([]ThreadMessage, error) {
+	parsedUUID, err := uuid.Parse(threadID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid thread ID format: %v", err)
+	}
+	return r.GetMessagesByThread(parsedUUID)
 }

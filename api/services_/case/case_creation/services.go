@@ -6,6 +6,8 @@ import (
 	"errors"
 	"time"
 
+	"context"
+
 	"github.com/google/uuid"
 )
 
@@ -53,6 +55,7 @@ func (s *Service) CreateCase(req *CreateCaseRequest) (*Case, error) {
 		TenantID:           req.TenantID, // Assuming this is a tenant ID for multi-tenancy
 		TeamID:             req.TeamID,   // Optional team ID
 		UpdatedAt:          time.Now(),   // Set initial update time
+		Progress:           GetProgressForStage(req.InvestigationStage),
 	}
 
 	// Persist the case in the repository
@@ -77,4 +80,18 @@ func (s *Service) CreateCase(req *CreateCaseRequest) (*Case, error) {
 	}
 
 	return newCase, nil
+}
+
+// GetCaseByID fetches a case by its ID (and optionally tenant/team if needed)
+// Implements: GetCaseByID(ctx context.Context, caseID string) (any, error)
+func (s *Service) GetCaseByID(ctx context.Context, caseID string) (any, error) {
+	id, err := uuid.Parse(caseID)
+	if err != nil {
+		return nil, err
+	}
+	caseObj, err := s.repo.GetCaseByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return caseObj, nil
 }

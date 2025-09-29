@@ -1,7 +1,9 @@
 package case_creation
 
 import (
-	//"aegis-api/db"
+	"context"
+
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -15,4 +17,14 @@ func NewGormCaseRepository(db *gorm.DB) *GormCaseRepository {
 
 func (r *GormCaseRepository) CreateCase(c *Case) error {
 	return r.db.Create(c).Error
+}
+
+// GetCaseByID fetches a case by its ID
+func (r *GormCaseRepository) GetCaseByID(ctx context.Context, id uuid.UUID) (*Case, error) {
+	var c Case
+	err := r.db.WithContext(ctx).First(&c, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
 }

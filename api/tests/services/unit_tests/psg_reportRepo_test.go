@@ -145,7 +145,7 @@ func TestRepo_GetByID_SQLMock(t *testing.T) {
 		WithArgs(id, 1).
 		WillReturnRows(sqlmock.NewRows(allReportCols).AddRow(fullReportRow(id, map[string]any{"name": "got"})...))
 
-	got, err := repo.GetByID(context.Background(), id)
+	got, err := repo.GetByID(context.Background(), id.String())
 	require.NoError(t, err)
 	assert.Equal(t, "got", got.Name)
 

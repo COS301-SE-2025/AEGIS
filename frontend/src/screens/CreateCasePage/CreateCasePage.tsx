@@ -87,7 +87,7 @@ export function CreateCaseForm(): JSX.Element {
   setForm(prev => ({ ...prev, tenantId: decoded.tenant_id }));
 
   // Use team_id here, NOT tenant_id
-axios.get<{ id: string; name: string }>(`http://localhost:8080/api/v1/teams/${decoded.team_id}`)
+axios.get<{ id: string; name: string }>(`https://localhost/api/v1/teams/${decoded.team_id}`)
   .then((res) => {
     setTeams([res.data]);  // wrap in array so you can map safely
   })
@@ -141,7 +141,7 @@ const payload = {
 
     try {
       const response = await axios.post(
-  "http://localhost:8080/api/v1/cases",
+  "https://localhost/api/v1/cases",
   payload,
   {
     headers: {
@@ -150,14 +150,16 @@ const payload = {
   }
 );
 
-
       if (response.status === 201) {
         //alert("Case created successfully!");
         clearSavedFormData();
-        const data = response.data as { case: { ID: string } };
-        navigate(`/case/${data.case.ID}/next-steps`);
+        const data = response.data as { case: { id: string } };
+        console.log("Case ID to navigate:", data.case.id);
+        navigate(`/case/${data.case.id}/next-steps`);
         // Save the case ID to localStorage so upload can find it
       localStorage.setItem("currentCase", JSON.stringify(data.case));
+
+      
 
       }
     } catch (error: any) {

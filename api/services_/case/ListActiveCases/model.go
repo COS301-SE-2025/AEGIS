@@ -20,6 +20,7 @@ type ActiveCase struct {
 	CreatedBy          uuid.UUID `gorm:"column:created_by;type:uuid;not null" json:"created_by"`
 	CreatedAt          time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 	UpdatedAt          time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+	Progress           int       `gorm:"column:progress;type:int" json:"progress"` // <-- Added for frontend
 }
 
 type RequestDTO struct {

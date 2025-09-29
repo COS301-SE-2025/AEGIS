@@ -25,8 +25,7 @@ import { ClipboardList } from "lucide-react";
 import { ThreatLandscape } from "../../components/ui/ThreatLandscape";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import React from "react";
-
-
+import { useUnreadCount } from "../../hooks/useUnreadCount";
 
 interface CaseCard {
   id: string;
@@ -60,24 +59,21 @@ export const DashBoardPage = () => {
 const [editingCase, setEditingCase] = useState<CaseCard | null>(null);
 const [updatedStatus, setUpdatedStatus] = useState("");
 const [updatedStage, setUpdatedStage] = useState("");
-const [] = useState<File | null>(null);
+//const [] = useState<File | null>(null);
 const [updatedTitle, setUpdatedTitle] = useState("");
 const [updatedDescription, setUpdatedDescription] = useState("");
-interface Notification {
-  id: string;
-  message: string;
-  read: boolean;
-  archived: boolean;
-  // Add other properties as needed
-}
 
-const [openCases, setOpenCases] = useState([]);
-const [closedCases, setClosedCases] = useState([]);
-const [archivedCases] = useState([]); // <-- Add this line
+
+const [openCases, setOpenCases] = useState<CaseCard[]>([]);
+const [closedCases, setClosedCases] = useState<CaseCard[]>([]);
+const [archivedCases, setArchivedCases] = useState<CaseCard[]>([]);
 const [evidenceCount, setEvidenceCount] = useState(0);
 const [evidenceError, setEvidenceError] = useState<string | null>(null);
-const [notifications] = useState<Notification[]>([]);
+const [refreshCases, setRefreshCases] = useState(0);
 const [searchQuery, setSearchQuery] = useState("");
+  const unread = useUnreadCount();
+
+
   interface DashboardTile {
   id: string;
   value: string;
@@ -159,7 +155,7 @@ useEffect(() => {
 
 
 // ✅ these are outside of the array
-const unreadCount = notifications.filter((n) => !n.read && !n.archived).length;
+
 const [role, setRole] = useState<string>(user?.role || "");
 const isDFIRAdmin = role === "DFIR Admin";
 const [showTileCustomizer, setShowTileCustomizer] = useState(false);
@@ -173,11 +169,14 @@ useEffect(() => {
       let responseKey = "";
 
       if (activeTab === "active") {
-        endpoint = "http://localhost:8080/api/v1/cases/active";
+        endpoint = "https://localhost/api/v1/cases/active";
         responseKey = "cases";
       } else if (activeTab === "closed") {
-        endpoint = "http://localhost:8080/api/v1/cases/closed";
+        endpoint = "https://localhost/api/v1/cases/closed";
         responseKey = "closed_cases";
+      } else if (activeTab === "archived") {
+        endpoint = "https://localhost/api/v1/cases/archived";
+        responseKey = "archived_cases";
       }
 
       const res = await fetch(endpoint, {
@@ -186,12 +185,30 @@ useEffect(() => {
         },
       });
 
+      if (res.status === 304) {
+        setCaseCards([]);
+        return;
+      }
       if (!res.ok) throw new Error(`Failed to load ${activeTab} cases`);
-      const data = await res.json();
+
+let data = {};
+try {
+  const text = await res.text();
+
+  if (text && (text.trim().startsWith("{") || text.trim().startsWith("["))) {
+    data = JSON.parse(text);
+  } else {
+    data = {};
+  }
+} catch (e) {
+  console.error("Failed to parse JSON for", activeTab, "cases:", e);
+  setCaseCards([]);
+  return;
+}
 
       console.log(`Fetched ${activeTab} cases:`, data);
 
-      const rawCases = data[responseKey] || [];
+      const rawCases = (data as any)[responseKey] || [];
 
       const mappedCases = rawCases.map((c: any) => ({
         id: c.id,
@@ -199,8 +216,10 @@ useEffect(() => {
         team_name: c.team_name,
         creator: c.created_by,
         priority: c.priority,
+        status: c.status,
         description: c.description,
         lastActivity: c.created_at,
+        investigation_stage: c.investigation_stage || "Triage",
         progress: c.progress || 0,
         image:
           c.image ||
@@ -215,7 +234,7 @@ useEffect(() => {
   };
 
   fetchCases();
-}, [activeTab]);
+}, [activeTab, refreshCases]);
 
 useEffect(() => {
   const token = sessionStorage.getItem("authToken");
@@ -231,13 +250,15 @@ useEffect(() => {
       return null;
     }
   }
+  // Add this helper function in your component
+
 
   const tenantId = getTenantIdFromJWT(token);
   if (!tenantId) return;
 
   const fetchEvidenceCount = async () => {
     try {
-      const res = await fetch(`http://localhost:8080/api/v1/evidence/count/${tenantId}`, {
+      const res = await fetch(`https://localhost/api/v1/evidence/count/${tenantId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -307,7 +328,7 @@ useEffect(() => {
   const fetchRecentActivities = async () => {
     try {
       const token = sessionStorage.getItem("authToken") || "";
-      const res = await fetch(`http://localhost:8080/api/v1/auditlogs/recent/${user.id}`, {
+      const res = await fetch(`https://localhost/api/v1/auditlogs/recent/${user.id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -337,30 +358,39 @@ useEffect(() => {
     const token = sessionStorage.getItem("authToken") || "";
 
     try {
-      const [openRes, closedRes] = await Promise.all([
-        fetch("http://localhost:8080/api/v1/cases/filter?status=open", {
+      const [openRes, ongoingRes, closedRes, archivedRes] = await Promise.all([
+        fetch("https://localhost/api/v1/cases/filter?status=open", {
           headers: { "Authorization": `Bearer ${token}` }
         }),
-        fetch("http://localhost:8080/api/v1/cases/filter?status=closed", {
+        fetch("https://localhost/api/v1/cases/filter?status=ongoing", {
+          headers: { "Authorization": `Bearer ${token}` }
+        }),
+        fetch("https://localhost/api/v1/cases/filter?status=closed", {
+          headers: { "Authorization": `Bearer ${token}` }
+        }),
+        fetch("https://localhost/api/v1/cases/filter?status=archived", {
           headers: { "Authorization": `Bearer ${token}` }
         }),
       ]);
 
       const openData = await openRes.json();
+      const ongoingData = await ongoingRes.json();
       const closedData = await closedRes.json();
+      const archivedData = await archivedRes.json();
 
-      setOpenCases(openData.cases || []);
+      // Merge open and ongoing cases
+      setOpenCases([...(openData.cases || []), ...(ongoingData.cases || [])]);
       setClosedCases(closedData.cases || []);
+      setArchivedCases(archivedData.cases || []);
 
       // Update tile values
       setAvailableTiles(prev => prev.map(tile => {
         switch(tile.id) {
           case 'ongoing-cases':
-            return { ...tile, value: (openData.cases || []).length.toString() };
+            return { ...tile, value: ([...(openData.cases || []), ...(ongoingData.cases || [])]).length.toString() };
           case 'closed-cases':
             return { ...tile, value: (closedData.cases || []).length.toString() };
           case 'evidence-count':
-            // Only update if evidenceCount is still zero (not set by backend)
             return tile.value === "0"
               ? { ...tile, value: evidenceCount.toString() }
               : tile;
@@ -375,8 +405,7 @@ useEffect(() => {
   };
 
   fetchCasesCount();
-}, []);
-
+}, []);                            
 
 // Define getIcon ABOVE the .map
 const getIcon = (action: string) => {
@@ -386,6 +415,19 @@ const getIcon = (action: string) => {
   if (action.toLowerCase().includes("login")) return Pencil;
   return FileText;
 };
+function getProgressForStage(stage: string): number {
+  switch (stage) {
+    case "Triage": return 10;
+    case "Evidence Collection": return 25;
+    case "Analysis": return 40;
+    case "Correlation & Threat Intelligence": return 55;
+    case "Containment & Eradication": return 70;
+    case "Recovery": return 85;
+    case "Reporting & Documentation": return 95;
+    case "Case Closure & Review": return 100;
+    default: return 0;
+  }
+}
 
 const handleSaveCase = async () => {
   if (!editingCase) return;
@@ -393,7 +435,7 @@ const handleSaveCase = async () => {
   const token = sessionStorage.getItem("authToken") || "";
   
   try {
-    const res = await fetch(`http://localhost:8080/api/v1/cases/${editingCase.id}`, {
+    const res = await fetch(`https://localhost/api/v1/cases/${editingCase.id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -412,10 +454,10 @@ const handleSaveCase = async () => {
     const data = await res.json();
     console.log("Case updated:", data);
 
-    // ✅ Close the modal
+    // Remove the edit modal
     setEditingCase(null);
 
-    // ✅ Update the list locally without refetch
+    // Update the caseCards list locally
     setCaseCards(prev =>
       prev.map(c =>
         c.id === editingCase.id
@@ -425,12 +467,85 @@ const handleSaveCase = async () => {
               description: updatedDescription,
               status: updatedStatus,
               investigation_stage: updatedStage,
+              progress: getProgressForStage(updatedStage),
             }
           : c
       )
     );
 
-    //alert("Case updated successfully!");
+    // Update openCases state to always reflect cases with status 'open' or 'ongoing'
+    setOpenCases(prev => {
+      const filtered = prev.filter(c => c.id !== editingCase.id);
+      if (updatedStatus === "open" || updatedStatus === "ongoing") {
+        return [
+          ...filtered,
+          {
+            ...editingCase!,
+            title: updatedTitle,
+            description: updatedDescription,
+            status: updatedStatus,
+            investigation_stage: updatedStage,
+            progress: getProgressForStage(updatedStage),
+          },
+        ];
+      }
+      return filtered;
+    });
+
+    // Update closedCases state to always reflect cases with status 'closed'
+    setClosedCases(prev => {
+      const filtered = prev.filter(c => c.id !== editingCase.id);
+      if (updatedStatus === "closed") {
+        return [
+          ...filtered,
+          {
+            ...editingCase!,
+            title: updatedTitle,
+            description: updatedDescription,
+            status: updatedStatus,
+            investigation_stage: updatedStage,
+            progress: getProgressForStage(updatedStage),
+          },
+        ];
+      }
+      return filtered;
+    });
+
+    // If status changed, switch tab so the card moves immediately
+    let newTab = "active";
+    if (updatedStatus === "closed") {
+      newTab = "closed";
+    } else if (updatedStatus === "archived") {
+      newTab = "archived";
+    } else if (updatedStatus === "open" || updatedStatus === "ongoing") {
+      newTab = "active";
+    }
+    setActiveTab(newTab);
+    setRefreshCases(prev => prev + 1); // Trigger a refresh to sync with backend
+
+    // Update dashboard tile counts immediately
+    setAvailableTiles(prev => prev.map(tile => {
+      let count = parseInt(tile.value, 10);
+      // Ongoing cases
+      if (tile.id === "ongoing-cases") {
+        if (editingCase?.status === "open" || editingCase?.status === "ongoing") count--;
+        if (newTab === "active") count++;
+        return { ...tile, value: Math.max(count, 0).toString() };
+      }
+      // Closed cases
+      if (tile.id === "closed-cases") {
+        if (editingCase?.status === "closed") count--;
+        if (newTab === "closed") count++;
+        return { ...tile, value: Math.max(count, 0).toString() };
+      }
+      // Archived cases (if you have a tile for it)
+      if (tile.id === "archived-cases") {
+        if (editingCase?.status === "archived") count--;
+        if (newTab === "archived") count++;
+        return { ...tile, value: Math.max(count, 0).toString() };
+      }
+      return tile;
+    }));
   } catch (err) {
     console.error("Error updating case:", err);
    // alert("Failed to update case");
@@ -467,7 +582,7 @@ const handleSaveCase = async () => {
     const fetchProfile = async () => {
       try {
         const token = sessionStorage.getItem("authToken");
-        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
+        const res = await fetch(`https://localhost/api/v1/profile/${user?.id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -532,7 +647,7 @@ useEffect(() => {
 
 
   return (
-    <div className="min-h-screen bg-background text-white">
+  <div className="min-h-screen bg-background text-foreground">
       {/* Sidebar */}
       <div className="fixed left-0 top-0 h-full w-80 bg-background border-r border-border p-6 flex flex-col z-10">
         {/* Logo */}
@@ -544,31 +659,31 @@ useEffect(() => {
               className="w-full h-full object-cover"
             />
           </div>
-          <span className="font-bold text-white text-2xl">AEGIS</span>
+          <span className="font-bold text-foreground text-2xl">AEGIS</span>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 space-y-2">
-          <div className="flex items-center gap-3 bg-blue-600 text-white p-3 rounded-lg">
+          <div className="flex items-center gap-3 bg-primary text-primary-foreground p-3 rounded-lg">
             <Home className="w-6 h-6" />
             <span className="text-lg">Dashboard</span>
           </div>
-          <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+          <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <FileText className="w-6 h-6" />
             <Link to="/case-management"><span className="text-lg">Case Management</span></Link>
           </div>
-          <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+          <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <Folder className="w-6 h-6" />
             <Link to="/evidence-viewer"><span className="text-lg">Evidence Viewer</span></Link>
           </div>
-          <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+          <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
             <MessageSquare className="w-6 h-6" />
             <span className="text-lg">
               <Link to="/secure-chat">Secure Chat</Link>
             </span>
           </div>
             {isDFIRAdmin && (
-              <div className="flex items-center gap-3 text-muted-foreground hover:text-white hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+              <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
                 <ClipboardList className="w-6 h-6" />
                 <Link to="/report-dashboard">
                   <span className="text-lg">Case Reports</span>
@@ -586,9 +701,9 @@ useEffect(() => {
               {user?.image_url ? (
                 <img
                   src={
-                    user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                    user.image_url.startsWith("https") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `http://localhost:8080${user.image_url}`
+                      : `https://localhost${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -609,24 +724,24 @@ useEffect(() => {
       </div>
 
       {/* Main Content */}
-      <div className="ml-80 min-h-screen bg-background">
+  <div className="ml-80 min-h-screen bg-background">
         {/* Topbar */}
         <div className="sticky top-0 bg-background bg-opacity-100 border-b border-border p-4 z-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <SidebarToggleButton />
-              <button className="text-blue-500 bg-blue-500/10 px-4 py-2 rounded-lg">Dashboard</button>
+              <button className="text-primary bg-primary/10 px-4 py-2 rounded-lg">Dashboard</button>
               <Link to="/case-management">
-                <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
+                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                   Case Management
                 </button>
               </Link>
               <Link to="/evidence-viewer">
-                <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
+                <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                   Evidence Viewer
                 </button>
               </Link>
-              <button className="text-muted-foreground hover:text-white px-4 py-2 rounded-lg transition-colors">
+              <button className="text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors">
                 <Link to="/secure-chat">Secure Chat</Link>
               </button>
             </div>
@@ -636,35 +751,41 @@ useEffect(() => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <input
-                className="w-80 h-12 bg-card border border-muted rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                className="w-80 h-12 bg-card border border-border rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-primary/10"
                 placeholder="Search cases"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-              <Link to="/notifications">
-                <button className="relative p-2 text-muted-foreground hover:text-white transition-colors">
-                  <Bell className="w-6 h-6" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
+              <Link
+                to="/notifications"
+                className="relative inline-block"
+                aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+                title={unread > 0 ? `${unread} unread` : "Notifications"}
+              >
+                <Bell className="w-6 h-6" />
+                {unread > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 translate-x-1/2 -translate-y-1/2
+                              bg-red-600 text-white text-[10px] leading-none
+                              min-w-4 h-4 px-1 flex items-center justify-center
+                              rounded-full pointer-events-none"
+                  >
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
               </Link>
 
-              <Link to="/settings">
-                <button className="p-2 text-muted-foreground hover:text-white transition-colors">
-                  <Settings className="w-6 h-6" />
-                </button>
+             <Link to="/settings">
+                <Settings className="text-muted-foreground hover:text-foreground w-5 h-5 cursor-pointer" />
               </Link>
               <Link to="/profile">
                 {user?.image_url ? (
                   <img
                     src={
-                      user.image_url.startsWith("http") || user.image_url.startsWith("data:")
+                      user.image_url.startsWith("https") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `http://localhost:8080${user.image_url}`
+                        : `https://localhost${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"
@@ -681,7 +802,7 @@ useEffect(() => {
         </div>
 
         {/* Page Content */}
-        <main className="p-8">
+        <main className="p-8 text-foreground">
         {evidenceError && (
           <div className="mb-4 p-3 bg-red-900 text-red-300 rounded">{evidenceError}</div>
         )}
@@ -692,7 +813,7 @@ useEffect(() => {
           <div className="flex justify-between items-center mb-4">
             <button
               onClick={() => setShowTileCustomizer(true)}
-              className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700"
+              className="bg-primary text-primary-foreground text-sm px-4 py-2 rounded-md hover:bg-primary/90"
             >
               Customize Dashboard
             </button>
@@ -714,9 +835,9 @@ useEffect(() => {
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
-                            className={`w-[266px] h-[123px] flex-shrink-0 bg-card border-[5px] border rounded-[8px] p-4 flex items-center justify-between ${
-                              snapshot.isDragging ? 'opacity-50' : ''
-                            }`}
+                            className={`w-[266px] h-[123px] flex-shrink-0 bg-card border border-border rounded-lg shadow p-4 flex items-center justify-between ${
+                                snapshot.isDragging ? 'opacity-50' : ''
+                              }`}
                           >
                             <div>
                               <p className={`text-3xl font-bold ${tile.color}`}>{tile.value}</p>
@@ -740,7 +861,7 @@ useEffect(() => {
 
             <div className="w-[529px] h-[366px] flex-shrink-0 rounded-lg border border-border bg-card p-6 overflow-hidden">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-[#58a6ff] text-lg flex items-center gap-2">
+                <h2 className="font-bold text-foreground text-lg flex items-center gap-2">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
                   </svg>
@@ -748,7 +869,7 @@ useEffect(() => {
                 </h2>
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
-                  <span className="text-xs text-muted-foreground">LIVE</span>
+                  <span className="text-xs text-success">LIVE</span>
                 </div>
               </div>
 
@@ -763,21 +884,20 @@ useEffect(() => {
                       ? new Date(activity.Timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })
                       : "---";
 
-                    // Color coding based on action type
-                    let activityColor = "text-[#58a6ff]"; // Default blue
+                    // Color coding based on action type (semantic classes)
+                    let activityColor = "text-primary"; // Default primary
                     if (activity.Action.toLowerCase().includes("alert") || activity.Action.toLowerCase().includes("threat")) {
-                      activityColor = "text-[#f85149]"; // Red for alerts
+                      activityColor = "text-error"; // Red for alerts
                     } else if (activity.Action.toLowerCase().includes("login")) {
-                      activityColor = "text-[#3fb950]"; // Green for logins
+                      activityColor = "text-success"; // Green for logins
                     }
 
                     return (
                       <li key={index} className="group">
-                        <div className="flex gap-3 p-2 rounded-md hover:bg-[#161b22] transition-colors">
+                        <div className="flex gap-3 p-2 rounded-md hover:bg-muted transition-colors">
                           <div className={`flex-shrink-0 mt-1 ${activityColor}`}>
                             <Icon className="w-4 h-4" />
                           </div>
-                          
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-baseline gap-2">
                               <p className={`text-sm font-mono truncate ${activityColor}`}>
@@ -785,29 +905,26 @@ useEffect(() => {
                               </p>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-muted-foreground">{date}</span>
-                                <span className="text-xs text-[#484f58]">{timeAgo}</span>
+                                <span className="text-xs text-muted-foreground">{timeAgo}</span>
                               </div>
                             </div>
-                            
-                            <p className="text-[#c9d1d9] text-sm mt-1 font-mono">
+                            <p className="text-foreground text-sm mt-1 font-mono">
                               {activity.Description}
                             </p>
-                            
                             <div className="mt-1 flex gap-2">
-                              <span className="text-[10px] px-2 py-0.5 bg-[#21262d] text-[#8b949e] rounded-full">
+                              <span className="text-[10px] px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
                                 {activity.Action}
                               </span>
                               {activity.Timestamp && (
-                                <span className="text-[10px] px-2 py-0.5 bg-[#1e60e5] bg-opacity-20 text-[#58a6ff] rounded-full">
+                                <span className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full">
                                   {new Date(activity.Timestamp).toLocaleTimeString([], { hour12: false }) + " UTC"}
                                 </span>
                               )}
                             </div>
                           </div>
                         </div>
-                        
                         {index < recentActivities.length - 1 && (
-                          <div className="h-px bg-[#21262d] mx-2 my-1 group-last:hidden"></div>
+                          <div className="h-px bg-border mx-2 my-1 group-last:hidden"></div>
                         )}
                       </li>
                     );
@@ -818,16 +935,16 @@ useEffect(() => {
           </div>
 
           {/* Case cards */}
-          <div className="w-full bg-card border border-border rounded-lg mt-8 p-6">
+          <div className="w-full bg-card border border-border rounded-2xl shadow-lg mt-8 p-8">
             <div className="flex justify-between items-center mb-4">
               <div className="flex gap-2">
                 <button
                   onClick={() => setActiveTab("active")}
                   className={cn(
-                    "text-sm rounded-lg h-8 px-4",
+                    "text-sm rounded-lg h-8 px-4 transition-colors",
                     activeTab === "active"
-                      ? "bg-muted text-foreground"
-                      : "bg-card text-muted-foreground border border-muted"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-primary/10 text-primary border border-primary"
                   )}
                 >
                   Active Cases ({openCases.length})
@@ -835,10 +952,10 @@ useEffect(() => {
                 <button
                   onClick={() => setActiveTab("archived")}
                   className={cn(
-                    "text-sm rounded-lg h-8 px-4",
+                    "text-sm rounded-lg h-8 px-4 transition-colors",
                     activeTab === "archived"
-                      ? "bg-muted text-white"
-                      : "bg-card text-muted-foreground border border-muted"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-primary/10 text-primary border border-primary"
                   )}
                 >
                   Archived Cases ({archivedCases.length})
@@ -846,20 +963,22 @@ useEffect(() => {
                 <button
                   onClick={() => setActiveTab("closed")}
                   className={cn(
-                    "text-sm rounded-lg h-8 px-4",
+                    "text-sm rounded-lg h-8 px-4 transition-colors",
                     activeTab === "closed"
-                      ? "bg-muted text-white"
-                      : "bg-card text-muted-foreground border border-muted"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-primary/10 text-primary border border-primary"
                   )}
                 >
                   Closed Cases ({closedCases.length})
                 </button>
               </div>
-              <Link to="/create-case">
-                <button className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700">
-                  Create Case
-                </button>
-              </Link>
+              {isDFIRAdmin && (
+                <Link to="/create-case">
+                  <button className="bg-primary text-primary-foreground text-sm px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                    Create Case
+                  </button>
+                </Link>
+              )}
             </div>
 
             {caseCards.length === 0 ? (
@@ -876,37 +995,37 @@ useEffect(() => {
                   card.team_name.toLowerCase().includes(searchQuery.toLowerCase())
                 )
                 .map((card) => {
-                  console.log("Evidence Card ID:", card.id);
                   return (
                     <div
                       key={card.id}
-                      className="relative flex flex-col justify-between items-center w-[460px] h-[450px] p-4 bg-card border border rounded-[8px]"
+                      className="relative flex flex-col justify-between items-center w-[460px] h-[450px] p-4 bg-card border border-border rounded-lg shadow"
                     >
                       <div className="absolute bottom-3 right-3 flex flex-col items-end gap-2 z-10">
-                        {/* Edit button (below) */}
-                        <button
-                          onClick={() => {
-                            setEditingCase(card);
-                            setUpdatedStatus(card.status || "open");
-                            setUpdatedStage(card.investigation_stage || "Triage");
-                            setUpdatedTitle(card.title);
-                            setUpdatedDescription(card.description);
-                          }}
-                          className="text-muted-foreground hover:text-blue-500 transition-colors"
-                          title="Edit Case"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        {/* Delete button  */}
-                        <button
-                          onClick={async () => {
-                            const confirmed = window.confirm("Are you sure you want to archive this case?");
-                            if (!confirmed) return;
+                        {/* Edit and Delete buttons are disabled in Archived tab */}
+                        {activeTab !== "archived" ? (
+                          <>
+                            <button
+                              onClick={() => {
+                                setEditingCase(card);
+                                setUpdatedStatus(card.status || "open");
+                                setUpdatedStage(card.investigation_stage || "Triage");
+                                setUpdatedTitle(card.title);
+                                setUpdatedDescription(card.description);
+                              }}
+                              className="text-muted-foreground hover:text-primary transition-colors"
+                              title="Edit Case"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                const confirmed = window.confirm("Are you sure you want to archive this case?");
+                                if (!confirmed) return;
 
-                            const token = sessionStorage.getItem("authToken") || "";
+                                const token = sessionStorage.getItem("authToken") || "";
 
                             try {
-                              const res = await fetch(`http://localhost:8080/api/v1/cases/${card.id}`, {
+                              const res = await fetch(`https://localhost/api/v1/cases/${card.id}`, {
                                 method: "PATCH",
                                 headers: {
                                   "Content-Type": "application/json",
@@ -915,22 +1034,39 @@ useEffect(() => {
                                 body: JSON.stringify({ status: "archived" }),
                               });
 
-                              if (res.ok) {
-                                setCaseCards(prev => prev.filter(c => c.id !== card.id));
-                              } else {
-                               // alert("Failed to archive the case.");
-                              }
-                            } catch (error) {
-                              console.error("Archive error:", error);
-                              //alert("An error occurred.");
-                            }
-                          }}
-                          className="text-muted-foreground hover:text-red-500 transition-colors"
-                          title="Archive Case"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-
+                                  if (res.ok) {
+                                    // Move card to archived tab and update status locally
+                                    setCaseCards(prev => prev.filter(c => c.id !== card.id));
+                                    setOpenCases((prev: CaseCard[]) => prev
+                                      .filter(c => c.id !== card.id)
+                                      .filter(c => c.status === "open" || c.status === "ongoing")
+                                    );
+                                    setArchivedCases((prev: CaseCard[]) => [...prev, { ...card, status: "archived" }]);
+                                    setActiveTab("archived");
+                                  } else {
+                                    // alert("Failed to archive the case.");
+                                  }
+                                } catch (error) {
+                                  console.error("Archive error:", error);
+                                  //alert("An error occurred.");
+                                }
+                              }}
+                              className="text-muted-foreground hover:text-red-500 transition-colors"
+                              title="Archive Case"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button disabled className="text-muted-foreground opacity-50 cursor-not-allowed" title="Edit disabled">
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button disabled className="text-muted-foreground opacity-50 cursor-not-allowed" title="Delete disabled">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
 
                       <img
@@ -940,7 +1076,7 @@ useEffect(() => {
                         height={180}
                         className="rounded-md mb-3"
                       />
-                      <h3 className="text-white text-lg font-bold text-center mb-1">
+                      <h3 className="text-foreground text-lg font-bold text-center mb-1">
                         {card.title || "Untitled Case"}
                       </h3>
                       <div className="text-sm text-muted-foreground text-center mb-2">
@@ -974,17 +1110,33 @@ useEffect(() => {
                           <span className="text-muted-foreground capitalize">{card.priority}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                          <span className="text-muted-foreground">Ongoing</span>
+                          <span
+                            className={cn(
+                              "w-2 h-2 rounded-full",
+                              card.status === "open"
+                                ? "bg-blue-400"
+                                : card.status === "ongoing"
+                                ? "bg-yellow-400"
+                                : card.status === "closed"
+                                ? "bg-green-500"
+                                : card.status === "archived"
+                                ? "bg-gray-500"
+                                : card.status === "under_review"
+                                ? "bg-purple-500"
+                                : "bg-muted"
+                            )}
+                          ></span>
+                          <span className="text-muted-foreground capitalize">{card.status ? card.status.replace(/_/g, " ") : "Unknown"}</span>
                         </div>
                       </div>
+                        
                       <Progress
                         value={card.progress}
                         className="w-full h-3 bg-muted mb-3 [&>div]:bg-green-500"
                       />
                       <Link to={card.id && card.id.length === 36 ? `/evidence-viewer/${card.id}` : "#"}>
                         <button
-                          className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted"
+                          className="bg-primary text-primary-foreground text-sm px-14 py-2 rounded hover:bg-primary/90 transition-colors"
                           disabled={!card.id || card.id.length !== 36}
                           title={!card.id || card.id.length !== 36 ? "Invalid Case ID" : "View Evidence Details"}
                         >
@@ -992,7 +1144,7 @@ useEffect(() => {
                         </button>
                       </Link>
                       <Link to={`/case-management/${card.id}`}>
-                        <button className="bg-blue-600 text-white text-sm px-14 py-2 rounded hover:bg-muted">
+                        <button className="bg-primary text-primary-foreground text-sm px-14 py-2 rounded hover:bg-primary/90 transition-colors">
                           View Details
                         </button>
                       </Link>
@@ -1075,36 +1227,38 @@ useEffect(() => {
                         Upload Evidence
                       </label>
                       <Link to={`/upload-evidence/${editingCase.id}`} className="inline-block w-full">
-                        <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                        <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 text-sm transition-colors">
                           Go to Upload Evidence Page
                         </button>
                       </Link>
                     </div>
 
-                    {/* Assign Members Button */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-muted-foreground mb-1">
-                        Assign Members
-                      </label>
-                      <Link to={`/assign-case-members/${editingCase.id}`} className="inline-block w-full">
-                        <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
-                          Go to Assign Members Page
-                        </button>
-                      </Link>
-                    </div>
+                    {/* Assign Members Button (DFIR Admin only) */}
+                    {isDFIRAdmin && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-muted-foreground mb-1">
+                          Assign Members
+                        </label>
+                        <Link to={`/assign-case-members/${editingCase.id}`} className="inline-block w-full">
+                          <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 text-sm transition-colors">
+                            Go to Assign Members Page
+                          </button>
+                        </Link>
+                      </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="flex justify-end gap-3 pt-2">
                       <button
                         onClick={() => setEditingCase(null)}
-                        className="px-4 py-2 text-sm text-muted-foreground hover:text-white"
+                        className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                       >
                         Cancel
                       </button>
 
                       <button
                         onClick={handleSaveCase}
-                        className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                        className="px-4 py-2 bg-primary text-primary-foreground text-sm rounded hover:bg-primary/90 transition-colors"
                       >
                         Save Changes
                       </button>
@@ -1119,7 +1273,7 @@ useEffect(() => {
           {/* Tile Customizer Modal */}
             {showTileCustomizer && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-card p-6 rounded-2xl shadow-lg border border-border w-full max-w-md">
+                <div className="bg-background p-6 rounded-2xl shadow-lg border border-background w-full max-w-md">
                   <h2 className="text-xl font-semibold text-foreground mb-4">Customize Dashboard</h2>
                   
                   <div className="space-y-3 max-h-96 overflow-y-auto">

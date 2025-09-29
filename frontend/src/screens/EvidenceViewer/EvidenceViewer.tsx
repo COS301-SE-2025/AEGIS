@@ -35,6 +35,7 @@ import { sendThreadMessage } from "./api";
 import { createAnnotationThread } from "./api";
 import { addThreadParticipant } from "./api";
 import { fetchThreadParticipants } from "./api";
+import { addReaction } from "./api";
 import { approveMessage } from "./api";
 import{MessageCard} from "../../components/ui/MessageCard";
 import { ClipboardList } from "lucide-react";
@@ -152,10 +153,10 @@ function getHashesFromMetadata(metadata: string) {
     const meta = JSON.parse(metadata);
     return {
       sha256: meta.sha256 || "N/A",
-      md5: meta.md5 || "N/A"
+      sha512: meta.sha512 || "N/A"
     };
   } catch {
-    return { sha256: "N/A", md5: "N/A" };
+    return { sha256: "N/A", sha251: "N/A" };
   }
 }
 // Helper to extract details from chainOfCustody
@@ -183,7 +184,7 @@ function getCustodyDetails(chainOfCustody: any[]) {
     notes: first?.forensic_info?.notes || "",
   };
 }
-const BASE_URL = "http://localhost:8080/api/v1";
+const BASE_URL = "https://localhost/api/v1";
   const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
@@ -248,6 +249,34 @@ console.debug('Parsed custodyDetails:', custodyDetails);
 
 const [chainLoading] = useState(false);
 const [chainError] = useState<string | null>(null);
+const [integrityCheckStatus, setIntegrityCheckStatus] = useState<'passed' | 'failed' | 'pending' | string>('pending');
+const [integrityCheckDetails, setIntegrityCheckDetails] = useState<string>('');
+
+useEffect(() => {
+  async function fetchIntegrityCheck() {
+    if (!selectedFile?.id) {
+      setIntegrityCheckStatus('pending');
+      setIntegrityCheckDetails('');
+      return;
+    }
+    try {
+      const token = sessionStorage.getItem("authToken");
+      const axiosConfig = token
+        ? { headers: { Authorization: `Bearer ${token}` } }
+        : {};
+      const res = await axios.get<{ valid: boolean; details: string }>(
+        `${BASE_URL}/evidence/${selectedFile.id}/verify-chain`,
+        axiosConfig
+      );
+      setIntegrityCheckStatus(res.data.valid ? 'passed' : 'failed');
+      setIntegrityCheckDetails(res.data.details || '');
+    } catch (err) {
+      setIntegrityCheckStatus('failed');
+      setIntegrityCheckDetails('Could not verify integrity');
+    }
+  }
+  fetchIntegrityCheck();
+}, [selectedFile]);
 
 useEffect(() => {
   async function loadEvidence() {
@@ -593,11 +622,27 @@ const [profile] = useState({
 
 
 // Add these helper functions inside the EvidenceViewer component (after existing functions)
-const handleAddReaction = async () => {
-  try {
-    // Call the backend and get the updated message with reactions
+// const handleAddReaction = async () => {
+//   try {
+//     // Call the backend and get the updated message with reactions
 
-    // Update the threadMessages state: replace the old message with updatedMessage
+//     // Update the threadMessages state: replace the old message with updatedMessage
+//     if (!selectedThread) return;
+//     const updatedMessages = await fetchThreadMessages(selectedThread.id);
+//     const formattedMessages = formatMessages(updatedMessages);
+//     setThreadMessages(buildNestedMessages(formattedMessages));
+
+//     setShowReactionPicker(null); // Close reaction picker
+//   } catch (err) {
+//     console.error("Failed to add reaction:", err);
+//   }
+// };
+
+const handleAddReaction = async (messageId: string, reaction: string) => {
+  try {
+    await addReaction(messageId, user.id, reaction);
+
+    // Refresh the messages to get the updated reactions
     if (!selectedThread) return;
     const updatedMessages = await fetchThreadMessages(selectedThread.id);
     const formattedMessages = formatMessages(updatedMessages);
@@ -608,7 +653,6 @@ const handleAddReaction = async () => {
     console.error("Failed to add reaction:", err);
   }
 };
-
 
 const handleApproveMessage = async (messageId: string) => {
   try {
@@ -770,7 +814,7 @@ if (!caseId || caseId === "undefined") {
                   src={
                     user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `http://localhost:8080${user.image_url}`
+                      : `https://localhost${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -844,7 +888,7 @@ if (!caseId || caseId === "undefined") {
                     src={
                       user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `http://localhost:8080${user.image_url}`
+                        : `https://localhost${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"
@@ -919,7 +963,7 @@ if (!caseId || caseId === "undefined") {
                   src={
                     user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `http://localhost:8080${user.image_url}`
+                      : `https://localhost${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -988,7 +1032,7 @@ if (!caseId || caseId === "undefined") {
                     src={
                       user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `http://localhost:8080${user.image_url}`
+                        : `https://localhost${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"
@@ -1029,11 +1073,10 @@ if (!caseId || caseId === "undefined") {
             <div className="flex gap-2 mb-4">
               {/* Filter by type */}
               <Select onValueChange={(value) => setTypeFilter(value)}>
-                <SelectTrigger className="w-40 bg-muted border-border text-foreground text-xs">
+                <SelectTrigger className="w-40 bg-muted border-border text-foreground text-xs hover:bg-muted/50">
                   <SelectValue placeholder="Filter by type" />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 text-popover-foreground text-sm">
-                  <SelectItem value="all">All files</SelectItem>
+                <SelectContent className="bg-gray-800/80 text-muted-foreground text-sm border-border">                  <SelectItem value="all">All files</SelectItem>
                   <SelectItem value="memory_dump">Memory Dump</SelectItem>
                   <SelectItem value="executable">Executable</SelectItem>
                   <SelectItem value="network_capture">Network Capture</SelectItem>
@@ -1046,11 +1089,10 @@ if (!caseId || caseId === "undefined") {
 
               {/* Sort by time */}
               <Select onValueChange={(value) => setTimeFilter(value as 'recent' | 'oldest')}>
-                <SelectTrigger className="w-36 bg-muted border-border text-foreground text-xs">
+                <SelectTrigger className="w-36 bg-muted border-border text-foreground text-xs hover:bg-muted/50">
                   <SelectValue placeholder="Sort by time" />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 text-popover-foreground text-sm">
-                  <SelectItem value="recent">Most Recent</SelectItem>
+                <SelectContent className="bg-gray-800/80 text-muted-foreground text-sm border-border">                  <SelectItem value="recent">Most Recent</SelectItem>
                   <SelectItem value="oldest">Oldest First</SelectItem>
                 </SelectContent>
               </Select>
@@ -1241,13 +1283,16 @@ if (!caseId || caseId === "undefined") {
                               <p className="text-muted-foreground capitalize">{selectedFile.file_type.replace('_', ' ')}</p>
                             </div>
                           </div>
-                          <div>
-                            <span className="text-muted-foreground">Integrity Check:</span>
-                            <div className={`inline-flex items-center gap-1 ml-2 ${getStatusColor(selectedFile.integrityCheck || "pending")}`}>
-                              {getStatusIcon(selectedFile.integrityCheck  || "pending")}
-                              <span className="capitalize">{selectedFile.integrityCheck}</span>
-                            </div>
+                         <div>
+                          <span className="text-muted-foreground">Integrity Check:</span>
+                          <div className={`inline-flex items-center gap-1 ml-2 ${getStatusColor(integrityCheckStatus)}`}>
+                            {getStatusIcon(integrityCheckStatus)}
+                            <span className="capitalize">{integrityCheckStatus}</span>
+                            {integrityCheckDetails && (
+                              <span className="ml-2 text-xs text-muted-foreground">({integrityCheckDetails})</span>
+                            )}
                           </div>
+                        </div>
                         </div>
                       </div>
 
@@ -1300,7 +1345,7 @@ if (!caseId || caseId === "undefined") {
                           </div>
                           <div>
                             <span className="text-muted-foreground">Hash:</span>
-                            <p className="text-muted-foreground font-mono text-xs break-all">{custodyDetails.hash || "N/A"}</p>
+                            <p className="text-muted-foreground font-mono text-xs break-all">{ getHashesFromMetadata(selectedFile.metadata).sha256|| "N/A"}</p>
                           </div>
                         </div>
                       </div>
@@ -1326,10 +1371,27 @@ if (!caseId || caseId === "undefined") {
                                 )}
                           </div>
                           <div className="flex items-center gap-3 text-sm">
-                            <CheckCircle className="w-4 h-4 text-green-400" />
+                            {integrityCheckStatus === 'passed' ? (
+                              <CheckCircle className="w-4 h-4 text-green-400" />
+                            ) : integrityCheckStatus === 'failed' ? (
+                              <XCircle className="w-4 h-4 text-red-400" />
+                            ) : (
+                              <Shield className="w-4 h-4 text-yellow-400 animate-spin" />
+                            )}
                             <div className="flex-1">
-                              <span className="text-muted-foreground">Integrity verification in progress </span>
-                              <div className="text-xs text-muted-foreground">System • just now</div>
+                              {integrityCheckStatus === 'passed' ? (
+                                <span className="text-green-400">Integrity verified</span>
+                              ) : integrityCheckStatus === 'failed' ? (
+                                <span className="text-red-400">Integrity check failed</span>
+                              ) : (
+                                <span className="text-muted-foreground">Integrity verification in progress</span>
+                              )}
+                              <div className="text-xs text-muted-foreground">
+                                System
+                                {integrityCheckDetails && (
+                                  <span className="ml-2">• {integrityCheckDetails}</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1346,12 +1408,12 @@ if (!caseId || caseId === "undefined") {
                               <input
                                 type="text"
                                 placeholder="Thread title"
-                                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-gray-200 text-sm"
+                                className="w-full px-3 py-2 bg-card border border-border rounded text-foreground text-sm focus:outline-none focus:border-primary/60"
                                 value={newThreadTitle}
                                 onChange={(e) => setNewThreadTitle(e.target.value)}
                               />
                               <button
-                                className="w-full px-4 py-2 bg-blue-600 text-foreground rounded hover:bg-blue-700 text-sm"
+                                className="w-full px-4 py-2 bg-primary text-white rounded hover:bg-primary/60 text-sm"
                                 onClick={async () => {
                                   if (!newThreadTitle.trim()) return;
                                   try {
@@ -1481,8 +1543,8 @@ if (!caseId || caseId === "undefined") {
                                       <div className="text-muted-foreground font-mono text-xs break-all">{hashes.sha256}</div>
                                     </div>
                                     <div className="bg-muted p-2 rounded">
-                                      <div className="text-xs text-muted-foreground mb-1">MD5:</div>
-                                      <div className="text-muted-foreground font-mono text-xs">{hashes.md5}</div>
+                                      <div className="text-xs text-muted-foreground mb-1">SHA512:</div>
+                                      <div className="text-muted-foreground font-mono text-xs break-all whitespace-pre-wrap">{hashes.sha512}</div>
                                     </div>
                                   </>
                                 );
@@ -1700,7 +1762,7 @@ if (!caseId || caseId === "undefined") {
                     </div>
                     <button
                       onClick={() => handleSendMessage()}
-                      className="p-1.5 bg-blue-600 text-foreground rounded hover:bg-blue-700"
+                      className="p-1.5 bg-primary text-white rounded hover:bg-primary/60"
                     >
                       <Send className="w-4 h-4" />
                     </button>

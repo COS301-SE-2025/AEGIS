@@ -1,0 +1,328 @@
+package report_ai_assistance
+
+import (
+	graphicalmapping "aegis-api/services_/GraphicalMapping"
+	"aegis-api/services_/case/case_creation"
+	"aegis-api/services_/evidence/metadata"
+	reportpkg "aegis-api/services_/report"
+	reportshared "aegis-api/services_/report/shared"
+	"aegis-api/services_/timeline"
+	"context"
+	"fmt"
+	"strings"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+// GenerateSectionSuggestionWithContext generates AI suggestions using provided context payload
+func (s *reportService) GenerateSectionSuggestionWithContext(ctx context.Context, reportIDHex string, sectionIDHex string, contextPayload map[string]interface{}) (*AISuggestion, error) {
+	// Verify section existence
+	var section reportshared.ReportSection
+	err := s.sectionRepo.pgDB.WithContext(ctx).Table("report_sections").First(&section, "id = ?", sectionIDHex).Error
+	if err != nil {
+		fmt.Printf("[AI Suggestion] Section existence check failed: id=%s, error=%v\n", sectionIDHex, err)
+		// Optionally, log all section IDs for the report for debugging
+		var allSections []ReportSection
+		errList := s.sectionRepo.pgDB.WithContext(ctx).Table("report_sections").Where("report_id = ?", reportIDHex).Find(&allSections).Error
+		if errList != nil {
+			fmt.Printf("[AI Suggestion] Failed to list sections for report_id=%s: %v\n", reportIDHex, errList)
+		} else {
+			fmt.Printf("[AI Suggestion] Existing section IDs for report_id=%s: %v\n", reportIDHex, func() []string {
+				ids := []string{}
+				for _, s := range allSections {
+					ids = append(ids, s.ID)
+				}
+				return ids
+			}())
+		}
+		return nil, fmt.Errorf("cannot generate suggestion: section does not exist (id=%s): %w", sectionIDHex, err)
+	}
+
+	// Build AISuggestionInput struct from contextPayload
+	aiInput := AISuggestionInput{}
+	if v, ok := contextPayload["case_info"]; ok {
+		if caseObj, ok := v.(*case_creation.Case); ok {
+			aiInput.Case = caseObj
+		}
+	}
+	if v, ok := contextPayload["section_title"]; ok {
+		if aiInput.Section == nil {
+			aiInput.Section = &reportshared.ReportSection{}
+		}
+		if title, ok := v.(string); ok {
+			aiInput.Section.Title = title
+		}
+	}
+	if v, ok := contextPayload["section_content"]; ok {
+		if aiInput.Section == nil {
+			aiInput.Section = &reportshared.ReportSection{}
+		}
+		if content, ok := v.(string); ok {
+			aiInput.Section.Content = content
+		}
+	}
+	if v, ok := contextPayload["iocs"]; ok {
+		if iocs, ok := v.([]graphicalmapping.IOC); ok {
+			aiInput.IOCs = iocs
+		}
+	}
+	if v, ok := contextPayload["evidence"]; ok {
+		if evidence, ok := v.([]metadata.Evidence); ok {
+			aiInput.Evidence = evidence
+		}
+	}
+	if v, ok := contextPayload["timeline"]; ok {
+		if timeline, ok := v.([]timeline.TimelineEvent); ok {
+			aiInput.Timeline = timeline
+		}
+	}
+
+	suggestionText, err := s.aiClient.GenerateSuggestion(ctx, aiInput)
+	if err != nil {
+		return nil, fmt.Errorf("AI engine failed: %w", err)
+	}
+	suggestion := &AISuggestion{
+		ReportID:       reportIDHex,
+		SectionID:      sectionIDHex,
+		SuggestionText: suggestionText,
+	}
+	if err := s.aiRepo.CreateSuggestion(ctx, suggestion); err != nil {
+		return nil, fmt.Errorf("failed to save suggestion: %w", err)
+	}
+	return suggestion, nil
+}
+
+// reportService handles AI-assisted reporting
+type reportService struct {
+	sectionRepo  *MongoSectionRepository
+	aiRepo       AISuggestionRepository
+	refsRepo     SectionRefsRepository
+	feedbackRepo AIFeedbackRepository
+	aiClient     AIClient // interface to the AI engine
+}
+
+var _ ReportAIService = (*reportService)(nil) // ensure interface compliance
+// EnhanceSummary calls the AI client to rewrite a summary in simple English
+func (s *reportService) EnhanceSummary(ctx context.Context, payload map[string]interface{}) (string, error) {
+	// Extract fields from payload
+	text, _ := payload["text"].(string)
+	// Extract IOCs from payload (expecting []map[string]interface{})
+	var iocs []IOC
+	if rawIocs, ok := payload["iocs"].([]interface{}); ok {
+		for _, raw := range rawIocs {
+			if m, ok := raw.(map[string]interface{}); ok {
+				iocType, _ := m["type"].(string)
+				iocValue, _ := m["value"].(string)
+				iocs = append(iocs, IOC{Type: iocType, Value: iocValue})
+			}
+		}
+	}
+	// Use only the rule-based enhancer, ignore AI
+	cleaned := PostProcessEnhancedSummaryWithIocs(text, iocs)
+	return cleaned, nil
+}
+
+// Wrapper to allow passing IOCs to evidence humanizer
+func PostProcessEnhancedSummaryWithIocs(text string, iocs []IOC) string {
+	if strings.Contains(text, "Case Title:") && strings.Contains(text, "Status:") {
+		return humanizeCaseInfo(text)
+	}
+	if strings.Contains(text, "Evidence:") {
+		return humanizeEvidence(text, iocs)
+	}
+	if strings.Contains(text, "Timeline Event") {
+		return humanizeTimeline(text)
+	}
+	// Fallback: original logic
+	replacements := map[string]string{
+		"protocol":   "rules",
+		"securely":   "safely",
+		"procedures": "steps",
+		"collected":  "gathered",
+		"evidence":   "proof",
+		"stored":     "kept",
+		"as per":     "according to",
+	}
+	boilerplate := []string{
+		"This summary was generated by AI.",
+		"Please review and edit as needed.",
+		"In summary:",
+	}
+	sentences := splitSentences(text)
+	result := ""
+	for _, s := range sentences {
+		trimmed := trimSpace(s)
+		if trimmed == "" {
+			continue
+		}
+		skip := false
+		for _, b := range boilerplate {
+			if trimmed == b {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+		for k, v := range replacements {
+			trimmed = replaceWord(trimmed, k, v)
+		}
+		if len(trimmed) > 120 {
+			trimmed = shortenSentence(trimmed)
+		}
+		result += trimmed + ". "
+	}
+	return result
+}
+
+// NewReportService creates a new reportService instance
+func NewReportService(
+	sectionRepo *MongoSectionRepository,
+	aiRepo AISuggestionRepository,
+	refsRepo SectionRefsRepository,
+	feedbackRepo AIFeedbackRepository,
+	aiClient AIClient,
+) ReportAIService {
+	return &reportService{
+		sectionRepo:  sectionRepo,
+		aiRepo:       aiRepo,
+		refsRepo:     refsRepo,
+		feedbackRepo: feedbackRepo,
+		aiClient:     aiClient,
+	}
+}
+
+// GenerateAISuggestion generates AI suggestions for a section (MongoDB)
+func (s *reportService) GenerateAISuggestion(ctx context.Context, reportIDHex string, sectionIDHex string) (*AISuggestion, error) {
+	// Convert Mongo ObjectIDs
+	reportMongoID, err := primitive.ObjectIDFromHex(reportIDHex)
+	if err != nil {
+		return nil, fmt.Errorf("invalid report ObjectID: %w", err)
+	}
+	sectionMongoID, err := primitive.ObjectIDFromHex(sectionIDHex)
+	if err != nil {
+		return nil, fmt.Errorf("invalid section ObjectID: %w", err)
+	}
+	section, err := s.sectionRepo.GetSectionByID(ctx, reportMongoID, sectionMongoID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get section: %w", err)
+	}
+
+	// Lookup Postgres report UUID using MongoID
+	type reportRow struct{ ID string }
+	db := s.sectionRepo.pgDB
+	var row reportRow
+	err = db.Raw("SELECT id FROM reports WHERE mongo_id = ?", reportIDHex).Scan(&row).Error
+	if err != nil || row.ID == "" {
+		return nil, fmt.Errorf("could not find Postgres report UUID for mongo_id %s: %w", reportIDHex, err)
+	}
+	reportUUID := row.ID
+
+	// Fetch report to get CaseID
+	var reportObj reportpkg.Report
+	err = db.First(&reportObj, "id = ?", reportUUID).Error
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch report: %w", err)
+	}
+	// Fetch case metadata using report's CaseID (convert to string if needed)
+	caseID := fmt.Sprintf("%v", reportObj.CaseID)
+	var caseObj *case_creation.Case
+	err = db.First(&caseObj, "id = ?", caseID).Error
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch case metadata: %w", err)
+	}
+
+	// Fetch timeline events
+	timelineRepo := timeline.NewRepository(db)
+	timelineEvents, _ := timelineRepo.ListByCase(reportUUID)
+
+	// Fetch IOCs
+	iocRepo := graphicalmapping.NewIOCRepository(db)
+	iocs, _ := iocRepo.ListByCase(reportUUID)
+
+	// Fetch evidence
+	evidenceRepo := metadata.NewGormRepository(db)
+	evidences, _ := evidenceRepo.FindEvidenceByCaseID(caseObj.ID)
+
+	// Build structured input for AIClient
+	// Convert pointers/slices to correct types for AI input
+	var timelineFlat []timeline.TimelineEvent
+	for _, t := range timelineEvents {
+		if t != nil {
+			timelineFlat = append(timelineFlat, *t)
+		}
+	}
+	var iocFlat []graphicalmapping.IOC
+	for _, i := range iocs {
+		if i != nil {
+			iocFlat = append(iocFlat, *i)
+		}
+	}
+	var evidenceFlat []metadata.Evidence
+	for _, e := range evidences {
+		evidenceFlat = append(evidenceFlat, e)
+	}
+	// Convert *report.ReportSection to *ReportSection
+	sectionConverted := &reportshared.ReportSection{
+		ID:       section.ID.Hex(),
+		ReportID: reportIDHex,
+		Title:    section.Title,
+		Content:  section.Content,
+	}
+	aiInput := AISuggestionInput{
+		Case:     caseObj,
+		Section:  sectionConverted,
+		Timeline: timelineFlat,
+		IOCs:     iocFlat,
+		Evidence: evidenceFlat,
+	}
+	suggestionText, err := s.aiClient.GenerateSuggestion(ctx, aiInput)
+	if err != nil {
+		return nil, fmt.Errorf("AI engine failed: %w", err)
+	}
+	suggestion := &AISuggestion{
+		ReportID:       reportIDHex,
+		SectionID:      sectionIDHex,
+		SuggestionText: suggestionText,
+	}
+	if err := s.aiRepo.CreateSuggestion(ctx, suggestion); err != nil {
+		return nil, fmt.Errorf("failed to save suggestion: %w", err)
+	}
+	return suggestion, nil
+}
+
+// buildAIInput prepares context for the AI engine
+func (s *reportService) buildAIInput(section *ReportSection, refs []*SectionRef) string {
+	input := fmt.Sprintf("Section Title: %s\nContent: %s\nReferences:\n", section.Title, section.Content)
+	for _, ref := range refs {
+		input += fmt.Sprintf("- [%s] %s\n", ref.RefType, ref.RefID)
+	}
+	return input
+}
+
+// SubmitFeedback saves feedback for a given suggestion
+func (s *reportService) SubmitFeedback(ctx context.Context, feedback *AIFeedback) error {
+	return s.feedbackRepo.SubmitFeedback(ctx, feedback)
+}
+
+// ListSuggestions returns all suggestions for a section
+func (s *reportService) ListSuggestions(ctx context.Context, sectionID string) ([]*AISuggestion, error) {
+	return s.aiRepo.ListSuggestionsBySection(ctx, sectionID)
+}
+
+// ListFeedback returns all feedback for a suggestion
+func (s *reportService) ListFeedback(ctx context.Context, suggestionID string) ([]*AIFeedback, error) {
+	return s.feedbackRepo.ListFeedbackBySuggestion(ctx, suggestionID)
+}
+
+// GenerateSectionSuggestion implements the missing method for ReportAIService interface.
+func (s *reportService) GenerateSectionSuggestion(ctx context.Context, reportIDHex string, sectionIDHex string) (*AISuggestion, error) {
+	return s.GenerateAISuggestion(ctx, reportIDHex, sectionIDHex)
+}
+func (s *reportService) SaveFeedback(ctx context.Context, feedback AIFeedback) error {
+	return s.SubmitFeedback(ctx, &feedback)
+}
+func (s *reportService) GenerateSectionReferences(ctx context.Context, sectionIDHex string, report *reportshared.Report) ([]string, error) {
+	return s.aiClient.GenerateSectionReferences(ctx, sectionIDHex, report)
+}

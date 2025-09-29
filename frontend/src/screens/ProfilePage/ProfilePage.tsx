@@ -25,7 +25,7 @@ export const ProfilePage = () => {
     const fetchProfile = async () => {
       try {
         const token = sessionStorage.getItem("authToken");
-        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
+        const res = await fetch(`https://localhost/api/v1/profile/${user?.id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -127,7 +127,7 @@ const toggleEdit = async () => {
       reader.readAsDataURL(e.target.files[0]);
     }
   };
-const backendBaseURL = "http://localhost:8080";
+const backendBaseURL = "https://localhost";
   return (
     <div className="min-h-screen bg-background text-foreground p-10 transition-colors">
       <h1 className="text-3xl font-bold mb-8">Profile</h1>
@@ -151,9 +151,9 @@ const backendBaseURL = "http://localhost:8080";
     {isEditing && (
       <button
         onClick={() => fileInputRef.current?.click()}
-        className="absolute bottom-0 right-0 bg-blue-600 hover:bg-blue-500 p-1 rounded-full"
+        className="absolute bottom-0 right-0 bg-primary hover:bg-primary/10 p-1 rounded-full"
       >
-        <Upload className="w-4 h-4 text-white" />
+        <Upload className="w-4 h-4 text-foreground" />
       </button>
     )}
     <input
@@ -175,7 +175,7 @@ const backendBaseURL = "http://localhost:8080";
               name="name"
               value={profile.name}
               onChange={handleChange}
-              className="bg-input border border-border p-2 rounded text-foreground w-full"
+              className="bg-input border border-border p-2 rounded text-foreground w-full focus:outline-none focus:border-primary/10"
             />
           ) : (
             <p className="text-lg">{profile.name}</p>
@@ -191,7 +191,7 @@ const backendBaseURL = "http://localhost:8080";
               name="email"
               value={profile.email}
               onChange={handleChange}
-              className="bg-input border border-border p-2 rounded text-foreground w-full"
+              className="bg-input border border-border p-2 rounded text-foreground w-full focus:outline-none focus:border-primary/10"
             />
           ) : (
             <p className="text-lg">{profile.email}</p>
@@ -227,7 +227,7 @@ const backendBaseURL = "http://localhost:8080";
 
           <button
             onClick={toggleEdit}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg transition text-white"
+            className="flex items-center gap-2 bg-primary hover:bg-primary/60 px-4 py-2 rounded-lg transition text-white"
           >
             {isEditing ? <Save className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
             {isEditing ? "Save Changes" : "Edit Profile"}

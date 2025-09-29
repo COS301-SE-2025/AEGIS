@@ -1,10 +1,11 @@
 package websocket
 
 import (
+	"aegis-api/pkg/chatModels"
 	"aegis-api/pkg/sharedws"
-	"aegis-api/services_/chat"
 	"aegis-api/services_/notification"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,8 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Hub struct {
@@ -25,27 +28,40 @@ type Hub struct {
 	mu                  sync.Mutex
 	connections         map[string]map[string]*websocket.Conn
 	NotificationService *notification.NotificationService
+
+	MongoDB     *mongo.Database // can be nil if Mongo disabled
+	MessagesCol *mongo.Collection
 }
 type Claims struct {
 	Email        string `json:"email"`
 	UserID       string `json:"user_id"`
 	Role         string `json:"role"`
 	FullName     string `json:"fullName"`
+	TeamID       string `json:"team_id"`
+	TenantID     string `json:"tenant_id"`
 	TokenVersion int    `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
-// Ensure Hub implements the chat.WebSocketManager interface
-var _ chat.WebSocketManager = (*Hub)(nil)
+// Ensure Hub implements the chatModels.WebSocketManager interface
+var _ chatModels.WebSocketManager = (*Hub)(nil)
 
-func NewHub(notificationService *notification.NotificationService) *Hub {
-	return &Hub{
+var ErrNoActiveConnection = errors.New("no active connection found for user")
+
+func NewHub(notificationService *notification.NotificationService, mongoDB *mongo.Database) *Hub {
+	h := &Hub{
 		clients:             make(map[string]map[*Client]bool),
 		broadcast:           make(chan MessageEnvelope),
 		register:            make(chan *Client),
 		unregister:          make(chan *Client),
 		NotificationService: notificationService,
+		MongoDB:             mongoDB,
 	}
+	// Initialize the collection if Mongo is wired up
+	if mongoDB != nil {
+		h.MessagesCol = mongoDB.Collection("chat_messages")
+	}
+	return h
 }
 
 func (h *Hub) Run() {
@@ -150,17 +166,16 @@ func (h *Hub) AddUserToGroup(userID, userEmail, caseID string, conn *websocket.C
 	}
 
 	// Close existing connection if any
-	if oldConn, exists := h.connections[caseID][userEmail]; exists && oldConn != conn {
+	if oldConn, exists := h.connections[caseID][userID]; exists && oldConn != conn {
 		_ = oldConn.Close()
 	}
-
-	h.connections[caseID][userEmail] = conn
+	h.connections[caseID][userID] = conn
 
 	log.Printf("✅ Added user %s (ID: %s) to group %s\n", userEmail, userID, caseID)
 	return nil
 }
 
-func (h *Hub) BroadcastToGroup(groupID string, message chat.WebSocketMessage) error {
+func (h *Hub) BroadcastToGroup(groupID string, message chatModels.WebSocketMessage) error {
 	// Marshal the message to JSON
 	encoded, err := json.Marshal(message)
 	if err != nil {
@@ -189,8 +204,8 @@ func (h *Hub) BroadcastTypingStart(groupID string, userEmail string) error {
 		CaseID:    groupID,
 	}
 
-	typingMessage := chat.WebSocketEvent{
-		Type:      chat.EventTypingStart, // 👈 this is of type EventType, as expected
+	typingMessage := chatModels.WebSocketEvent{
+		Type:      chatModels.EventTypingStart, // 👈 this is of type EventType, as expected
 		Payload:   typingPayload,
 		GroupID:   groupID,
 		UserEmail: userEmail,
@@ -220,8 +235,8 @@ func (h *Hub) BroadcastTypingStop(groupID string, userEmail string) error {
 		CaseID:    groupID,
 	}
 
-	typingMessage := chat.WebSocketEvent{
-		Type:      chat.EventTypingStop, // ✅ correct EventType
+	typingMessage := chatModels.WebSocketEvent{
+		Type:      chatModels.EventTypingStop, // ✅ correct EventType
 		Payload:   typingPayload,
 		GroupID:   groupID,
 		UserEmail: userEmail,
@@ -243,7 +258,7 @@ func (h *Hub) BroadcastTypingStop(groupID string, userEmail string) error {
 	return nil
 }
 
-func (h *Hub) BroadcastToCase(caseID string, message chat.WebSocketMessage) error {
+func (h *Hub) BroadcastToCase(caseID string, message chatModels.WebSocketMessage) error {
 	// Marshal message to JSON bytes
 	encoded, err := json.Marshal(message)
 	if err != nil {
@@ -274,7 +289,7 @@ func extractCaseIDFromPath(path string) string {
 func GetJWTSecret() []byte {
 	return []byte(os.Getenv("JWT_SECRET_KEY"))
 }
-func (h *Hub) HandleConnection(w http.ResponseWriter, r *http.Request) error {
+func (h *Hub) HandleConnection(w http.ResponseWriter, r *http.Request, c *gin.Context) error {
 	tokenString := r.URL.Query().Get("token")
 	if tokenString == "" {
 		http.Error(w, "Missing token", http.StatusUnauthorized)
@@ -325,6 +340,7 @@ func (h *Hub) HandleConnection(w http.ResponseWriter, r *http.Request) error {
 	h.AddUserToGroup(userID, claims.Email, caseID, conn)
 	log.Printf("✅ WebSocket upgraded for user %s in case %s\n", userID, caseID)
 
+	h.syncNotificationsOnConnect(userID, claims.TenantID, claims.TeamID) // Sync notifications upon being online
 	// Start pumps
 	go client.writePump()
 	go client.readPump()
@@ -364,14 +380,14 @@ func (c *Client) readPump() {
 			break
 		}
 
-		var msg chat.WebSocketEvent
+		var msg chatModels.WebSocketEvent
 		if err := json.Unmarshal(rawMessage, &msg); err != nil {
 			log.Printf("❌ Invalid WebSocket message format: %v", err)
 			continue
 		}
 
 		switch msg.Type {
-		case chat.EventNewMessage:
+		case chatModels.EventNewMessage:
 			// Marshal and re-unmarshal payload into NewMessagePayload
 			payloadBytes, err := json.Marshal(msg.Payload)
 			if err != nil {
@@ -379,7 +395,7 @@ func (c *Client) readPump() {
 				continue
 			}
 
-			var payload chat.NewMessagePayload
+			var payload chatModels.NewMessagePayload
 			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
 				log.Printf("❌ Failed to decode NEW_MESSAGE payload: %v", err)
 				continue
@@ -387,19 +403,19 @@ func (c *Client) readPump() {
 
 			// Save message to DB
 			log.Printf("📥 Persisting message with ID: %s", payload.MessageID)
-			if err := chat.SaveMessageToDB(payload); err != nil {
+			if err := SaveMessageToDB(payload); err != nil {
 				log.Printf("❌ Failed to persist message: %v", err)
 			} else {
 				log.Printf("✅ Message persisted successfully: %s", payload.MessageID)
 			}
 
 			// Re-encode full event for broadcasting
-			broadcastMsg := chat.WebSocketEvent{
-				Type:      chat.EventNewMessage,
+			broadcastMsg := chatModels.WebSocketEvent{
+				Type:      chatModels.EventNewMessage,
 				GroupID:   payload.GroupID,
 				Payload:   payload,
 				Timestamp: time.Now(),
-				UserEmail: payload.SenderID, // or SenderEmail if available
+				UserEmail: payload.SenderEmail, // or SenderEmail if available
 			}
 
 			encoded, err := json.Marshal(broadcastMsg)
@@ -413,7 +429,7 @@ func (c *Client) readPump() {
 				Data:   encoded,
 			}
 
-		case chat.EventTypingStart:
+		case chatModels.EventTypingStart:
 			payloadBytes, _ := json.Marshal(msg.Payload)
 			var payload TypingPayload
 			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
@@ -423,7 +439,7 @@ func (c *Client) readPump() {
 			log.Printf("✍️ Typing START received from %s in case %s", payload.UserEmail, c.CaseID)
 			c.Hub.BroadcastTypingStart(c.CaseID, payload.UserEmail)
 
-		case chat.EventTypingStop:
+		case chatModels.EventTypingStop:
 			payloadBytes, _ := json.Marshal(msg.Payload)
 			var payload TypingPayload
 			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
@@ -433,9 +449,9 @@ func (c *Client) readPump() {
 			log.Printf("🛑 Typing STOP received from %s in case %s", payload.UserEmail, c.CaseID)
 			c.Hub.BroadcastTypingStop(c.CaseID, payload.UserEmail)
 
-		case chat.EventMarkNotificationRead:
+		case chatModels.EventMarkNotificationRead:
 			payloadBytes, _ := json.Marshal(msg.Payload)
-			var payload chat.MarkReadPayload
+			var payload chatModels.MarkReadPayload
 			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
 				log.Printf("❌ Failed to decode MARK_READ payload: %v", err)
 				continue
@@ -447,17 +463,17 @@ func (c *Client) readPump() {
 			}
 
 			// 🔹 Broadcast to the same user across all connections
-			ack := chat.WebSocketEvent{
-				Type:      chat.EventMarkNotificationRead,
+			ack := chatModels.WebSocketEvent{
+				Type:      chatModels.EventMarkNotificationRead,
 				Payload:   payload,
 				UserEmail: c.UserID,
 				Timestamp: time.Now(),
 			}
 			c.Hub.SendToUser(c.UserID, ack)
 
-		case chat.EventArchiveNotification:
+		case chatModels.EventArchiveNotification:
 			payloadBytes, _ := json.Marshal(msg.Payload)
-			var payload chat.MarkReadPayload // reuse struct with NotificationIDs []string
+			var payload chatModels.MarkReadPayload // reuse struct with NotificationIDs []string
 			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
 				log.Printf("❌ Failed to decode ARCHIVE payload: %v", err)
 				continue
@@ -468,9 +484,9 @@ func (c *Client) readPump() {
 				continue
 			}
 
-		case chat.EventDeleteNotification:
+		case chatModels.EventDeleteNotification:
 			payloadBytes, _ := json.Marshal(msg.Payload)
-			var payload chat.MarkReadPayload
+			var payload chatModels.MarkReadPayload
 			if err := json.Unmarshal(payloadBytes, &payload); err != nil {
 				log.Printf("❌ Failed to decode DELETE payload: %v", err)
 				continue
@@ -575,5 +591,5 @@ func (h *Hub) SendToUser(userID string, message interface{}) error {
 		}
 	}
 
-	return fmt.Errorf("no active connection found for user %s", userID)
+	return ErrNoActiveConnection
 }

@@ -119,6 +119,26 @@ func (r *testMetadataRepo) FindEvidenceByID(id uuid.UUID) (*metadata.Evidence, e
 	return &ev, nil
 }
 
+// AppendEvidenceLog implements metadata.Repository for testMetadataRepo.
+// Adjusted to match expected signature: (*metadata.EvidenceLog) error
+func (r *testMetadataRepo) AppendEvidenceLog(logEntry *metadata.EvidenceLog) error {
+	// Use proper timestamp handling
+	timestamp := logEntry.Timestamp
+	if timestamp.IsZero() {
+		timestamp = time.Now()
+	}
+
+	details := logEntry.Details
+	if details == "" {
+		details = "{}"
+	}
+
+	return r.db.Exec(`
+        INSERT INTO evidence_log (evidence_id, action, timestamp, details)
+        VALUES (?, ?, ?, ?)
+    `, logEntry.EvidenceID, logEntry.Action, timestamp, details).Error
+}
+
 // ---- register the upload endpoint ----
 func registerEvidenceTestEndpoints(r *gin.Engine) {
 	repo := &testMetadataRepo{db: pgDB}
@@ -216,4 +236,37 @@ func registerEvidenceTestEndpoints(r *gin.Engine) {
 			"uploaded":  time.Now().Format(time.RFC3339),
 		})
 	})
+}
+
+// Add this method to your testMetadataRepo to fix the interface implementation
+func (r *testMetadataRepo) GetLastEvidenceLog(evidenceID uuid.UUID) (*metadata.EvidenceLog, error) {
+	var logEntry struct {
+		EvidenceID uuid.UUID
+		Action     string
+		Timestamp  time.Time
+		Details    string
+		CreatedAt  time.Time
+	}
+
+	err := r.db.Raw(`
+		SELECT evidence_id, action, timestamp, details, created_at
+		FROM evidence_log 
+		WHERE evidence_id = ? 
+		ORDER BY created_at DESC 
+		LIMIT 1
+	`, evidenceID).Scan(&logEntry).Error
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound || err == sql.ErrNoRows {
+			return nil, nil // Return nil if no log found
+		}
+		return nil, err
+	}
+
+	return &metadata.EvidenceLog{
+		EvidenceID: logEntry.EvidenceID,
+		Action:     logEntry.Action,
+		Timestamp:  logEntry.Timestamp,
+		Details:    logEntry.Details,
+	}, nil
 }

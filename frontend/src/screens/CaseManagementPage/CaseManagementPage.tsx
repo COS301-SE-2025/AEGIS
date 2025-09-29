@@ -17,12 +17,13 @@ import {ShareButton} from "../ShareCasePage/sharecasebutton";
 //
 import { useParams } from 'react-router-dom';
 
-import axios from "axios";
 
 import { ClipboardList } from "lucide-react";
 
 
 import { InvestigationTimeline } from "../../components/ui/Timeline";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export const CaseManagementPage = () => {
 const storedUser = sessionStorage.getItem("user");
@@ -77,7 +78,7 @@ const getPriorityStyle = (priority: string) => {
 const { caseId } = useParams<{ caseId: string }>();
 
 
-const API_URL = "http://localhost:8080/api/v1";
+const API_URL = "https://localhost/api/v1";
 
 const navigate = useNavigate();
 
@@ -89,7 +90,7 @@ useEffect(() => {
     if (!caseId) return;
     try {
       const token = sessionStorage.getItem("authToken");
-      const res = await fetch(`http://localhost:8080/api/v1/cases/${caseId}`, {
+      const res = await fetch(`https://localhost/api/v1/cases/${caseId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -152,7 +153,7 @@ useEffect(() => {
   }
 }, [role]);
 
-const [assignedMembers, setAssignedMembers] = useState<{ name: string; role: string }[]>([]);
+const [assignedMembers, setAssignedMembers] = useState<{ id: string; name: string; role: string }[]>([]);
 const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
 
 useEffect(() => {
@@ -160,7 +161,7 @@ useEffect(() => {
     if (!caseId) return;
     try {
       const token = sessionStorage.getItem("authToken");
-      const res = await fetch(`http://localhost:8080/api/v1/cases/${caseId}/collaborators`, {
+      const res = await fetch(`https://localhost/api/v1/cases/${caseId}/collaborators`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"
@@ -178,6 +179,7 @@ useEffect(() => {
 
       // 🔁 Map backend fields to your frontend structure
       const normalized = (data.data || []).map((collab: any) => ({
+        id: collab.id || collab.user_id || collab.assignee_id, // ensure id is present
         name: collab.full_name,
         role: collab.role
       }));
@@ -196,7 +198,7 @@ useEffect(() => {
     if (!caseId) return;
     try {
       const token = sessionStorage.getItem("authToken");
-      const res = await fetch(`http://localhost:8080/api/v1/evidence-metadata/case/${caseId}`, {
+      const res = await fetch(`https://localhost/api/v1/evidence-metadata/case/${caseId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -289,7 +291,7 @@ useEffect(() => {
     const fetchProfile = async () => {
       try {
         const token = sessionStorage.getItem("authToken");
-        const res = await fetch(`http://localhost:8080/api/v1/profile/${user?.id}`, {
+        const res = await fetch(`https://localhost/api/v1/profile/${user?.id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -414,9 +416,12 @@ const handleViewReport = async () => {
   try {
     const reportId = await getOrCreateReportForCase(caseId);
     navigate(`/report-editor/${reportId}`);
+    console.log("Navigating to report:", reportId);
+
   } catch (err) {
     console.error(err);
     alert("Could not open or create a report for this case.");
+    
   } finally {
     setViewReportBusy(false);
   }
@@ -432,6 +437,7 @@ const handleViewReport = async () => {
 
   return (
     <div className="min-h-screen bg-background">
+  <ToastContainer position="top-center" aria-label="Notification Toasts" />
       {/* Left Sidebar - Fixed */}
       <div className="fixed left-0 top-0 h-full w-80 bg-background border-r border p-6 flex flex-col z-10">
         {/* Logo */}
@@ -486,7 +492,7 @@ const handleViewReport = async () => {
                   src={
                     user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `http://localhost:8080${user.image_url}`
+                      : `https://localhost${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -532,7 +538,7 @@ const handleViewReport = async () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
-                  className="w-80 h-12 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500"
+                  className="w-80 h-12 bg-background border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
                   placeholder="Search cases, evidence, users"
                 />
               </div>
@@ -549,7 +555,7 @@ const handleViewReport = async () => {
                     src={
                       user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `http://localhost:8080${user.image_url}`
+                        : `https://localhost${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"
@@ -578,7 +584,7 @@ const handleViewReport = async () => {
             <h1 className="text-3xl font-bold text-foreground">Case Details & Timeline</h1>
             <div className="flex gap-4">
 
-              <button className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500">
+              <button className="flex items-center gap-2 px-4 py-2 bg-card border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500">
                 <Share2 className="w-4 h-4" />
                   {userRole === "admin" && (
                   //<ShareButton caseId={caseId} caseName={caseName} />
@@ -596,7 +602,7 @@ const handleViewReport = async () => {
               </button>
               <button
                 onClick={() => setShowFilterInput(!showFilterInput)}
-                className="flex items-center gap-2 px-4 py-2 bg-popover border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500"
+                className="flex items-center gap-2 px-4 py-2 bg-card border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
               >
                 <Filter className="w-4 h-4" />
                 Filter Timeline
@@ -634,7 +640,7 @@ const handleViewReport = async () => {
                   setFilterKeyword('');
                   setFilterDate('');
                 }}
-                className="px-4 py-2 bg-gray-500 text-foreground rounded-md hover:bg-gray-600 transition-colors"
+                className="px-4 py-2 bg-primary text-foreground rounded-md hover:bg-primary/60 transition-colors"
               >
                 Clear
               </button>
@@ -650,7 +656,7 @@ const handleViewReport = async () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Case Details Section */}
           <div className="lg:col-span-1">
-            <div className="bg-card border border-bg-accent rounded-lg p-6 mb-6">
+            <div className="bg-card border border-bg-accent rounded-lg p-6 mb-6 shadow-xl">
               {/* Case Title and Threat Level */}
               <div className="mb-6">
               <div className="flex items-center justify-between">
@@ -704,6 +710,56 @@ const handleViewReport = async () => {
                             ({member.role})
                           </span>
                         </div>
+                        {/* Unassign button for DFIR Admins */}
+                        {isDFIRAdmin && member.id && (
+                          <button
+                            className="ml-2 px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                            title="Unassign member"
+                            onClick={() => {
+                              if (!caseId) return;
+                              toast.info(
+                                <span>
+                                  Unassign <b>{member.name}</b> from this case?
+                                  <button
+                                    style={{ marginLeft: 12, color: '#fff', background: '#d32f2f', border: 'none', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      toast.dismiss();
+                                      try {
+                                        const token = sessionStorage.getItem("authToken") || "";
+                                        const res = await fetch("https://localhost/api/v1/cases/unassign", {
+                                          method: "POST",
+                                          headers: {
+                                            "Authorization": `Bearer ${token}`,
+                                            "Content-Type": "application/json"
+                                          },
+                                          body: JSON.stringify({
+                                            assignee_id: member.id,
+                                            case_id: caseId
+                                          })
+                                        });
+                                        if (!res.ok) {
+                                          const err = await res.text();
+                                          throw new Error(err || "Failed to unassign member");
+                                        }
+                                        setAssignedMembers(prev => prev.filter((_, i) => i !== index));
+                                        toast.success(`${member.name} unassigned from case.`);
+                                      } catch (err) {
+                                        toast.error("Failed to unassign member. See console for details.");
+                                        console.error(err);
+                                      }
+                                    }}
+                                  >
+                                    Confirm
+                                  </button>
+                                </span>,
+                                { autoClose: false, closeOnClick: false, closeButton: true }
+                              );
+                            }}
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
                     ))
                   ) : (

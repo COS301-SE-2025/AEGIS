@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Case represents a case record in the database.
+// Case represents a case record in the database and API response.
 type Case struct {
 	ID                 uuid.UUID `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	Title              string    `gorm:"column:title;not null" json:"title"`
@@ -20,6 +20,31 @@ type Case struct {
 	TeamID             uuid.UUID `gorm:"column:team_id;type:uuid" json:"team_id"`
 	CreatedAt          time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 	UpdatedAt          time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+	Progress           int       `gorm:"column:progress;type:int;default:0" json:"progress"` // Persisted in DB
+}
+
+// Map investigation stage to progress percentage
+func GetProgressForStage(stage string) int {
+	switch stage {
+	case "Triage":
+		return 10
+	case "Evidence Collection":
+		return 25
+	case "Analysis":
+		return 40
+	case "Correlation & Threat Intelligence":
+		return 55
+	case "Containment & Eradication":
+		return 70
+	case "Recovery":
+		return 85
+	case "Reporting & Documentation":
+		return 95
+	case "Case Closure & Review":
+		return 100
+	default:
+		return 0
+	}
 }
 
 type CreateCaseRequest struct {
