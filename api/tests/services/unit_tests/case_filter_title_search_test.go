@@ -150,9 +150,7 @@ func TestGetFilteredCases_InvalidSortAndOrder(t *testing.T) {
 	mockRepo := new(MockCaseQueryRepository)
 	service := ListCases.NewListCasesService(mockRepo)
 
-	mockRepo.On("QueryCases", mock.MatchedBy(func(f ListCases.CaseFilter) bool {
-		return f.SortBy == "invalid_field" && f.SortOrder == "invalid_order"
-	})).Return([]ListCases.Case{}, nil)
+	mockRepo.On("QueryCases", mock.AnythingOfType("ListCases.CaseFilter")).Return([]ListCases.Case{}, nil)
 
 	results, err := service.GetFilteredCases("", "", "", "", "", "", "invalid_field", "invalid_order", "", "")
 

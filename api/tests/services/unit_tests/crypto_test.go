@@ -1,4 +1,4 @@
-package x3dh_test
+package unit_tests
 
 import (
 	"encoding/base64"

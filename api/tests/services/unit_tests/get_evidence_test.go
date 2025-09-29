@@ -35,6 +35,11 @@ func (m *MockMetadataService) FindEvidenceByID(id uuid.UUID) (*metadata.Evidence
 	return args.Get(0).(*metadata.Evidence), args.Error(1)
 }
 
+func (m *MockMetadataService) VerifyEvidenceLogChain(evidenceID uuid.UUID) (bool, string, error) {
+	args := m.Called(evidenceID)
+	return args.Bool(0), args.String(1), args.Error(2)
+}
+
 // ─── Fake Mongo Logger for Audit ───────────────────────
 type FakeMongoLogger struct{}
 

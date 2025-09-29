@@ -172,6 +172,9 @@ func decodeAnyB64(s string) ([]byte, error) {
 	// Fallback to standard base64
 	return base64.StdEncoding.DecodeString(s)
 }
+func NewBundleServiceWithMongo(store KeyStore, crypto CryptoService, auditor *MongoAuditLogger) *BundleService {
+	return &BundleService{store: store, crypto: crypto, auditor: auditor}
+}
 
 // bundle_service.go
 func verifySPKSignatureBase64(identityKeyB64, spkB64, sigB64 string) error {

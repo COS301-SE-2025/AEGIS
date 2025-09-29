@@ -69,7 +69,7 @@ func NewService(repo Repository, ipfs upload.IPFSClientImp) *Service {
 // UploadEvidence uploads evidence to IPFS and saves metadata into the database.
 // Supports multi-tenancy (tenant & team).
 func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
-	// Compute SHA256 and SHA512 checksums while streaming to IPFS
+	// Compute SHA256 and SHA512 while streaming
 	sha256Hasher := sha256.New()
 	sha512Hasher := sha512.New()
 	tee := io.TeeReader(data.FileData, io.MultiWriter(sha256Hasher, sha512Hasher))
@@ -81,19 +81,19 @@ func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
 	}
 	sha256Sum := hex.EncodeToString(sha256Hasher.Sum(nil))
 	sha512Sum := hex.EncodeToString(sha512Hasher.Sum(nil))
-	// Merge into metadata JSON
+
+	// Merge metadata
 	if data.Metadata == nil {
 		data.Metadata = make(map[string]string)
 	}
 	data.Metadata["sha256"] = sha256Sum
 	data.Metadata["sha512"] = sha512Sum
-
 	metadataJSON, err := json.Marshal(data.Metadata)
 	if err != nil {
 		return fmt.Errorf("metadata JSON marshal failed: %w", err)
 	}
 
-	// Build Evidence record with multi-tenancy
+	// Create Evidence
 	e := &Evidence{
 		ID:         uuid.New(),
 		CaseID:     data.CaseID,
@@ -108,21 +108,24 @@ func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
 		Metadata:   string(metadataJSON),
 	}
 
-	// Save evidence
+	// Save via interface
 	if err := s.repo.SaveEvidence(e); err != nil {
 		return err
 	}
 
-	// Compute previous_hash for hash chain
+	// Compute previous hash via interface, never touching Gorm directly
 	var previousHash string
 	lastLog, err := s.repo.GetLastEvidenceLog(e.ID)
 	if err == nil && lastLog != nil {
-		hashInput := lastLog.Sha256 + lastLog.Sha512 + lastLog.Action + fmt.Sprintf("%v", lastLog.Result) + lastLog.Timestamp.String() + lastLog.Details + lastLog.CreatedAt.String()
+
+		hashInput := lastLog.Sha256 + lastLog.Sha512 + lastLog.Action +
+			fmt.Sprintf("%v", lastLog.Result) + lastLog.Timestamp.String() +
+			lastLog.Details + lastLog.CreatedAt.String()
 		hashBytes := sha256.Sum256([]byte(hashInput))
 		previousHash = hex.EncodeToString(hashBytes[:])
 	}
 
-	// Append to evidence_log (append-only)
+	// Append log via interface
 	log := &EvidenceLog{
 		ID:           uuid.New(),
 		EvidenceID:   e.ID,
@@ -131,6 +134,7 @@ func (s *Service) UploadEvidence(data UploadEvidenceRequest) error {
 		Action:       "upload",
 		Result:       true,
 		PreviousHash: previousHash,
+		//Timestamp:    time.Now(),
 	}
 	return s.repo.AppendEvidenceLog(log)
 }

@@ -531,7 +531,8 @@ func RateLimitMiddleware(defaultLimit int, window time.Duration, config Endpoint
 		if RedisClient == nil {
 			// If Redis is not available, allow the request to proceed
 			log.Println("⚠️ Redis client not available, skipping rate limiting")
-			c.Next()
+			c.JSON(503, gin.H{"error": "Rate limiting unavailable"})
+			c.Abort()
 			return
 		}
 

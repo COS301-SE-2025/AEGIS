@@ -188,6 +188,17 @@ func idsString(ids []uuid.UUID) string {
 
 func Test_ListActiveCases_Basic(t *testing.T) {
 	tenantID, teamID, userID := seedTenantTeamUser(t)
+	err := pgDB.Exec(`DO $$ 
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_enum 
+                WHERE enumlabel = 'archived' 
+                AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'case_status')
+            ) THEN
+                ALTER TYPE case_status ADD VALUE 'archived';
+            END IF;
+        END $$`).Error
+	require.NoError(t, err)
 
 	// Seed exactly 3 open cases for this tenant/team/user
 	want := []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
