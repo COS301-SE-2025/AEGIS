@@ -49,6 +49,23 @@
 
 </details>
 
+<details>
+  <summary>Demo 4</summary>
+  
+  | Document | Description |
+  |----------|-------------|
+  | [SRS](./docs/System Requirements Specifications V4.pdf) | Demo 4 Documents |
+  | [Architectural diagram](./docs/Architecural Diagram V4) | Demo 4 Documents |
+  | [Quality requirements](./docs/Quality_Requirements.pdf) | Demo 4 Documents |
+  | [Deployment model](./docs/demo4/Deployment_Model.pdf) | Demo 4 Documents |
+  | [Testing policy](./docs/demo4/Testing_Policy.pdf) | Demo 4 Documents |
+  | [Coding standards](./docs/AEGIS Development Coding StandardsV4.pdf) | Demo 4 Documents |
+  | [User manual](./docs/User Manual V4.pdf) | Demo 4 Documents |
+  | [Technical installation manual](./docs/demo4/Technical_Installation_Manual.pdf) | Demo 4 Documents |
+  | [User stories](./docs/User Stories v4.pdf) | Demo 4 Documents |
+  
+</details>
+
 
 # Demos:
 | Demo | Demo Slides | Demo Video |
