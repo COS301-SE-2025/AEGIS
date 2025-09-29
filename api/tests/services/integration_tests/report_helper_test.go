@@ -49,10 +49,26 @@ func seedCoreFixtures() error {
 }
 
 func ensureCaseRow(caseID uuid.UUID) error {
-	return execSQLNoTB(`INSERT INTO cases (id, title, team_name, created_by, tenant_id)
-	                    VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING`,
-		caseID, "Case "+caseID.String()[:8], "test-team", FixedUserID, FixedTenantID,
-	)
+	// First check if case exists
+	var count int64
+	err := pgDB.Raw("SELECT COUNT(*) FROM cases WHERE id = ?", caseID).Scan(&count).Error
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return execSQLNoTB(`INSERT INTO cases (id, title, team_name, created_by, tenant_id, team_id, status)
+            VALUES ($1, $2, $3, $4, $5, $6, 'open')`,
+			caseID, "Case "+caseID.String()[:8], "test-team", FixedUserID, FixedTenantID, FixedTeamID,
+		)
+	}
+	return nil
+}
+
+// Use this before any test that needs cases
+func setupCaseForTest(t *testing.T, caseID uuid.UUID) {
+	t.Helper()
+	require.NoError(t, ensureCaseRow(caseID))
 }
 
 // ---------------------------

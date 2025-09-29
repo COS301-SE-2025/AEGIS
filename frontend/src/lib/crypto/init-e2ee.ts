@@ -115,7 +115,7 @@ export async function initializeE2EE(opts: InitOpts) {
   const spkSignature = sodium.crypto_sign_detached(spkPub!, ikPriv!); // sig over SPK
   let mustRegisterBundle = false;
   try {
-    const r = await fetch(`http://localhost:8080/api/v1/x3dh/bundle/${userId}`, {
+    const r = await fetch(`https://localhost/api/v1/x3dh/bundle/${userId}`, {
       headers: { Authorization: `Bearer ${sessionStorage.getItem("authToken") || ""}` },
     });
     mustRegisterBundle = r.status === 404;

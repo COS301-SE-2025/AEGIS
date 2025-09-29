@@ -27,6 +27,13 @@ func (m *MockRepo) SaveEvidence(e *metadata.Evidence) error {
 	args := m.Called(e)
 	return args.Error(0)
 }
+func (m *MockRepo) GetLastEvidenceLog(evidenceID uuid.UUID) (*metadata.EvidenceLog, error) {
+	args := m.Called(evidenceID)
+	if log, ok := args.Get(0).(*metadata.EvidenceLog); ok {
+		return log, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
 
 func (m *MockRepo) FindEvidenceByID(id uuid.UUID) (*metadata.Evidence, error) {
 	args := m.Called(id)

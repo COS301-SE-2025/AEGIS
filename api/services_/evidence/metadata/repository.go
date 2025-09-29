@@ -43,6 +43,7 @@ func (r *GormRepository) AppendEvidenceLog(log *EvidenceLog) error {
 func (r *GormRepository) GetLastEvidenceLog(evidenceID uuid.UUID) (*EvidenceLog, error) {
 	var lastLog EvidenceLog
 	err := r.db.Where("evidence_id = ?", evidenceID).Order("created_at DESC").First(&lastLog).Error
+
 	if err != nil {
 		return nil, err
 	}
