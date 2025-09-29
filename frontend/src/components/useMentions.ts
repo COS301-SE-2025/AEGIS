@@ -37,7 +37,7 @@ interface UseMentionsProps {
   apiBaseUrl?: string;
 }
 
-export const useMentions = ({ caseId, apiBaseUrl = 'http://localhost:8080/api/v1' }: UseMentionsProps) => {
+export const useMentions = ({ caseId, apiBaseUrl = 'https://localhost/api/v1' }: UseMentionsProps) => {
   const [iocs, setIOCs] = useState<IOC[]>([]);
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [loading, setLoading] = useState(false);

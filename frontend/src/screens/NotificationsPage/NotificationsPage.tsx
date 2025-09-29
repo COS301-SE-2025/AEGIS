@@ -44,7 +44,7 @@ useEffect(() => {
   async function fetchNotifications() {
     if (!token) return;
     try {
-      const res = await fetch("http://localhost:8080/api/v1/notifications", {
+      const res = await fetch("https://localhost/api/v1/notifications", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Failed to fetch notifications");
@@ -71,7 +71,7 @@ useEffect(() => {
 
   // 🔹 Scope the WS to tenant or team instead of global
   const ws = new WebSocket(
-    `ws://localhost:8080/ws/cases/${tenantID }?token=${token}`
+    `wss://localhost:8443/ws/cases/${tenantID }?token=${token}`
   );
   wsRef.current = ws;
 
@@ -149,7 +149,7 @@ const markAsRead = async () => {
 
   // Optional: Persist via REST
   try {
-    await fetch("http://localhost:8080/api/v1/notifications/read", {
+    await fetch("https://localhost/api/v1/notifications/read", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -190,7 +190,7 @@ const archiveSelected = async () => {
 
   // 3. Persist via REST
   try {
-    await fetch("http://localhost:8080/api/v1/notifications/archive", {
+    await fetch("https://localhost/api/v1/notifications/archive", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -228,7 +228,7 @@ const deleteSelected = async () => {
 
   // 3. Persist via REST
   try {
-    await fetch("http://localhost:8080/api/v1/notifications/delete", {
+    await fetch("https://localhost/api/v1/notifications/delete", {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",

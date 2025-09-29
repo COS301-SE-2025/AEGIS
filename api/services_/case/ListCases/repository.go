@@ -3,6 +3,7 @@ package ListCases
 import (
 	"aegis-api/services_/case/case_creation"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -53,6 +54,21 @@ func (r *GormCaseQueryRepository) QueryCases(filter CaseFilter) ([]Case, error) 
 	if filter.TitleTerm != "" {
 		query = query.Where("title ILIKE ?", "%"+filter.TitleTerm+"%")
 	}
+	if filter.UserID != "" && filter.TeamID != uuid.Nil {
+		query = query.Where(
+			"created_by = ? OR id IN (SELECT case_id FROM case_user_roles WHERE user_id = ?)",
+			filter.UserID, filter.UserID,
+		)
+	} else if filter.UserID != "" {
+		query = query.Where(
+			"created_by = ? OR id IN (SELECT case_id FROM case_user_roles WHERE user_id = ?)",
+			filter.UserID, filter.UserID,
+		)
+	} else if filter.TeamID != uuid.Nil {
+		query = query.Where("team_id = ?", filter.TeamID)
+	}
+	// --------------------------------------
+
 	if filter.SortBy != "" && (filter.SortOrder == "asc" || filter.SortOrder == "desc") {
 		query = query.Order(filter.SortBy + " " + filter.SortOrder)
 	}
@@ -60,7 +76,6 @@ func (r *GormCaseQueryRepository) QueryCases(filter CaseFilter) ([]Case, error) 
 	err := query.Select("*").Scan(&cases).Error
 	return cases, err
 }
-
 func (r *GormCaseQueryRepository) GetCaseByID(caseID string, tenantID string) (*case_creation.Case, error) {
 	var c case_creation.Case
 	err := r.db.Table("cases").Select("*").Where("id = ? AND tenant_id = ?", caseID, tenantID).First(&c).Error

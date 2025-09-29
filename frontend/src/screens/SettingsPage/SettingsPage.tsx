@@ -1,4 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+// Simple toast implementation (replace with your UI lib if available)
+function showToast(message: string, type: 'success' | 'error' = 'success') {
+  const toast = document.createElement('div');
+  toast.textContent = message;
+  toast.style.position = 'fixed';
+  toast.style.bottom = '32px';
+  toast.style.left = '50%';
+  toast.style.transform = 'translateX(-50%)';
+  toast.style.background = type === 'success' ? '#22c55e' : '#ef4444';
+  toast.style.color = 'white';
+  toast.style.padding = '12px 24px';
+  toast.style.borderRadius = '8px';
+  toast.style.fontSize = '1rem';
+  toast.style.zIndex = '9999';
+  toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.remove(); }, 2500);
+}
+import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
 
 
@@ -8,7 +29,6 @@ import {
   Settings,
   UserCog,
   Shield,
-  Bell,
   User,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -63,27 +83,101 @@ const ThemeToggle = () => {
     </div>
   );
 };
-export const SettingsPage = () => {
 
-  const isAdmin = true;
-  const [users, setUsers] = useState([
-    { id: 1, name: "Analyst One", email: "analyst1@aegis.com" },
-    { id: 2, name: "Responder Alpha", email: "responder@aegis.com" },
-    { id: 3, name: "Manager Zeta", email: "manager@aegis.com" },
-  ]);
+function SettingsPage() {
+  const [users, setUsers] = useState<any[]>([]);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [isDFIRAdmin, setIsDFIRAdmin] = useState(false);
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
 
+  useEffect(() => {
+    // Check role and tenantId after mount (when sessionStorage is available)
+    try {
+      const token = sessionStorage.getItem('authToken');
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setIsDFIRAdmin(payload.role === 'DFIR Admin');
+        setTenantId(payload.tenant_id || payload.tenantId || null);
+      }
+    } catch {}
+  }, []);
 
-  const handleRemoveUser = (userId: number) => {
-    if (!isAdmin) return;
-    setUsers((prev) => prev.filter((user) => user.id !== userId));
+  useEffect(() => {
+    if (isDFIRAdmin && tenantId) {
+      axios.get(`https://localhost/api/v1/tenants/${tenantId}/users`, {
+        headers: { Authorization: `Bearer ${sessionStorage.getItem('authToken')}` },
+        params: { page, page_size: pageSize }
+      })
+        .then(res => {
+          let data = (res.data as any)?.data;
+          let total = (res.data as any)?.total || null;
+          if (typeof data === 'undefined' && Array.isArray((res.data as any)?.users)) {
+            data = (res.data as any).users;
+            total = (res.data as any).total || null;
+          }
+          // Exclude DFIR Admin and Tenant Admin from the list
+          const filtered = (data || []).filter((u: any) => {
+            const role = u.role || u.Role;
+            return role !== 'DFIR Admin' && role !== 'Tenant Admin';
+          });
+          setUsers(filtered);
+          setTotalUsers(total !== null ? filtered.length : total);
+        })
+        .catch(() => { setUsers([]); setTotalUsers(null); });
+    }
+  }, [isDFIRAdmin, tenantId, page, pageSize]);
+
+  const handleRemoveUser = async (userId: string) => {
+    if (!isDFIRAdmin) return;
+    // Confirm with react-toastify toast (like CaseManagementPage)
+    const confirmed = await new Promise<boolean>((resolve) => {
+      let toastInstance: any = null;
+      toastInstance = toast.info(
+        <span>
+          Are you sure you want to remove this user?
+          <button
+            style={{ marginLeft: 16, padding: '4px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+            onClick={() => { toast.dismiss(toastInstance); resolve(true); }}
+          >
+            Yes
+          </button>
+          <button
+            style={{ marginLeft: 8, padding: '4px 12px', background: '#64748b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+            onClick={() => { toast.dismiss(toastInstance); resolve(false); }}
+          >
+            No
+          </button>
+        </span>,
+        { autoClose: false, closeOnClick: false, closeButton: true }
+      );
+    });
+    if (!confirmed) return;
+    try {
+      await axios.delete(`https://localhost/api/v1/users/${userId}`, {
+        headers: { Authorization: `Bearer ${sessionStorage.getItem('authToken')}` },
+      });
+      setUsers((prev) => prev.filter((user) => (user.id || user.ID) !== userId));
+      setTotalUsers((old) => (old !== null ? Math.max(0, old - 1) : null));
+      showToast('User removed successfully.', 'success');
+    } catch (err: any) {
+      showToast(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        'Failed to remove user.',
+        'error'
+      );
+    }
   };
 
   return (
     <div className="min-h-screen px-8 py-10 bg-background text-foreground transition-colors">
+      <ToastContainer position="top-center" aria-label="Notification Toasts" />
      
       <div className="flex items-center justify-between border-b border-border pb-4 mb-6">
         {/* Left: Page title */}
@@ -130,57 +224,61 @@ export const SettingsPage = () => {
         </Link>
       </div>
 
-      {/* DFIR Settings */}
-      <div className="bg-card text-card-foreground rounded-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <Shield className="w-5 h-5" /> DFIR Configuration
-        </h2>
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Alert Threshold Level</span>
-            <select className="bg-input border border-border rounded-lg px-3 py-1 text-foreground">
-              <option>Low</option>
-              <option>Moderate</option>
-              <option>High</option>
-              <option>Critical</option>
-            </select>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Evidence Retention (Days)</span>
-            <input
-              type="number"
-              defaultValue={90}
-              className="bg-input border border-border rounded-lg px-3 py-1 w-24 text-foreground"
-            />
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Notification Preferences</span>
-            <button className="flex items-center gap-2 text-primary hover:text-primary/80">
-              <Bell className="w-5 h-5 text-primary" />
-              Configure Alerts
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* User Management */}
-      {isAdmin && (
+      {isDFIRAdmin && (
         <div className="bg-card text-card-foreground rounded-lg p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <UserCog className="w-5 h-5" /> User Management
           </h2>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <span className="text-sm text-muted-foreground">Page {page}</span>
+              {totalUsers !== null && (
+                <span className="ml-2 text-sm text-muted-foreground">Total Users: {totalUsers}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="px-2 py-1 rounded bg-muted text-foreground border border-border disabled:opacity-50"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Prev
+              </button>
+              <button
+                className="px-2 py-1 rounded bg-muted text-foreground border border-border disabled:opacity-50"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={users.length < pageSize}
+              >
+                Next
+              </button>
+              <select
+                className="ml-2 px-2 py-1 rounded border border-border bg-muted text-foreground"
+                value={pageSize}
+                onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+              >
+                {[5, 10, 20, 50].map(size => (
+                  <option key={size} value={size}>{size} per page</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <ul className="space-y-4">
+            {users.length === 0 && (
+              <li className="text-muted-foreground">No users found for this tenant.</li>
+            )}
             {users.map((user) => (
               <li
-                key={user.id}
+                key={user.id || user.ID}
                 className="flex justify-between items-center bg-muted p-3 rounded-lg"
               >
                 <div>
-                  <p className="font-semibold">{user.name}</p>
-                  <p className="text-muted-foreground text-sm">{user.email}</p>
+                  <p className="font-semibold">{user.full_name || user.FullName || user.name}</p>
+                  <p className="text-muted-foreground text-sm">{user.email || user.Email}</p>
+                  <p className="text-sm text-muted-foreground">Role: {user.role || user.Role || 'N/A'}</p>
                 </div>
                 <button
-                  onClick={() => handleRemoveUser(user.id)}
+                  onClick={() => handleRemoveUser(user.id || user.ID)}
                   className="text-red-400 hover:text-red-300 flex items-center gap-1"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -214,17 +312,19 @@ export const SettingsPage = () => {
           Logout
         </Link>
       </div>
-      {/* Register User */}
-      <div className="bg-card text-card-foreground rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Register User</h2>
-        <Link
-          to="/register"
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          <User className="w-5 h-5 text-primary-foreground" />
-          Register User
-        </Link>
-      </div>
+      {/* Register User (DFIR Admin only) */}
+      {isDFIRAdmin && (
+        <div className="bg-card text-card-foreground rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Register User</h2>
+          <Link
+            to="/register"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            <User className="w-5 h-5 text-primary-foreground" />
+            Register User
+          </Link>
+        </div>
+      )}
 
     <div className="p-8">
       <h2 className="text-2xl font-bold mb-4">Customize Theme</h2>
@@ -287,4 +387,6 @@ export const SettingsPage = () => {
 
     </div>
   );
-};
+}
+
+export { SettingsPage };

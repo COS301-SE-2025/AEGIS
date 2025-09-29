@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -47,41 +48,66 @@ func SendJSONMessage(hub *Hub, caseID string, messageType string, payload interf
 }
 
 func SaveMessageToDB(payload chatModels.NewMessagePayload) error {
-	parsedTime, err := time.Parse(time.RFC3339, payload.Timestamp)
+	// Guard
+	if MessageCollection == nil {
+		log.Println("[WS] MessageCollection is nil; skipping DB persist")
+		return nil
+	}
+
+	// Timestamp
+	created, err := time.Parse(time.RFC3339, payload.Timestamp)
 	if err != nil {
-		return err
+		log.Printf("[WS] invalid timestamp %q: %v; using time.Now()", payload.Timestamp, err)
+		created = time.Now().UTC()
 	}
 
-	groupID := primitive.NewObjectID()
+	// GroupID
+	var groupID primitive.ObjectID
 	if payload.GroupID != "" {
-		var err error
-		// Convert the GroupID string to a primitive ObjectID
-		groupID, err = primitive.ObjectIDFromHex(payload.GroupID)
-		if err != nil {
-			return fmt.Errorf("invalid group ID: %w", err)
+		if gid, err := primitive.ObjectIDFromHex(payload.GroupID); err == nil {
+			groupID = gid
+		} else {
+			log.Printf("[WS] invalid group ID %q: %v; generating new ObjectID()", payload.GroupID, err)
+			groupID = primitive.NewObjectID()
 		}
+	} else {
+		groupID = primitive.NewObjectID()
 	}
 
-	message := chatModels.Message{
-		ID:          payload.MessageID,
-		GroupID:     groupID,
-		SenderEmail: payload.SenderName,
-		SenderName:  payload.SenderName,
-		Content:     payload.Text,
-		CreatedAt:   parsedTime,
-		UpdatedAt:   parsedTime,
-		IsDeleted:   false,
-		Status: chatModels.MessageStatus{
-			Sent: parsedTime,
-		},
-		MessageType: "text",
-	}
-
+	// Derive message type
+	msgType := "text"
 	if len(payload.Attachments) > 0 {
-		message.Attachments = payload.Attachments
-		message.MessageType = "file"
+		msgType = "file"
 	}
 
-	_, err = MessageCollection.InsertOne(context.Background(), message)
-	return err
+	// Build doc — ciphertext path vs plaintext path
+	doc := chatModels.Message{
+		ID:          payload.MessageID, // string _id is OK in Mongo
+		GroupID:     groupID,
+		SenderEmail: payload.SenderEmail, // ✅ use SenderEmail (not SenderID/SenderName)
+		SenderName:  payload.SenderName,
+		MessageType: msgType,
+		IsEncrypted: payload.IsEncrypted,
+		Envelope:    payload.Envelope, // may be nil if plaintext
+
+		// plaintext content only when not encrypted
+		Content:     "",
+		Status:      chatModels.MessageStatus{Sent: created},
+		CreatedAt:   created,
+		UpdatedAt:   created,
+		IsDeleted:   false,
+		Attachments: payload.Attachments, // if you extended with envelope, it passes through
+	}
+
+	if !payload.IsEncrypted {
+		doc.Content = payload.Text
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if _, err := MessageCollection.InsertOne(ctx, doc); err != nil {
+		return fmt.Errorf("insert message: %w", err)
+	}
+	return nil
 }

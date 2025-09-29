@@ -17,6 +17,7 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 		db: db,
 	}
 }
+
 func (r *UserRepository) GetAllUsers(ctx context.Context) ([]User, error) {
 	var users []User
 	err := r.db.Table("users").Find(&users).Error
@@ -25,16 +26,17 @@ func (r *UserRepository) GetAllUsers(ctx context.Context) ([]User, error) {
 	}
 	return users, nil
 }
-func (r *UserRepository) GetUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]User, error) {
+
+func (r *UserRepository) GetUsersByTenant(ctx context.Context, tenantID uuid.UUID, page int, pageSize int) ([]User, int64, error) {
 	var users []User
-	err := r.db.WithContext(ctx).
-		Table("users").
-		Where("tenant_id = ?", tenantID).
-		Find(&users).Error
+	var total int64
+	db := r.db.WithContext(ctx).Table("users").Where("tenant_id = ?", tenantID)
+	db.Count(&total)
+	err := db.Offset((page - 1) * pageSize).Limit(pageSize).Find(&users).Error
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return users, nil
+	return users, total, nil
 }
 func (r *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*User, error) {
 	var user User

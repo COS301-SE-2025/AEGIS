@@ -153,10 +153,10 @@ function getHashesFromMetadata(metadata: string) {
     const meta = JSON.parse(metadata);
     return {
       sha256: meta.sha256 || "N/A",
-      md5: meta.md5 || "N/A"
+      sha512: meta.sha512 || "N/A"
     };
   } catch {
-    return { sha256: "N/A", md5: "N/A" };
+    return { sha256: "N/A", sha251: "N/A" };
   }
 }
 // Helper to extract details from chainOfCustody
@@ -184,7 +184,7 @@ function getCustodyDetails(chainOfCustody: any[]) {
     notes: first?.forensic_info?.notes || "",
   };
 }
-const BASE_URL = "http://localhost:8080/api/v1";
+const BASE_URL = "https://localhost/api/v1";
   const storedUser = sessionStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const displayName = user?.name || user?.email?.split("@")[0] || "Agent User";
@@ -249,6 +249,34 @@ console.debug('Parsed custodyDetails:', custodyDetails);
 
 const [chainLoading] = useState(false);
 const [chainError] = useState<string | null>(null);
+const [integrityCheckStatus, setIntegrityCheckStatus] = useState<'passed' | 'failed' | 'pending' | string>('pending');
+const [integrityCheckDetails, setIntegrityCheckDetails] = useState<string>('');
+
+useEffect(() => {
+  async function fetchIntegrityCheck() {
+    if (!selectedFile?.id) {
+      setIntegrityCheckStatus('pending');
+      setIntegrityCheckDetails('');
+      return;
+    }
+    try {
+      const token = sessionStorage.getItem("authToken");
+      const axiosConfig = token
+        ? { headers: { Authorization: `Bearer ${token}` } }
+        : {};
+      const res = await axios.get<{ valid: boolean; details: string }>(
+        `${BASE_URL}/evidence/${selectedFile.id}/verify-chain`,
+        axiosConfig
+      );
+      setIntegrityCheckStatus(res.data.valid ? 'passed' : 'failed');
+      setIntegrityCheckDetails(res.data.details || '');
+    } catch (err) {
+      setIntegrityCheckStatus('failed');
+      setIntegrityCheckDetails('Could not verify integrity');
+    }
+  }
+  fetchIntegrityCheck();
+}, [selectedFile]);
 
 useEffect(() => {
   async function loadEvidence() {
@@ -786,7 +814,7 @@ if (!caseId || caseId === "undefined") {
                   src={
                     user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `http://localhost:8080${user.image_url}`
+                      : `https://localhost${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -860,7 +888,7 @@ if (!caseId || caseId === "undefined") {
                     src={
                       user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `http://localhost:8080${user.image_url}`
+                        : `https://localhost${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"
@@ -935,7 +963,7 @@ if (!caseId || caseId === "undefined") {
                   src={
                     user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                       ? user.image_url
-                      : `http://localhost:8080${user.image_url}`
+                      : `https://localhost${user.image_url}`
                   }
                   alt="Profile"
                   className="w-12 h-12 rounded-full object-cover"
@@ -1004,7 +1032,7 @@ if (!caseId || caseId === "undefined") {
                     src={
                       user.image_url.startsWith("http") || user.image_url.startsWith("data:")
                         ? user.image_url
-                        : `http://localhost:8080${user.image_url}`
+                        : `https://localhost${user.image_url}`
                     }
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover"
@@ -1255,13 +1283,16 @@ if (!caseId || caseId === "undefined") {
                               <p className="text-muted-foreground capitalize">{selectedFile.file_type.replace('_', ' ')}</p>
                             </div>
                           </div>
-                          <div>
-                            <span className="text-muted-foreground">Integrity Check:</span>
-                            <div className={`inline-flex items-center gap-1 ml-2 ${getStatusColor(selectedFile.integrityCheck || "pending")}`}>
-                              {getStatusIcon(selectedFile.integrityCheck  || "pending")}
-                              <span className="capitalize">{selectedFile.integrityCheck}</span>
-                            </div>
+                         <div>
+                          <span className="text-muted-foreground">Integrity Check:</span>
+                          <div className={`inline-flex items-center gap-1 ml-2 ${getStatusColor(integrityCheckStatus)}`}>
+                            {getStatusIcon(integrityCheckStatus)}
+                            <span className="capitalize">{integrityCheckStatus}</span>
+                            {integrityCheckDetails && (
+                              <span className="ml-2 text-xs text-muted-foreground">({integrityCheckDetails})</span>
+                            )}
                           </div>
+                        </div>
                         </div>
                       </div>
 
@@ -1314,7 +1345,7 @@ if (!caseId || caseId === "undefined") {
                           </div>
                           <div>
                             <span className="text-muted-foreground">Hash:</span>
-                            <p className="text-muted-foreground font-mono text-xs break-all">{custodyDetails.hash || "N/A"}</p>
+                            <p className="text-muted-foreground font-mono text-xs break-all">{ getHashesFromMetadata(selectedFile.metadata).sha256|| "N/A"}</p>
                           </div>
                         </div>
                       </div>
@@ -1340,10 +1371,27 @@ if (!caseId || caseId === "undefined") {
                                 )}
                           </div>
                           <div className="flex items-center gap-3 text-sm">
-                            <CheckCircle className="w-4 h-4 text-green-400" />
+                            {integrityCheckStatus === 'passed' ? (
+                              <CheckCircle className="w-4 h-4 text-green-400" />
+                            ) : integrityCheckStatus === 'failed' ? (
+                              <XCircle className="w-4 h-4 text-red-400" />
+                            ) : (
+                              <Shield className="w-4 h-4 text-yellow-400 animate-spin" />
+                            )}
                             <div className="flex-1">
-                              <span className="text-muted-foreground">Integrity verification in progress </span>
-                              <div className="text-xs text-muted-foreground">System • just now</div>
+                              {integrityCheckStatus === 'passed' ? (
+                                <span className="text-green-400">Integrity verified</span>
+                              ) : integrityCheckStatus === 'failed' ? (
+                                <span className="text-red-400">Integrity check failed</span>
+                              ) : (
+                                <span className="text-muted-foreground">Integrity verification in progress</span>
+                              )}
+                              <div className="text-xs text-muted-foreground">
+                                System
+                                {integrityCheckDetails && (
+                                  <span className="ml-2">• {integrityCheckDetails}</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1495,8 +1543,8 @@ if (!caseId || caseId === "undefined") {
                                       <div className="text-muted-foreground font-mono text-xs break-all">{hashes.sha256}</div>
                                     </div>
                                     <div className="bg-muted p-2 rounded">
-                                      <div className="text-xs text-muted-foreground mb-1">MD5:</div>
-                                      <div className="text-muted-foreground font-mono text-xs">{hashes.md5}</div>
+                                      <div className="text-xs text-muted-foreground mb-1">SHA512:</div>
+                                      <div className="text-muted-foreground font-mono text-xs break-all whitespace-pre-wrap">{hashes.sha512}</div>
                                     </div>
                                   </>
                                 );

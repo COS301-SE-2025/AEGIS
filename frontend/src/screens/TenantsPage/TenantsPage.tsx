@@ -45,7 +45,7 @@ const mockStatus = () => {
 useEffect(() => {
   const fetchTenants = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/v1/tenants");
+      const res = await fetch("https://localhost/api/v1/tenants");
       const data = await res.json();
 
       const tenantsRaw = Array.isArray(data) ? data : data.tenants;

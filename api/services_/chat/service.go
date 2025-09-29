@@ -2,12 +2,12 @@ package chat
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
+	"log"
 	"mime"
 	"mime/multipart"
-	"net/http"
 	"path/filepath"
 	"time"
 
@@ -41,96 +41,118 @@ func (s *ChatService) SendMessageWithAttachment(
 	senderEmail, senderName string,
 	groupID primitive.ObjectID,
 	content string,
-	file multipart.File,
+	isEncrypted bool,
+	msgEnvelope *CryptoEnvelopeV1,
+	fileBase64 string,
 	fileHeader *multipart.FileHeader,
-) error {
+	attEnvelope *CryptoEnvelopeV1,
+) (*Message, error) {
+	if fileBase64 == "" || fileHeader == nil {
+		return nil, errors.New("fileBase64 and fileHeader required")
+	}
 	if fileHeader.Size == 0 {
-		return errors.New("empty file")
-	}
-	if file == nil {
-		return errors.New("no file provided")
-	}
-	if fileHeader == nil || fileHeader.Size == 0 {
-		return errors.New("empty or missing file")
+		return nil, errors.New("empty file")
 	}
 
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
-
-	}
-	fmt.Println("Read bytes sample:", data[:min(20, len(data))], "len:", len(data))
-
-	// Detect MIME type
-	contentType := http.DetectContentType(data[:512])
-
-	// Try to use file extension as a fallback
-	ext := filepath.Ext(fileHeader.Filename)
-	fallbackType := mime.TypeByExtension(ext)
-	if contentType == "application/octet-stream" && fallbackType != "" {
-		contentType = fallbackType
-	}
-
-	fileSize := fileHeader.Size
-	if fileSize == 0 {
-		fileSize = int64(len(data))
-	}
-
-	// fallback to Seek if still unknown
-	if fileSize == 0 {
-		if seeker, ok := file.(io.Seeker); ok {
-			currentPos, _ := seeker.Seek(0, io.SeekCurrent)
-			size, err := seeker.Seek(0, io.SeekEnd)
-			if err == nil {
-				fileSize = size
-				_, _ = seeker.Seek(currentPos, io.SeekStart)
+	var data []byte
+	var err error
+	if isEncrypted {
+		if attEnvelope == nil || attEnvelope.CT == "" {
+			return nil, errors.New("missing attEnvelope.CT for encrypted attachment")
+		}
+		log.Printf("attEnvelope.CT length: %d, sample (first 100 chars): %s", len(attEnvelope.CT), attEnvelope.CT[:min(len(attEnvelope.CT), 100)])
+		data, err = base64.URLEncoding.DecodeString(attEnvelope.CT)
+		if err != nil {
+			log.Printf("Failed to decode attEnvelope.CT: %v", err)
+			data, err = base64.StdEncoding.DecodeString(fileBase64)
+			if err != nil {
+				return nil, fmt.Errorf("decode fileBase64 fallback: %w", err)
 			}
+			log.Printf("Using fallback fileBase64")
+		}
+	} else {
+		data, err = base64.StdEncoding.DecodeString(fileBase64)
+		if err != nil {
+			return nil, fmt.Errorf("decode fileBase64: %w", err)
 		}
 	}
 
-	// Upload to IPFS
-	ipfsResult, err := s.ipfsUploader.UploadBytes(ctx, data, fileHeader.Filename)
-	if err != nil {
-		return fmt.Errorf("IPFS upload failed: %w", err)
+	log.Printf("File data (first 16 bytes): %x", data[:min(len(data), 16)])
+
+	declared := fileHeader.Header.Get("Content-Type")
+	if declared == "" || declared == "application/octet-stream" {
+		if ext := filepath.Ext(fileHeader.Filename); ext != "" {
+			if mt := mime.TypeByExtension(ext); mt != "" {
+				declared = mt
+			}
+		}
+		if declared == "" {
+			declared = "application/octet-stream"
+		}
 	}
 
-	attachment := &Attachment{
-		ID:       primitive.NewObjectID().Hex(),
-		FileName: ipfsResult.FileName,
-		FileType: contentType,
-		FileSize: fileSize, // file actual size
-		URL:      ipfsResult.URL,
-		Hash:     ipfsResult.Hash,
+	ipfsResult, err := s.ipfsUploader.UploadBytes(ctx, data, fileHeader.Filename)
+	if err != nil {
+		return nil, fmt.Errorf("IPFS upload failed: %w", err)
 	}
-	fmt.Printf("Attachment debug: %+v\n", attachment)
-	message := &Message{
+	log.Printf("IPFS CID: %s, URL: %s", ipfsResult.Hash, ipfsResult.URL)
+
+	att := &Attachment{
+		ID:          primitive.NewObjectID().Hex(),
+		FileName:    ipfsResult.FileName,
+		FileType:    declared,
+		FileSize:    fileHeader.Size,
+		URL:         ipfsResult.URL,
+		Hash:        ipfsResult.Hash,
+		IsEncrypted: isEncrypted,
+		Envelope:    attEnvelope,
+	}
+	log.Printf("Attachment before normalize: %+v", att)
+
+	now := time.Now().UTC()
+	msg := &Message{
 		GroupID:     groupID,
 		SenderEmail: senderEmail,
 		SenderName:  senderName,
-		Content:     content,
 		MessageType: "file",
-		Attachments: []*Attachment{attachment},
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		Attachments: []*Attachment{att},
+		IsEncrypted: isEncrypted,
+		Envelope:    msgEnvelope,
+		Content:     content, // Preserve content as caption, even for encrypted messages
+		CreatedAt:   now,
+		UpdatedAt:   now,
 		IsDeleted:   false,
-		Status: MessageStatus{
-			Sent: time.Now(),
-		},
+		Status:      MessageStatus{Sent: now},
 	}
 
-	if err := s.repo.CreateMessage(ctx, message); err != nil {
-		return fmt.Errorf("failed to store message: %w", err)
+	log.Printf("Message before normalize: %+v", msg)
+	NormalizeMessageEncryption(msg)
+	log.Printf("Message after normalize: %+v", msg)
+
+	if err := s.repo.CreateMessage(ctx, msg); err != nil {
+		return nil, fmt.Errorf("store message: %w", err)
 	}
 
-	_ = s.wsManager.BroadcastToGroup(groupID.Hex(), WebSocketMessage{
-		Type:      "new_message",
+	err = s.wsManager.BroadcastToGroup(groupID.Hex(), WebSocketMessage{
+		Type:      MessageType(EventNewMessage),
 		GroupID:   groupID.Hex(),
-		Payload:   message,
-		Timestamp: time.Now(),
+		Payload:   msg,
+		Timestamp: now,
 		UserEmail: senderEmail,
 	})
+	if err != nil {
+		log.Printf("Failed to broadcast message: %v", err)
+	}
 
-	return nil
+	return msg, nil
+}
+
+// Helper function to avoid index out of range
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // NewUserService creates a new user service instance
@@ -245,42 +267,45 @@ func (s *userService) CreateUser(ctx context.Context, user *User) error {
 var MessageCollection *mongo.Collection // Inject this from main.go or init
 
 func SaveMessageToDB(payload NewMessagePayload) error {
-	parsedTime, err := time.Parse(time.RFC3339, payload.Timestamp)
+	if MessageCollection == nil {
+		return fmt.Errorf("MessageCollection not initialized")
+	}
+
+	createdAt, err := time.Parse(time.RFC3339, payload.Timestamp)
 	if err != nil {
 		return err
 	}
 
-	groupID := primitive.NewObjectID()
-	if payload.GroupID != "" {
-		var err error
-		// Convert the GroupID string to a primitive ObjectID
-		groupID, err = primitive.ObjectIDFromHex(payload.GroupID)
-		if err != nil {
-			return fmt.Errorf("invalid group ID: %w", err)
-		}
+	gid, err := primitive.ObjectIDFromHex(payload.GroupID)
+	if err != nil {
+		return fmt.Errorf("invalid group ID: %w", err)
 	}
 
-	message := Message{
-		ID:          payload.MessageID,
-		GroupID:     groupID,
-		SenderEmail: payload.SenderName,
+	msg := Message{
+		GroupID:     gid,
+		SenderEmail: payload.SenderEmail,
 		SenderName:  payload.SenderName,
-		Content:     payload.Text,
-		CreatedAt:   parsedTime,
-		UpdatedAt:   parsedTime,
-		IsDeleted:   false,
-		Status: MessageStatus{
-			Sent: parsedTime,
-		},
 		MessageType: "text",
+		CreatedAt:   createdAt,
+		UpdatedAt:   createdAt,
+		IsDeleted:   false,
+		Status:      MessageStatus{Sent: createdAt},
+		IsEncrypted: payload.IsEncrypted,
+		Envelope:    payload.Envelope,
 	}
 
 	if len(payload.Attachments) > 0 {
-		message.Attachments = payload.Attachments
-		message.MessageType = "file"
+		msg.Attachments = payload.Attachments
+		msg.MessageType = "file"
 	}
 
-	_, err = MessageCollection.InsertOne(context.Background(), message)
+	if !payload.IsEncrypted {
+		msg.Content = payload.Text
+	} else {
+		msg.Content = "" // ensure no plaintext
+	}
+
+	_, err = MessageCollection.InsertOne(context.Background(), msg)
 	return err
 }
 
@@ -333,55 +358,82 @@ func (s *userService) GetOnlineUsers(ctx context.Context) ([]*User, error) {
 // In services_/chat/chat_service.go
 func (s *ChatService) HandleMessage(
 	ctx context.Context,
-	senderEmail, senderName, content, fileName, contentType string,
-	fileBytes []byte,
+	senderEmail, senderName string,
+	content string,
+	fileName string,
+	contentType string, // <-- from client; don't infer from ciphertext
+	fileBytes []byte, // ciphertext if E2EE
 	groupID primitive.ObjectID,
+	isEncrypted bool,
+	msgEnvelope *CryptoEnvelopeV1,
+	attEnvelope *CryptoEnvelopeV1,
 ) error {
-	// IPFS upload
-	ipfsResult, err := s.ipfsUploader.UploadBytes(ctx, fileBytes, fileName)
-	if err != nil {
-		return fmt.Errorf("IPFS upload failed: %w", err)
+	var att *Attachment
+	if len(fileBytes) > 0 && fileName != "" {
+		declared := contentType
+		if declared == "" {
+			declared = "application/octet-stream"
+		}
+		ipfsResult, err := s.ipfsUploader.UploadBytes(ctx, fileBytes, fileName)
+		if err != nil {
+			return fmt.Errorf("IPFS upload failed: %w", err)
+		}
+		att = &Attachment{
+			ID:          primitive.NewObjectID().Hex(),
+			FileName:    fileName,
+			FileType:    declared,
+			FileSize:    int64(len(fileBytes)),
+			URL:         ipfsResult.URL,
+			Hash:        ipfsResult.Hash,
+			IsEncrypted: isEncrypted || msgEnvelope != nil || attEnvelope != nil,
+			Envelope:    attEnvelope,
+		}
 	}
 
-	// Construct attachment
-	attachment := &Attachment{
-		ID:       primitive.NewObjectID().Hex(),
-		FileName: fileName,
-		FileType: contentType,
-		FileSize: int64(len(fileBytes)),
-		URL:      ipfsResult.URL,
-		Hash:     ipfsResult.Hash,
-	}
-
-	// Build message
+	now := time.Now().UTC()
 	msg := &Message{
 		GroupID:     groupID,
 		SenderEmail: senderEmail,
 		SenderName:  senderName,
-		Content:     content,
-		MessageType: "file",
-		Attachments: []*Attachment{attachment},
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		MessageType: ifThen(att != nil, "file", "text"),
+		IsEncrypted: isEncrypted,
+		Envelope:    msgEnvelope,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 		IsDeleted:   false,
-		Status:      MessageStatus{Sent: time.Now()},
+		Status:      MessageStatus{Sent: now},
+	}
+	if att != nil {
+		msg.Attachments = []*Attachment{att}
+	}
+	if isEncrypted {
+		msg.Content = ""
+	} else {
+		msg.Content = content
 	}
 
-	// Save to DB
+	// ✅ enforce flags consistently
+	NormalizeMessageEncryption(msg)
+
 	if err := s.repo.CreateMessage(ctx, msg); err != nil {
-		return fmt.Errorf("failed to store message: %w", err)
+		return fmt.Errorf("store message: %w", err)
 	}
 
-	// Broadcast via WebSocket
 	_ = s.wsManager.BroadcastToGroup(groupID.Hex(), WebSocketMessage{
 		Type:      MessageType(EventNewMessage),
 		GroupID:   groupID.Hex(),
 		Payload:   msg,
-		Timestamp: time.Now(),
+		Timestamp: now,
 		UserEmail: senderEmail,
 	})
-
 	return nil
+}
+
+func ifThen[T any](cond bool, a, b T) T {
+	if cond {
+		return a
+	}
+	return b
 }
 
 // SearchUsers searches for users by name or email

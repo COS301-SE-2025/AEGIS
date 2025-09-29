@@ -364,21 +364,49 @@ func (r *MongoRepository) UpdateLastMessage(ctx context.Context, groupID primiti
 func (r *MongoRepository) CreateMessage(ctx context.Context, message *Message) error {
 	collection := r.db.Collection(MessagesCollection)
 
-	message.CreatedAt = time.Now()
-	message.UpdatedAt = time.Now()
-	message.IsDeleted = false
-	message.Status.Sent = time.Now()
+	// ---- Validation rules
+	if message.IsEncrypted {
+		if message.Envelope == nil {
+			return fmt.Errorf("encrypted message requires envelope")
+		}
+		// Never store plaintext content when encrypted
+		message.Content = ""
+	} else {
+		if message.Content == "" && len(message.Attachments) == 0 {
+			return fmt.Errorf("plaintext message requires content or attachments")
+		}
+	}
 
-	result, err := collection.InsertOne(ctx, message)
+	// For attachments: if any attachment is encrypted, its Envelope must be present
+	for _, a := range message.Attachments {
+		if a.IsEncrypted && a.Envelope == nil {
+			return fmt.Errorf("encrypted attachment requires envelope")
+		}
+	}
+
+	// ---- Timestamps & flags
+	now := time.Now().UTC()
+	if message.CreatedAt.IsZero() {
+		message.CreatedAt = now
+	}
+	message.UpdatedAt = now
+	message.IsDeleted = false
+	if message.Status.Sent.IsZero() {
+		message.Status.Sent = now
+	}
+
+	// ---- Insert
+	res, err := collection.InsertOne(ctx, message)
 	if err != nil {
 		return fmt.Errorf("failed to create message: %w", err)
 	}
 
-	oid, ok := result.InsertedID.(primitive.ObjectID)
-	if !ok {
-		return fmt.Errorf("failed to convert inserted ID to ObjectID")
+	// Save hex string id consistently
+	if oid, ok := res.InsertedID.(primitive.ObjectID); ok {
+		message.ID = oid.Hex()
+	} else if s, ok := res.InsertedID.(string); ok {
+		message.ID = s
 	}
-	message.ID = oid.Hex()
 	return nil
 }
 
@@ -482,25 +510,52 @@ func (r *MongoRepository) SearchMessages(ctx context.Context, groupID primitive.
 func (r *MongoRepository) UpdateMessage(ctx context.Context, message *Message) error {
 	collection := r.db.Collection(MessagesCollection)
 
-	message.UpdatedAt = time.Now()
-	editedTime := time.Now()
-	message.Status.Edited = &editedTime
+	// Basic validation + E2EE guardrails
+	if message.ID == "" {
+		return fmt.Errorf("missing message id")
+	}
+	if message.IsEncrypted && message.Envelope == nil {
+		return fmt.Errorf("encrypted message requires envelope")
+	}
+	if message.IsEncrypted {
+		// never allow plaintext to be stored for encrypted messages
+		message.Content = ""
+	}
 
+	// Timestamps
+	now := time.Now().UTC()
+	message.UpdatedAt = now
+	message.Status.Edited = &now
+
+	// ✅ Flexible _id filter: supports either string _id or ObjectID _id
+	var idFilter interface{} = message.ID
+	if oid, err := primitive.ObjectIDFromHex(message.ID); err == nil {
+		idFilter = oid
+	}
 	filter := bson.M{
-		"_id":        message.ID,
+		"_id":        idFilter,
 		"is_deleted": false,
 	}
-	update := bson.M{"$set": message}
 
-	result, err := collection.UpdateOne(ctx, filter, update)
+	// Only mutate allowed fields (avoid replacing _id/group_id)
+	update := bson.M{"$set": bson.M{
+		"content":      message.Content,
+		"is_encrypted": message.IsEncrypted,
+		"envelope":     message.Envelope,
+		"attachments":  message.Attachments,
+		"mentions":     message.Mentions,
+		"status":       message.Status,
+		"metadata":     message.Metadata,
+		"updated_at":   message.UpdatedAt,
+	}}
+
+	res, err := collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("failed to update message: %w", err)
 	}
-
-	if result.MatchedCount == 0 {
+	if res.MatchedCount == 0 {
 		return fmt.Errorf("message not found or already deleted")
 	}
-
 	return nil
 }
 

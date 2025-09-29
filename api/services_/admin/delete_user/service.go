@@ -2,6 +2,7 @@ package delete_user
 
 import (
 	"fmt"
+
 	"github.com/google/uuid"
 )
 
@@ -15,8 +16,8 @@ func NewUserDeleteService(repo UserRepository) *UserDeleteService {
 
 // DeleteUser deletes a user by ID only if the requester is an Admin.
 func (s *UserDeleteService) DeleteUser(req DeleteUserRequest, requesterRole string) error {
-	if requesterRole != "Admin" {
-		return fmt.Errorf("unauthorized: only Admins can delete users")
+	if requesterRole != "DFIR Admin" {
+		return fmt.Errorf("unauthorized: only DFIR Admins can delete users")
 	}
 
 	userID, err := uuid.Parse(req.UserID)

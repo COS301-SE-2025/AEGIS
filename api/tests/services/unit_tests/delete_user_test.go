@@ -32,7 +32,7 @@ func TestDeleteUser_Success(t *testing.T) {
 
 	mockRepo.On("DeleteUserByID", userID).Return(nil)
 
-	err := service.DeleteUser(req, "Admin")
+	err := service.DeleteUser(req, "DFIR Admin")
 
 	assert.NoError(t, err)
 	mockRepo.AssertExpectations(t)
@@ -60,7 +60,7 @@ func TestDeleteUser_InvalidUUID(t *testing.T) {
 		UserID: "invalid-uuid",
 	}
 
-	err := service.DeleteUser(req, "Admin")
+	err := service.DeleteUser(req, "DFIR Admin")
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid user UUID")
@@ -77,7 +77,7 @@ func TestDeleteUser_RepoFailure(t *testing.T) {
 
 	mockRepo.On("DeleteUserByID", userID).Return(errors.New("db error"))
 
-	err := service.DeleteUser(req, "Admin")
+	err := service.DeleteUser(req, "DFIR Admin")
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete user")

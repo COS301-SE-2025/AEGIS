@@ -42,7 +42,7 @@ const statuses = ["Active", "Inactive"];
       }
 
       try {
-        const res = await fetch(`http://localhost:8080/api/v1/teams?tenant_id=${tenantId}`, {
+        const res = await fetch(`https://localhost/api/v1/teams?tenant_id=${tenantId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

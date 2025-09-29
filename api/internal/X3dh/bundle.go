@@ -3,8 +3,9 @@ package x3dh
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/hex"
+	"encoding/base64"
 	"fmt"
+	"log"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -34,9 +35,9 @@ type RegisterBundleRequest struct {
 }
 
 type OneTimePreKeyUpload struct {
+	KeyID     string `json:"key_id"`
 	PublicKey string `json:"public_key"`
 }
-
 type RefillOPKRequest struct {
 	UserID string                `json:"user_id"`
 	OPKs   []OneTimePreKeyUpload `json:"opks"`
@@ -45,42 +46,28 @@ type BundleResponse struct {
 	IdentityKey   string `json:"identity_key"`
 	SignedPreKey  string `json:"signed_prekey"`
 	SPKSignature  string `json:"spk_signature"`
-	OneTimePreKey string `json:"one_time_prekey,omitempty"` // optional
+	OneTimePreKey string `json:"one_time_prekey,omitempty"`
+	OPKID         string `json:"opk_id,omitempty"`
 }
 
 // NewBundleService returns a new instance of BundleService
 func NewBundleService(store KeyStore, crypto CryptoService, auditor *MongoAuditLogger) *BundleService {
 	return &BundleService{store: store, crypto: crypto, auditor: auditor}
 }
-func (s *BundleService) StoreBundle(ctx context.Context, req RegisterBundleRequest) error {
-	// Step 1: Verify SPK signature
-	err := verifySPKSignature(req.IdentityKey, req.SignedPreKey, req.SPKSignature)
-	if err != nil {
-		s.logAudit(ctx, req.UserID, "REGISTER_BUNDLE", "failure", "Invalid SPK signature", bson.M{
-			"reason": "SPK signature verification failed",
-			"route":  "/x3dh/register-bundle",
-			"method": "POST",
-		})
-		return fmt.Errorf("invalid SPK signature: %w", err)
-	}
 
-	// Step 2: Store the bundle
-	err = s.store.StoreBundle(ctx, req)
-	status := "success"
-	description := "User uploaded X3DH key bundle"
-	if err != nil {
-		status = "failure"
-		description = "Failed to store X3DH key bundle"
-	}
+// func (s *BundleService) StoreBundle(ctx context.Context, req RegisterBundleRequest) error {
+// 	// Step 1: verify SPK signature
+// 	if err := verifySPKSignature(req.IdentityKey, req.SignedPreKey, req.SPKSignature); err != nil {
+// 		s.logAudit(ctx, req.UserID, "REGISTER_BUNDLE", "failure", "Invalid SPK signature", bson.M{ /* … */ })
+// 		return fmt.Errorf("invalid SPK signature: %w", err)
+// 	}
 
-	s.logAudit(ctx, req.UserID, "REGISTER_BUNDLE", status, description, bson.M{
-		"num_opks": len(req.OneTimePreKeys),
-		"route":    "/x3dh/register-bundle",
-		"method":   "POST",
-	})
+// 	// Step 2: store (pass crypto down)
+// 	err := s.store.StoreBundle(ctx, req, s.crypto)
+// 	// … audit as you had …
+// 	return err
+// }
 
-	return err
-}
 func (s *BundleService) logAudit(ctx context.Context, userID, action, status, description string, metadata bson.M) {
 	userAgent, _ := ctx.Value("user-agent").(string)
 
@@ -136,7 +123,10 @@ func (s *BundleService) GetBundle(ctx context.Context, userID string) (*BundleRe
 		})
 		return nil, fmt.Errorf("get OPK: %w", err)
 	}
-
+	var opkPub, opkID string
+	if opk != nil {
+		opkPub, opkID = opk.PublicKey, opk.ID // return client key id
+	}
 	s.logAudit(ctx, userID, "GET_BUNDLE", "success", "Fetched X3DH bundle", bson.M{
 		"has_opk": opk != nil,
 		"route":   "/x3dh/bundle/:user_id",
@@ -147,7 +137,8 @@ func (s *BundleService) GetBundle(ctx context.Context, userID string) (*BundleRe
 		IdentityKey:   ik.PublicKey,
 		SignedPreKey:  spk.PublicKey,
 		SPKSignature:  spk.Signature,
-		OneTimePreKey: opk.PublicKey,
+		OneTimePreKey: opkPub,
+		OPKID:         opkID,
 	}, nil
 }
 
@@ -169,36 +160,70 @@ func (s *BundleService) RefillOPKs(ctx context.Context, userID string, opks []On
 
 	return err
 }
-
-func verifySPKSignature(identityKeyHex, spkHex, sigHex string) error {
-	identityKey, err := hex.DecodeString(identityKeyHex)
-	if err != nil {
-		return fmt.Errorf("invalid identity key: %w", err)
+func decodeAnyB64(s string) ([]byte, error) {
+	// Try URL-safe without padding first
+	if decoded, err := base64.RawURLEncoding.DecodeString(s); err == nil {
+		return decoded, nil
 	}
-	if len(identityKey) != ed25519.PublicKeySize {
-		return fmt.Errorf("identity key length invalid")
+	// Try URL-safe with padding
+	if decoded, err := base64.URLEncoding.DecodeString(s); err == nil {
+		return decoded, nil
+	}
+	// Fallback to standard base64
+	return base64.StdEncoding.DecodeString(s)
+}
+func NewBundleServiceWithMongo(store KeyStore, crypto CryptoService, auditor *MongoAuditLogger) *BundleService {
+	return &BundleService{store: store, crypto: crypto, auditor: auditor}
+}
+
+// bundle_service.go
+func verifySPKSignatureBase64(identityKeyB64, spkB64, sigB64 string) error {
+	log.Printf("[x3dh] IK base64 len=%d", len(identityKeyB64))
+
+	ik, err := decodeAnyB64(identityKeyB64)
+	if err != nil || len(ik) != ed25519.PublicKeySize {
+		return fmt.Errorf("invalid IK: %w", err)
 	}
 
-	spk, err := hex.DecodeString(spkHex)
-	if err != nil {
-		return fmt.Errorf("invalid signed prekey: %w", err)
+	spk, err := decodeAnyB64(spkB64)
+	if err != nil || len(spk) != ed25519.PublicKeySize {
+		return fmt.Errorf("invalid SPK: %w", err)
 	}
 
-	sig, err := hex.DecodeString(sigHex)
-	if err != nil {
+	sig, err := decodeAnyB64(sigB64)
+	if err != nil || len(sig) != ed25519.SignatureSize {
 		return fmt.Errorf("invalid signature: %w", err)
 	}
-	if len(sig) != ed25519.SignatureSize {
-		return fmt.Errorf("signature length invalid")
-	}
 
-	if !ed25519.Verify(identityKey, spk, sig) {
+	if !ed25519.Verify(ed25519.PublicKey(ik), spk, sig) {
 		return fmt.Errorf("signature verification failed")
 	}
 	return nil
 }
 
+func (s *BundleService) StoreBundle(ctx context.Context, req RegisterBundleRequest) error {
+	if err := verifySPKSignatureBase64(req.IdentityKey, req.SignedPreKey, req.SPKSignature); err != nil {
+		s.logAudit(ctx, req.UserID, "REGISTER_BUNDLE", "failure", "Invalid SPK signature", nil)
+		return fmt.Errorf("invalid SPK signature: %w", err)
+	}
+	return s.store.StoreBundle(ctx, req, s.crypto)
+}
+
 func (s *BundleService) RotateSPK(ctx context.Context, userID, newSPK, signature string, expiresAt *time.Time) error {
-	// 🔐 (Optional) Verify the signature before rotating
+	ik, err := s.store.GetIdentityKey(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("fetch IK: %w", err)
+	}
+
+	if err := verifySPKSignatureBase64(ik.PublicKey, newSPK, signature); err != nil {
+		s.logAudit(ctx, userID, "ROTATE_SPK", "failure", "Invalid SPK signature", nil)
+		return fmt.Errorf("invalid SPK signature: %w", err)
+	}
 	return s.store.RotateSignedPreKey(ctx, userID, newSPK, signature, expiresAt)
+}
+
+// bundle_service.go
+func (s *BundleService) CountAvailableOPKs(ctx context.Context, userID string) (int, error) {
+	// Delegate to the store (repo)
+	return s.store.CountAvailableOPKs(ctx, userID)
 }

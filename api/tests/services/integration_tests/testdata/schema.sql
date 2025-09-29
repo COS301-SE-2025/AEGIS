@@ -469,3 +469,53 @@ CREATE INDEX IF NOT EXISTS idx_evidence_case_id ON evidence(case_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_tenant_id ON evidence(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_team_id ON evidence(team_id);
 CREATE INDEX IF NOT EXISTS idx_evidence_checksum ON evidence(checksum);
+
+-- Create evidence_log table
+CREATE TABLE IF NOT EXISTS evidence_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    evidence_id UUID NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
+    action VARCHAR(100) NOT NULL,
+    timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+    details TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Create report_sections table
+CREATE TABLE IF NOT EXISTS report_sections (
+    id VARCHAR(24) PRIMARY KEY, -- MongoDB ObjectID as string
+    report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+    section_name VARCHAR(255) NOT NULL,
+    content TEXT,
+    section_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Fix case_status enum (add 'archived' if it doesn't exist)
+DO $$ 
+BEGIN
+    -- Check if 'archived' exists in the enum
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_enum 
+        WHERE enumlabel = 'archived' 
+        AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'case_status')
+    ) THEN
+        ALTER TYPE case_status ADD VALUE 'archived';
+    END IF;
+END $$;
+
+-- Ensure all required tables exist
+CREATE TABLE IF NOT EXISTS timeline_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    event_type VARCHAR(100) NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    case_id UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    created_by UUID NOT NULL REFERENCES users(id),
+    tenant_id UUID NOT NULL,
+    team_id UUID NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    deleted_at TIMESTAMP
+);
