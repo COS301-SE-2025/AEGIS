@@ -1,0 +1,44 @@
+name: Full Security Scan
+on: [push, pull_request]
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+          npx serve dist -p 3000 --single &
+          sleep 10
+
+      - name: Start Backend Services
+        run: |
+          docker-compose up -d backend 
+          sleep 30
+
+      - name: Backend Security Scan
+        run: |
+          docker run --rm --network host \
+          ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+          -t http://localhost:8080 \
+          -r backend_report.html \
+          -d
+
+      # - name: Frontend Security Scan
+      #   run: |
+      #     docker run --rm --network host \
+      #     ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+      #     -t http://localhost:3000 \
+      #     -r frontend_report.html \
+      #     -d
+
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            backend_report.html
+            frontend_report.html

@@ -1,0 +1,37 @@
+version: '3.8'
+services:
+  chaos-mesh:
+    image: ghcr.io/chaos-mesh/chaos-mesh:latest
+    container_name: chaos-mesh
+    ports:
+      - "2333:2333"  # Dashboard
+      - "2334:2334"  # Chaos Daemon
+    environment:
+      - NAMESPACE=default
+      - TZ=UTC
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./chaos-data:/data
+    privileged: true
+    networks:
+      - aegis_default
+
+  chaos-dashboard:
+    image: ghcr.io/chaos-mesh/chaos-dashboard:latest
+    container_name: chaos-dashboard
+    ports:
+      - "2335:2335"
+    environment:
+      - LISTEN_HOST=0.0.0.0
+      - LISTEN_PORT=2335
+      - DATABASE_URL=/data/chaos-mesh.sqlite
+    volumes:
+      - ./chaos-data:/data
+    depends_on:
+      - chaos-mesh
+    networks:
+      - aegis_default
+
+networks:
+  aegis_default:
+    external: true
