@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+<OWASPZAPReport programName="ZAP" version="2.16.1" generated="Mon, 29 Sept 2025 01:39:30" created="2025-09-29T01:39:30.367453078Z">
+	
+		<site name="https://aegis-backend-1:8443" host="aegis-backend-1" port="8443" ssl="true">
+			<alerts>
+				
+					<alertitem>
+						<pluginid>10035</pluginid>
+						<alertRef>10035-1</alertRef>
+						<alert>Strict-Transport-Security Header Not Set</alert>
+						<name>Strict-Transport-Security Header Not Set</name>
+						<riskcode>1</riskcode>
+						<confidence>3</confidence>
+						<riskdesc>Low (High)</riskdesc>
+						<confidencedesc>High</confidencedesc>
+						<desc>&lt;p&gt;HTTP Strict Transport Security (HSTS) is a web security policy mechanism whereby a web server declares that complying user agents (such as a web browser) are to interact with it using only secure HTTPS connections (i.e. HTTP layered over TLS/SSL). HSTS is an IETF standards track protocol and is specified in RFC 6797.&lt;/p&gt;</desc>
+						<instances>
+							
+								<instance>
+									<uri>https://aegis-backend-1:8443</uri>
+									<method>GET</method>
+									<param></param>
+									<attack></attack>
+									<evidence></evidence>
+									<otherinfo></otherinfo>
+								</instance>
+							
+						</instances>
+						<count>1</count>
+						<solution>&lt;p&gt;Ensure that your web server, application server, load balancer, etc. is configured to enforce Strict-Transport-Security.&lt;/p&gt;</solution>
+						<otherinfo></otherinfo>
+						<reference>&lt;p&gt;https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Strict_Transport_Security_Cheat_Sheet.html&lt;/p&gt;&lt;p&gt;https://owasp.org/www-community/Security_Headers&lt;/p&gt;&lt;p&gt;https://en.wikipedia.org/wiki/HTTP_Strict_Transport_Security&lt;/p&gt;&lt;p&gt;https://caniuse.com/stricttransportsecurity&lt;/p&gt;&lt;p&gt;https://datatracker.ietf.org/doc/html/rfc6797&lt;/p&gt;</reference>
+						<cweid>319</cweid>
+						<wascid>15</wascid>
+						<sourceid>6</sourceid>
+					</alertitem>
+				
+				
+					<alertitem>
+						<pluginid>10049</pluginid>
+						<alertRef>10049-1</alertRef>
+						<alert>Non-Storable Content</alert>
+						<name>Non-Storable Content</name>
+						<riskcode>0</riskcode>
+						<confidence>2</confidence>
+						<riskdesc>Informational (Medium)</riskdesc>
+						<confidencedesc>Medium</confidencedesc>
+						<desc>&lt;p&gt;The response contents are not storable by caching components such as proxy servers. If the response does not contain sensitive, personal or user-specific information, it may benefit from being stored and cached, to improve performance.&lt;/p&gt;</desc>
+						<instances>
+							
+								<instance>
+									<uri>https://aegis-backend-1:8443</uri>
+									<method>GET</method>
+									<param></param>
+									<attack></attack>
+									<evidence>401</evidence>
+									<otherinfo></otherinfo>
+								</instance>
+							
+							
+								<instance>
+									<uri>https://aegis-backend-1:8443/robots.txt</uri>
+									<method>GET</method>
+									<param></param>
+									<attack></attack>
+									<evidence>401</evidence>
+									<otherinfo></otherinfo>
+								</instance>
+							
+							
+								<instance>
+									<uri>https://aegis-backend-1:8443/sitemap.xml</uri>
+									<method>GET</method>
+									<param></param>
+									<attack></attack>
+									<evidence>401</evidence>
+									<otherinfo></otherinfo>
+								</instance>
+							
+						</instances>
+						<count>3</count>
+						<solution>&lt;p&gt;The content may be marked as storable by ensuring that the following conditions are satisfied:&lt;/p&gt;&lt;p&gt;The request method must be understood by the cache and defined as being cacheable (&quot;GET&quot;, &quot;HEAD&quot;, and &quot;POST&quot; are currently defined as cacheable)&lt;/p&gt;&lt;p&gt;The response status code must be understood by the cache (one of the 1XX, 2XX, 3XX, 4XX, or 5XX response classes are generally understood)&lt;/p&gt;&lt;p&gt;The &quot;no-store&quot; cache directive must not appear in the request or response header fields&lt;/p&gt;&lt;p&gt;For caching by &quot;shared&quot; caches such as &quot;proxy&quot; caches, the &quot;private&quot; response directive must not appear in the response&lt;/p&gt;&lt;p&gt;For caching by &quot;shared&quot; caches such as &quot;proxy&quot; caches, the &quot;Authorization&quot; header field must not appear in the request, unless the response explicitly allows it (using one of the &quot;must-revalidate&quot;, &quot;public&quot;, or &quot;s-maxage&quot; Cache-Control response directives)&lt;/p&gt;&lt;p&gt;In addition to the conditions above, at least one of the following conditions must also be satisfied by the response:&lt;/p&gt;&lt;p&gt;It must contain an &quot;Expires&quot; header field&lt;/p&gt;&lt;p&gt;It must contain a &quot;max-age&quot; response directive&lt;/p&gt;&lt;p&gt;For &quot;shared&quot; caches such as &quot;proxy&quot; caches, it must contain a &quot;s-maxage&quot; response directive&lt;/p&gt;&lt;p&gt;It must contain a &quot;Cache Control Extension&quot; that allows it to be cached&lt;/p&gt;&lt;p&gt;It must have a status code that is defined as cacheable by default (200, 203, 204, 206, 300, 301, 404, 405, 410, 414, 501).&lt;/p&gt;</solution>
+						<otherinfo></otherinfo>
+						<reference>&lt;p&gt;https://datatracker.ietf.org/doc/html/rfc7234&lt;/p&gt;&lt;p&gt;https://datatracker.ietf.org/doc/html/rfc7231&lt;/p&gt;&lt;p&gt;https://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html&lt;/p&gt;</reference>
+						<cweid>524</cweid>
+						<wascid>13</wascid>
+						<sourceid>6</sourceid>
+					</alertitem>
+				
+			</alerts>
+		</site>
+	
+</OWASPZAPReport>

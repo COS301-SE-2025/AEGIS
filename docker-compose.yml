@@ -135,7 +135,9 @@ services:
     depends_on:
       postgres:
         condition: service_started
+        #condition: service_healthy
       mongo:
+        #condition: service_healthy
         condition: service_started
       ipfs:
         condition: service_started
