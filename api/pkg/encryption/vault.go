@@ -107,3 +107,13 @@ func (v *VaultEncryptionService) Decrypt(ctx context.Context, ciphertext string)
     
     return plaintext, nil
 }
+
+func IsEncryptedFormat(value string) bool {
+	if len(value) < 6 {
+		return false
+	}
+	// Vault format: "vault:v1:..."
+	// Mock format: "mock::..."
+	return (len(value) > 8 && value[:7] == "vault:v") || 
+		   (len(value) > 6 && value[:6] == "mock::")
+}
