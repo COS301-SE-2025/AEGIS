@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"aegis-api/db"
-	"fmt"
+
 
 	"aegis-api/handlers"
 	"aegis-api/middleware"
@@ -118,18 +118,7 @@ func main() {
 	}
 	permChecker := &middleware.DBPermissionChecker{DB: sqlDB}
 
-	// ─── Initialize Encryption ──────────────────────────────────
-	// Initialize encryption with master key
-	// if err := encryption.Init(); err != nil {
-	// 	log.Fatal("encryption init failed:", err)
-	// }
 
-	// Test encryption
-	enc, _ := encryption.Encrypt("secret123")
-	fmt.Println("Encrypted:", enc)
-
-	dec, _ := encryption.Decrypt(enc)
-	fmt.Println("Decrypted:", string(dec))
 
 	// ─── websocket ─────────────────────────────────
 
