@@ -98,6 +98,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.GET("/cases/:case_id", h.CaseHandler.GetCaseByIDHandler)
 
 		protected.GET("/tenants/:tenantId/cases/:case_id/ioc-graph", middleware.AuthMiddleware(), h.IOCHandler.GetCaseIOCGraph)
+		protected.GET("tenants/:tenantId/ioc-graph", middleware.AuthMiddleware(), h.IOCHandler.GetTenantIOCGraph)
 		protected.POST("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.AddIOCToCase)
 		protected.GET("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.GetIOCsByCase)
 		// ______timeline routes______________

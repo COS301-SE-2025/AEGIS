@@ -485,6 +485,7 @@ const handleSendMessage = async (overrideText?: string) => {
   if (!text.trim() || !selectedThread) return;
 
   try {
+    
     if (user.id !== selectedThread.createdBy) {
       try {
         await addThreadParticipant(selectedThread.id, user.id);

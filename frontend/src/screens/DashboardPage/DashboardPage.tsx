@@ -751,7 +751,7 @@ useEffect(() => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <input
-                className="w-80 h-12 bg-card border border-border rounded-lg pl-10 pr-4 text-white placeholder-gray-400 focus:outline-none focus:border-primary/10"
+                className="w-80 h-12 bg-card border border-border rounded-lg pl-10 pr-4 text-foreground/80 placeholder-gray-400 focus:outline-none focus:border-primary/10"
                 placeholder="Search cases"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
