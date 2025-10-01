@@ -75,6 +75,7 @@ type Handler struct {
 	TimelineAIHandler     *TimelineAIHandler
 	EvidenceHandler       *EvidenceHandler
 	ChainOfCustodyHandler *ChainOfCustodyHandler
+	EncryptionHandler	*EncryptionHandler
 }
 
 func NewHandler(
@@ -114,6 +115,7 @@ func NewHandler(
 	EvidenceHandler *EvidenceHandler,
 	ChainOfCustodyHandler *ChainOfCustodyHandler,
 	healthHandler *HealthHandler,
+	EncryptionHandler *EncryptionHandler,
 
 ) *Handler {
 	return &Handler{
@@ -153,6 +155,7 @@ func NewHandler(
 		EvidenceHandler:       EvidenceHandler,
 		ChainOfCustodyHandler: ChainOfCustodyHandler,
 		HealthHandler:         healthHandler,
+		EncryptionHandler:    EncryptionHandler,
 	}
 }
 
