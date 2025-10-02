@@ -1,5 +1,10 @@
 package messages
 
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // ThreadMessage represents a message in an annotation thread.
 type ThreadMessage struct {
@@ -17,8 +22,6 @@ type ThreadMessage struct {
 	Mentions  []MessageMention  `gorm:"foreignKey:MessageID"`
 	Reactions []MessageReaction `gorm:"foreignKey:MessageID"`
 }
-
-
 
 // MessageMention represents a mention in a thread message.
 type MessageMention struct {
