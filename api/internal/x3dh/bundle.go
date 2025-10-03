@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"time"
+	"encoding/base64"
 
 	"go.mongodb.org/mongo-driver/bson"
 )

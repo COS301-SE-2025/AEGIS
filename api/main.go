@@ -52,7 +52,7 @@ import (
 	"aegis-api/services_/user/profile"
 	"aegis-api/pkg/encryption"
 
-	//"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -119,18 +119,7 @@ func main() {
 	}
 	permChecker := &middleware.DBPermissionChecker{DB: sqlDB}
 
-	// ─── Initialize Encryption ──────────────────────────────────
-	// Initialize encryption with master key
-	// if err := encryption.Init(); err != nil {
-	// 	log.Fatal("encryption init failed:", err)
-	// }
-
-	// Test encryption
-	enc, _ := encryption.Encrypt("secret123")
-	fmt.Println("Encrypted:", enc)
-
-	dec, _ := encryption.Decrypt(enc)
-	fmt.Println("Decrypted:", string(dec))
+	
 
 	//--Gin setup for HTTPS--
 	r := gin.Default()
