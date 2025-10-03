@@ -330,7 +330,7 @@ func (h *ReportHandler) GenerateReport(c *gin.Context) {
 	}
 
 	// 2) Otherwise create it
-	claims := MustClaims(c) // your JWT claims extraction (user/team/tenant)
+	claims := MustClaims(c)
 	rep, genErr := h.ReportService.GenerateReport(ctx, caseID, claims.UserID, claims.TenantID, claims.TeamID)
 	if genErr != nil {
 		// If a parallel request created it, surface the existing one
@@ -344,10 +344,21 @@ func (h *ReportHandler) GenerateReport(c *gin.Context) {
 		return
 	}
 
+	// ADD CRITICAL NIL CHECKS HERE
+	if rep == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "generated report is nil"})
+		return
+	}
+
+	if rep.CaseID == uuid.Nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "report has invalid case ID"})
+		return
+	}
+
 	// Use rep.CaseID (not rep.Metadata)
 	caseObj, caseErr := h.CaseService.GetCaseByID(ctx, rep.CaseID.String())
 	var caseMap map[string]any
-	if caseErr == nil {
+	if caseErr == nil && caseObj != nil {
 		switch v := caseObj.(type) {
 		case map[string]any:
 			caseMap = v
@@ -358,17 +369,26 @@ func (h *ReportHandler) GenerateReport(c *gin.Context) {
 	} else {
 		caseMap = map[string]any{}
 	}
+
+	// Safely extract case properties with fallbacks
+	caseIDVal := caseMap["ID"]
+	caseName := caseMap["Name"]
+	caseStatus := caseMap["Status"]
+	description := caseMap["Description"]
+	createdAt := caseMap["CreatedAt"]
+	updatedAt := caseMap["UpdatedAt"]
+
 	c.JSON(http.StatusOK, gin.H{
 		"id":            rep.ID,
 		"name":          rep.Name,
 		"status":        rep.Status,
 		"last_modified": rep.UpdatedAt,
-		"case_id":       caseMap["ID"],
-		"case_name":     caseMap["Name"],
-		"case_status":   caseMap["Status"],
-		"description":   caseMap["Description"],
-		"created_at":    caseMap["CreatedAt"],
-		"updated_at":    caseMap["UpdatedAt"],
+		"case_id":       caseIDVal,
+		"case_name":     caseName,
+		"case_status":   caseStatus,
+		"description":   description,
+		"created_at":    createdAt,
+		"updated_at":    updatedAt,
 	})
 }
 

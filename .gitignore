@@ -79,4 +79,8 @@ out/
 
 .DS_Store
 
+#local certicates
+certs/
+.pem 
+
 
