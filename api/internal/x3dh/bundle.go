@@ -169,6 +169,18 @@ func (s *BundleService) RefillOPKs(ctx context.Context, userID string, opks []On
 
 	return err
 }
+func decodeAnyB64(s string) ([]byte, error) {
+	// Try URL-safe without padding first
+	if decoded, err := base64.RawURLEncoding.DecodeString(s); err == nil {
+		return decoded, nil
+	}
+	// Try URL-safe with padding
+	if decoded, err := base64.URLEncoding.DecodeString(s); err == nil {
+		return decoded, nil
+	}
+	// Fallback to standard base64
+	return base64.StdEncoding.DecodeString(s)
+}
 
 func verifySPKSignature(identityKeyHex, spkHex, sigHex string) error {
 	identityKey, err := hex.DecodeString(identityKeyHex)

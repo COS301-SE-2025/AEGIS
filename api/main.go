@@ -47,6 +47,7 @@ import (
 	"aegis-api/services_/timeline"
 
 	
+	
 	"aegis-api/services_/health"
 	"aegis-api/services_/user/profile"
 	"aegis-api/pkg/encryption"
@@ -118,7 +119,23 @@ func main() {
 	}
 	permChecker := &middleware.DBPermissionChecker{DB: sqlDB}
 
+	// ─── Initialize Encryption ──────────────────────────────────
+	// Initialize encryption with master key
+	// if err := encryption.Init(); err != nil {
+	// 	log.Fatal("encryption init failed:", err)
+	// }
 
+	// Test encryption
+	enc, _ := encryption.Encrypt("secret123")
+	fmt.Println("Encrypted:", enc)
+
+	dec, _ := encryption.Decrypt(enc)
+	fmt.Println("Decrypted:", string(dec))
+
+	//--Gin setup for HTTPS--
+	r := gin.Default()
+	// Enforce HTTPS and add HSTS headers
+	r.Use(gin.Recovery())
 
 	// ─── websocket ─────────────────────────────────
 
