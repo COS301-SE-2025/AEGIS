@@ -182,8 +182,7 @@ func (h *CaseHandler) GetFilteredCasesHandler(c *gin.Context) {
 
 	// Always filter by user/team access
 	cases, err := h.ListCasesService.GetFilteredCases(
-		tenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order, userID, teamID,
-	)
+		tenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order, userID, teamID)
 	if err != nil {
 		fmt.Printf("[GetFilteredCasesHandler] failed: %v\n", err)
 		h.auditLogger.Log(c, auditlog.AuditLog{

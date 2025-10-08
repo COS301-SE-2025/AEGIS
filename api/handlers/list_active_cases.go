@@ -4,7 +4,6 @@ import (
 	"aegis-api/cache"
 	"aegis-api/middleware"
 	"aegis-api/services_/auditlog"
-	"aegis-api/services_/case/ListCases"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,23 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Assuming your ListCases service looks like this:
-type ListCasesService interface {
-	//ListActiveCases(userID string) ([]ListActiveCases.ActiveCase, error)
-	GetAllCases(tenantID string) ([]ListCases.Case, error)
-	GetCasesByUser(userID string, tenantID string) ([]ListCases.Case, error)
-	GetFilteredCases(TenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order string, userID, teamID string) ([]ListCases.Case, error)
-	GetCaseByID(caseID string, tenantID string) (*ListCases.Case, error)
-}
-
-type CaseListHandler struct {
-	Service ListCasesService
-}
-
-func NewCaseListHandler(service ListCasesService) *CaseListHandler {
-	return &CaseListHandler{Service: service}
-}
-
+// ✅ Keep the receiver as CaseHandler and use the correct field name
 func (h *CaseHandler) ListActiveCasesHandler(c *gin.Context) {
 	userIDv, uok := c.Get("userID")
 	tenantIDv, tok := c.Get("tenantID")
@@ -62,20 +45,22 @@ func (h *CaseHandler) ListActiveCasesHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	// 1) Try cache (HIT)
-	if raw, ok, _ := h.Cache.Get(ctx, key); ok {
-		etag := cache.ListETag([]byte(raw))
-		if middleware.IfNoneMatch(c.Writer, c.Request, etag) {
-			c.Header("X-Cache", "REVALIDATED")
+	if h.Cache != nil {
+		if raw, ok, _ := h.Cache.Get(ctx, key); ok {
+			etag := cache.ListETag([]byte(raw))
+			if middleware.IfNoneMatch(c.Writer, c.Request, etag) {
+				c.Header("X-Cache", "REVALIDATED")
+				return
+			}
+			middleware.SetCacheControl(c.Writer, 120)
+			c.Header("X-Cache", "HIT")
+			c.Data(http.StatusOK, "application/json", []byte(raw))
 			return
 		}
-		middleware.SetCacheControl(c.Writer, 120)
-		c.Header("X-Cache", "HIT")
-		c.Data(http.StatusOK, "application/json", []byte(raw))
-		return
 	}
 
-	// 2) MISS → service
-	cases, err := h.CaseService.ListActiveCases(userID, tenantID, teamID)
+	// 2) MISS → service - ✅ Use the correct field name
+	cases, err := h.ListActiveCasesServ.ListActiveCases(userID, tenantID, teamID)
 	if err != nil {
 		h.auditLogger.Log(c, auditlog.AuditLog{
 			Action: "LIST_ACTIVE_CASES", Actor: actor,
@@ -104,16 +89,20 @@ func (h *CaseHandler) ListActiveCasesHandler(c *gin.Context) {
 				"team_id":   teamID,
 			},
 		},
-
 		Service:     "case",
 		Status:      "SUCCESS",
-		Description: fmt.Sprintf("Retrieved %d active cases for user %s", len(cases), userID)})
+		Description: fmt.Sprintf("Retrieved %d active cases for user %s", len(cases), userID),
+	})
 
 	body, _ := json.Marshal(gin.H{
 		"cases": cases,
 		"meta":  gin.H{"page": page, "pageSize": pageSize, "sort": sort, "order": order},
 	})
-	_ = h.Cache.Set(ctx, key, string(body), 120*time.Second)
+
+	// ✅ Add nil check for cache
+	if h.Cache != nil {
+		_ = h.Cache.Set(ctx, key, string(body), 120*time.Second)
+	}
 
 	etag := cache.ListETag(body)
 	if middleware.IfNoneMatch(c.Writer, c.Request, etag) {
@@ -123,12 +112,4 @@ func (h *CaseHandler) ListActiveCasesHandler(c *gin.Context) {
 	middleware.SetCacheControl(c.Writer, 120)
 	c.Header("X-Cache", "MISS")
 	c.Data(http.StatusOK, "application/json", body)
-
-	h.auditLogger.Log(c, auditlog.AuditLog{
-		Action: "LIST_ACTIVE_CASES", Actor: actor,
-		Target: auditlog.Target{Type: "active_case_listing", ID: userID,
-			AdditionalInfo: map[string]string{"tenant_id": tenantID, "team_id": teamID}},
-		Service: "case", Status: "SUCCESS",
-		Description: fmt.Sprintf("You viewed your active cases (%d found).", len(cases)),
-	})
 }

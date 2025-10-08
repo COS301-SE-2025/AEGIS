@@ -529,18 +529,16 @@ func IPThrottleMiddleware(defaultLimit int, window time.Duration, config Endpoin
 func RateLimitMiddleware(defaultLimit int, window time.Duration, config EndpointLimitConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if RedisClient == nil {
-			// If Redis is not available, allow the request to proceed
 			log.Println("⚠️ Redis client not available, skipping rate limiting")
-			c.JSON(503, gin.H{"error": "Rate limiting unavailable"})
-			c.Abort()
+			c.Next()
 			return
 		}
 
 		userID, exists := c.Get("userID")
 		tenantID, tenantExists := c.Get("tenantID")
 		if !exists || !tenantExists {
-			c.JSON(http.StatusUnauthorized, structs.ErrorResponse{
-				Error:   "unauthorized",
+			c.JSON(http.StatusServiceUnavailable, structs.ErrorResponse{
+				Error:   "service_unavailable",
 				Message: "User or tenant not authenticated",
 			})
 			c.Abort()
@@ -551,13 +549,24 @@ func RateLimitMiddleware(defaultLimit int, window time.Duration, config Endpoint
 		path := c.FullPath()
 		roleLimit := defaultLimit
 		roleName := "user"
+
+		// Fix: Check for both "role" and "userRole" keys
 		if role, ok := c.Get("role"); ok {
+			roleName, _ = role.(string)
+		} else if role, ok := c.Get("userRole"); ok {
 			roleName, _ = role.(string)
 		}
 
-		// Tenant Admins/DFIR Admins get higher limits
-		if roleName == "Tenant Admin" || roleName == "DFIR Admin" {
+		// Apply role-based multipliers
+		switch roleName {
+		case "Tenant Admin":
 			roleLimit = defaultLimit * 5
+		case "Admin":
+			roleLimit = defaultLimit * 3
+		case "DFIR Admin":
+			roleLimit = defaultLimit * 5
+		default:
+			roleLimit = defaultLimit
 		}
 
 		// Granular override
@@ -569,40 +578,29 @@ func RateLimitMiddleware(defaultLimit int, window time.Duration, config Endpoint
 			}
 		}
 
-		// Sliding window for user
-		userKey := fmt.Sprintf("user_sliding_window:%s:%s:%s", userID, method, path)
-		tenantKey := fmt.Sprintf("tenant_sliding_window:%s:%s:%s", tenantID, method, path)
+		// Use consistent key format - simplified for rate limiting
+		key := fmt.Sprintf("rate_limit:%s:%s", userID, tenantID)
 		now := time.Now().Unix()
 		windowSec := int64(window.Seconds())
 
 		// Remove old timestamps
-		if err := RedisClient.ZRemRangeByScore(ctx, userKey, "-inf", fmt.Sprintf("%d", now-windowSec)).Err(); err != nil {
+		if err := RedisClient.ZRemRangeByScore(ctx, key, "-inf", fmt.Sprintf("%d", now-windowSec)).Err(); err != nil {
 			log.Printf("Redis error in rate limiting: %v", err)
-			c.Next() // Continue without rate limiting on Redis error
-			return
-		}
-		if err := RedisClient.ZRemRangeByScore(ctx, tenantKey, "-inf", fmt.Sprintf("%d", now-windowSec)).Err(); err != nil {
-			log.Printf("Redis error in rate limiting: %v", err)
-			c.Next() // Continue without rate limiting on Redis error
+			c.Next()
 			return
 		}
 
 		// Count requests in window
-		userCount, err := RedisClient.ZCard(ctx, userKey).Result()
+		count, err := RedisClient.ZCard(ctx, key).Result()
 		if err != nil {
 			log.Printf("Redis error in rate limiting: %v", err)
-			c.Next() // Continue without rate limiting on Redis error
-			return
-		}
-		tenantCount, err := RedisClient.ZCard(ctx, tenantKey).Result()
-		if err != nil {
-			log.Printf("Redis error in rate limiting: %v", err)
-			c.Next() // Continue without rate limiting on Redis error
+			c.Next()
 			return
 		}
 
-		if int(userCount) >= roleLimit || int(tenantCount) >= roleLimit*20 {
-			fmt.Fprintf(os.Stderr, "[THROTTLE] User %v or Tenant %v hit limit for %s %s at %v\n", userID, tenantID, method, path, now)
+		if int(count) >= roleLimit {
+			fmt.Fprintf(os.Stderr, "[THROTTLE] User %v hit limit for %s %s at %v (role: %s, limit: %d)\n",
+				userID, method, path, now, roleName, roleLimit)
 			c.JSON(http.StatusTooManyRequests, structs.ErrorResponse{
 				Error:   "rate_limited",
 				Message: fmt.Sprintf("Too many requests, slow down (role: %s)", roleName),
@@ -611,21 +609,16 @@ func RateLimitMiddleware(defaultLimit int, window time.Duration, config Endpoint
 			return
 		}
 
-		// Add current timestamp
-		if err := RedisClient.ZAdd(ctx, userKey, redis.Z{Score: float64(now), Member: now}).Err(); err != nil {
+		// Add current timestamp with unique member to avoid duplicates
+		member := fmt.Sprintf("%d_%d", now, time.Now().UnixNano())
+		if err := RedisClient.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: member}).Err(); err != nil {
 			log.Printf("Redis error in rate limiting: %v", err)
-			c.Next() // Continue without rate limiting on Redis error
-			return
-		}
-		if err := RedisClient.ZAdd(ctx, tenantKey, redis.Z{Score: float64(now), Member: now}).Err(); err != nil {
-			log.Printf("Redis error in rate limiting: %v", err)
-			c.Next() // Continue without rate limiting on Redis error
+			c.Next()
 			return
 		}
 
 		// Set expiry
-		RedisClient.Expire(ctx, userKey, window)
-		RedisClient.Expire(ctx, tenantKey, window)
+		RedisClient.Expire(ctx, key, window)
 		c.Next()
 	}
 }

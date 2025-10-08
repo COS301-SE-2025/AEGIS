@@ -13,6 +13,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Add this method to safely log audit events
+func (h *CaseHandler) safeAuditLog(c *gin.Context, log auditlog.AuditLog) {
+	if h.auditLogger != nil {
+		h.auditLogger.Log(c, log)
+	}
+}
 func (h *CaseHandler) ListClosedCasesHandler(c *gin.Context) {
 	log.Println(">>> ListClosedCasesHandler called")
 
@@ -70,7 +76,7 @@ func (h *CaseHandler) ListClosedCasesHandler(c *gin.Context) {
 			c.Header("Cache-Control", "private, max-age=120")
 			log.Println(">>> Responding with 304 Not Modified (cache REVALIDATED)")
 			c.Status(http.StatusNotModified)
-			h.auditLogger.Log(c, auditlog.AuditLog{
+			h.safeAuditLog(c, auditlog.AuditLog{
 				Action: "LIST_CLOSED_CASES",
 				Actor:  actor,
 				Target: auditlog.Target{
@@ -96,7 +102,7 @@ func (h *CaseHandler) ListClosedCasesHandler(c *gin.Context) {
 		log.Println(">>> Responding with 200 OK (cache HIT)")
 		c.Data(http.StatusOK, "application/json", []byte(raw))
 
-		h.auditLogger.Log(c, auditlog.AuditLog{
+		h.safeAuditLog(c, auditlog.AuditLog{
 			Action: "LIST_CLOSED_CASES",
 			Actor:  actor,
 			Target: auditlog.Target{
@@ -118,7 +124,7 @@ func (h *CaseHandler) ListClosedCasesHandler(c *gin.Context) {
 	if err != nil {
 		log.Println(">>> ERROR: CaseService.ListClosedCases failed:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not list closed cases"})
-		h.auditLogger.Log(c, auditlog.AuditLog{
+		h.safeAuditLog(c, auditlog.AuditLog{
 			Action: "LIST_CLOSED_CASES",
 			Actor:  actor,
 			Target: auditlog.Target{
@@ -165,7 +171,7 @@ func (h *CaseHandler) ListClosedCasesHandler(c *gin.Context) {
 	log.Println(">>> Responding with 200 OK (cache MISS)")
 	c.JSON(http.StatusOK, payload)
 
-	h.auditLogger.Log(c, auditlog.AuditLog{
+	h.safeAuditLog(c, auditlog.AuditLog{
 		Action: "LIST_CLOSED_CASES",
 		Actor:  actor,
 		Target: auditlog.Target{

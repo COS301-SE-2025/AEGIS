@@ -1,5 +1,7 @@
 package ListActiveCases
 
+import "context"
+
 type Service struct {
 	repo ActiveCaseQueryRepository
 }
@@ -11,5 +13,5 @@ func NewService(repo ActiveCaseQueryRepository) *Service {
 // Updated to accept tenantID and teamID for multi-tenancy
 func (s *Service) ListActiveCases(userID string, tenantID string, teamID string) ([]ActiveCase, error) {
 	// Repo will filter by user, tenant, and team
-	return s.repo.GetActiveCasesByUserID(nil, userID, tenantID, teamID)
+	return s.repo.GetActiveCasesByUserID(context.TODO(), userID, tenantID, teamID)
 }
