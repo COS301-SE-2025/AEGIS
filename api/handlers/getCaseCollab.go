@@ -10,12 +10,21 @@ import (
 	"github.com/google/uuid"
 )
 
-type GetCollaboratorsHandler struct {
-	service     *get_collaborators.Service
-	auditLogger *auditlog.AuditLogger
+// Add interfaces for dependency injection
+type CollaboratorService interface {
+	GetCollaborators(caseID uuid.UUID) ([]get_collaborators.Collaborator, error)
 }
 
-func NewGetCollaboratorsHandler(service *get_collaborators.Service, auditLogger *auditlog.AuditLogger) *GetCollaboratorsHandler {
+type AuditService interface {
+	Log(c *gin.Context, log auditlog.AuditLog) error
+}
+
+type GetCollaboratorsHandler struct {
+	service     CollaboratorService // Changed from concrete type to interface
+	auditLogger AuditService        // Changed from concrete type to interface
+}
+
+func NewGetCollaboratorsHandler(service CollaboratorService, auditLogger AuditService) *GetCollaboratorsHandler {
 	return &GetCollaboratorsHandler{
 		service:     service,
 		auditLogger: auditLogger,
