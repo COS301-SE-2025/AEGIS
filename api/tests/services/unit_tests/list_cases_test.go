@@ -8,9 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,13 +21,9 @@ type MockListCasesQueryRepository struct {
 
 func (m *MockListCasesQueryRepository) GetAllCases(tenantID string) ([]case_creation.Case, error) {
 	args := m.Called(tenantID)
-func (m *MockListCasesQueryRepository) GetAllCases(tenantID string) ([]case_creation.Case, error) {
-	args := m.Called(tenantID)
 	return args.Get(0).([]case_creation.Case), args.Error(1)
 }
 
-func (m *MockListCasesQueryRepository) GetCasesByUser(userID string, tenantID string) ([]case_creation.Case, error) {
-	args := m.Called(userID, tenantID)
 func (m *MockListCasesQueryRepository) GetCasesByUser(userID string, tenantID string) ([]case_creation.Case, error) {
 	args := m.Called(userID, tenantID)
 	return args.Get(0).([]case_creation.Case), args.Error(1)
@@ -114,80 +108,9 @@ func TestGetAllCases_Error(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-// TestGetCasesByUser tests the GetCasesByUser method
 func TestGetCasesByUser(t *testing.T) {
-	// Test 1: Normal case with user cases
-	t.Run("returns cases for user", func(t *testing.T) {
-		mockRepo := new(MockListCasesQueryRepository)
-		service := ListCases.NewListCasesService(mockRepo)
-
-		userID := uuid.New()
-		userIDStr := userID.String()
-		tenantID := uuid.New()
-		tenantIDStr := tenantID.String()
-		caseID1 := uuid.New()
-		caseID2 := uuid.New()
-
-		expectedCases := []case_creation.Case{
-			createTestCase(caseID1, tenantID, "User Case A", "active", "Analysis", userID),
-			createTestCase(caseID2, tenantID, "User Case B", "active", "Recovery", userID),
-		}
-
-		mockRepo.On("GetCasesByUser", userIDStr, tenantIDStr).Return(expectedCases, nil).Once()
-
-		cases, err := service.GetCasesByUser(userIDStr, tenantIDStr)
-
-		assert.NoError(t, err)
-		assert.Equal(t, 2, len(cases), "Expected 2 cases")
-		assert.Equal(t, "User Case A", cases[0].Title)
-		assert.Equal(t, "User Case B", cases[1].Title)
-		assert.Equal(t, tenantID, cases[0].TenantID, "Expected TenantID to be set")
-
-		// Check progress calculation
-		expectedProgress1 := getExpectedProgress("Analysis")
-		expectedProgress2 := getExpectedProgress("Recovery")
-		assert.Equal(t, expectedProgress1, cases[0].Progress, "Expected Progress to be set for case-1")
-		assert.Equal(t, expectedProgress2, cases[1].Progress, "Expected Progress to be set for case-2")
-		mockRepo.AssertExpectations(t)
-	})
-
-	// Test 2: Non-existent user
-	t.Run("returns empty for non-existent user", func(t *testing.T) {
-		mockRepo := new(MockListCasesQueryRepository)
-		service := ListCases.NewListCasesService(mockRepo)
-
-		nonExistentUserID := uuid.New().String()
-		tenantIDStr := uuid.New().String()
-		mockRepo.On("GetCasesByUser", nonExistentUserID, tenantIDStr).Return([]case_creation.Case{}, nil).Once()
-
-		cases, err := service.GetCasesByUser(nonExistentUserID, tenantIDStr)
-		assert.NoError(t, err)
-		assert.Empty(t, cases, "Expected no cases for non-existent user")
-		mockRepo.AssertExpectations(t)
-	})
-
-	// Test 3: Empty results from repository
-	t.Run("handles empty repository results", func(t *testing.T) {
-		mockRepo := new(MockListCasesQueryRepository)
-		service := ListCases.NewListCasesService(mockRepo)
-
-		userIDStr := uuid.New().String()
-		tenantIDStr := uuid.New().String()
-		mockRepo.On("GetCasesByUser", userIDStr, tenantIDStr).Return([]case_creation.Case{}, nil).Once()
-
-		cases, err := service.GetCasesByUser(userIDStr, tenantIDStr)
-		assert.NoError(t, err, "Service should handle empty repository results gracefully")
-		assert.Empty(t, cases, "Expected empty cases when repository returns empty")
-		mockRepo.AssertExpectations(t)
-	})
-}
-
-// TestGetFilteredCases tests the GetFilteredCases method
-func TestGetFilteredCases(t *testing.T) {
-	// Test 1: Filter by status and tenantID
-	t.Run("filters by status", func(t *testing.T) {
-		mockRepo := new(MockListCasesQueryRepository)
-		service := ListCases.NewListCasesService(mockRepo)
+	mockRepo := new(MockListCasesQueryRepository)
+	service := ListCases.NewListCasesService(mockRepo)
 
 	userID := "8fb89568-3c52-4535-af33-d2f1266def52"
 	tenantID := "tenant-123"
@@ -233,12 +156,9 @@ func TestGetCasesByUser_Error(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-// TestGetCaseByID tests the GetCaseByID method
-func TestGetCaseByID(t *testing.T) {
-	// Test 1: Normal case
-	t.Run("returns case by ID", func(t *testing.T) {
-		mockRepo := new(MockListCasesQueryRepository)
-		service := ListCases.NewListCasesService(mockRepo)
+func TestGetCasesByNonexistentUser(t *testing.T) {
+	mockRepo := new(MockListCasesQueryRepository)
+	service := ListCases.NewListCasesService(mockRepo)
 
 	nonexistentUserID := "00000000-0000-0000-0000-000000000999"
 	tenantID := "test-tenant-id"

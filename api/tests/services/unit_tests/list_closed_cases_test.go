@@ -244,7 +244,7 @@ func TestGetClosedCasesByUserID(t *testing.T) {
 	repo := ListClosedCases.NewClosedCaseRepository(gdb)
 	userID := "user-1"
 
-	mock.ExpectQuery(SELECT .* FROM "cases").
+	mock.ExpectQuery(`SELECT .* FROM "cases"`).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "title", "description", "status", "investigation_stage", "priority", "created_by", "created_at",
 		}).AddRow(
@@ -270,7 +270,7 @@ func TestGetClosedCasesByUserID_WithTenantAndTeam(t *testing.T) {
 	tenantID := "tenant-123"
 	teamID := "team-456"
 
-	mock.ExpectQuery(SELECT .* FROM "cases").
+	mock.ExpectQuery(`SELECT .* FROM "cases"`).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "title", "description", "status", "investigation_stage", "priority", "created_by", "created_at",
 		}).AddRow(
@@ -295,7 +295,7 @@ func TestGetClosedCasesByUserID_EmptyResult(t *testing.T) {
 	repo := ListClosedCases.NewClosedCaseRepository(gdb)
 	userID := "nonexistent-user"
 
-	mock.ExpectQuery(SELECT .* FROM "cases").
+	mock.ExpectQuery(`SELECT .* FROM "cases"`).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "title", "description", "status", "investigation_stage", "priority", "created_by", "created_at",
 		}))
@@ -316,7 +316,7 @@ func TestGetClosedCasesByUserID_DatabaseError(t *testing.T) {
 	repo := ListClosedCases.NewClosedCaseRepository(gdb)
 	userID := "user-1"
 
-	mock.ExpectQuery(SELECT .* FROM "cases").
+	mock.ExpectQuery(`SELECT .* FROM "cases"`).
 		WillReturnError(errors.New("database connection lost"))
 
 	cases, err := repo.GetClosedCasesByUserID(context.Background(), userID, "", "")
@@ -343,7 +343,7 @@ func TestGetClosedCasesByUserID_MultipleResults(t *testing.T) {
 		AddRow("678e8400-e80b-41d4-a716-446345440001", "Second Case", "Second Desc", "closed", "resolved", "medium", "987e4567-e89b-34a3-a456-334614174000", time.Now()).
 		AddRow("678e8400-e80b-41d4-a716-446345440002", "Third Case", "Third Desc", "closed", "resolved", "low", "987e4567-e89b-34a3-a456-334614174000", time.Now())
 
-	mock.ExpectQuery(SELECT .* FROM "cases").WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT .* FROM "cases"`).WillReturnRows(rows)
 
 	cases, err := repo.GetClosedCasesByUserID(context.Background(), userID, "", "")
 	assert.NoError(t, err)
@@ -364,7 +364,7 @@ func TestGetClosedCasesByUserID_NilContext(t *testing.T) {
 	repo := ListClosedCases.NewClosedCaseRepository(gdb)
 	userID := "user-1"
 
-	mock.ExpectQuery(SELECT .* FROM "cases").
+	mock.ExpectQuery(`SELECT .* FROM "cases"`).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "title", "description", "status", "investigation_stage", "priority", "created_by", "created_at",
 		}).AddRow(
