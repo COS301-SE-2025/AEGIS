@@ -84,6 +84,9 @@ func NewWebSocketManager(userService UserService, repo ChatRepository) WebSocket
 		userGroups:       make(map[string][]string),
 		typingUsers:      make(map[string]map[string]time.Time),
 		groupConnections: make(map[string]map[string]*websocket.Conn),
+		caseGroups:       make(map[string][]string),                   // ✅ ADD THIS
+		clients:          make(map[string]*sharedws.Client),           // ✅ ADD THIS
+		connection:       make(map[string]map[string]*websocket.Conn), // ✅ ADD THIS
 		userService:      userService,
 
 		repo: repo,
@@ -100,8 +103,10 @@ func NewWebSocketManager(userService UserService, repo ChatRepository) WebSocket
 		},
 	}
 
+	stopChan := make(chan struct{})
+
 	// Start cleanup routine for typing indicators
-	go manager.cleanupTypingIndicators()
+	go manager.cleanupTypingIndicators(stopChan)
 
 	return manager
 }
@@ -461,8 +466,12 @@ func (w *webSocketManager) sendMessageToUser(userEmail string, data []byte) erro
 //		return nil
 //	}
 func (w *webSocketManager) AddUserToGroup(userEmail, groupID, caseID string, conn *websocket.Conn) error {
+	log.Printf("[DEBUG] AddUserToGroup START user=%s group=%s case=%s", userEmail, groupID, caseID)
 	w.mutex.Lock()
-	defer w.mutex.Unlock()
+	defer func() {
+		w.mutex.Unlock()
+		log.Printf("[DEBUG] AddUserToGroup END user=%s group=%s case=%s", userEmail, groupID, caseID)
+	}()
 
 	// Check and add user to groupUsers
 	userAlreadyInGroup := false
@@ -500,8 +509,6 @@ func (w *webSocketManager) AddUserToGroup(userEmail, groupID, caseID string, con
 	go w.notifyUserJoined(groupID, userEmail)
 
 	// Track group under caseID
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
 	w.caseGroups[caseID] = appendUnique(w.caseGroups[caseID], groupID)
 	return nil
 }
@@ -641,27 +648,31 @@ func (w *webSocketManager) broadcastTypingIndicator(groupID, userEmail string, i
 	}
 }
 
-// cleanupTypingIndicators removes stale typing indicators
-func (w *webSocketManager) cleanupTypingIndicators() {
+func (w *webSocketManager) cleanupTypingIndicators(stopChan <-chan struct{}) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		w.mutex.Lock()
-		now := time.Now()
-		for groupID, typingUsers := range w.typingUsers {
-			for userEmail, lastTyping := range typingUsers {
-				if now.Sub(lastTyping) > 10*time.Second {
-					delete(typingUsers, userEmail)
-					// Notify others that user stopped typing
-					go w.broadcastTypingIndicator(groupID, userEmail, false)
+	for {
+		select {
+		case <-ticker.C:
+			w.mutex.Lock()
+			now := time.Now()
+			for groupID, typingUsers := range w.typingUsers {
+				for userEmail, lastTyping := range typingUsers {
+					if now.Sub(lastTyping) > 10*time.Second {
+						delete(typingUsers, userEmail)
+						go w.broadcastTypingIndicator(groupID, userEmail, false)
+					}
+				}
+				if len(typingUsers) == 0 {
+					delete(w.typingUsers, groupID)
 				}
 			}
-			if len(typingUsers) == 0 {
-				delete(w.typingUsers, groupID)
-			}
+			w.mutex.Unlock()
+
+		case <-stopChan:
+			return
 		}
-		w.mutex.Unlock()
 	}
 }
 
