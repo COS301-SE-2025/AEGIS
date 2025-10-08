@@ -8,7 +8,7 @@ import { MentionsDropdown } from './MentionsDropdown';
 
 interface EnhancedEditorProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (_value: string) => void;
   placeholder?: string;
   caseId: string;
   apiBaseUrl?: string;
