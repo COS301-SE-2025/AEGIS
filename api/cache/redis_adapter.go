@@ -7,10 +7,23 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type Redis struct{ rdb *redis.Client }
+// RedisClient interface for mocking
+type RedisClient interface {
+	Get(ctx context.Context, key string) *redis.StringCmd
+	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd
+	Del(ctx context.Context, keys ...string) *redis.IntCmd
+	Scan(ctx context.Context, cursor uint64, match string, count int64) *redis.ScanCmd
+}
+
+type Redis struct{ rdb RedisClient }
 
 func NewRedis(addr, password string, db int) *Redis {
 	return &Redis{rdb: redis.NewClient(&redis.Options{Addr: addr, Password: password, DB: db})}
+}
+
+// NewRedisWithClient allows dependency injection for testing
+func NewRedisWithClient(client RedisClient) *Redis {
+	return &Redis{rdb: client}
 }
 
 func (c *Redis) Get(ctx context.Context, key string) (string, bool, error) {
