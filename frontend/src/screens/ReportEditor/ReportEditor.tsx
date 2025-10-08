@@ -1144,8 +1144,8 @@ const commitEditingTitle = useCallback(async () => {
         .ql-snow .ql-picker-label.ql-active .ql-fill {
           fill: #e5e7eb !important;
         }
-                
-                /* Fix dropdown text colors */
+        
+        /* Fix dropdown text colors */
         .ql-snow .ql-picker-label {
           color: #9ca3af !important;
         }
@@ -1178,14 +1178,45 @@ const commitEditingTitle = useCallback(async () => {
           color: #e5e7eb !important;
         }
 
-        .ql-snow .ql-picker-options .ql-picker-item {
-          color: #e5e7eb !important;
-          background-color: transparent !important;
+        /* Color picker fixes - UPDATED */
+        .ql-snow .ql-color-picker .ql-picker-options,
+        .ql-snow .ql-background-picker .ql-picker-options {
+          background-color: #374151 !important; /* Changed from white to dark gray */
+          border: 1px solid #4b5563 !important;
+          padding: 3px 5px !important;
+          width: 152px !important;
         }
 
-        .ql-snow .ql-picker-options .ql-picker-item:hover {
-          color: #ffffff !important;
-          background-color: #4b5563 !important;
+        .ql-snow .ql-color-picker .ql-picker-item,
+        .ql-snow .ql-background-picker .ql-picker-item {
+          border: 1px solid #4b5563 !important; /* Darker border for dark mode */
+          float: left !important;
+          height: 16px !important;
+          margin: 2px !important;
+          width: 16px !important;
+          padding: 0 !important;
+        }
+
+        .ql-snow .ql-color-picker .ql-picker-item:hover,
+        .ql-snow .ql-background-picker .ql-picker-item:hover {
+          border-color: #9ca3af !important; /* Lighter border on hover for visibility */
+        }
+
+        /* Keep all pickers dark consistently */
+        .ql-snow .ql-picker .ql-picker-options {
+          background-color: #374151 !important;
+          border: 1px solid #4b5563 !important;
+        }
+
+        .ql-snow .ql-picker .ql-picker-item {
+          color: #e5e7eb !important;
+        }
+
+        /* Specific fix for font and size pickers */
+        .ql-snow .ql-font-picker .ql-picker-options,
+        .ql-snow .ql-size-picker .ql-picker-options {
+          background-color: #374151 !important;
+          border: 1px solid #4b5563 !important;
         }
       `}</style>
 
