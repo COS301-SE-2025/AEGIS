@@ -23,7 +23,7 @@ type Bundle struct {
 type BundleService struct {
 	store   KeyStore
 	crypto  CryptoService
-	auditor *MongoAuditLogger
+	auditor AuditLogger
 }
 
 type RegisterBundleRequest struct {
@@ -50,25 +50,31 @@ type BundleResponse struct {
 	OPKID         string `json:"opk_id,omitempty"`
 }
 
+// type BundleServiceInterface interface {
+// 	GetBundle(ctx context.Context, userID string) (*BundleResponse, error)
+// 	StoreBundle(ctx context.Context, req RegisterBundleRequest) error
+// 	RefillOPKs(ctx context.Context, userID string, opks []OneTimePreKeyUpload) error
+// 	RotateSPK(ctx context.Context, userID, newSPK, signature string, expiresAt *time.Time) error
+// 	CountAvailableOPKs(ctx context.Context, userID string) (int, error)
+// }
+
+// // Make sure your actual BundleService implements this interface
+// var _ BundleServiceInterface = (*BundleService)(nil)
+
+type AuditLogger interface {
+	Log(ctx context.Context, log AuditLog) error
+}
+
 // NewBundleService returns a new instance of BundleService
-func NewBundleService(store KeyStore, crypto CryptoService, auditor *MongoAuditLogger) *BundleService {
+func NewBundleService(store KeyStore, crypto CryptoService, auditor AuditLogger) *BundleService {
 	return &BundleService{store: store, crypto: crypto, auditor: auditor}
 }
 
-// func (s *BundleService) StoreBundle(ctx context.Context, req RegisterBundleRequest) error {
-// 	// Step 1: verify SPK signature
-// 	if err := verifySPKSignature(req.IdentityKey, req.SignedPreKey, req.SPKSignature); err != nil {
-// 		s.logAudit(ctx, req.UserID, "REGISTER_BUNDLE", "failure", "Invalid SPK signature", bson.M{ /* … */ })
-// 		return fmt.Errorf("invalid SPK signature: %w", err)
-// 	}
-
-// 	// Step 2: store (pass crypto down)
-// 	err := s.store.StoreBundle(ctx, req, s.crypto)
-// 	// … audit as you had …
-// 	return err
-// }
-
 func (s *BundleService) logAudit(ctx context.Context, userID, action, status, description string, metadata bson.M) {
+
+	if s.auditor == nil {
+		return
+	}
 	userAgent, _ := ctx.Value("user-agent").(string)
 
 	log := AuditLog{
