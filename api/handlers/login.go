@@ -46,7 +46,7 @@ type Handler struct {
 	UserService               UserServiceInterface
 	CaseHandler               *CaseHandler
 	CaseDeletionHandler       *CaseDeletionHandler
-	CaseListHandler           *CaseListHandler
+	CaseListHandler           interface{} // TODO: Replace 'interface{}' with the actual CaseListHandler type when defined/imported
 	UploadHandler             *UploadHandler
 	DownloadHandler           *DownloadHandler
 	MetadataHandler           *MetadataHandler

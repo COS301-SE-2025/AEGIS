@@ -14,22 +14,37 @@ import (
 
 	"aegis-api/cache"
 	update_case "aegis-api/services_/case/case_update"
+	"context"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
+type UpdateCaseServiceInterface interface {
+	UpdateCaseDetails(ctx context.Context, req *update_case.UpdateCaseRequest) (*update_case.UpdateCaseResponse, error)
+}
 type CaseHandler struct {
-	CaseService              CaseServiceInterface
-	ListCasesService         ListCasesService
-	ListActiveCasesServ      ListActiveCasesService
-	auditLogger              *auditlog.AuditLogger
-	ListClosedCasesService   ListClosedCasesService
-	UpdateCaseService        *update_case.Service
+	CaseService            CaseServiceInterface
+	ListCasesService       ListCasesService
+	ListActiveCasesServ    ListActiveCasesService
+	auditLogger            *auditlog.AuditLogger
+	ListClosedCasesService ListClosedCasesService
+	UpdateCaseService      UpdateCaseServiceInterface // Instead of *update_case.Service
+
 	UserRepo                 case_assign.UserRepo // Add UserRepo here
 	ListArchivedCasesService listArchiveCases.ArchiveCaseLister
 	Cache                    cache.Client
 }
+
+// ✅ Add the missing ListCasesService interface
+type ListCasesService interface {
+	GetAllCases(tenantID string) ([]ListCases.Case, error)
+	GetCasesByUser(userID string, tenantID string) ([]ListCases.Case, error)
+	GetFilteredCases(TenantID, status, priority, createdBy, teamName, titleTerm, sortBy, order, userID, teamID string) ([]ListCases.Case, error)
+	GetCaseByID(caseID string, tenantID string) (*ListCases.Case, error)
+}
+
+// ✅ Keep this interface here and remove it from list_active_cases.go
 type ListActiveCasesService interface {
 	ListActiveCases(userID, tenantID, teamID string) ([]ListActiveCases.ActiveCase, error)
 }
@@ -53,7 +68,7 @@ type CaseServices struct {
 
 	assignCase *case_assign.CaseAssignmentService
 	// removeCollaborator *remove_user_from_case.Service
-	UpdateCaseService *update_case.Service
+	UpdateCaseService UpdateCaseServiceInterface // Changed from *update_case.Service
 }
 
 func NewCaseServices(
@@ -63,7 +78,7 @@ func NewCaseServices(
 	assignCase *case_assign.CaseAssignmentService,
 	listClosed *ListClosedCases.Service,
 	listArchived *listArchiveCases.ArchiveCaseService,
-	updateCaseService *update_case.Service,
+	updateCaseService UpdateCaseServiceInterface, // Changed from handlers.UpdateCaseServiceInterface
 ) *CaseServices {
 	return &CaseServices{
 		createCase:        createCase,
@@ -110,7 +125,7 @@ func NewCaseHandler(
 	listArchivedCasesService listArchiveCases.ArchiveCaseLister, // Add ListArchivedCasesService parameter
 	auditLogger *auditlog.AuditLogger,
 	userRepo case_assign.UserRepo, // Inject UserRepo here
-	updateCaseService *update_case.Service,
+	updateCaseService UpdateCaseServiceInterface, // Changed from *update_case.Service
 	cacheClient cache.Client,
 ) *CaseHandler {
 	return &CaseHandler{
