@@ -278,6 +278,21 @@ func (h *Hub) BroadcastToCase(caseID string, message chatModels.WebSocketMessage
 		return fmt.Errorf("broadcast channel is full or unavailable")
 	}
 }
+
+// TestBroadcast is for testing purposes only
+func (h *Hub) TestBroadcast(caseID string, data []byte) {
+	envelope := MessageEnvelope{
+		CaseID: caseID,
+		Data:   data,
+	}
+
+	select {
+	case h.broadcast <- envelope:
+	default:
+		// Handle full channel if needed
+	}
+}
+
 func extractCaseIDFromPath(path string) string {
 	// Example: /ws/cases/<caseId>
 	parts := strings.Split(path, "/")
