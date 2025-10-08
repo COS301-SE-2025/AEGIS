@@ -102,9 +102,9 @@ func (m *MockCacheClosedCases) Del(ctx context.Context, keys ...string) (int, er
 }
 
 // No-op audit logger for testing
-type NoOpAuditLogger struct{}
+type NoOpAuditLogger1 struct{}
 
-func (n *NoOpAuditLogger) Log(c *gin.Context, log auditlog.AuditLog) {
+func (n *NoOpAuditLogger1) Log(c *gin.Context, log auditlog.AuditLog) {
 	// Do nothing
 }
 

@@ -4,31 +4,114 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Deploy over SSH
-        uses: appleboy/ssh-action@v0.1.6
+        uses: appleboy/ssh-action@v1.2.1
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT }}
+          port: ${{ secrets.SERVER_SSH_PORT }}
           script: |
-            cd /home/${{ secrets.SERVER_USER }}/AEGIS
-            git pull origin main
+            set -e  # Exit on any error
 
-            echo "Pulled latest code"
+            PROJECT_DIR="/home/${{ secrets.SERVER_USER }}/AEGIS"
+
+            # Create project directory if it doesn't exist
+            mkdir -p "$PROJECT_DIR"
+            cd "$PROJECT_DIR"
+
+            # Initialize git repository if it doesn't exist
+            if [ ! -d ".git" ]; then
+              echo "Initializing git repository..."
+              git init
+              git remote add origin https://github.com/COS301-SE-2025/AEGIS.git
+            fi
+
+            # Stash any local changes (like untracked .env files)
+            echo "Stashing any local changes..."
+            git stash --include-untracked || true
+
+            # Fetch and pull latest changes
+            echo "Fetching latest code..."
+            git fetch origin main
+            git checkout main 2>/dev/null || git checkout -b main origin/main
+            git reset --hard origin/main  # Force sync with remote (discards local commits)
+
+            echo "Successfully pulled latest code"
+
+            # Restore stashed files (if any, like .env)
+            echo "Restoring local configuration files..."
+            git stash pop || echo "No stashed changes to restore"
+
+            # Ensure environment file exists (create from template if missing)
+            if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+              echo "Creating .env from .env.example..."
+              cp .env.example .env
+              echo "WARNING: Please update .env with production values!"
+            fi
+
+            # Verify Docker is installed
+            if ! command -v docker &> /dev/null; then
+              echo "Error: Docker is not installed on the server" >&2
+              exit 1
+            fi
+
+            # Determine Docker Compose command
+            if docker compose version &> /dev/null; then
+              COMPOSE_CMD="docker compose"
+            elif command -v docker-compose &> /dev/null; then
+              COMPOSE_CMD="docker-compose"
+            else
+              echo "Error: Docker Compose is not installed" >&2
+              exit 1
+            fi
+
+            # Check if docker-compose file exists
+            if [ ! -f "docker-compose.yml" ] && [ ! -f "docker-compose.yaml" ]; then
+              echo "Error: No docker-compose file found" >&2
+              ls -la
+              exit 1
+            fi
 
             echo "Stopping existing containers..."
-            docker-compose down
+            $COMPOSE_CMD down --remove-orphans
 
-            echo "Building and starting fresh containers..."
-            docker-compose up -d --build
+            echo "Removing old images to force rebuild..."
+            docker images | grep aegis | awk '{print $3}' | xargs -r docker rmi -f || true
 
-            echo "Deployment complete!"
+            echo "Building and starting containers..."
+            $COMPOSE_CMD up -d --build --force-recreate
+
+            echo "Waiting for services to start..."
+            sleep 5
+
+            echo "Container status:"
+            $COMPOSE_CMD ps
+
+            echo "Recent logs:"
+            $COMPOSE_CMD logs --tail=20
+
+            # Optional: Health check (uncomment and customize)
+            # echo "Running health check..."
+            # sleep 10
+            # if curl -f http://localhost:80/health; then
+            #   echo "✓ Health check passed"
+            # else
+            #   echo "✗ Health check failed" >&2
+            #   $COMPOSE_CMD logs
+            #   exit 1
+            # fi
+
+            echo "✓ Deployment completed successfully!"

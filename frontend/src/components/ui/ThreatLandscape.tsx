@@ -6,7 +6,7 @@ const ThreatLandscape = ({ userCases }: { userCases: any[] }) => {
   const cyRef = useRef<HTMLDivElement | null>(null);
   const [mode, setMode] = useState<"case" | "network">("case");
   const [selectedCase, setSelectedCase] = useState(userCases[0]?.id || "");
-  const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
+  //const [graphData, setGraphData] = useState({ nodes: [], edges: [] });
   const [tenantId, setTenantId] = useState<string>("");
 
   // Extract tenantId from JWT token on mount

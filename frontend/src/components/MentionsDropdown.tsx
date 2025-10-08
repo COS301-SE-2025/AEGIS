@@ -5,8 +5,8 @@ import { MentionItem } from './useMentions';
 interface MentionsDropdownProps {
   items: MentionItem[];
   selectedIndex: number;
-  onSelect: (item: MentionItem) => void;
-  onClose: () => void;
+  onSelect: (_item: MentionItem) => void;
+  //onClose: () => void;
   loading?: boolean;
   position: { x: number; y: number };
   query: string;
@@ -42,7 +42,7 @@ export const MentionsDropdown: React.FC<MentionsDropdownProps> = ({
   items,
   selectedIndex,
   onSelect,
-  onClose,
+  //onClose,
   loading = false,
   position,
   query

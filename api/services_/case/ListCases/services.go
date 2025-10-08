@@ -36,8 +36,6 @@ func NewListCasesService(repo CaseQueryRepository) *Service {
 	return &Service{repo: repo}
 }
 
-// CaseQueryRepository should have the new method signature
-
 func (s *Service) GetAllCases(tenantID string) ([]Case, error) {
 	cases, err := s.repo.GetAllCases(tenantID)
 	if err != nil {
@@ -55,7 +53,7 @@ func (s *Service) GetAllCases(tenantID string) ([]Case, error) {
 			CreatedBy:          c.CreatedBy,
 			TeamName:           c.TeamName,
 			CreatedAt:          c.CreatedAt,
-			TenantID:           c.TenantID, // Ensure TenantID is included
+			TenantID:           c.TenantID,
 			UpdatedAt:          c.UpdatedAt,
 			Progress:           GetProgressForStage(c.InvestigationStage),
 		}
@@ -80,7 +78,7 @@ func (s *Service) GetCasesByUser(userID string, tenantID string) ([]Case, error)
 			CreatedBy:          c.CreatedBy,
 			TeamName:           c.TeamName,
 			CreatedAt:          c.CreatedAt,
-			TenantID:           c.TenantID, // Ensure TenantID is included
+			TenantID:           c.TenantID,
 			UpdatedAt:          c.UpdatedAt,
 			Progress:           GetProgressForStage(c.InvestigationStage),
 		}
@@ -118,10 +116,35 @@ func (s *Service) GetFilteredCases(
 		SortBy:    sortBy,
 		SortOrder: order,
 		UserID:    userID,
-		TeamID:    teamUUID, // Now correct type
+		TeamID:    teamUUID,
 	}
-	return s.repo.QueryCases(filter)
+
+	// Fix: Map the cases and set Progress field
+	cases, err := s.repo.QueryCases(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]Case, len(cases))
+	for i, c := range cases {
+		result[i] = Case{
+			ID:                 c.ID,
+			Title:              c.Title,
+			Description:        c.Description,
+			Status:             c.Status,
+			Priority:           c.Priority,
+			InvestigationStage: c.InvestigationStage,
+			CreatedBy:          c.CreatedBy,
+			TeamName:           c.TeamName,
+			CreatedAt:          c.CreatedAt,
+			TenantID:           c.TenantID,
+			UpdatedAt:          c.UpdatedAt,
+			Progress:           GetProgressForStage(c.InvestigationStage), // Add this line
+		}
+	}
+	return result, nil
 }
+
 func (s *Service) GetCaseByID(caseID string, tenantID string) (*Case, error) {
 	c, err := s.repo.GetCaseByID(caseID, tenantID)
 	if err != nil {
@@ -137,7 +160,7 @@ func (s *Service) GetCaseByID(caseID string, tenantID string) (*Case, error) {
 		CreatedBy:          c.CreatedBy,
 		TeamName:           c.TeamName,
 		CreatedAt:          c.CreatedAt,
-		TenantID:           c.TenantID, // Ensure TenantID is included
+		TenantID:           c.TenantID,
 		UpdatedAt:          c.UpdatedAt,
 		Progress:           GetProgressForStage(c.InvestigationStage),
 	}

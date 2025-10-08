@@ -17,17 +17,18 @@ func NewAuthService(repo registration.UserRepository) *AuthService {
 func (s *AuthService) Login(email, password string) (*LoginResponse, error) {
 	user, err := s.repo.GetUserByEmail(email)
 	var tenantID, teamID string
-
+	if err != nil {
+		return nil, fmt.Errorf("invalid credentials")
+	}
+	if user == nil {
+		return nil, fmt.Errorf("invalid credentials")
+	}
 	if user.TenantID != nil {
 		tenantID = user.TenantID.String()
 	}
 
 	if user.TeamID != nil {
 		teamID = user.TeamID.String()
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("invalid credentials")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
