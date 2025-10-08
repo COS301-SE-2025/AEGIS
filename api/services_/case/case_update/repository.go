@@ -28,7 +28,7 @@ func (r *GormUpdateCaseRepository) UpdateCase(ctx context.Context, req *UpdateCa
 			"title":               req.Title,
 			"description":         req.Description,
 			"status":              req.Status,
-			"investigation_stage": req.InvestigationStage,
+			"investigation_stage": "Case Closure & Review",
 			"progress":            progress,
 			"updated_at":          time.Now(), // Update the timestamp
 		})
