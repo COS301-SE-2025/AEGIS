@@ -197,7 +197,7 @@ const payload = {
           <div>
             <label className="block mb-1 text-sm">Case Priority</label>
             <Select onValueChange={(value: string) => setForm({ ...form, priority: value })}>
-              <SelectTrigger className="bg-muted border-border text-foreground">
+              <SelectTrigger className="bg-muted border-border text-foreground hover:bg-cyan-800/60">
                 <SelectValue placeholder="Select priority" />
               </SelectTrigger>
               <SelectContent className="bg-zinc-800 text-popover-foreground">
