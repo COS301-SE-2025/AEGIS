@@ -71,12 +71,12 @@ export const TenantAdminDashboard = () => {
       {/* Right: Navigation buttons */}
       <div className="flex gap-4">
           <Link to="/settings">
-          <button className="p-2 text-muted-foreground hover:text-white transition-colors">
+          <button className="p-2 text-muted-foreground transition-colors">
           <Settings className="w-6 h-6" />
           </button>
           </Link>
           <Link to="/notifications">
-          <button className="p-2 text-muted-foreground hover:text-white transition-colors">
+          <button className="p-2 text-muted-foreground  transition-colors">
           <Bell className="w-6 h-6" />
           </button>
           </Link>

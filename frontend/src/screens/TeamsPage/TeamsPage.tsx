@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Input } from "../../components/ui/input";
 import { Pagination } from "../../components/ui/pagination";
 import { jwtDecode } from "jwt-decode";
+import { ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface Team {
   id: string;
@@ -17,7 +19,8 @@ export const TeamsPage = () => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
-const statuses = ["Active", "Inactive"];
+  const statuses = ["Active", "Inactive"];
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTeams = async () => {
@@ -42,11 +45,14 @@ const statuses = ["Active", "Inactive"];
       }
 
       try {
-        const res = await fetch(`https://localhost/api/v1/teams?tenant_id=${tenantId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const res = await fetch(
+          `https://localhost/api/v1/teams?tenant_id=${tenantId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
         if (!res.ok) {
           const errPayload = await res.json();
@@ -55,13 +61,14 @@ const statuses = ["Active", "Inactive"];
         }
         const teamsData = await res.json();
         const mapped = teamsData.map((team: any) => ({
-        id: team.id,
-        name: team.name,
-        manager: team.manager,         // Or dynamically derive from backend later
-        members: 0,             // Placeholder for now
-        status: statuses[Math.floor(Math.random() * statuses.length)], // Random status for demo
-      }));
-      setTeams(mapped);
+          id: team.id,
+          name: team.name,
+          manager: team.manager, // Or dynamically derive from backend later
+          members: 0, // Placeholder for now
+          status:
+            statuses[Math.floor(Math.random() * statuses.length)], // Random status for demo
+        }));
+        setTeams(mapped);
         setFilteredTeams(teamsData);
       } catch (err) {
         console.error("Error fetching teams:", err);
@@ -71,19 +78,26 @@ const statuses = ["Active", "Inactive"];
     fetchTeams();
   }, []);
 
-useEffect(() => {
-  const filtered = teams.filter(
-    (t) =>
-      typeof t.name === "string" &&
-      t.name.toLowerCase().includes(search.toLowerCase())
-  );
-  setFilteredTeams(filtered);
-  setPage(1);
-}, [search, teams]);
-
+  useEffect(() => {
+    const filtered = teams.filter(
+      (t) =>
+        typeof t.name === "string" &&
+        t.name.toLowerCase().includes(search.toLowerCase())
+    );
+    setFilteredTeams(filtered);
+    setPage(1);
+  }, [search, teams]);
 
   const totalPages = Math.ceil(filteredTeams.length / itemsPerPage);
-  const paginated = filteredTeams.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  const paginated = filteredTeams.slice(
+    (page - 1) * itemsPerPage,
+    page * itemsPerPage
+  );
+
+  // Handle back navigation
+  const handleBack = () => {
+    navigate(-1); // Go back to previous page
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6">
@@ -97,6 +111,14 @@ useEffect(() => {
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-sm"
           />
+
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors border border-border hover:bg-muted"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">

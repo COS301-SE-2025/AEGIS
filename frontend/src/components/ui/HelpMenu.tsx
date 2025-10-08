@@ -5,36 +5,40 @@ import {
   BookOpen,
   MessageSquare,
   Info,
-  ExternalLink,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export const HelpMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasMounted, setHasMounted] = useState(false); // ⬅️ prevent early render
+  const [hasMounted, setHasMounted] = useState(false);
 
-  // Mark component as mounted to avoid hydration mismatch
+  // Load state from localStorage on mount
   useEffect(() => {
     setHasMounted(true);
+    const savedState = localStorage.getItem('helpMenuOpen');
+    if (savedState === 'true') {
+      setIsOpen(true);
+    }
   }, []);
 
-  // Close on Escape
+  // Save state to localStorage whenever it changes
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsOpen(false);
-    };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, []);
+    if (hasMounted) {
+      localStorage.setItem('helpMenuOpen', isOpen.toString());
+    }
+  }, [isOpen, hasMounted]);
 
-  // Don’t render HelpMenu until mounted (avoids SSR hydration issues)
+  const handleOpen = () => setIsOpen(true);
+  const handleClose = () => setIsOpen(false);
+
+  // Don't render HelpMenu until mounted (avoids SSR hydration issues)
   if (!hasMounted) return null;
 
   return (
     <>
       {/* Floating Button */}
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpen}
         className="fixed bottom-6 right-6 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition"
         aria-label="Help"
       >
@@ -53,7 +57,7 @@ export const HelpMenu = () => {
                 <h3 className="text-lg font-bold">Help & Support</h3>
               </div>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={handleClose}
                 className="text-gray-400 hover:text-white"
                 aria-label="Close Help"
               >
@@ -84,23 +88,11 @@ export const HelpMenu = () => {
                 <Info className="w-4 h-4 text-yellow-400" />
                 About AEGIS
               </Link>
-              <a
-                href="https://support.aegis.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 hover:text-blue-400 transition"
-              >
-                <ExternalLink className="w-4 h-4 text-gray-400" />
-                Visit Support Center
-              </a>
             </div>
           </div>
 
           {/* Overlay */}
-          <div
-            className="fixed inset-0 bg-black/50 z-30"
-            onClick={() => setIsOpen(false)}
-          />
+          <div className="fixed inset-0 bg-black/50 z-30" />
         </>
       )}
     </>

@@ -26,6 +26,7 @@ import { ThreatLandscape } from "../../components/ui/ThreatLandscape";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import React from "react";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
+import { title } from "process";
 
 interface CaseCard {
   id: string;
@@ -429,6 +430,129 @@ function getProgressForStage(stage: string): number {
   }
 }
 
+// const handleSaveCase = async () => {
+//   if (!editingCase) return;
+  
+//   const token = sessionStorage.getItem("authToken") || "";
+  
+//   try {
+//     const res = await fetch(`https://localhost/api/v1/cases/${editingCase.id}`, {
+//       method: "PATCH",
+//       headers: {
+//         "Content-Type": "application/json",
+//         Authorization: `Bearer ${token}`,
+//       },
+//       body: JSON.stringify({
+//         title: updatedTitle,
+//         description: updatedDescription,
+//         status: updatedStatus,
+//         investigation_stage: updatedStage,
+//       }),
+//     });
+
+//     if (!res.ok) throw new Error("Failed to update case");
+
+//     const data = await res.json();
+//     console.log("Case updated:", data);
+
+//     // Remove the edit modal
+//     setEditingCase(null);
+
+//     // Update the caseCards list locally
+//     setCaseCards(prev =>
+//       prev.map(c =>
+//         c.id === editingCase.id
+//           ? {
+//               ...c,
+//               title: updatedTitle,
+//               description: updatedDescription,
+//               status: updatedStatus,
+//               investigation_stage: updatedStage,
+//               progress: getProgressForStage(updatedStage),
+//             }
+//           : c
+//       )
+//     );
+
+//     // Update openCases state to always reflect cases with status 'open' or 'ongoing'
+//     setOpenCases(prev => {
+//       const filtered = prev.filter(c => c.id !== editingCase.id);
+//       if (updatedStatus === "open" || updatedStatus === "ongoing") {
+//         return [
+//           ...filtered,
+//           {
+//             ...editingCase!,
+//             title: updatedTitle,
+//             description: updatedDescription,
+//             status: updatedStatus,
+//             investigation_stage: updatedStage,
+//             progress: getProgressForStage(updatedStage),
+//           },
+//         ];
+//       }
+//       return filtered;
+//     });
+
+//     // Update closedCases state to always reflect cases with status 'closed'
+//     setClosedCases(prev => {
+//       const filtered = prev.filter(c => c.id !== editingCase.id);
+//       if (updatedStatus === "closed") {
+//         return [
+//           ...filtered,
+//           {
+//             ...editingCase!,
+//             title: updatedTitle,
+//             description: updatedDescription,
+//             status: updatedStatus,
+//             investigation_stage: updatedStage,
+//             progress: getProgressForStage(updatedStage),
+//           },
+//         ];
+//       }
+//       return filtered;
+//     });
+
+//     // If status changed, switch tab so the card moves immediately
+//     let newTab = "active";
+//     if (updatedStatus === "closed") {
+//       newTab = "closed";
+//     } else if (updatedStatus === "archived") {
+//       newTab = "archived";
+//     } else if (updatedStatus === "open" || updatedStatus === "ongoing") {
+//       newTab = "active";
+//     }
+//     setActiveTab(newTab);
+//     setRefreshCases(prev => prev + 1); // Trigger a refresh to sync with backend
+
+//     // Update dashboard tile counts immediately
+//     setAvailableTiles(prev => prev.map(tile => {
+//       let count = parseInt(tile.value, 10);
+//       // Ongoing cases
+//       if (tile.id === "ongoing-cases") {
+//         if (editingCase?.status === "open" || editingCase?.status === "ongoing") count--;
+//         if (newTab === "active") count++;
+//         return { ...tile, value: Math.max(count, 0).toString() };
+//       }
+//       // Closed cases
+//       if (tile.id === "closed-cases") {
+//         if (editingCase?.status === "closed") count--;
+//         if (newTab === "closed") count++;
+//         return { ...tile, value: Math.max(count, 0).toString() };
+//       }
+//       // Archived cases (if you have a tile for it)
+//       if (tile.id === "archived-cases") {
+//         if (editingCase?.status === "archived") count--;
+//         if (newTab === "archived") count++;
+//         return { ...tile, value: Math.max(count, 0).toString() };
+//       }
+//       return tile;
+//     }));
+//   } catch (err) {
+//     console.error("Error updating case:", err);
+//    // alert("Failed to update case");
+//   }
+// };
+
 const handleSaveCase = async () => {
   if (!editingCase) return;
   
@@ -457,98 +581,57 @@ const handleSaveCase = async () => {
     // Remove the edit modal
     setEditingCase(null);
 
-    // Update the caseCards list locally
-    setCaseCards(prev =>
-      prev.map(c =>
-        c.id === editingCase.id
-          ? {
-              ...c,
-              title: updatedTitle,
-              description: updatedDescription,
-              status: updatedStatus,
-              investigation_stage: updatedStage,
-              progress: getProgressForStage(updatedStage),
-            }
-          : c
-      )
-    );
+    // Remove case from ALL local arrays first
+    setCaseCards(prev => prev.filter(c => c.id !== editingCase.id));
+    setOpenCases(prev => prev.filter(c => c.id !== editingCase.id));
+    setClosedCases(prev => prev.filter(c => c.id !== editingCase.id));
+    setArchivedCases(prev => prev.filter(c => c.id !== editingCase.id));
 
-    // Update openCases state to always reflect cases with status 'open' or 'ongoing'
-    setOpenCases(prev => {
-      const filtered = prev.filter(c => c.id !== editingCase.id);
-      if (updatedStatus === "open" || updatedStatus === "ongoing") {
-        return [
-          ...filtered,
-          {
-            ...editingCase!,
-            title: updatedTitle,
-            description: updatedDescription,
-            status: updatedStatus,
-            investigation_stage: updatedStage,
-            progress: getProgressForStage(updatedStage),
-          },
-        ];
-      }
-      return filtered;
-    });
+    // Create updated case object
+    const updatedCase = {
+      ...editingCase,
+      title: updatedTitle,
+      description: updatedDescription,
+      status: updatedStatus,
+      investigation_stage: updatedStage,
+      progress: getProgressForStage(updatedStage),
+    };
 
-    // Update closedCases state to always reflect cases with status 'closed'
-    setClosedCases(prev => {
-      const filtered = prev.filter(c => c.id !== editingCase.id);
-      if (updatedStatus === "closed") {
-        return [
-          ...filtered,
-          {
-            ...editingCase!,
-            title: updatedTitle,
-            description: updatedDescription,
-            status: updatedStatus,
-            investigation_stage: updatedStage,
-            progress: getProgressForStage(updatedStage),
-          },
-        ];
-      }
-      return filtered;
-    });
-
-    // If status changed, switch tab so the card moves immediately
-    let newTab = "active";
+    // Add to appropriate array based on new status
     if (updatedStatus === "closed") {
-      newTab = "closed";
+      setClosedCases(prev => [...prev, updatedCase]);
+      setActiveTab("closed"); // Switch to closed tab
     } else if (updatedStatus === "archived") {
-      newTab = "archived";
-    } else if (updatedStatus === "open" || updatedStatus === "ongoing") {
-      newTab = "active";
+      setArchivedCases(prev => [...prev, updatedCase]);
+      setActiveTab("archived"); // Switch to archived tab
+    } else {
+      // For open, ongoing, under_review - treat as active
+      setOpenCases(prev => [...prev, updatedCase]);
+      setActiveTab("active"); // Switch to active tab
     }
-    setActiveTab(newTab);
-    setRefreshCases(prev => prev + 1); // Trigger a refresh to sync with backend
 
-    // Update dashboard tile counts immediately
+    // Update dashboard tile counts
     setAvailableTiles(prev => prev.map(tile => {
-      let count = parseInt(tile.value, 10);
-      // Ongoing cases
       if (tile.id === "ongoing-cases") {
-        if (editingCase?.status === "open" || editingCase?.status === "ongoing") count--;
-        if (newTab === "active") count++;
-        return { ...tile, value: Math.max(count, 0).toString() };
+        const count = updatedStatus === "closed" || updatedStatus === "archived" 
+          ? Math.max(parseInt(tile.value, 10) - 1, 0)
+          : parseInt(tile.value, 10);
+        return { ...tile, value: count.toString() };
       }
-      // Closed cases
       if (tile.id === "closed-cases") {
-        if (editingCase?.status === "closed") count--;
-        if (newTab === "closed") count++;
-        return { ...tile, value: Math.max(count, 0).toString() };
-      }
-      // Archived cases (if you have a tile for it)
-      if (tile.id === "archived-cases") {
-        if (editingCase?.status === "archived") count--;
-        if (newTab === "archived") count++;
-        return { ...tile, value: Math.max(count, 0).toString() };
+        const count = updatedStatus === "closed" 
+          ? parseInt(tile.value, 10) + 1
+          : Math.max(parseInt(tile.value, 10) - (editingCase.status === "closed" ? 1 : 0), 0);
+        return { ...tile, value: count.toString() };
       }
       return tile;
     }));
+
+    // Trigger refresh to sync with backend
+    setRefreshCases(prev => prev + 1);
+
   } catch (err) {
     console.error("Error updating case:", err);
-   // alert("Failed to update case");
   }
 };
 
@@ -1017,45 +1100,68 @@ useEffect(() => {
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={async () => {
-                                const confirmed = window.confirm("Are you sure you want to archive this case?");
-                                if (!confirmed) return;
+                          <button
+                            onClick={async () => {
+                              // const confirmed = window.confirm("Are you sure you want to archive this case?");
+                              // if (!confirmed) return;
 
-                                const token = sessionStorage.getItem("authToken") || "";
+                              const token = sessionStorage.getItem("authToken") || "";
 
-                            try {
-                              const res = await fetch(`https://localhost/api/v1/cases/${card.id}`, {
-                                method: "PATCH",
-                                headers: {
-                                  "Content-Type": "application/json",
-                                  Authorization: `Bearer ${token}`,
-                                },
-                                body: JSON.stringify({ status: "archived" }),
-                              });
+                              try {
+                                const res = await fetch(`https://localhost/api/v1/cases/${card.id}`, {
+                                  method: "PATCH",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                    Authorization: `Bearer ${token}`,
+                                  },
+                                  body: JSON.stringify({ status: "archived",
+                                    title: card.title,
+                                    description: card.description,
+                                    //investigation_stage: card.investigation_stage
+                                   }),
+                                });
 
-                                  if (res.ok) {
-                                    // Move card to archived tab and update status locally
-                                    setCaseCards(prev => prev.filter(c => c.id !== card.id));
-                                    setOpenCases((prev: CaseCard[]) => prev
-                                      .filter(c => c.id !== card.id)
-                                      .filter(c => c.status === "open" || c.status === "ongoing")
-                                    );
-                                    setArchivedCases((prev: CaseCard[]) => [...prev, { ...card, status: "archived" }]);
-                                    setActiveTab("archived");
-                                  } else {
-                                    // alert("Failed to archive the case.");
-                                  }
-                                } catch (error) {
-                                  console.error("Archive error:", error);
-                                  //alert("An error occurred.");
+                                if (res.ok) {
+                                  // Remove from ALL local arrays
+                                  setCaseCards(prev => prev.filter(c => c.id !== card.id));
+                                  setOpenCases(prev => prev.filter(c => c.id !== card.id));
+                                  setClosedCases(prev => prev.filter(c => c.id !== card.id));
+                                  setArchivedCases(prev => prev.filter(c => c.id !== card.id));
+                                  
+                                  // Add to archived cases
+                                  const archivedCard = { ...card, status: "archived" ,
+                                    title: card.title,
+                                    description: card.description,
+                                    progress: card.progress
+                                  };
+                                  setArchivedCases(prev => [...prev, archivedCard]);
+                                  
+                                  // Switch to archived tab
+                                  setActiveTab("archived");
+                                  
+                                  // Update dashboard tile counts
+                                  setAvailableTiles(prev => prev.map(tile => {
+                                    if (tile.id === "ongoing-cases") {
+                                      const count = Math.max(parseInt(tile.value, 10) - 1, 0);
+                                      return { ...tile, value: count.toString() };
+                                    }
+                                    return tile;
+                                  }));
+
+                                  // Trigger refresh to ensure data is synced
+                                  //setRefreshCases(prev => prev + 1);
+                                } else {
+                                  console.error("Failed to archive the case.");
                                 }
-                              }}
-                              className="text-muted-foreground hover:text-red-500 transition-colors"
-                              title="Archive Case"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                              } catch (error) {
+                                console.error("Archive error:", error);
+                              }
+                            }}
+                            className="text-muted-foreground hover:text-red-500 transition-colors"
+                            title="Archive Case"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                           </>
                         ) : (
                           <>

@@ -1,80 +1,102 @@
+import { ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export const About = () => {
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    navigate(-1); // Go back to previous page
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white px-6 py-20">
-      <div className="max-w-5xl mx-auto space-y-16">
-        {/* Heading */}
-        <section className="text-center">
-          <h1 className="text-4xl font-bold mb-4 text-blue-400">
-            About AEGIS
-          </h1>
-          <p className="text-gray-300 text-lg max-w-3xl mx-auto">
-            AEGIS (Automated Evidence Generation and Integrity System) is an advanced cybersecurity and digital forensics platform designed to support secure, efficient, and collaborative investigation of cyber incidents.
-          </p>
-        </section>
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Back Button - Top Left */}
+      <div className="absolute top-6 left-6 z-10">
+        <button
+          onClick={handleBack}
+          className="flex items-center gap-2 text-blue-400 hover:text-white border border-blue-400 hover:border-white px-3 py-2 rounded-lg transition-colors"
+          aria-label="Go back"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span>Back</span>
+        </button>
+      </div>
 
-        {/* Purpose */}
-        <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">Why AEGIS?</h2>
-          <p className="text-gray-300">
-            Digital Forensics and Incident Response (DFIR) teams face increasing challenges: maintaining the integrity of digital evidence, enabling real-time collaboration, and producing clear and auditable case histories. AEGIS addresses these needs by combining automation, security, and collaboration tools into a single unified platform.
-          </p>
-        </section>
+      <div className="px-6 py-20">
+        <div className="max-w-5xl mx-auto space-y-16">
+          {/* Heading */}
+          <section className="text-center">
+            <h1 className="text-4xl font-bold mb-4 text-blue-400">
+              About AEGIS
+            </h1>
+            <p className="text-gray-300 text-lg max-w-3xl mx-auto">
+              AEGIS (Automated Evidence Generation and Integrity System) is an advanced cybersecurity and digital forensics platform designed to support secure, efficient, and collaborative investigation of cyber incidents.
+            </p>
+          </section>
 
-        {/* Core Capabilities */}
-        <section>
-          <h2 className="text-2xl font-semibold text-white mb-6">Core Capabilities</h2>
-          <div className="grid md:grid-cols-2 gap-8 text-gray-300">
-            <div>
-              <h3 className="font-semibold text-blue-400 mb-2">🧾 Case Management</h3>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Create and track cases with role-based access</li>
-                <li>Visual timeline for tracking incident events</li>
-                <li>Automatic logging of all evidence actions</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-blue-400 mb-2">🧪 Collaborative Evidence Analysis</h3>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Support for logs, images, packet captures, and more</li>
-                <li>Real-time multi-user collaboration and chat</li>
-                <li>Threaded annotations on specific evidence</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-blue-400 mb-2">🔐 Secure Communication</h3>
-              <ul className="list-disc list-inside space-y-1">
-                <li>End-to-end encryption for messages and files</li>
-                <li>Encrypted storage for all case data</li>
-                <li>Secure file sharing among team members</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-blue-400 mb-2">🛡️ Chain of Custody</h3>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Document collection methods and timestamps</li>
-                <li>Track all forensic steps and tool usage</li>
-                <li>Generate detailed investigation reports</li>
-              </ul>
-            </div>
-          </div>
-        </section>
+          {/* Purpose */}
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">Why AEGIS?</h2>
+            <p className="text-gray-300">
+              Digital Forensics and Incident Response (DFIR) teams face increasing challenges: maintaining the integrity of digital evidence, enabling real-time collaboration, and producing clear and auditable case histories. AEGIS addresses these needs by combining automation, security, and collaboration tools into a single unified platform.
+            </p>
+          </section>
 
-        {/* Use Cases */}
-        <section>
-          <h2 className="text-2xl font-semibold text-white mb-3">Who Is AEGIS For?</h2>
-          <p className="text-gray-300">
-            AEGIS is ideal for cybersecurity professionals, DFIR teams, enterprise security departments, and digital investigators who need a secure and efficient platform for managing cyber incidents and forensic investigations.
-          </p>
-        </section>
+          {/* Core Capabilities */}
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-6">Core Capabilities</h2>
+            <div className="grid md:grid-cols-2 gap-8 text-gray-300">
+              <div>
+                <h3 className="font-semibold text-blue-400 mb-2">🧾 Case Management</h3>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Create and track cases with role-based access</li>
+                  <li>Visual timeline for tracking incident events</li>
+                  <li>Automatic logging of all evidence actions</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-400 mb-2">🧪 Collaborative Evidence Analysis</h3>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Support for logs, images, packet captures, and more</li>
+                  <li>Real-time multi-user collaboration and chat</li>
+                  <li>Threaded annotations on specific evidence</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-400 mb-2">🔐 Secure Communication</h3>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>End-to-end encryption for messages and files</li>
+                  <li>Encrypted storage for all case data</li>
+                  <li>Secure file sharing among team members</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-400 mb-2">🛡️ Chain of Custody</h3>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Document collection methods and timestamps</li>
+                  <li>Track all forensic steps and tool usage</li>
+                  <li>Generate detailed investigation reports</li>
+                </ul>
+              </div>
+            </div>
+          </section>
 
-        {/* Contact */}
-        <section className="text-center pt-10 border-t border-gray-700">
-          <h3 className="text-xl font-semibold text-white mb-2">Contact Us</h3>
-          <p className="text-gray-400">
-            📧 capstone.incidentintel@gmail.com
-          </p>
-        </section>
+          {/* Use Cases */}
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-3">Who Is AEGIS For?</h2>
+            <p className="text-gray-300">
+              AEGIS is ideal for cybersecurity professionals, DFIR teams, enterprise security departments, and digital investigators who need a secure and efficient platform for managing cyber incidents and forensic investigations.
+            </p>
+          </section>
+
+          {/* Contact */}
+          <section className="text-center pt-10 border-t border-gray-700">
+            <h3 className="text-xl font-semibold text-white mb-2">Contact Us</h3>
+            <p className="text-gray-400">
+              📧 capstone.incidentintel@gmail.com
+            </p>
+          </section>
+        </div>
       </div>
     </div>
   );
