@@ -72,7 +72,7 @@ interface FileItem {
   metadata: string; // Corresponds to Go's `Metadata` (JSON string)
   uploaded_at: string; // Corresponds to Go's `UploadedAt` (time.Time)
   description?: string; // These would likely be parsed from 'metadata' JSON
-  status?: 'verified' | 'pending' | 'failed' | string; // Parsed from 'metadata'
+  //status?: 'verified' | 'pending' | 'failed' | string; // Parsed from 'metadata'
   chainOfCustody?: string[]; // Parsed from 'metadata'
   acquisitionDate?: string; // Parsed from 'metadata'
   acquisitionTool?: string; // Parsed from 'metadata'
@@ -97,7 +97,7 @@ interface AnnotationThread {
   messageCount: number;
   participantCount: number;
   isActive?: boolean;
-  status: 'open' | 'resolved' | 'pending_approval';
+  //status: 'open' | 'resolved' | 'pending_approval';
   priority: 'high' | 'medium' | 'low';
   tags: ThreadTag[];
   fileId: string;
@@ -180,7 +180,7 @@ function getCustodyDetails(chainOfCustody: any[]) {
     lastBoot: last?.system_info?.lastBoot || last?.system_info?.last_boot || "",
     method: first?.forensic_info?.method || first?.forensic_info?.Method || "",
     location: first?.forensic_info?.location || "",
-    legalStatus: first?.forensic_info?.legalStatus || first?.forensic_info?.legal_status || "",
+    //legalStatus: first?.forensic_info?.legalStatus || first?.forensic_info?.legal_status || "",
     notes: first?.forensic_info?.notes || "",
   };
 }
@@ -368,7 +368,7 @@ useEffect(() => {
                 method: forensic_info.method || forensic_info.Method || "",
                 examiner: forensic_info.examiner || forensic_info.Examiner || "",
                 location: forensic_info.location || "",
-                legalStatus: forensic_info.legalStatus || forensic_info.legal_status || forensic_info.LegalStatus || "",
+                //legalStatus: forensic_info.legalStatus || forensic_info.legal_status || forensic_info.LegalStatus || "",
               },
               system_info: {
                 osVersion: system_info.osVersion || system_info.os_version || "",
@@ -562,32 +562,32 @@ const [profile] = useState({
   const recentThread = [...annotationThreads]
   .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0]; // most recent
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'verified': case 'passed': case 'resolved': return 'text-green-400';
-      case 'pending': case 'open': return 'text-yellow-400';
-      case 'failed': return 'text-red-400';
-      default: return 'text-muted-foreground';
-    }
-  };
+  // const getStatusColor = (status: string) => {
+  //   switch (status) {
+  //     case 'verified': case 'passed': case 'resolved': return 'text-green-400';
+  //     case 'pending': case 'open': return 'text-yellow-400';
+  //     case 'failed': return 'text-red-400';
+  //     default: return 'text-muted-foreground';
+  //   }
+  // };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'verified': case 'passed': case 'resolved': return <CheckCircle className="w-4 h-4" />;
-      case 'pending': case 'open': return <Clock className="w-4 h-4" />;
-      case 'failed': return <XCircle className="w-4 h-4" />;
-      default: return <Info className="w-4 h-4" />;
-    }
-  };
+  // const getStatusIcon = (status: string) => {
+  //   switch (status) {
+  //     case 'verified': case 'passed': case 'resolved': return <CheckCircle className="w-4 h-4" />;
+  //     case 'pending': case 'open': return <Clock className="w-4 h-4" />;
+  //     case 'failed': return <XCircle className="w-4 h-4" />;
+  //     default: return <Info className="w-4 h-4" />;
+  //   }
+  // };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'text-red-400 bg-red-400/10';
-      case 'medium': return 'text-yellow-400 bg-yellow-400/10';
-      case 'low': return 'text-green-400 bg-green-400/10';
-      default: return 'text-muted-foreground bg-gray-400/10';
-    }
-  };
+  // const getPriorityColor = (priority: string) => {
+  //   switch (priority) {
+  //     case 'high': return 'text-red-400 bg-red-400/10';
+  //     case 'medium': return 'text-yellow-400 bg-yellow-400/10';
+  //     case 'low': return 'text-green-400 bg-green-400/10';
+  //     default: return 'text-muted-foreground bg-gray-400/10';
+  //   }
+  // };
 
   // const filteredThreads = annotationThreads.filter(thread => 
   //   selectedFile ? thread.fileId === selectedFile.id : true
@@ -1116,7 +1116,7 @@ if (!caseId || caseId === "undefined") {
                     <File className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0 text-left">
                       <div className="font-medium text-sm truncate mb-1">{file.filename}</div>
-                      <div className="flex items-center gap-2 mb-2">
+                      {/* <div className="flex items-center gap-2 mb-2">
                         <span className={`inline-flex items-center gap-1 text-xs ${getStatusColor(file.status || "pending")}`}>
                           {getStatusIcon(file.status || "pending")}
                           {file.status || "pending"}
@@ -1124,7 +1124,7 @@ if (!caseId || caseId === "undefined") {
                         <span className={`px-2 py-0.5 rounded text-xs ${getPriorityColor(file.priority || "low")}`}>
                           {file.priority || "low"}
                         </span>
-                      </div>
+                      </div> */}
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{formatFileSize(file.file_size)}</span>
                         <div className="flex items-center gap-1">
@@ -1148,16 +1148,16 @@ if (!caseId || caseId === "undefined") {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <h1 className="text-2xl font-semibold">{selectedFile.filename}</h1>
-                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-sm ${getStatusColor(selectedFile.status || "pending")}`}>
+                      {/* <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-sm ${getStatusColor(selectedFile.status || "pending")}`}>
                         {getStatusIcon(selectedFile.status || "pending")}
                         {selectedFile.status || "pending"}
-                      </div>
+                      </div> */}
                     </div>
                     <div className="flex items-center gap-2">
                       <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
                         <Download className="w-5 h-5" />
                       </button>
-                      <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
+                      {/* <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
                         <FileText className="w-5 h-5" />
                       </button>
                       <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
@@ -1165,7 +1165,7 @@ if (!caseId || caseId === "undefined") {
                       </button>
                       <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
                         <MoreVertical className="w-5 h-5" />
-                      </button>
+                      </button> */}
                     </div>
                   </div>
 
@@ -1285,14 +1285,14 @@ if (!caseId || caseId === "undefined") {
                             </div>
                           </div>
                          <div>
-                          <span className="text-muted-foreground">Integrity Check:</span>
+                          {/* <span className="text-muted-foreground">Integrity Check:</span>
                           <div className={`inline-flex items-center gap-1 ml-2 ${getStatusColor(integrityCheckStatus)}`}>
                             {getStatusIcon(integrityCheckStatus)}
                             <span className="capitalize">{integrityCheckStatus}</span>
                             {integrityCheckDetails && (
                               <span className="ml-2 text-xs text-muted-foreground">({integrityCheckDetails})</span>
                             )}
-                          </div>
+                          </div> */}
                         </div>
                         </div>
                       </div>
@@ -1477,14 +1477,14 @@ if (!caseId || caseId === "undefined") {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            {/* <div className="flex items-center gap-2">
                               <span className={`px-2 py-1 rounded text-xs ${getPriorityColor(thread.priority)}`}>
                                 {thread.priority}
                               </span>
                               <span className={`px-2 py-1 rounded text-xs ${getStatusColor(thread.status)}`}>
                                 {thread.status.replace('_', ' ')}
                               </span>
-                            </div>
+                            </div> */}
                           </div>
                           
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -1598,13 +1598,13 @@ if (!caseId || caseId === "undefined") {
                             <p className="text-muted-foreground"> #{`CS-${caseId.slice(0, 7)}...`}</p>
                           </div>
                           
-                          <div>
+                          {/* <div>
                             <span className="text-muted-foreground">Legal Status:</span>
                             <div className="flex items-center gap-2 mt-1">
                               <CheckCircle className="w-4 h-4 text-green-400" />
                               <span className="text-green-400">{custodyDetails.legalStatus || "N/A"}</span>
                             </div>
-                          </div>
+                          </div> */}
                         </div>
                       </div>
 
@@ -1644,7 +1644,7 @@ if (!caseId || caseId === "undefined") {
                       </div>
 
                       {/* Analysis Tools */}
-                      <div className="bg-card p-4 rounded-lg">
+                      {/* <div className="bg-card p-4 rounded-lg">
                         <h3 className="font-semibold mb-4 flex items-center gap-2">
                           <Settings className="w-5 h-5 text-purple-400" />
                           Analysis History
@@ -1668,7 +1668,7 @@ if (!caseId || caseId === "undefined") {
                             <div className="text-muted-foreground text-xs">Tool: YARA Rules v4.3.2</div>
                           </div>
                         </div>
-                      </div>
+                      </div> */}
                     </div>
                   )}
                 </div>

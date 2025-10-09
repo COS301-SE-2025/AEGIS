@@ -82,6 +82,10 @@ out/
 #local certicates
 certs/
 .pem 
+api/certs/
+*.pem
+*.key
+*.crt
 
 #github secrets
 github_deploy_key

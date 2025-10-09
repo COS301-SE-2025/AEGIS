@@ -90,6 +90,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.PATCH("/cases/:case_id/archive", h.CaseDeletionHandler.ArchiveCaseHandler)
 		// List archived cases
 		protected.GET("/cases/archived", h.CaseHandler.ListArchivedCasesHandler)
+		protected.POST("/auth/verify-admin", h.VerificationHandler.VerifyAdminGin) // Move here
 
 		// ─── New List / Filter Cases ──────────────────
 		protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)
@@ -127,6 +128,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.GET("/users", h.AdminService.ListUsers)
 		protected.GET("tenants/:tenantId/users", middleware.AuthMiddleware(), h.AdminService.ListUsersByTenant)
 		protected.DELETE("/users/:userId", h.AdminService.DeleteUserHandler)
+		protected.GET("/audit-logs", h.AdminService.GetAuditLogs)
 
 		// ─── Profile Routes ──────────────────────────
 		protected.GET("/profile/:userID", h.ProfileHandler.GetProfileHandler)
