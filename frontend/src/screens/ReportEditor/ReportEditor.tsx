@@ -29,6 +29,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { useTheme } from "../../context/ThemeContext";
 
 interface ReportSection {
   id: string;
@@ -296,6 +297,7 @@ export const ReportEditor = () => {
   const insertingSuggestionRef = useRef(false);
    const [isDFIRAdmin, setIsDFIRAdmin] = useState(false);
   const [, setTenantId] = useState<string | null>(null);
+  const { theme } = useTheme(); 
 
   useEffect(() => {
     // Check role and tenantId after mount (when sessionStorage is available)
@@ -1073,157 +1075,159 @@ const commitEditingTitle = useCallback(async () => {
   }
 }, [editingTitleSectionId, tempSectionTitle, reportId, report, sections]);
 
-
+   const editorWrapperClasses = `
+                            editor-wrapper-${theme} 
+                            ${isPreviewMode ? 'editor-preview-mode' : 'editor-edit-mode'}
+                          `;
 
   return (
     <div className="min-h-screen bg-background flex">
       
       {/* Custom styles for Quill in dark mode */}
       <style>{`
-        .ql-snow {
-          border: 1px solid #374151 !important;
-          background-color: #1f2937 !important;
-        }
-        
-        .ql-snow .ql-toolbar {
-          border-bottom: 1px solid #374151 !important;
-          background-color: #1f2937 !important;
-        }
-        
-        .ql-snow .ql-container {
-          border-top: none !important;
-          background-color: #1f2937 !important;
-        }
-        
-        .ql-editor {
-          color: #e5e7eb !important;
-          background-color: #1f2937 !important;
-          min-height: 500px !important;
-          font-size: 16px !important;
-          line-height: 1.6 !important;
-        }
-        
-        .ql-editor.ql-blank::before {
-          color: #6b7280 !important;
-          font-style: italic;
-        }
-        
-        .ql-snow .ql-tooltip {
-          background-color: #374151 !important;
-          border: 1px solid #4b5563 !important;
-          color: #e5e7eb !important;
-        }
-        
-        .ql-snow .ql-tooltip input {
-          background-color: #1f2937 !important;
-          color: #e5e7eb !important;
-          border: 1px solid #4b5563 !important;
-        }
-        
-        .ql-snow .ql-picker-options {
-          background-color: #374151 !important;
-          border: 1px solid #4b5563 !important;
-        }
-        
-        .ql-snow .ql-picker-item:hover {
-          background-color: #4b5563 !important;
-          color: #e5e7eb !important;
-        }
-        
-        .ql-snow .ql-stroke {
-          stroke: #9ca3af !important;
-        }
-        
-        .ql-snow .ql-fill {
-          fill: #9ca3af !important;
-        }
-        
-        .ql-snow .ql-picker-label:hover .ql-stroke,
-        .ql-snow .ql-picker-label.ql-active .ql-stroke {
-          stroke: #e5e7eb !important;
-        }
-        
-        .ql-snow .ql-picker-label:hover .ql-fill,
-        .ql-snow .ql-picker-label.ql-active .ql-fill {
-          fill: #e5e7eb !important;
-        }
-        
-        /* Fix dropdown text colors */
-        .ql-snow .ql-picker-label {
-          color: #9ca3af !important;
-        }
+  /* Theme-specific variables for readability */
+  :root {
+    --quill-bg: ${theme === 'dark' ? '#1f2937' : '#ffffff'};
+    --quill-fg: ${theme === 'dark' ? '#e5e7eb' : '#1f2937'};
+    --quill-border: ${theme === 'dark' ? '#374151' : '#d1d5db'};
+    --quill-tooltip-bg: ${theme === 'dark' ? '#374151' : '#ffffff'};
+    --quill-tooltip-border: ${theme === 'dark' ? '#4b5563' : '#d1d5db'};
+    --quill-placeholder-color: ${theme === 'dark' ? '#6b7280' : '#9ca3af'};
+    --quill-icon-color: ${theme === 'dark' ? '#9ca3af' : '#4b5563'};
+    --quill-icon-active-color: ${theme === 'dark' ? '#e5e7eb' : '#1f2937'};
+    --quill-picker-bg: ${theme === 'dark' ? '#374151' : '#ffffff'};
+    --quill-picker-border: ${theme === 'dark' ? '#4b5563' : '#d1d5db'};
+    --quill-picker-hover-bg: ${theme === 'dark' ? '#4b5563' : '#f3f4f6'};
+    --quill-picker-hover-color: ${theme === 'dark' ? '#ffffff' : '#1f2937'};
+  }
 
-        .ql-snow .ql-picker-label:hover,
-        .ql-snow .ql-picker-label.ql-active {
-          color: #e5e7eb !important;
-        }
+  /* Main container (toolbar + editor) */
+  .ql-snow {
+    border: 1px solid var(--quill-border) !important;
+    background-color: var(--quill-bg) !important;
+  }
+  
+  /* Toolbar container */
+  .ql-snow .ql-toolbar {
+    border-bottom: 1px solid var(--quill-border) !important;
+    background-color: var(--quill-picker-bg) !important; /* Use picker BG for toolbar */
+  }
+  
+  /* Editor container */
+  .ql-snow .ql-container {
+    border-top: none !important;
+    background-color: var(--quill-bg) !important;
+  }
+  
+  /* Editor Content Area */
+  .ql-editor {
+    color: var(--quill-fg) !important;
+    background-color: var(--quill-bg) !important;
+    min-height: 500px !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+  }
+  
+  /* Placeholder text */
+  .ql-editor.ql-blank::before {
+    color: var(--quill-placeholder-color) !important;
+    font-style: italic;
+  }
+  
+  /* Tooltip for links/images */
+  .ql-snow .ql-tooltip {
+    background-color: var(--quill-tooltip-bg) !important;
+    border: 1px solid var(--quill-tooltip-border) !important;
+    color: var(--quill-fg) !important;
+  }
+  
+  /* Tooltip input field */
+  .ql-snow .ql-tooltip input {
+    background-color: var(--quill-bg) !important;
+    color: var(--quill-fg) !important;
+    border: 1px solid var(--quill-tooltip-border) !important;
+  }
+  
+  /* Dropdown options list (e.g., Font, Size, Header) */
+  .ql-snow .ql-picker-options {
+    background-color: var(--quill-picker-bg) !important;
+    border: 1px solid var(--quill-picker-border) !important;
+  }
+  
+  /* Base icon/stroke color */
+  .ql-snow .ql-stroke {
+    stroke: var(--quill-icon-color) !important;
+  }
+  
+  /* Base fill color (for certain icons) */
+  .ql-snow .ql-fill {
+    fill: var(--quill-icon-color) !important;
+  }
+  
+  /* Icon/stroke color on hover/active */
+  .ql-snow .ql-picker-label:hover .ql-stroke,
+  .ql-snow .ql-picker-label.ql-active .ql-stroke,
+  .ql-snow .ql-toolbar button:hover .ql-stroke,
+  .ql-snow .ql-toolbar button.ql-active .ql-stroke {
+    stroke: var(--quill-icon-active-color) !important;
+  }
+  
+  /* Fill color on hover/active */
+  .ql-snow .ql-picker-label:hover .ql-fill,
+  .ql-snow .ql-picker-label.ql-active .ql-fill,
+  .ql-snow .ql-toolbar button:hover .ql-fill,
+  .ql-snow .ql-toolbar button.ql-active .ql-fill {
+    fill: var(--quill-icon-active-color) !important;
+  }
+  
+  /* Dropdown label text */
+  .ql-snow .ql-picker-label {
+    color: var(--quill-icon-color) !important;
+  }
 
-        .ql-snow .ql-picker-item {
-          color: #e5e7eb !important;
-        }
+  .ql-snow .ql-picker-label:hover,
+  .ql-snow .ql-picker-label.ql-active {
+    color: var(--quill-icon-active-color) !important;
+  }
 
-        .ql-snow .ql-picker-item:hover {
-          color: #ffffff !important;
-          background-color: #4b5563 !important;
-        }
+  /* Dropdown item text */
+  .ql-snow .ql-picker-item {
+    color: var(--quill-icon-active-color) !important; /* Start with active color for visibility */
+  }
 
-        /* Fix header dropdown specifically */
-        .ql-snow .ql-picker.ql-header .ql-picker-label {
-          color: #9ca3af !important;
-        }
+  /* Dropdown item text on hover */
+  .ql-snow .ql-picker-item:hover {
+    color: var(--quill-picker-hover-color) !important;
+    background-color: var(--quill-picker-hover-bg) !important;
+  }
 
-        .ql-snow .ql-picker.ql-header .ql-picker-label:hover,
-        .ql-snow .ql-picker.ql-header .ql-picker-label.ql-active {
-          color: #e5e7eb !important;
-        }
+  /* Color/Background Picker container */
+  .ql-snow .ql-color-picker .ql-picker-options,
+  .ql-snow .ql-background-picker .ql-picker-options {
+    background-color: var(--quill-picker-bg) !important;
+    border: 1px solid var(--quill-picker-border) !important;
+    padding: 3px 5px !important;
+    width: 152px !important;
+  }
 
-        .ql-snow .ql-picker.ql-header .ql-picker-item {
-          color: #e5e7eb !important;
-        }
+  /* Color Swatch border */
+  .ql-snow .ql-color-picker .ql-picker-item,
+  .ql-snow .ql-background-picker .ql-picker-item {
+    border: 1px solid var(--quill-border) !important;
+    float: left !important;
+    height: 16px !important;
+    margin: 2px !important;
+    width: 16px !important;
+    padding: 0 !important;
+  }
 
-        /* Color picker fixes - UPDATED */
-        .ql-snow .ql-color-picker .ql-picker-options,
-        .ql-snow .ql-background-picker .ql-picker-options {
-          background-color: #374151 !important; /* Changed from white to dark gray */
-          border: 1px solid #4b5563 !important;
-          padding: 3px 5px !important;
-          width: 152px !important;
-        }
+  .ql-snow .ql-color-picker .ql-picker-item:hover,
+  .ql-snow .ql-background-picker .ql-picker-item:hover {
+    border-color: var(--quill-icon-active-color) !important;
+  }
+`}</style>
 
-        .ql-snow .ql-color-picker .ql-picker-item,
-        .ql-snow .ql-background-picker .ql-picker-item {
-          border: 1px solid #4b5563 !important; /* Darker border for dark mode */
-          float: left !important;
-          height: 16px !important;
-          margin: 2px !important;
-          width: 16px !important;
-          padding: 0 !important;
-        }
-
-        .ql-snow .ql-color-picker .ql-picker-item:hover,
-        .ql-snow .ql-background-picker .ql-picker-item:hover {
-          border-color: #9ca3af !important; /* Lighter border on hover for visibility */
-        }
-
-        /* Keep all pickers dark consistently */
-        .ql-snow .ql-picker .ql-picker-options {
-          background-color: #374151 !important;
-          border: 1px solid #4b5563 !important;
-        }
-
-        .ql-snow .ql-picker .ql-picker-item {
-          color: #e5e7eb !important;
-        }
-
-        /* Specific fix for font and size pickers */
-        .ql-snow .ql-font-picker .ql-picker-options,
-        .ql-snow .ql-size-picker .ql-picker-options {
-          background-color: #374151 !important;
-          border: 1px solid #4b5563 !important;
-        }
-      `}</style>
-
-   
+      
       {/* Main Content */}
       <div className="w-full flex">
         {/* Report Sections Navigation */}
@@ -1516,167 +1520,219 @@ const commitEditingTitle = useCallback(async () => {
             </button>
             
             {/* Inline context panel (not overlay) */}
-            <div
-              className="w-[340px] max-h-[80vh] overflow-y-auto bg-gray-900 border border-gray-700 rounded-xl shadow-xl ml-6 my-4"
-              style={{
-          position: "absolute", top: "180px", right: "80px", zIndex: 40,
-        }}
+          <div
+            className={`
+              w-[340px] max-h-[80vh] overflow-y-auto rounded-xl shadow-xl ml-6 my-4 
+              ${theme === 'dark' 
+                ? 'bg-gray-900 border border-gray-700' 
+                : 'bg-white border border-gray-300'}
+            `}
+            style={{
+              position: "absolute", top: "180px", right: "80px", zIndex: 40,
+            }}
+
             >
               <button
-                className="w-full flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700 rounded-t-xl hover:bg-gray-700 transition"
-                onClick={() => setContextOpen((v) => !v)}
-              >
-                <span className="font-semibold text-white text-lg">Section Context</span>
-                {contextOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-              </button>
+            className={`w-full flex items-center justify-between px-4 py-2 rounded-t-xl transition
+              ${theme === 'dark' 
+                ? 'bg-gray-800 border-b border-gray-700 hover:bg-gray-700' 
+                : 'bg-gray-100 border-b border-gray-300 hover:bg-gray-200'}
+            `}
+            onClick={() => setContextOpen((v) => !v)}
+          >
+                 <span 
+                  className={`font-semibold text-lg ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
+                >
+                  Section Context
+                </span>
+               {contextOpen 
+                ? <ChevronUp className={`w-5 h-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`} /> 
+                : <ChevronDown className={`w-5 h-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`} />}
+            </button>
      
       
         {contextOpen && sectionContext && (
-          <div className="p-4 space-y-4">
-            {/* Case Info (draggable) */}
-            <div
-              draggable
-              onDragStart={e => {
-                e.dataTransfer.setData("application/json", JSON.stringify(sectionContext.case_info));
-                e.dataTransfer.effectAllowed = "copy";
-              }}
-              className="cursor-grab select-none"
-              style={{ pointerEvents: 'auto', userSelect: 'none' }}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <Shield className="w-5 h-5 text-blue-400" />
-                <span className="font-bold text-white">Case Info</span>
+            <div className="p-4 space-y-4">
+              {/* Case Info (draggable) */}
+              <div
+                draggable
+                onDragStart={e => {
+                  e.dataTransfer.setData("application/json", JSON.stringify(sectionContext.case_info));
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                className="cursor-grab select-none"
+                style={{ pointerEvents: 'auto', userSelect: 'none' }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {/* Shield icon color remains strong, no change */}
+                  <Shield className="w-5 h-5 text-blue-400" />
+                  {/* Heading Text */}
+                  <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Case Info</span>
+                </div>
+                {sectionContext.case_info && typeof sectionContext.case_info === 'object' ? (
+                  <ul className={`text-xs rounded p-2 overflow-x-auto ${theme === 'dark' ? 'text-gray-300 bg-gray-800' : 'text-gray-700 bg-gray-200'}`}>
+                    {Object.entries(sectionContext.case_info).map(([key, value]) => (
+                      <li key={key}>
+                        {/* Key text color */}
+                        <span className={`font-bold ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{key}:</span> {String(value)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <pre className={`text-xs rounded p-2 overflow-x-auto ${theme === 'dark' ? 'text-gray-300 bg-gray-800' : 'text-gray-700 bg-gray-200'}`}>
+                    {JSON.stringify(sectionContext.case_info, null, 2)}
+                  </pre>
+                )}
+                {/* Instructional Text */}
+                <div className={`text-xs mt-2 ${theme === 'dark' ? 'text-blue-300' : 'text-blue-600'}`}>Drag to section editor to auto-fill description</div>
               </div>
-              {sectionContext.case_info && typeof sectionContext.case_info === 'object' ? (
-                <ul className="text-xs text-gray-300 bg-gray-800 rounded p-2 overflow-x-auto">
-                  {Object.entries(sectionContext.case_info).map(([key, value]) => (
-                    <li key={key}><span className="font-bold text-gray-400">{key}:</span> {String(value)}</li>
+
+              {/* IOCs (draggable) */}
+              <div
+                draggable
+                onDragStart={e => {
+                  e.dataTransfer.setData("application/json", JSON.stringify(sectionContext.iocs));
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                className="cursor-grab select-none"
+                style={{ pointerEvents: 'auto', userSelect: 'none' }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {/* AlertCircle icon color remains strong, no change */}
+                  <AlertCircle className="w-5 h-5 text-red-400" />
+                  {/* Heading Text */}
+                  <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>IOCs</span>
+                </div>
+                <ul className="space-y-1">
+                  {(Array.isArray(sectionContext.iocs) ? sectionContext.iocs : []).map((ioc, i) => (
+                    <li key={i} className={`flex items-center gap-2 text-sm ${theme === 'dark' ? 'text-red-300' : 'text-red-800'}`}>
+                      {/* IOC Tag BG/Text */}
+                      <span className={`${theme === 'dark' ? 'bg-red-900/60' : 'bg-red-200/60'} px-2 py-0.5 rounded font-mono`}>{ioc?.type || "IOC"}</span>
+                      <span>{ioc?.value || (typeof ioc === 'string' ? ioc : JSON.stringify(ioc))}</span>
+                    </li>
                   ))}
                 </ul>
-              ) : (
-                <pre className="text-xs text-gray-300 bg-gray-800 rounded p-2 overflow-x-auto">{JSON.stringify(sectionContext.case_info, null, 2)}</pre>
-              )}
-              <div className="text-xs text-blue-300 mt-2">Drag to section editor to auto-fill description</div>
-            </div>
-            {/* IOCs (draggable) */}
-            <div
-              draggable
-              onDragStart={e => {
-                e.dataTransfer.setData("application/json", JSON.stringify(sectionContext.iocs));
-                e.dataTransfer.effectAllowed = "copy";
-              }}
-              className="cursor-grab select-none"
-              style={{ pointerEvents: 'auto', userSelect: 'none' }}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <AlertCircle className="w-5 h-5 text-red-400" />
-                <span className="font-bold text-white">IOCs</span>
+                {/* Instructional Text */}
+                <div className={`text-xs mt-2 ${theme === 'dark' ? 'text-red-300' : 'text-red-600'}`}>Drag to section editor to auto-fill description</div>
               </div>
-              <ul className="space-y-1">
-                {(Array.isArray(sectionContext.iocs) ? sectionContext.iocs : []).map((ioc, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-red-300">
-                    <span className="bg-red-900/60 px-2 py-0.5 rounded font-mono">{ioc?.type || "IOC"}</span>
-                    <span>{ioc?.value || (typeof ioc === 'string' ? ioc : JSON.stringify(ioc))}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="text-xs text-red-300 mt-2">Drag to section editor to auto-fill description</div>
-            </div>
-            {/* Evidence (draggable) */}
-            <div
-              className="cursor-grab select-none"
-              style={{ pointerEvents: 'auto', userSelect: 'none' }}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <FileText className="w-5 h-5 text-green-400" />
-                <span className="font-bold text-white">Evidence</span>
-              </div>
-              <ul className="space-y-1">
-                {(Array.isArray(sectionContext.evidence) ? sectionContext.evidence : []).map((ev, i) => {
-                  // If evidence is a string, try to parse it
-                  let evidenceObj = ev;
-                  if (typeof ev === 'string') {
-                    try {
-                      evidenceObj = JSON.parse(ev);
-                    } catch {
-                      // fallback: skip rendering this evidence item
-                      return null;
+
+              {/* Evidence (draggable) */}
+              <div
+                className="cursor-grab select-none"
+                style={{ pointerEvents: 'auto', userSelect: 'none' }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {/* FileText icon color remains strong, no change */}
+                  <FileText className="w-5 h-5 text-green-400" />
+                  {/* Heading Text */}
+                  <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Evidence</span>
+                </div>
+                <ul className="space-y-1">
+                  {(Array.isArray(sectionContext.evidence) ? sectionContext.evidence : []).map((ev, i) => {
+                    // ... (existing parsing logic remains the same)
+                    let evidenceObj = ev;
+                    if (typeof ev === 'string') {
+                      try {
+                        evidenceObj = JSON.parse(ev);
+                      } catch {
+                        return null;
+                      }
                     }
-                  }
-                  let sha512 = evidenceObj.sha512, sha256 = evidenceObj.sha256, uploader = evidenceObj.uploader;
-                  if (evidenceObj.metadata) {
-                    try {
-                      const meta = typeof evidenceObj.metadata === 'string' ? JSON.parse(evidenceObj.metadata) : evidenceObj.metadata;
-                      sha512 = meta.sha512 || sha512;
-                      sha256 = meta.sha256 || sha256;
-                      uploader = meta.uploader || uploader;
-                    } catch {}
-                  }
-                  return (
-                    <li
-                      key={i}
-                      className="bg-green-950/80 border border-green-800 rounded-xl shadow flex flex-col gap-2 p-3 mb-2"
-                      draggable
-                      onDragStart={e => {
-                        e.dataTransfer.setData("application/json", JSON.stringify([ev]));
-                        e.dataTransfer.effectAllowed = "copy";
-                      }}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <FileText className="w-5 h-5 text-green-400" />
-                        <span className="font-bold text-green-200 text-base">{evidenceObj.filename || evidenceObj.fileName || "Unknown file"}</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 mb-1 overflow-x-auto">
-                        <span
-                          className="bg-gray-800 px-2 py-0.5 rounded font-mono text-xs text-gray-300 break-all max-w-full"
-                          title={sha256}
-                        >
-                          SHA256: {sha256 ? sha256 : <span className='italic text-gray-500'>N/A</span>}
-                        </span>
-                        <span
-                          className="bg-gray-800 px-2 py-0.5 rounded font-mono text-xs text-gray-300 break-all max-w-full"
-                          title={sha512}
-                        >
-                          SHA512: {sha512 ? sha512 : <span className='italic text-gray-500'>N/A</span>}
-                        </span>
-                      </div>
-                      {uploader && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="bg-green-900/60 px-2 py-0.5 rounded font-mono text-xs text-green-300"><User className="inline w-4 h-4 mr-1 text-green-400" /> Uploaded by: {uploader}</span>
+                    let sha512 = evidenceObj.sha512, sha256 = evidenceObj.sha256, uploader = evidenceObj.uploader;
+                    if (evidenceObj.metadata) {
+                      try {
+                        const meta = typeof evidenceObj.metadata === 'string' ? JSON.parse(evidenceObj.metadata) : evidenceObj.metadata;
+                        sha512 = meta.sha512 || sha512;
+                        sha256 = meta.sha256 || sha256;
+                        uploader = meta.uploader || uploader;
+                      } catch {}
+                    }
+                    return (
+                      <li
+                        key={i}
+                        className={`rounded-xl shadow flex flex-col gap-2 p-3 mb-2 
+                          ${theme === 'dark' 
+                            ? 'bg-green-950/80 border border-green-800' 
+                            : 'bg-green-50/80 border border-green-300'}
+                        `}
+                        draggable
+                        onDragStart={e => {
+                          e.dataTransfer.setData("application/json", JSON.stringify([ev]));
+                          e.dataTransfer.effectAllowed = "copy";
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <FileText className="w-5 h-5 text-green-400" />
+                          {/* Filename Text */}
+                          <span className={`font-bold text-base ${theme === 'dark' ? 'text-green-200' : 'text-green-800'}`}>
+                            {evidenceObj.filename || evidenceObj.fileName || "Unknown file"}
+                          </span>
                         </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="text-xs text-green-300 mt-2">Drag to section editor to auto-fill description</div>
-            </div>
-            {/* Timeline (draggable) */}
-            <div
-              draggable
-              onDragStart={e => {
-                e.dataTransfer.setData("application/json", JSON.stringify(sectionContext.timeline));
-                e.dataTransfer.effectAllowed = "copy";
-              }}
-              className="cursor-grab select-none"
-              style={{ pointerEvents: 'auto', userSelect: 'none' }}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <Clock className="w-5 h-5 text-yellow-400" />
-                <span className="font-bold text-white">Timeline</span>
+                        <div className="flex flex-wrap items-center gap-2 mb-1 overflow-x-auto">
+                          {/* Hash Tags */}
+                          <span
+                            className={`px-2 py-0.5 rounded font-mono text-xs break-all max-w-full 
+                              ${theme === 'dark' ? 'bg-gray-800 text-gray-300' : 'bg-gray-300 text-gray-800'}
+                            `}
+                            title={sha256}
+                          >
+                            SHA256: {sha256 ? sha256 : <span className={`italic ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>N/A</span>}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded font-mono text-xs break-all max-w-full 
+                              ${theme === 'dark' ? 'bg-gray-800 text-gray-300' : 'bg-gray-300 text-gray-800'}
+                            `}
+                            title={sha512}
+                          >
+                            SHA512: {sha512 ? sha512 : <span className={`italic ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>N/A</span>}
+                          </span>
+                        </div>
+                        {uploader && (
+                          <div className="flex items-center gap-2 mt-1">
+                            {/* Uploader Tag */}
+                            <span className={`px-2 py-0.5 rounded font-mono text-xs ${theme === 'dark' ? 'bg-green-900/60 text-green-300' : 'bg-green-200/60 text-green-800'}`}>
+                              <User className="inline w-4 h-4 mr-1 text-green-400" /> Uploaded by: {uploader}
+                            </span>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {/* Instructional Text */}
+                <div className={`text-xs mt-2 ${theme === 'dark' ? 'text-green-300' : 'text-green-600'}`}>Drag to section editor to auto-fill description</div>
               </div>
-              <ul className="space-y-1">
-                {(Array.isArray(sectionContext.timeline) ? sectionContext.timeline : []).map((ev, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-yellow-300">
-                    <span className="bg-yellow-900/60 px-2 py-0.5 rounded font-mono">{ev?.createdAt || "Event"}</span>
-                    <span>{ev?.description || (typeof ev === 'string' ? ev : JSON.stringify(ev))}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="text-xs text-yellow-300 mt-2">Drag to section editor to auto-fill description</div>
+
+              {/* Timeline (draggable) */}
+              <div
+                draggable
+                onDragStart={e => {
+                  e.dataTransfer.setData("application/json", JSON.stringify(sectionContext.timeline));
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                className="cursor-grab select-none"
+                style={{ pointerEvents: 'auto', userSelect: 'none' }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {/* Clock icon color remains strong, no change */}
+                  <Clock className="w-5 h-5 text-yellow-400" />
+                  {/* Heading Text */}
+                  <span className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Timeline</span>
+                </div>
+                <ul className="space-y-1">
+                  {(Array.isArray(sectionContext.timeline) ? sectionContext.timeline : []).map((ev, i) => (
+                    <li key={i} className={`flex items-center gap-2 text-sm ${theme === 'dark' ? 'text-yellow-300' : 'text-yellow-800'}`}>
+                      {/* Timeline Tag BG/Text */}
+                      <span className={`${theme === 'dark' ? 'bg-yellow-900/60' : 'bg-yellow-200/60'} px-2 py-0.5 rounded font-mono`}>{ev?.createdAt || "Event"}</span>
+                      <span>{ev?.description || (typeof ev === 'string' ? ev : JSON.stringify(ev))}</span>
+                    </li>
+                  ))}
+                </ul>
+                {/* Instructional Text */}
+                <div className={`text-xs mt-2 ${theme === 'dark' ? 'text-yellow-300' : 'text-yellow-600'}`}>Drag to section editor to auto-fill description</div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
 
@@ -1768,21 +1824,31 @@ const commitEditingTitle = useCallback(async () => {
                       )}
 
 {isPreviewMode ? (
-  <div className="bg-gray-800 p-6 rounded-lg">
-    {/* Word Document Simulation */}
+  // Outer Wrapper: adapts background
+  <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
+    {/* Word Document Simulation Container: adapts background and text color */}
     <div 
-      className="mx-auto bg-gray-900 text-gray-100 shadow-2xl rounded overflow-hidden"
+      className={`
+        mx-auto shadow-2xl rounded overflow-hidden
+        ${theme === 'dark' 
+          ? 'bg-gray-900 text-gray-100' // Dark page text color is set here
+          : 'bg-white text-gray-900'} // Light page text color is set here
+      `}
       style={{
         width: '210mm', // A4 width
         minHeight: '297mm', // A4 height
-        boxShadow: '0 0 25px rgba(0,0,0,0.7)'
+        // Shadow adapts for better visibility in light mode
+        boxShadow: theme === 'dark' ? '0 0 25px rgba(0,0,0,0.7)' : '0 0 15px rgba(0,0,0,0.2)'
       }}
     >
       {/* Document Content Pages */}
       <div 
-        className="p-12 bg-gray-900"
+        className={`p-12 ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'}`}
         style={{
-          background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+          // Use the gradient ONLY in dark mode, use solid color in light mode
+          background: theme === 'dark' 
+            ? 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)' 
+            : 'white',
           minHeight: '297mm'
         }}
       >
@@ -1797,14 +1863,16 @@ const commitEditingTitle = useCallback(async () => {
                 {/* Section Header */}
                 {section.title && (
                   <h2 
-                    className="text-blue-400 mb-4"
+                    // Header text color adapts (blue-400 for dark -> blue-700 for light)
+                    className={`${theme === 'dark' ? 'text-blue-400' : 'text-blue-700'} mb-4`}
                     style={{
                       fontSize: '16pt',
                       fontWeight: '600',
                       fontFamily: 'Calibri, sans-serif',
                       marginBottom: '16px',
                       paddingBottom: '8px',
-                      borderBottom: '2px solid #374151'
+                      // Border color adapts
+                      borderBottom: `2px solid ${theme === 'dark' ? '#374151' : '#d1d5db'}`
                     }}
                   >
                     {section.title}
@@ -1818,11 +1886,12 @@ const commitEditingTitle = useCallback(async () => {
                     fontFamily: 'Calibri, sans-serif',
                     fontSize: '11pt',
                     lineHeight: '1.5',
-                    color: '#e5e7eb'
+                    // Main content text color adapts
+                    color: theme === 'dark' ? '#e5e7eb' : '#1f2937' 
                   }}
                   dangerouslySetInnerHTML={{ 
                     __html: section.content || `
-                      <div style="color: #6b7280; font-style: italic; text-align: center; padding: 32px; border: 1px dashed #4b5563; border-radius: 4px;">
+                      <div style="color: ${theme === 'dark' ? '#6b7280' : '#9ca3af'}; font-style: italic; text-align: center; padding: 32px; border: 1px dashed ${theme === 'dark' ? '#4b5563' : '#d1d5db'}; border-radius: 4px;">
                         <p style="margin: 0; font-size: 11pt;">No content added for this section</p>
                       </div>
                     `
@@ -1832,13 +1901,15 @@ const commitEditingTitle = useCallback(async () => {
                 {/* Section Separator */}
                 {index < sections.length - 1 && (
                   <div className="my-8 opacity-30">
-                    <div className="w-full h-px bg-gray-600"></div>
+                    {/* Separator line color adapts */}
+                    <div className={`w-full h-px ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
                   </div>
                 )}
               </div>
             ))
           ) : (
-            <div className="text-center py-20 text-gray-400">
+            // Empty State
+            <div className={`text-center py-20 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
               <div className="text-4xl mb-4">📄</div>
               <h3 className="text-xl font-semibold mb-2" style={{ fontFamily: 'Calibri, sans-serif' }}>
                 No Sections Added
@@ -1849,8 +1920,10 @@ const commitEditingTitle = useCallback(async () => {
         </div>
 
         {/* Page Footer */}
-        <div className="mt-16 pt-8 border-t border-gray-700 text-center">
-          <div className="text-xs text-gray-500">
+        <div 
+          className={`mt-16 pt-8 text-center ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'} border-t`}
+        >
+          <div className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'} text-xs`}>
             Page 1 | {sections.reduce((total, section) => {
               const text = section.content?.replace(/<[^>]*>/g, '') || '';
               return total + (text.split(/\s+/).filter(word => word.length > 0).length);
@@ -1859,104 +1932,111 @@ const commitEditingTitle = useCallback(async () => {
         </div>
       </div>
     </div>
-
-    {/* Word Document Styling */}
+    
+    {/* ... (The <style> block needs adaptation too, see below) ... */}
     <style>{`
-      .word-content-section h1 {
-        color: #ffffff;
-        font-size: 16pt;
-        font-weight: bold;
-        margin: 20px 0 12px 0;
-        font-family: Calibri, sans-serif;
-      }
+  /* Define colors based on the theme variable */
+  :root {
+    --preview-heading-color: ${theme === 'dark' ? '#ffffff' : '#1f2937'};
+    --preview-text-color: ${theme === 'dark' ? '#e5e7eb' : '#1f2937'};
+    --preview-table-bg: ${theme === 'dark' ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 0.5)'};
+    --preview-table-header-bg: ${theme === 'dark' ? '#374151' : '#e5e7eb'};
+    --preview-table-header-color: ${theme === 'dark' ? '#ffffff' : '#1f2937'};
+    --preview-table-border: ${theme === 'dark' ? '#4b5563' : '#d1dd1d'};
+    --preview-blockquote-border: #2563eb; /* Blue stays consistent */
+    --preview-blockquote-bg: ${theme === 'dark' ? 'rgba(37, 99, 235, 0.1)' : 'rgba(37, 99, 235, 0.05)'};
+  }
 
-      .word-content-section h2 {
-        color: #e5e7eb;
-        font-size: 14pt;
-        font-weight: bold;
-        margin: 18px 0 10px 0;
-        font-family: Calibri, sans-serif;
-      }
+  /* Headings: H1 */
+  .word-content-section h1 {
+    color: var(--preview-heading-color);
+    font-size: 16pt;
+    font-weight: bold;
+    margin: 20px 0 12px 0;
+    font-family: Calibri, sans-serif;
+  }
 
-      .word-content-section h3 {
-        color: #e5e7eb;
-        font-size: 12pt;
-        font-weight: bold;
-        margin: 16px 0 8px 0;
-        font-family: Calibri, sans-serif;
-      }
+  /* Headings: H2 and H3 */
+  .word-content-section h2,
+  .word-content-section h3 {
+    color: var(--preview-heading-color); /* Uses the same color for consistency */
+    font-size: 14pt;
+    font-weight: bold;
+    margin: 18px 0 10px 0;
+    font-family: Calibri, sans-serif;
+  }
 
-      .word-content-section p {
-        margin-bottom: 12px;
-        text-align: left;
-        line-height: 1.5;
-      }
+  .word-content-section h3 {
+    font-size: 12pt;
+    margin: 16px 0 8px 0;
+  }
 
-      .word-content-section ul, 
-      .word-content-section ol {
-        margin: 12px 0;
-        padding-left: 36px;
-      }
+  /* Paragraphs and Lists */
+  .word-content-section p,
+  .word-content-section ul, 
+  .word-content-section ol,
+  .word-content-section li {
+    color: var(--preview-text-color); /* Main text color */
+  }
 
-      .word-content-section li {
-        margin-bottom: 6px;
-        line-height: 1.5;
-      }
+  .word-content-section p {
+    margin-bottom: 12px;
+    text-align: left;
+    line-height: 1.5;
+  }
 
-      .word-content-section strong {
-        font-weight: bold;
-      }
+  .word-content-section ul, 
+  .word-content-section ol {
+    margin: 12px 0;
+    padding-left: 36px;
+  }
 
-      .word-content-section em {
-        font-style: italic;
-      }
+  .word-content-section li {
+    margin-bottom: 6px;
+    line-height: 1.5;
+  }
+  
+  /* Blockquote */
+  .word-content-section blockquote {
+    border-left: 3px solid var(--preview-blockquote-border);
+    background: var(--preview-blockquote-bg);
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 2px 2px 0;
+  }
 
-      .word-content-section u {
-        text-decoration: underline;
-      }
+  /* Tables */
+  .word-content-section table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    background: var(--preview-table-bg);
+    border: 1px solid var(--preview-table-border);
+  }
 
-      .word-content-section s {
-        text-decoration: line-through;
-      }
+  .word-content-section th {
+    background: var(--preview-table-header-bg);
+    color: var(--preview-table-header-color);
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    border: 1px solid var(--preview-table-border);
+  }
 
-      .word-content-section blockquote {
-        border-left: 3px solid #2563eb;
-        background: rgba(37, 99, 235, 0.1);
-        padding: 12px 16px;
-        margin: 16px 0;
-        border-radius: 0 2px 2px 0;
-      }
+  .word-content-section td {
+    padding: 8px 12px;
+    border: 1px solid var(--preview-table-border);
+  }
 
-      .word-content-section table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 16px 0;
-        background: rgba(55, 65, 81, 0.5);
-        border: 1px solid #4b5563;
-      }
-
-      .word-content-section th {
-        background: #374151;
-        color: #ffffff;
-        padding: 8px 12px;
-        text-align: left;
-        font-weight: 600;
-        border: 1px solid #4b5563;
-      }
-
-      .word-content-section td {
-        padding: 8px 12px;
-        border: 1px solid #4b5563;
-      }
-
-      @media print {
-        .section-word-style {
-          page-break-inside: avoid;
-        }
-      }
-    `}</style>
+  @media print {
+    .section-word-style {
+      page-break-inside: avoid;
+    }
+  }
+`}</style>
   </div>
 ) : (
+
                         <div style={{ position: "relative" }}>
                           <div
                             style={{ position: "relative" }}
@@ -2085,6 +2165,9 @@ const commitEditingTitle = useCallback(async () => {
                                 }
                               }
                             }}>
+                                
+                         
+                              <div className={editorWrapperClasses}>
                             <ReactQuill
                               theme="snow"
                               value={sections[activeSection]?.content ?? ""}
@@ -2113,6 +2196,7 @@ const commitEditingTitle = useCallback(async () => {
                                 }
                               }}
                             />
+                            </div>
                           </div>
                           {/* AI suggestion box always visible below editor */}
                           {(aiSuggestion && !aiLoading) && (

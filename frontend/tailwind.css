@@ -6,6 +6,111 @@
   .all-\[unset\] {
     all: unset;
   }
+
+  @layer components {
+  /* =======================================
+     REACT-QUILL THEME OVERRIDES 
+     ======================================= */
+  
+  /* --- Shared Styles for EDIT MODE --- */
+  .editor-wrapper-dark .ql-toolbar.ql-snow,
+  .editor-wrapper-light .ql-toolbar.ql-snow,
+  .editor-wrapper-default .ql-toolbar.ql-snow {
+    /* Toolbar background and border */
+    background-color: hsl(var(--card)) !important; 
+    border-color: hsl(var(--border)) !important; 
+  }
+
+  .editor-wrapper-dark .ql-container.ql-snow,
+  .editor-wrapper-light .ql-container.ql-snow,
+  .editor-wrapper-default .ql-container.ql-snow {
+    /* Content container border */
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .editor-wrapper-dark .ql-editor,
+  .editor-wrapper-light .ql-editor,
+  .editor-wrapper-default .ql-editor {
+    /* Content Area: Use the main background and foreground colors */
+    background-color: hsl(var(--background)) !important; 
+    color: hsl(var(--foreground)) !important; 
+  }
+
+  .editor-wrapper-dark .ql-editor.ql-blank::before,
+  .editor-wrapper-light .ql-editor.ql-blank::before,
+  .editor-wrapper-default .ql-editor.ql-blank::before {
+    /* Placeholder text color */
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+
+  /* =======================================
+     PREVIEW MODE OVERRIDE (.editor-preview-mode) 
+     ======================================= */
+  
+  .editor-preview-mode .ql-toolbar.ql-snow {
+    /* Hide the toolbar completely in preview mode */
+    display: none !important;
+  }
+
+  .editor-preview-mode .ql-container.ql-snow {
+    /* Remove borders */
+    border: none !important; 
+  }
+
+  .editor-preview-mode .ql-editor {
+    /* Styles to make it look like a clean document */
+    background-color: white !important; 
+    color: #1f2937 !important; /* Near-black text for high contrast */
+    padding: 40px !important; 
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); 
+    min-height: 1000px !important; 
+    pointer-events: none !important; /* Disable editing/interactions */
+    cursor: default !important;
+    
+  }
+
+  /* --- Additional Shared Styles for Toolbar Elements --- */
+
+/* Fix 2A: Set default icon/text color for the toolbar */
+.editor-wrapper-light .ql-toolbar.ql-snow button,
+.editor-wrapper-light .ql-toolbar.ql-snow .ql-stroke {
+    stroke: hsl(var(--foreground)) !important; /* Dark text/icons */
+}
+.editor-wrapper-light .ql-toolbar.ql-snow button:hover .ql-stroke {
+    stroke: hsl(var(--primary)) !important; /* Highlight color on hover */
+}
+/* For fill icons (like color swatch checkmark or background icon) */
+.editor-wrapper-light .ql-toolbar.ql-snow .ql-fill {
+    fill: hsl(var(--foreground)) !important; /* Dark fill color */
+}
+
+/* Fix 2B: Fix the text in dropdowns (e.g., Font, Size, Header) */
+.editor-wrapper-light .ql-toolbar.ql-snow .ql-picker-label {
+    color: hsl(var(--foreground)) !important; /* Dark text for dropdown label */
+}
+.editor-wrapper-light .ql-toolbar.ql-snow .ql-picker-label:hover {
+    color: hsl(var(--primary)) !important; /* Highlight color on hover */
+}
+
+/* Fix 2C: Fix the dropdown menu backgrounds and text */
+.editor-wrapper-light .ql-picker.ql-color-picker .ql-picker-options,
+.editor-wrapper-light .ql-picker.ql-font .ql-picker-options,
+.editor-wrapper-light .ql-picker.ql-size .ql-picker-options {
+    /* Set dropdown background to light color */
+    background-color: hsl(var(--background)) !important;
+    border-color: hsl(var(--border)) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+/* Fix 2D: Fix selected text in dropdowns (like when 'Large' is selected) */
+.editor-wrapper-light .ql-toolbar.ql-snow .ql-active .ql-picker-label,
+.editor-wrapper-light .ql-toolbar.ql-snow .ql-active .ql-stroke {
+    /* When an item is active/selected */
+    color: hsl(var(--primary)) !important; 
+    stroke: hsl(var(--primary)) !important;
+}
+}
 }
 
 @tailwind base;
