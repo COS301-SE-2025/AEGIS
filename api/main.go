@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-playground/validator/v10"
+	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 
 	"aegis-api/cache"
@@ -62,9 +64,11 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"aegis-api/internal/x3dh"
+	verification "aegis-api/services_/auth/verification"
 
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.uber.org/zap"
 )
 
 func InitCollections(db *mongo.Database) {
@@ -312,7 +316,27 @@ func main() {
 	// ─── Handlers ───────────────────────────────────────────────
 	adminHandler := handlers.NewAdminService(regService, listUserService, nil, userDeleteService, auditLogger, *auditLogService)
 	authHandler := handlers.NewAuthHandler(authService, resetService, userRepo, auditLogger)
+	// Replace lines 316-321:
 
+	// Get the database as *sqlx.DB
+	sqlStdDB, err := db.DB.DB()
+	if err != nil {
+		log.Fatalf("❌ Failed to extract SQL DB: %v", err)
+	}
+	sqlxDB := sqlx.NewDb(sqlStdDB, "postgres")
+
+	// Create validator instance
+	validator := validator.New()
+
+	// Create zap logger directly
+	zapLog, err := zap.NewProduction()
+	if err != nil {
+		log.Fatalf("❌ Failed to create zap logger: %v", err)
+	}
+
+	// Create MFA service and verification handler
+	verificationService := verification.NewMFAService(sqlxDB, zapLog)
+	verificationHandler := handlers.NewVerificationHandler(sqlxDB, validator, zapLog, verificationService)
 	addr := os.Getenv("REDIS_ADDR") // "redis:6379" in compose
 	pass := os.Getenv("REDIS_PASS")
 	db1 := 0
@@ -531,6 +555,7 @@ func main() {
 
 	x3dhAuditor := x3dh.NewMongoAuditLogger(mongoDatabase)
 	x3dhService := x3dh.NewBundleService(x3dhStore, cryptoSvc, x3dhAuditor)
+	// ----------------------------------------------------------------
 
 	// ─── Compose Handler Struct ─────────────────────────────────
 	mainHandler := handlers.NewHandler(
@@ -573,7 +598,7 @@ func main() {
 		healthHandler,
 
 		x3dhService, // X3DH Service
-
+		verificationHandler,
 	)
 
 	// ─── Set Up Router and Launch ───────────────────────────────
