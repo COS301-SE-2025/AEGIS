@@ -56,7 +56,6 @@ import (
 
 	"aegis-api/services_/timeline"
 
-	
 	"aegis-api/services_/health"
 	"aegis-api/services_/user/profile"
 
@@ -208,8 +207,6 @@ func main() {
 	}
 	permChecker := &middleware.DBPermissionChecker{DB: sqlDB}
 
-	
-
 	//--Gin setup for HTTPS--
 	r := gin.Default()
 	// Enforce HTTPS and add HSTS headers
@@ -311,9 +308,9 @@ func main() {
 	timelineService := timeline.NewService(timelineRepo)
 
 	evidenceCountService := evidencecount.NewEvidenceService(evidenceCountRepo)
-
+	auditLogService := auditlog.NewAuditLogService(mongoDatabase, userRepo)
 	// ─── Handlers ───────────────────────────────────────────────
-	adminHandler := handlers.NewAdminService(regService, listUserService, nil, userDeleteService, auditLogger)
+	adminHandler := handlers.NewAdminService(regService, listUserService, nil, userDeleteService, auditLogger, *auditLogService)
 	authHandler := handlers.NewAuthHandler(authService, resetService, userRepo, auditLogger)
 
 	addr := os.Getenv("REDIS_ADDR") // "redis:6379" in compose
@@ -366,7 +363,7 @@ func main() {
 	if chainOfCustodyService == nil {
 		log.Fatal("Failed to create chain of custody service")
 	}
-	chainOfCustodyHandler := handlers.NewChainOfCustodyHandler(chainOfCustodyService)
+	chainOfCustodyHandler := handlers.NewChainOfCustodyHandler(chainOfCustodyService, auditLogger)
 
 	// ─── Messages / WebSocket ───────────────────────────────────
 	messageRepo := messages.NewMessageRepository(db.DB)
@@ -429,9 +426,6 @@ func main() {
 	caseDeletionService := case_deletion.NewCaseDeletionService(caseDeletionRepo)
 	caseDeletionHandler := handlers.NewCaseDeletionHandler(caseDeletionService)
 
-	// ─── AuditLog Service and Handler ─────────────────────────────
-	auditLogService := auditlog.NewAuditLogService(mongoDatabase, userRepo)
-
 	recentActivityHandler := handlers.NewRecentActivityHandler(auditLogService)
 
 	notificationService = &notification.NotificationService{
@@ -469,7 +463,7 @@ func main() {
 	TimelineAIService := timelineai.NewAIService(timelineAIrepo, &aiConfig)
 
 	// Instantiate Timeline AI Handler
-	timelineAIHandler := handlers.NewTimelineAIHandler(TimelineAIService)
+	timelineAIHandler := handlers.NewTimelineAIHandler(TimelineAIService, auditLogger)
 	log.Println("✅ Timeline AI service initialized")
 
 	// ─── Report Handler Initialization ─────────────────────────────
@@ -481,6 +475,7 @@ func main() {
 		timelineService, // implements ListEvents
 		caseService,     // implements GetCaseByID
 		iocService,      // implements ListIOCsByCase
+		auditLogger,
 	)
 
 	// Instantiate Report AI Service

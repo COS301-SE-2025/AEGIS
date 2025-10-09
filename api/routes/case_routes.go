@@ -127,6 +127,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.GET("/users", h.AdminService.ListUsers)
 		protected.GET("tenants/:tenantId/users", middleware.AuthMiddleware(), h.AdminService.ListUsersByTenant)
 		protected.DELETE("/users/:userId", h.AdminService.DeleteUserHandler)
+		protected.GET("/audit-logs", h.AdminService.GetAuditLogs)
 
 		// ─── Profile Routes ──────────────────────────
 		protected.GET("/profile/:userID", h.ProfileHandler.GetProfileHandler)

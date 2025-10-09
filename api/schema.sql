@@ -77,6 +77,19 @@ CREATE TYPE investigation_stage AS ENUM (
     'Reporting & Documentation',
     'Case Closure & Review'
 );
+-- STEP 1: Create ENUM for token status (if it doesn't exist yet)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'token_status') THEN
+        CREATE TYPE token_status AS ENUM ('active', 'expired', 'revoked');
+    END IF;
+END$$;
+
+CREATE TYPE token_type AS ENUM (
+    'EMAIL_VERIFY',
+    'RESET_PASSWORD',
+    'COLLAB_INVITE'
+);
 
 CREATE TABLE tenants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -94,13 +107,6 @@ CREATE TABLE teams (
   CONSTRAINT fk_teams_tenant FOREIGN KEY (tenant_id)
     REFERENCES tenants(id) ON DELETE CASCADE
 );
--- STEP 1: Create ENUM for token status (if it doesn't exist yet)
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'token_status') THEN
-        CREATE TYPE token_status AS ENUM ('active', 'expired', 'revoked');
-    END IF;
-END$$;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -124,11 +130,17 @@ CREATE TABLE IF NOT EXISTS users (
     team_id UUID REFERENCES teams(id) ON DELETE SET NULL -- Link to team
 );
 
-CREATE TYPE token_type AS ENUM (
-    'EMAIL_VERIFY',
-    'RESET_PASSWORD',
-    'COLLAB_INVITE'
+-- Tokens table for email verification, password resets, etc.
+CREATE TABLE tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type token_type NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP,
+    used BOOLEAN DEFAULT FALSE
 );
+
 
 CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -141,58 +153,6 @@ CREATE TABLE notifications (
     read BOOLEAN DEFAULT FALSE,
     archived BOOLEAN DEFAULT FALSE
 );
-
---- Case Collaborators table
-CREATE TABLE case_collaborators (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    case_id         UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
-    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role            user_role NOT NULL,
-    invited_by      UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
-    invited_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    expires_at      TIMESTAMP WITH TIME ZONE,
-    status          VARCHAR(20) NOT NULL DEFAULT 'active', -- active, expired, revoked
-    UNIQUE (case_id, user_id)
-);
-
--- Tokens table for email verification, password resets, etc.
-CREATE TABLE tokens (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type token_type NOT NULL,
-    token TEXT UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP,
-    used BOOLEAN DEFAULT FALSE
-);
-
--- X3DH Identity Keys table
-CREATE TABLE x3dh_identity_keys (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    public_key TEXT NOT NULL,
-    private_key TEXT NOT NULL,  -- Encrypt this field before storing
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE x3dh_signed_prekeys (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    public_key TEXT NOT NULL,
-    private_key TEXT NOT NULL,   -- Encrypted
-    signature TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP
-);
-
-
-CREATE TABLE x3dh_one_time_prekeys (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    public_key TEXT NOT NULL,
-    private_key TEXT NOT NULL,   -- Encrypted
-    is_used BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 
 -- Cases table
 CREATE TABLE IF NOT EXISTS cases (
@@ -210,6 +170,20 @@ CREATE TABLE IF NOT EXISTS cases (
   tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL, -- Link to tenant
   progress INTEGER DEFAULT 0 -- Progress percentage (0-100)
 );
+--- Case Collaborators table
+CREATE TABLE case_collaborators (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    case_id         UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role            user_role NOT NULL,
+    invited_by      UUID NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+    invited_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    expires_at      TIMESTAMP WITH TIME ZONE,
+    status          VARCHAR(20) NOT NULL DEFAULT 'active', -- active, expired, revoked
+    UNIQUE (case_id, user_id)
+);
+
+
 
 CREATE TABLE IF NOT EXISTS groups (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -223,6 +197,7 @@ CREATE TABLE IF NOT EXISTS groups (
     -- New Fields
     tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL -- Link to tenant
 );
+
 
 CREATE TABLE annotation_threads (
   id UUID PRIMARY KEY,
@@ -247,6 +222,48 @@ CREATE TABLE thread_tags (
   thread_id UUID NOT NULL REFERENCES annotation_threads(id),
   tag_name VARCHAR(255) NOT NULL
 );
+
+-- ⚠ WARNING: This will delete existing key data
+DROP TABLE IF EXISTS public.x3dh_one_time_prekeys CASCADE;
+DROP TABLE IF EXISTS public.x3dh_signed_prekeys CASCADE;
+DROP TABLE IF EXISTS public.x3dh_identity_keys CASCADE;
+
+-- ✅ Correct schema (matches the working one)
+CREATE TABLE public.x3dh_identity_keys (
+    user_id uuid NOT NULL,
+    public_key text NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT x3dh_identity_keys_pkey PRIMARY KEY (user_id),
+    CONSTRAINT x3dh_identity_keys_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE public.x3dh_signed_prekeys (
+    user_id uuid NOT NULL,
+    public_key text NOT NULL,
+    signature text NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT x3dh_signed_prekeys_pkey PRIMARY KEY (user_id),
+    CONSTRAINT x3dh_signed_prekeys_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX x3dh_spk_created_at_idx ON public.x3dh_signed_prekeys (user_id, created_at DESC);
+
+CREATE TABLE public.x3dh_one_time_prekeys (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    key_id text NOT NULL,
+    public_key text NOT NULL,
+    is_used boolean NOT NULL DEFAULT false,
+    created_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT x3dh_one_time_prekeys_pkey PRIMARY KEY (id),
+    CONSTRAINT x3dh_one_time_prekeys_user_id_key_id_key UNIQUE (user_id, key_id),
+    CONSTRAINT x3dh_one_time_prekeys_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX x3dh_opk_user_id_idx ON public.x3dh_one_time_prekeys (user_id);
+
+
+
 
 CREATE TABLE thread_participants (
   thread_id UUID NOT NULL REFERENCES annotation_threads(id),
@@ -1010,35 +1027,7 @@ CREATE TRIGGER update_reports_updated_at
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
 
--- Alternative for MySQL (if not using PostgreSQL)
-/*
-CREATE TABLE reports (
-    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    case_id CHAR(36) NOT NULL,
-    examiner_id CHAR(36) NOT NULL,
-    scope TEXT,
-    objectives TEXT,
-    limitations TEXT,
-    tools_methods TEXT,
-    final_conclusion TEXT,
-    evidence_summary TEXT,
-    certification_statement TEXT,
-    date_examined DATE,
-    status ENUM('draft', 'published', 'archived', 'pending', 'reviewed') DEFAULT 'draft',
-    version INTEGER NOT NULL DEFAULT 1,
-    report_number VARCHAR(255) UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    name VARCHAR(255) NOT NULL,
-    file_path VARCHAR(255) NOT NULL,
-    
-    INDEX idx_reports_case_id (case_id),
-    INDEX idx_reports_examiner_id (examiner_id),
-    INDEX idx_reports_status (status),
-    INDEX idx_reports_created_at (created_at),
-    INDEX idx_reports_report_number (report_number),
-    INDEX idx_reports_date_examined (date_examined)
-);*/
+
 
 CREATE TABLE report_sections (
   id CHAR(24) PRIMARY KEY,
