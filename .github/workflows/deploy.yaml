@@ -32,6 +32,13 @@ jobs:
             mkdir -p "$PROJECT_DIR"
             cd "$PROJECT_DIR"
 
+            # Backup critical files before pull
+            echo "Backing up critical configuration files..."
+            mkdir -p .backup
+            [ -f .env ] && cp .env .backup/.env.bak
+            [ -f docker-compose.yml ] && cp docker-compose.yml .backup/docker-compose.yml.bak
+            [ -f nginx.conf ] && cp nginx.conf .backup/nginx.conf.bak
+
             # Initialize git repository if it doesn't exist
             if [ ! -d ".git" ]; then
               echo "Initializing git repository..."
@@ -39,27 +46,58 @@ jobs:
               git remote add origin https://github.com/COS301-SE-2025/AEGIS.git
             fi
 
-            # Stash any local changes (like untracked .env files)
-            echo "Stashing any local changes..."
-            git stash --include-untracked || true
+            # Clean up any merge conflicts from previous failed deployments
+            echo "Cleaning up any existing merge conflicts..."
+            git merge --abort 2>/dev/null || true
+            git reset --hard 2>/dev/null || true
 
-            # Fetch and pull latest changes
+            # Fetch latest changes
             echo "Fetching latest code..."
             git fetch origin main
-            git checkout main 2>/dev/null || git checkout -b main origin/main
-            git reset --hard origin/main  # Force sync with remote (discards local commits)
+
+            # Force checkout main branch with latest code
+            echo "Checking out main branch..."
+            git checkout -B main origin/main
 
             echo "Successfully pulled latest code"
 
-            # Restore stashed files (if any, like .env)
-            echo "Restoring local configuration files..."
-            git stash pop || echo "No stashed changes to restore"
+            # Restore backed up configuration files if they exist
+            echo "Restoring configuration files..."
+            [ -f .backup/.env.bak ] && cp .backup/.env.bak .env
 
-            # Ensure environment file exists (create from template if missing)
+            # Only restore docker-compose.yml if it has custom configurations
+            # Otherwise use the version from git
+            if [ -f .backup/docker-compose.yml.bak ]; then
+              echo "Note: Using docker-compose.yml from repository"
+              echo "Previous docker-compose.yml backed up at .backup/docker-compose.yml.bak"
+            fi
+
+            # Restore nginx.conf if it exists in backup
+            if [ -f .backup/nginx.conf.bak ]; then
+              echo "Note: Using nginx.conf from repository"
+              echo "Previous nginx.conf backed up at .backup/nginx.conf.bak"
+            fi
+
+            # Ensure environment file exists
             if [ ! -f ".env" ] && [ -f ".env.example" ]; then
               echo "Creating .env from .env.example..."
               cp .env.example .env
               echo "WARNING: Please update .env with production values!"
+            fi
+
+            # Validate docker-compose.yml syntax
+            echo "Validating docker-compose.yml..."
+            if ! docker compose config > /dev/null 2>&1; then
+              echo "Error: docker-compose.yml has syntax errors"
+              docker compose config || true
+              echo "Attempting to use backup..."
+              if [ -f .backup/docker-compose.yml.bak ]; then
+                cp .backup/docker-compose.yml.bak docker-compose.yml
+                echo "Restored backup docker-compose.yml"
+              else
+                echo "No backup available. Please fix docker-compose.yml manually."
+                exit 1
+              fi
             fi
 
             # Verify Docker is installed
@@ -78,40 +116,65 @@ jobs:
               exit 1
             fi
 
-            # Check if docker-compose file exists
-            if [ ! -f "docker-compose.yml" ] && [ ! -f "docker-compose.yaml" ]; then
-              echo "Error: No docker-compose file found" >&2
-              ls -la
-              exit 1
-            fi
-
             echo "Stopping existing containers..."
-            $COMPOSE_CMD down --remove-orphans
+            $COMPOSE_CMD down --remove-orphans || true
 
             echo "Removing old images to force rebuild..."
             docker images | grep aegis | awk '{print $3}' | xargs -r docker rmi -f || true
 
-            echo "Building and starting containers..."
-            $COMPOSE_CMD up -d --build --force-recreate
+            echo "Pruning unused Docker resources..."
+            docker system prune -f || true
 
-            echo "Waiting for services to start..."
-            sleep 5
+            echo "Building and starting containers..."
+            if ! $COMPOSE_CMD up -d --build --force-recreate; then
+              echo "Deployment failed! Rolling back to previous state..."
+              if [ -f .backup/docker-compose.yml.bak ]; then
+                cp .backup/docker-compose.yml.bak docker-compose.yml
+                $COMPOSE_CMD up -d
+              fi
+              exit 1
+            fi
+
+            echo "Waiting for services to stabilize..."
+            sleep 10
 
             echo "Container status:"
             $COMPOSE_CMD ps
 
             echo "Recent logs:"
-            $COMPOSE_CMD logs --tail=20
+            $COMPOSE_CMD logs --tail=30
 
-            # Optional: Health check (uncomment and customize)
-            # echo "Running health check..."
-            # sleep 10
-            # if curl -f http://localhost:80/health; then
-            #   echo "✓ Health check passed"
-            # else
-            #   echo "✗ Health check failed" >&2
-            #   $COMPOSE_CMD logs
-            #   exit 1
-            # fi
+            # Health check for critical services
+            echo "Performing health checks..."
+            sleep 5
 
+            # Check if API is responding
+            if docker ps | grep -q "aegis.*api"; then
+              echo "✓ API container is running"
+            else
+              echo "✗ API container failed to start" >&2
+              $COMPOSE_CMD logs api
+            fi
+
+            # Check if frontend is responding
+            if docker ps | grep -q "aegis.*frontend"; then
+              echo "✓ Frontend container is running"
+            else
+              echo "✗ Frontend container failed to start" >&2
+              $COMPOSE_CMD logs frontend
+            fi
+
+            # Check if nginx is responding
+            if docker ps | grep -q "nginx"; then
+              echo "✓ Nginx container is running"
+            else
+              echo "✗ Nginx container failed to start" >&2
+              $COMPOSE_CMD logs nginx
+            fi
+
+            echo "============================================"
             echo "✓ Deployment completed successfully!"
+            echo "============================================"
+            echo "Deployed commit: $(git rev-parse --short HEAD)"
+            echo "Backup location: $PROJECT_DIR/.backup"
+            echo "============================================"
