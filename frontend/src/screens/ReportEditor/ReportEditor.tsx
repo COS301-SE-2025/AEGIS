@@ -1455,80 +1455,82 @@ const commitEditingTitle = useCallback(async () => {
       </button>
       {/* AI Suggest Button */}
       <button
-        type="button"
-        onClick={async () => {
-          if (!report?.mongoId) return;
-          setAiLoading(true);
-          try {
-            const token = sessionStorage.getItem("authToken");
-            // Send section context in POST payload for context-aware suggestions
-            const contextPayload = {
-              case_info: sectionContext?.case_info,
-              iocs: sectionContext?.iocs,
-              evidence: sectionContext?.evidence,
-              timeline: sectionContext?.timeline,
-              section_title: sections[activeSection]?.title,
-              section_content: sections[activeSection]?.content,
-            };
-            const res = await axios.post(
-              `${API_URL}/reports/ai/${report.mongoId}/sections/${sections[activeSection].id}/suggest`,
-              contextPayload,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            // Defensive: extract string, fallback to empty string
-            const suggestionObj = res.data as any;
-            let suggestionText = "";
-            // Handle nested object structure: { suggestion: { SuggestionText: "..." } }
-            if (suggestionObj && typeof suggestionObj === "object") {
-              if (typeof suggestionObj.SuggestionText === "string") {
-                suggestionText = suggestionObj.SuggestionText;
-              } else if (
-                suggestionObj.suggestion &&
-                typeof suggestionObj.suggestion === "object" &&
-                typeof suggestionObj.suggestion.SuggestionText === "string"
-              ) {
-                suggestionText = suggestionObj.suggestion.SuggestionText;
-              } else if (typeof suggestionObj.suggestion === "string") {
-                suggestionText = suggestionObj.suggestion;
-              } else {
-                console.warn("AI suggestion object missing expected string property:", suggestionObj);
-                suggestionText = "";
-              }
-            } else if (typeof suggestionObj === "string") {
-              suggestionText = suggestionObj;
-            }
-            console.log("AI suggestion received:", suggestionText); // Debug log
-            if (!insertingSuggestionRef.current) {
-              setAiSuggestion(suggestionText);
-            }
-            // Removed setShowFeedback(true) to prevent duplicate overlay and ghost text persistence
-          } catch (e) {
-            console.error("AI suggest failed", e);
-            toast.error("Failed to fetch AI suggestion");
-          } finally {
-            setAiLoading(false);
-          }
+              type="button"
+              onClick={async () => {
+                if (!report?.mongoId) return;
+                setAiLoading(true);
+                try {
+                  const token = sessionStorage.getItem("authToken");
+                  // Send section context in POST payload for context-aware suggestions
+                  const contextPayload = {
+                    case_info: sectionContext?.case_info,
+                    iocs: sectionContext?.iocs,
+                    evidence: sectionContext?.evidence,
+                    timeline: sectionContext?.timeline,
+                    section_title: sections[activeSection]?.title,
+                    section_content: sections[activeSection]?.content,
+                  };
+                  const res = await axios.post(
+                    `${API_URL}/reports/ai/${report.mongoId}/sections/${sections[activeSection].id}/suggest`,
+                    contextPayload,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                  );
+                  // Defensive: extract string, fallback to empty string
+                  const suggestionObj = res.data as any;
+                  let suggestionText = "";
+                  // Handle nested object structure: { suggestion: { SuggestionText: "..." } }
+                  if (suggestionObj && typeof suggestionObj === "object") {
+                    if (typeof suggestionObj.SuggestionText === "string") {
+                      suggestionText = suggestionObj.SuggestionText;
+                    } else if (
+                      suggestionObj.suggestion &&
+                      typeof suggestionObj.suggestion === "object" &&
+                      typeof suggestionObj.suggestion.SuggestionText === "string"
+                    ) {
+                      suggestionText = suggestionObj.suggestion.SuggestionText;
+                    } else if (typeof suggestionObj.suggestion === "string") {
+                      suggestionText = suggestionObj.suggestion;
+                    } else {
+                      console.warn("AI suggestion object missing expected string property:", suggestionObj);
+                      suggestionText = "";
+                    }
+                  } else if (typeof suggestionObj === "string") {
+                    suggestionText = suggestionObj;
+                  }
+                  console.log("AI suggestion received:", suggestionText); // Debug log
+                  if (!insertingSuggestionRef.current) {
+                    setAiSuggestion(suggestionText);
+                  }
+                  // Removed setShowFeedback(true) to prevent duplicate overlay and ghost text persistence
+                } catch (e) {
+                  console.error("AI suggest failed", e);
+                  toast.error("Failed to fetch AI suggestion");
+                } finally {
+                  setAiLoading(false);
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded"
+            >
+              <Sparkles className="w-4 h-4" />
+              Suggest
+            </button>
+            
+            {/* Inline context panel (not overlay) */}
+            <div
+              className="w-[340px] max-h-[80vh] overflow-y-auto bg-gray-900 border border-gray-700 rounded-xl shadow-xl ml-6 my-4"
+              style={{
+          position: "absolute", top: "180px", right: "80px", zIndex: 40,
         }}
-        className="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded"
-      >
-        <Sparkles className="w-4 h-4" />
-        Suggest
-      </button>
+            >
+              <button
+                className="w-full flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700 rounded-t-xl hover:bg-gray-700 transition"
+                onClick={() => setContextOpen((v) => !v)}
+              >
+                <span className="font-semibold text-white text-lg">Section Context</span>
+                {contextOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </button>
+     
       
-      {/* Inline context panel (not overlay) */}
-      <div
-        className="w-[340px] max-h-[80vh] overflow-y-auto bg-gray-900 border border-gray-700 rounded-xl shadow-xl ml-6 my-4"
-        style={{
-    position: "absolute", top: "210px", right: "80px", zIndex: 40,
-  }}
-      >
-        <button
-          className="w-full flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700 rounded-t-xl hover:bg-gray-700 transition"
-          onClick={() => setContextOpen((v) => !v)}
-        >
-          <span className="font-semibold text-white text-lg">Section Context</span>
-          {contextOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-        </button>
         {contextOpen && sectionContext && (
           <div className="p-4 space-y-4">
             {/* Case Info (draggable) */}
