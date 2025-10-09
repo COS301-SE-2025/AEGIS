@@ -9,8 +9,6 @@ interface Team {
   id: string;
   name: string;
   manager: string;
-  members: number;
-  status: "Active" | "Inactive";
 }
 
 export const TeamsPage = () => {
@@ -19,7 +17,6 @@ export const TeamsPage = () => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
-  const statuses = ["Active", "Inactive"];
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -63,13 +60,10 @@ export const TeamsPage = () => {
         const mapped = teamsData.map((team: any) => ({
           id: team.id,
           name: team.name,
-          manager: team.manager, // Or dynamically derive from backend later
-          members: 0, // Placeholder for now
-          status:
-            statuses[Math.floor(Math.random() * statuses.length)], // Random status for demo
+          manager: team.manager,
         }));
         setTeams(mapped);
-        setFilteredTeams(teamsData);
+        setFilteredTeams(mapped);
       } catch (err) {
         console.error("Error fetching teams:", err);
       }
@@ -135,22 +129,6 @@ export const TeamsPage = () => {
                 <div className="text-lg font-semibold">{team.name}</div>
                 <div className="text-sm text-muted-foreground">
                   Manager: {team.manager}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Members: {team.members}
-                </div>
-                <div>
-                  <span
-                    className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                      team.status === "Active"
-                        ? "bg-success text-success-foreground"
-                        : team.status === "Inactive"
-                        ? "bg-destructive text-destructive-foreground"
-                        : "bg-warning text-warning-foreground"
-                    }`}
-                  >
-                    {team.status}
-                  </span>
                 </div>
               </div>
             ))

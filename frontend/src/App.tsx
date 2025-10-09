@@ -44,6 +44,7 @@ import { useEffect, useState } from "react"; // make sure this import exists
 
 //Notification WS
 import NotificationsWSProvider from "./components/NotificationWSProvider";
+import {DFIRAuditLogsPage} from "./screens/DFIRAuditLogsPage/DFIRAuditLogsPage";
 
 function decodeRoleFromToken(): string {
   try {
@@ -141,6 +142,7 @@ export default function App() {
       <Route path="/teams" element={<TeamsPage />} />
       <Route path="/cases/:case_id/iocs" element={<IOCPage />} />
       <Route path="/chain-of-custody/:caseId" element={<ChainOfCustody />} />
+      <Route path="/dfir-audit-logs" element={isDFIRAdmin ? <DFIRAuditLogsPage /> : <Navigate to="/" replace />} />
 
       {/* Fallback route */}
     </Routes>

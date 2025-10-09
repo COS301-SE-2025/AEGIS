@@ -5,7 +5,9 @@ import { toast } from "react-hot-toast";
 import { createRoot } from "react-dom/client";
 import  { useState, useEffect, useRef, useCallback } from "react";
 import ReactQuill from "react-quill";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 interface ContextAutofillResponse {
   case_info: any;
   iocs: any[];
@@ -280,6 +282,7 @@ function SortableSectionItem({
 }
 
 export const ReportEditor = () => {
+  const navigate = useNavigate(); // <-- Add this line
   // Dummy key to force ghost text unmount
   const [] = useState(0);
   // Enhancement button state for last dropped summary
@@ -1350,10 +1353,13 @@ const commitEditingTitle = useCallback(async () => {
               <div>
 
                 <div className="flex items-center gap-4 text-sm text-foreground mt-1">
-                  <span className="flex items-center gap-1">
-                    <Eye className="w-4 h-4" />
-                    Export
-                  </span>
+                   <button
+                    onClick={() => navigate(-1)}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg transition-colors border border-border hover:bg-muted"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </button>
                 </div>
               </div>
               <div className="flex items-center gap-3">

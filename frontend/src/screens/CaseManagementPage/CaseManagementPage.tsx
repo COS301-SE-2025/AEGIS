@@ -7,7 +7,8 @@ import {
   MessageSquare,
   Search,
   Settings,
-  Share2} from "lucide-react";
+  Share2,
+  Shield} from "lucide-react";
 import { useState, useEffect  } from 'react';
 import { Link, useNavigate } from "react-router-dom";
 //thati added
@@ -557,12 +558,24 @@ const handleViewReport = async () => {
             <MessageSquare className="w-6 h-6" />
             <span className="text-lg"><Link to="/secure-chat"> Secure Chat</Link></span>
           </div>
-              {isDFIRAdmin && (
-              <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
-                <ClipboardList className="w-6 h-6" />
-                 <span className="text-lg"><Link to="/report-dashboard"> Case Reports</Link></span>
-              </div>
-            )}
+             {isDFIRAdmin && (
+          <>
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+              <ClipboardList className="w-6 h-6" />
+              <Link to="/report-dashboard">
+                <span className="text-lg">Case Reports</span>
+              </Link>
+            </div>
+            
+            {/* Add this new DFIR Audit Logs button */}
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+              <Shield className="w-6 h-6" />
+              <Link to="/dfir-audit-logs">
+                <span className="text-lg">Audit Logs</span>
+              </Link>
+            </div>
+          </>
+             )}
         </nav>
 
         {/* User Profile */}

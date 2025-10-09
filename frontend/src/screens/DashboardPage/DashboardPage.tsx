@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Pencil,
   Trash2,
+  Shield,
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
@@ -26,7 +27,7 @@ import { ThreatLandscape } from "../../components/ui/ThreatLandscape";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import React from "react";
 import { useUnreadCount } from "../../hooks/useUnreadCount";
-import { title } from "process";
+// import { title } from "process";
 
 interface CaseCard {
   id: string;
@@ -765,16 +766,24 @@ useEffect(() => {
               <Link to="/secure-chat">Secure Chat</Link>
             </span>
           </div>
-            {isDFIRAdmin && (
-              <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
-                <ClipboardList className="w-6 h-6" />
-                <Link to="/report-dashboard">
-                  <span className="text-lg">Case Reports</span>
-                </Link>
-              </div>
-            )}
-
-
+        {isDFIRAdmin && (
+          <>
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+              <ClipboardList className="w-6 h-6" />
+              <Link to="/report-dashboard">
+                <span className="text-lg">Case Reports</span>
+              </Link>
+            </div>
+            
+            {/* Add this new DFIR Audit Logs button */}
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+              <Shield className="w-6 h-6" />
+              <Link to="/dfir-audit-logs">
+                <span className="text-lg">Audit Logs</span>
+              </Link>
+            </div>
+          </>
+        )}
         </nav>
 
         {/* User Profile */}

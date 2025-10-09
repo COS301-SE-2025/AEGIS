@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { HelpMenu } from "../../components/ui/HelpMenu";
-
+import { Link as Link2 } from "react-router-dom" 
 export const LandingPage: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -105,7 +105,7 @@ export const LandingPage: React.FC = () => {
             <Search className="h-5 w-5 text-gray-400 hover:text-blue-400" />
           </button>
           <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
-            <a href="/login">Get Started</a>
+            <Link2 to="/login">Get Started</Link2>
           </button>
         </div>
       </nav>
