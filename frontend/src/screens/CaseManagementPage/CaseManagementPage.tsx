@@ -1,7 +1,6 @@
 import {
   Bell,
   FileText,
-  Filter,
   Paperclip,
   Folder,
   Home, 
@@ -333,19 +332,12 @@ useEffect(() => {
 
   //state declaration for filtering the timeline
   const [filterKeyword, setFilterKeyword] = useState('');
-  const [showFilterInput, setShowFilterInput] = useState(false);
+  const [showFilterInput,] = useState(false);
 
   const [filterDate, setFilterDate] = useState('');
 
 
   // ADD THESE NEW FUNCTIONS
-
-
-
-
-
-
-
 type Json = unknown;
 const isObj = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object";
@@ -717,13 +709,7 @@ const handleViewReport = async () => {
                 </button>
               )}
 
-              <button
-                onClick={() => setShowFilterInput(!showFilterInput)}
-                className="flex items-center gap-2 px-4 py-2 bg-card border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
-              >
-                <Filter className="w-4 h-4" />
-                Filter Timeline
-              </button>
+            
                     {/* Add IOC button */}
               <button
               onClick={() => navigate(`/cases/${caseId}/iocs`)}
@@ -751,16 +737,7 @@ const handleViewReport = async () => {
                 className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
 
-              {/* Clear Button */}
-              <button
-                onClick={() => {
-                  setFilterKeyword('');
-                  setFilterDate('');
-                }}
-                className="px-4 py-2 bg-primary text-foreground rounded-md hover:bg-primary/60 transition-colors"
-              >
-                Clear
-              </button>
+ 
             </div>
           )}
 
