@@ -322,6 +322,10 @@ function SettingsPage() {
   const [userToRemove, setUserToRemove] = useState<any>(null);
   const [removingUser, setRemovingUser] = useState(false);
 
+  // Add state for password reset loading and errors
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+  const [passwordResetError, setPasswordResetError] = useState('');
+
   useEffect(() => {
     // Check role and tenantId after mount (when sessionStorage is available)
     try {
@@ -414,12 +418,146 @@ function SettingsPage() {
     setUserToRemove(null);
   };
 
+      const handleLogout = async () => {
+        try {
+          const token = sessionStorage.getItem('authToken');
+          
+          if (token) {
+            // Call backend logout endpoint
+            try {
+              await axios.post('https://localhost/api/v1/auth/logout', {}, {
+                headers: { 
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              console.log('Server logout successful');
+            } catch (err) {
+              console.warn('Server logout failed, proceeding with client logout:', err);
+            }
+          }
+
+          // Clear client-side storage
+          sessionStorage.removeItem('authToken');
+          localStorage.removeItem('authToken');
+          sessionStorage.clear();
+          
+          showToast('Logged out successfully', 'success');
+          navigate('/login');
+          
+        } catch (error) {
+          console.error('Logout error:', error);
+          
+          // Force logout even if there's an error
+          sessionStorage.removeItem('authToken');
+          localStorage.removeItem('authToken');
+          sessionStorage.clear();
+          
+          showToast('Logged out', 'success');
+          navigate('/login');
+        }
+      };
   // Determine if navbar should be hidden
   const shouldHideNavbar = userRole === 'Tenant Admin' || userRole === 'System Admin';
 
   // Handle back navigation
   const handleBack = () => {
     navigate(-1); // Go back to previous page
+  };
+
+  // Add password validation function
+  const validatePassword = (password: string) => {
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters long';
+    }
+    if (!/(?=.*[a-z])/.test(password)) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!/(?=.*[A-Z])/.test(password)) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!/(?=.*\d)/.test(password)) {
+      return 'Password must contain at least one number';
+    }
+    return '';
+  };
+
+  // Add the handlePasswordReset function
+  const handlePasswordReset = async () => {
+    // Validation
+    if (!oldPassword.trim()) {
+      setPasswordResetError('Current password is required');
+      return;
+    }
+
+    if (!newPassword.trim()) {
+      setPasswordResetError('New password is required');
+      return;
+    }
+
+    if (!confirmNewPassword.trim()) {
+      setPasswordResetError('Please confirm your new password');
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordResetError('New passwords do not match');
+      return;
+    }
+
+    // Password strength validation
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      setPasswordResetError(passwordError);
+      return;
+    }
+
+    setPasswordResetLoading(true);
+    setPasswordResetError('');
+
+    try {
+      const token = sessionStorage.getItem('authToken');
+      
+      if (!token) {
+        setPasswordResetError('Authentication token not found. Please log in again.');
+        return;
+      }
+
+      await axios.post('https://localhost/api/v1/auth/change-password', {
+        oldPassword: oldPassword,
+        newPassword: newPassword,
+        confirmPassword: confirmNewPassword
+      }, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // Success
+      showToast('Password changed successfully!', 'success');
+      setShowPasswordModal(false);
+      navigate('/login');
+      
+      // Clear form
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setPasswordResetError('');
+
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      
+      if (err.response?.status === 401) {
+        setPasswordResetError('Authentication failed. Please log in again.');
+      } else if (err.response?.status === 400) {
+        setPasswordResetError(err.response.data?.error || 'Invalid password data');
+      } else {
+        setPasswordResetError(err?.response?.data?.error || 'Failed to change password');
+      }
+    } finally {
+      setPasswordResetLoading(false);
+    }
   };
 
   return (
@@ -568,14 +706,15 @@ function SettingsPage() {
         </button>
 
       {/* Logout */}
-        <h2 className="text-xl font-semibold mb-4">Logout</h2>
-        <Link
-          to="/login"
-          className="inline-flex items-center gap-2 bg-destructive text-destructive-foreground px-4 py-2 rounded-lg hover:bg-destructive/80 transition-colors"
-        >
-          <LogOut className="w-5 h-5 text-destructive-foreground" />
-          Logout
-        </Link>
+      <h2 className="text-xl font-semibold mb-4">Logout</h2>
+      <button
+        onClick={handleLogout}
+        className="inline-flex items-center gap-2 bg-destructive text-destructive-foreground px-4 py-2 rounded-lg hover:bg-destructive/80 transition-colors"
+      >
+        <LogOut className="w-5 h-5 text-destructive-foreground" />
+        Logout
+      </button>
+
       </div>
 
       {/* Register User (DFIR Admin only) */}
@@ -608,17 +747,47 @@ function SettingsPage() {
     />
 
     {showPasswordModal && (
-      <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
-        <div className="bg-card text-card-foreground rounded-lg p-6 w-full max-w-md shadow-lg">
-          <h2 className="text-xl font-semibold mb-4">Reset Password</h2>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-card text-card-foreground rounded-lg p-6 w-full max-w-md shadow-xl border border-border">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Lock className="w-5 h-5" />
+              Reset Password
+            </h2>
+            <button
+              onClick={() => {
+                setShowPasswordModal(false);
+                setPasswordResetError('');
+                setOldPassword('');
+                setNewPassword('');
+                setConfirmNewPassword('');
+              }}
+              className="text-muted-foreground hover:text-foreground"
+              disabled={passwordResetLoading}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {passwordResetError && (
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <p className="text-sm text-destructive">{passwordResetError}</p>
+            </div>
+          )}
+
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-muted-foreground mb-1">Old Password</label>
+              <label className="block text-sm text-muted-foreground mb-1">Current Password</label>
               <input
                 type="password"
                 value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground focus:outline-none"
+                onChange={(e) => {
+                  setOldPassword(e.target.value);
+                  setPasswordResetError('');
+                }}
+                className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={passwordResetLoading}
+                placeholder="Enter your current password"
               />
             </div>
             <div>
@@ -626,35 +795,53 @@ function SettingsPage() {
               <input
                 type="password"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground focus:outline-none"
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  setPasswordResetError('');
+                }}
+                className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={passwordResetLoading}
+                placeholder="Enter new password (min 8 characters)"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Must contain uppercase, lowercase, number, and be at least 8 characters
+              </p>
             </div>
             <div>
               <label className="block text-sm text-muted-foreground mb-1">Confirm New Password</label>
               <input
                 type="password"
                 value={confirmNewPassword}
-                onChange={(e) => setConfirmNewPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground focus:outline-none"
+                onChange={(e) => {
+                  setConfirmNewPassword(e.target.value);
+                  setPasswordResetError('');
+                }}
+                className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={passwordResetLoading}
+                placeholder="Confirm your new password"
               />
             </div>
           </div>
           <div className="mt-6 flex justify-end gap-2">
             <button
-              onClick={() => setShowPasswordModal(false)}
+              onClick={() => {
+                setShowPasswordModal(false);
+                setPasswordResetError('');
+                setOldPassword('');
+                setNewPassword('');
+                setConfirmNewPassword('');
+              }}
               className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/70 text-muted-foreground"
+              disabled={passwordResetLoading}
             >
               Cancel
             </button>
             <button
-              onClick={() => {
-                // TODO: Implement reset logic
-                setShowPasswordModal(false);
-              }}
-              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={handlePasswordReset}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              disabled={passwordResetLoading || !oldPassword || !newPassword || !confirmNewPassword}
             >
-              Save
+              {passwordResetLoading ? 'Changing...' : 'Change Password'}
             </button>
           </div>
         </div>

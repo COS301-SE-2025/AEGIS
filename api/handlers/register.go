@@ -42,6 +42,8 @@ type AuthServiceInterface interface {
 	LoginHandler(c *gin.Context)
 	RequestPasswordReset(c *gin.Context)
 	ResetPasswordHandler(c *gin.Context)
+	LogoutHandler(c *gin.Context)
+	ChangePasswordHandler(c *gin.Context)
 }
 
 // type CaseServiceInterface interface {

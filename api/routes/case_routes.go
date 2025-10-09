@@ -91,7 +91,8 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		// List archived cases
 		protected.GET("/cases/archived", h.CaseHandler.ListArchivedCasesHandler)
 		protected.POST("/auth/verify-admin", h.VerificationHandler.VerifyAdminGin) // Move here
-
+		protected.POST("/auth/logout", h.AuthService.LogoutHandler)
+		protected.POST("/auth/change-password", h.AuthService.ChangePasswordHandler)
 		// ─── New List / Filter Cases ──────────────────
 		protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)
 		protected.GET("/cases/user/:user_id", h.CaseHandler.GetCasesByUserHandler)

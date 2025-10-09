@@ -69,11 +69,7 @@ export const LoginPage = (): JSX.Element => {
                 <p className="text-red-400 text-sm text-center">{errors.general}</p>
               )}
 
-              <div className="flex justify-between items-center text-sm">
-                <Link to="/reset-password" className="text-blue-300 hover:underline">
-                  Forgot password?
-                </Link>
-              </div>
+
 
               <Button
                 type="submit"
