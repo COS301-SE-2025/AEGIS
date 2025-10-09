@@ -485,6 +485,44 @@ func (h *ReportHandler) DownloadReportPDF(c *gin.Context) {
 	c.Data(http.StatusOK, "application/pdf", pdfBytes)
 }
 
+// func (h *ReportHandler) DownloadReportPDF(c *gin.Context) {
+// 	reportIDStr := c.Param("reportID")
+// 	reportID, err := uuid.Parse(reportIDStr)
+// 	if err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid report ID"})
+// 		return
+// 	}
+
+// 	// Check if HTML is provided in request body (for custom rendering)
+// 	var requestBody struct {
+// 		HTML string `json:"html"`
+// 	}
+	
+// 	if c.Request.Method == "POST" {
+// 		if err := c.ShouldBindJSON(&requestBody); err == nil && requestBody.HTML != "" {
+// 			// Use HTML-based PDF generation (for cover page support)
+// 			pdfBytes, err := h.ReportService.GeneratePDFFromHTML(c.Request.Context(), requestBody.HTML)
+// 			if err != nil {
+// 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PDF from HTML"})
+// 				return
+// 			}
+// 			c.Header("Content-Disposition", "attachment; filename=report_"+reportIDStr+".pdf")
+// 			c.Data(http.StatusOK, "application/pdf", pdfBytes)
+// 			return
+// 		}
+// 	}
+
+// 	// Default: use existing gofpdf generation
+// 	pdfBytes, err := h.ReportService.DownloadReportAsPDF(c.Request.Context(), reportID)
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate PDF"})
+// 		return
+// 	}
+
+// 	c.Header("Content-Disposition", "attachment; filename=report_"+reportIDStr+".pdf")
+// 	c.Data(http.StatusOK, "application/pdf", pdfBytes)
+// }
+
 // DownloadReportJSON returns the report as JSON.
 func (h *ReportHandler) DownloadReportJSON(c *gin.Context) {
 	reportIDStr := c.Param("reportID")

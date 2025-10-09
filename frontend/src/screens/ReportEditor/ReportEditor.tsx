@@ -331,7 +331,7 @@ export const ReportEditor = () => {
     const [aiLoading, setAiLoading] = useState(false);
 
   const [reportTitle, setReportTitle] = useState("");
-  const documentTitle = reportTitle; 
+  //const documentTitle = reportTitle; 
   const [incidentId, setIncidentId] = useState("");
   const [, setDateCreated] = useState("");
   const [, setAnalyst] = useState("");
@@ -662,6 +662,8 @@ const blob = new Blob([res.data as BlobPart], { type: "application/pdf" });
     setError("Failed to download report");
   }
 }
+
+
 // wrapper that saves first then downloads
 const flushAndDownload = async () => {
   const id = reportId ?? report?.id; // fall back to loaded report if you have it
