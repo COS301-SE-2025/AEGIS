@@ -10,6 +10,13 @@ import (
 	"log"
 	"net/http"
 
+	"bytes"
+	"encoding/csv"
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/google/uuid"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +44,7 @@ type AdminServiceInterface interface {
 	CreateTenant(c *gin.Context)
 	CreateTeam(c *gin.Context)
 	GetAuditLogs(c *gin.Context)
+	ExportAuditLogs(c *gin.Context)
 }
 type AuthServiceInterface interface {
 	LoginHandler(c *gin.Context)
@@ -465,4 +473,258 @@ func (s *AdminService) RegisterTeamUser(c *gin.Context) {
 		Message: "User registered successfully",
 		Data:    user,
 	})
+}
+
+// Replace the ExportAuditLogs function with corrected field names:
+func (s *AdminService) ExportAuditLogs(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Get user context for audit logging with proper nil checks
+	userID, _ := c.Get("userID")
+	userEmail, _ := c.Get("userEmail")
+	userRole, _ := c.Get("userRole")
+
+	// Safely convert to strings with nil checks
+	var userIDStr, userEmailStr, userRoleStr string
+
+	if userID != nil {
+		if id, ok := userID.(string); ok {
+			userIDStr = id
+		}
+	}
+
+	if userEmail != nil {
+		if email, ok := userEmail.(string); ok {
+			userEmailStr = email
+		}
+	}
+
+	if userRole != nil {
+		if role, ok := userRole.(string); ok {
+			userRoleStr = role
+		}
+	}
+
+	// Parse query parameters (same as GetAuditLogs)
+	filter := auditlog.AuditLogFilter{
+		Status:  c.DefaultQuery("status", "ALL"),
+		Action:  c.Query("action"),
+		Service: c.Query("service"),
+		Limit:   1000, // Higher limit for export
+	}
+
+	// Parse limit if provided
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 {
+			if limit > 10000 { // Reasonable max for export
+				limit = 10000
+			}
+			filter.Limit = limit
+		}
+	}
+
+	// Get audit logs
+	logs, err := s.auditLogService.GetAuditLogs(ctx, filter)
+	if err != nil {
+		// Log export failure with safe string values - use correct field names
+		s.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "EXPORT_AUDIT_LOGS",
+			Actor: auditlog.Actor{
+				ID:    userIDStr,
+				Email: userEmailStr,
+				Role:  userRoleStr,
+				// Remove IP and UserAgent if they don't exist in the struct
+			},
+			Target: auditlog.Target{
+				Type: "audit_logs",
+				ID:   "export_failed",
+			},
+			Service:     "admin",
+			Status:      "FAILED",
+			Description: "Failed to export audit logs",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"error":      err.Error(),
+				"filter":     fmt.Sprintf("%+v", filter),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+			},
+		})
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve audit logs for export"})
+		return
+	}
+
+	// Generate CSV content
+	var csvBuffer bytes.Buffer
+	writer := csv.NewWriter(&csvBuffer)
+
+	// Write CSV header
+	header := []string{
+		"ID",
+		"Timestamp",
+		"Action",
+		"Actor_ID",
+		"Actor_Email",
+		"Actor_Role",
+		"Target_Type",
+		"Target_ID",
+		"Service",
+		"Status",
+		"Description",
+		"Metadata",
+	}
+
+	if err := writer.Write(header); err != nil {
+		s.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "EXPORT_AUDIT_LOGS",
+			Actor: auditlog.Actor{
+				ID:    userIDStr,
+				Email: userEmailStr,
+				Role:  userRoleStr,
+			},
+			Target: auditlog.Target{
+				Type: "audit_logs",
+				ID:   "csv_write_failed",
+			},
+			Service:     "admin",
+			Status:      "FAILED",
+			Description: "Failed to write CSV header",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"error":      err.Error(),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+			},
+		})
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate CSV"})
+		return
+	}
+
+	// Write log data
+	for _, log := range logs {
+		// Convert metadata to JSON string
+		metadataStr := ""
+		if log.Metadata != nil {
+			if metadataBytes, err := json.Marshal(log.Metadata); err == nil {
+				metadataStr = string(metadataBytes)
+			}
+		}
+
+		// Get UserAgent from metadata if it's stored there
+		if log.Metadata != nil {
+			if _, exists := log.Metadata["user_agent"]; exists {
+				// user_agent exists in metadata
+			}
+		}
+
+		record := []string{
+			log.ID,
+			log.Timestamp.Format(time.RFC3339),
+			log.Action,
+			log.Actor.ID,
+			log.Actor.Email,
+			log.Actor.Role,
+			log.Target.Type,
+			log.Target.ID,
+			log.Service,
+			log.Status,
+			log.Description,
+			metadataStr,
+		}
+
+		if err := writer.Write(record); err != nil {
+			s.auditLogger.Log(c, auditlog.AuditLog{
+				Action: "EXPORT_AUDIT_LOGS",
+				Actor: auditlog.Actor{
+					ID:    userIDStr,
+					Email: userEmailStr,
+					Role:  userRoleStr,
+				},
+				Target: auditlog.Target{
+					Type: "audit_logs",
+					ID:   "csv_write_failed",
+				},
+				Service:     "admin",
+				Status:      "FAILED",
+				Description: "Failed to write CSV record",
+				Metadata: map[string]string{
+					"timestamp":  time.Now().Format(time.RFC3339),
+					"error":      err.Error(),
+					"record_id":  log.ID,
+					"ip_address": c.ClientIP(),
+					"user_agent": c.GetHeader("User-Agent"),
+				},
+			})
+
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate CSV"})
+			return
+		}
+	}
+
+	writer.Flush()
+
+	if err := writer.Error(); err != nil {
+		s.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "EXPORT_AUDIT_LOGS",
+			Actor: auditlog.Actor{
+				ID:    userIDStr,
+				Email: userEmailStr,
+				Role:  userRoleStr,
+			},
+			Target: auditlog.Target{
+				Type: "audit_logs",
+				ID:   "csv_flush_failed",
+			},
+			Service:     "admin",
+			Status:      "FAILED",
+			Description: "Failed to flush CSV writer",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"error":      err.Error(),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+			},
+		})
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate CSV"})
+		return
+	}
+
+	// Log successful export
+	s.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "EXPORT_AUDIT_LOGS",
+		Actor: auditlog.Actor{
+			ID:    userIDStr,
+			Email: userEmailStr,
+			Role:  userRoleStr,
+		},
+		Target: auditlog.Target{
+			Type: "audit_logs",
+			ID:   "export_success",
+		},
+		Service:     "admin",
+		Status:      "SUCCESS",
+		Description: fmt.Sprintf("Successfully exported %d audit logs to CSV", len(logs)),
+		Metadata: map[string]string{
+			"timestamp":    time.Now().Format(time.RFC3339),
+			"record_count": strconv.Itoa(len(logs)),
+			"filter":       fmt.Sprintf("%+v", filter),
+			"file_size":    strconv.Itoa(csvBuffer.Len()),
+			"ip_address":   c.ClientIP(),
+			"user_agent":   c.GetHeader("User-Agent"),
+		},
+	})
+
+	// Generate filename with timestamp
+	filename := fmt.Sprintf("audit_logs_%s.csv", time.Now().Format("2006-01-02_15-04-05"))
+
+	// Set response headers for file download
+	c.Header("Content-Type", "text/csv")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	c.Header("Content-Length", strconv.Itoa(csvBuffer.Len()))
+
+	// Send CSV data
+	c.Data(http.StatusOK, "text/csv", csvBuffer.Bytes())
 }
