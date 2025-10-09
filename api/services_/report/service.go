@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jung-kurt/gofpdf"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	//"github.com/SebastiaanKlippert/go-wkhtmltopdf"
 )
 
 // ReportService defines the business logic for managing reports.
@@ -39,7 +40,7 @@ type ReportService interface {
 	UpdateCustomSectionContent(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newContent string) error
 	//AddSection(ctx context.Context, reportID primitive.ObjectID, section ReportSection) error
 	ReorderSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newOrder int) error
-
+	//GeneratePDFFromHTML(ctx context.Context, html string) ([]byte, error)
 	AddCustomSection(ctx context.Context, reportUUID uuid.UUID, title, content string, order int) error
 	DeleteCustomSection(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID) error
 	UpdateSectionContent(ctx context.Context, reportUUID uuid.UUID, sectionID primitive.ObjectID, newContent string) error
@@ -387,6 +388,8 @@ func (s *ReportServiceImpl) DownloadReportAsPDF(ctx context.Context, reportID uu
 	return buf.Bytes(), nil
 }
 
+
+
 func (s *ReportServiceImpl) UpdateCustomSectionContent(
 	ctx context.Context,
 	reportUUID uuid.UUID,
@@ -481,3 +484,47 @@ func (s *ReportServiceImpl) GetReportsByTeamID(
 ) ([]ReportWithDetails, error) {
 	return s.repo.GetReportsByTeamID(ctx, tenantID, teamID)
 }
+
+
+
+
+
+// func (s *ReportServiceImpl) GeneratePDFFromHTML(ctx context.Context, html string) ([]byte, error) {
+// 	// Create new PDF generator
+// 	pdfg, err := wkhtmltopdf.NewPDFGenerator()
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to create PDF generator: %w", err)
+// 	}
+
+// 	// Set global options
+// 	pdfg.Dpi.Set(300)
+// 	pdfg.NoCollate.Set(false)
+// 	pdfg.PageSize.Set(wkhtmltopdf.PageSizeA4)
+// 	pdfg.Orientation.Set(wkhtmltopdf.OrientationPortrait)
+// 	pdfg.MarginTop.Set(0)
+// 	pdfg.MarginBottom.Set(0)
+// 	pdfg.MarginLeft.Set(0)
+// 	pdfg.MarginRight.Set(0)
+
+// 	// Create a new page from HTML string
+// 	page := wkhtmltopdf.NewPageReader(strings.NewReader(html))
+	
+// 	// Set page options
+// 	page.EnableLocalFileAccess.Set(true)
+// 	page.PrintMediaType.Set(true)
+	
+// 	// Try to enable background - if method exists
+// 	// Some versions use NoBackground instead
+// 	page.NoBackground.Set(false) // This enables backgrounds
+
+// 	// Add page to PDF generator
+// 	pdfg.AddPage(page)
+
+// 	// Generate PDF
+// 	err = pdfg.Create()
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to create PDF: %w", err)
+// 	}
+
+// 	return pdfg.Bytes(), nil
+// }

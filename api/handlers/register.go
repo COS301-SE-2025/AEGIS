@@ -36,11 +36,14 @@ type AdminServiceInterface interface {
 	DeleteUserHandler(c *gin.Context)
 	CreateTenant(c *gin.Context)
 	CreateTeam(c *gin.Context)
+	GetAuditLogs(c *gin.Context)
 }
 type AuthServiceInterface interface {
 	LoginHandler(c *gin.Context)
 	RequestPasswordReset(c *gin.Context)
 	ResetPasswordHandler(c *gin.Context)
+	LogoutHandler(c *gin.Context)
+	ChangePasswordHandler(c *gin.Context)
 }
 
 // type CaseServiceInterface interface {
@@ -75,6 +78,7 @@ type AdminService struct {
 	userService         *update_user_role.UserService
 	userDeleteService   *delete_user.UserDeleteService
 	auditLogger         *auditlog.AuditLogger
+	auditLogService     auditlog.AuditLogService
 }
 
 func NewAdminService(
@@ -83,6 +87,7 @@ func NewAdminService(
 	userService *update_user_role.UserService,
 	userDeleteService *delete_user.UserDeleteService,
 	auditLogger *auditlog.AuditLogger,
+	auditLogService auditlog.AuditLogService,
 ) *AdminService {
 	return &AdminService{
 		registrationService: regService,
@@ -90,6 +95,7 @@ func NewAdminService(
 		userService:         userService,
 		userDeleteService:   userDeleteService,
 		auditLogger:         auditLogger,
+		auditLogService:     auditLogService,
 	}
 }
 

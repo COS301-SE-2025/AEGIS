@@ -21,6 +21,7 @@ func RegisterReportRoutes(router *gin.RouterGroup, handler *handlers.ReportHandl
 		// Download endpoints
 		report.GET("/:reportID/download/pdf", handler.DownloadReportPDF)   // Download PDF
 		report.GET("/:reportID/download/json", handler.DownloadReportJSON) // Download JSON
+		//report.POST("/:reportID/download/pdf", handler.DownloadReportPDF) 
 
 		// Section-level endpoints
 		report.POST("/:reportID/sections", handler.AddSection)                             // Add custom section

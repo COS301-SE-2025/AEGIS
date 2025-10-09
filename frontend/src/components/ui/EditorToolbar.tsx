@@ -17,7 +17,7 @@ interface ToolbarAction {
 }
 
 interface EditorToolbarProps {
-  onAction: (action: ToolbarAction['type']) => void;
+  onAction: (_action: ToolbarAction['type']) => void;
   activeFormats?: Set<string>;
 }
 

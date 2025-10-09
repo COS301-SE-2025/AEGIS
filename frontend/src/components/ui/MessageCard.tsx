@@ -1,5 +1,6 @@
 import React from 'react';
-import { Reply, CheckCircle, ThumbsUp } from 'lucide-react';
+// import { Reply, CheckCircle, ThumbsUp } from 'lucide-react';
+import { Reply, CheckCircle} from 'lucide-react';
 
 interface ThreadMessage {
   id: string;
@@ -26,8 +27,8 @@ interface AnnotationThread {
   messageCount: number;
   participantCount: number;
   isActive?: boolean;
-  status: 'open' | 'resolved' | 'pending_approval';
-  priority: 'high' | 'medium' | 'low';
+  //status: 'open' | 'resolved' | 'pending_approval';
+  //priority: 'high' | 'medium' | 'low';
   tags: any[];
   fileId: string;
   createdBy?: string;
@@ -37,15 +38,15 @@ interface MessageCardProps {
   message: ThreadMessage;
   user: any;
   replyingToMessageId: string | null;
-  setReplyingToMessageId: (id: string | null) => void;
+  setReplyingToMessageId: (_id: string | null) => void;
   replyText: string;
-  setReplyText: (text: string) => void;
+  setReplyText: (_text: string) => void;
   showReactionPicker: string | null;
-  setShowReactionPicker: (id: string | null) => void;
+  setShowReactionPicker: (_id: string | null) => void;
   selectedThread: AnnotationThread;
-  onSendMessage: (text: string, parentId?: string) => Promise<void>;
-  onAddReaction: (messageId: string, emoji: string) => Promise<void>;
-  onApproveMessage: (messageId: string) => Promise<void>;
+  onSendMessage: (_text: string, _parentId?: string) => Promise<void>;
+  onAddReaction: (_messageId: string, _emoji: string) => Promise<void>;
+  onApproveMessage: (_messageId: string) => Promise<void>;
   profile: { name: string };
 }
 

@@ -1827,11 +1827,10 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
   }
 
   try {
-
     const token = sessionStorage.getItem("authToken");
+    
     // Send the request to add the member
     const res = await fetch(`https://localhost/api/v1/chat/groups/${activeChat.id}/members`, {
-
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1839,7 +1838,7 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
       },
       body: JSON.stringify({
         user_email: newMemberEmail,
-        role: "member" // or "admin" if assigning admin role
+        role: "member"
       })
     });
 
@@ -1890,48 +1889,63 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
 
     toast.success(`${newMemberEmail} successfully added to the group`);
     setNewMemberEmail(""); // Clear input field
-// Parse current user from session storage
-const userStr = sessionStorage.getItem("user");
-let currentUserId: string | null = null;
-try {
-  const userObj = userStr ? JSON.parse(userStr) : null; // { id, email, ... } expected
-  currentUserId = userObj?.id ?? null;
-} catch {
-  // malformed JSON
-  currentUserId = null;
-}
 
-if (!currentUserId) {
-  toast.error("Could not determine current user. Please sign in again.");
-  return;
-}
+    // Parse current user from session storage
+    const userStr = sessionStorage.getItem("user");
+    let currentUserId: string | null = null;
+    try {
+      const userObj = userStr ? JSON.parse(userStr) : null;
+      currentUserId = userObj?.id ?? null;
+    } catch {
+      currentUserId = null;
+    }
 
-// **Shared Secret Management**:
-// Recalculate the shared secret for the entire group with the new member
-const secretResult = await generateGroupSharedSecretForChat(
-  updatedGroup,   // must be of type Chat
-  token || "",
-  currentUserId   // <- pass user id explicitly (per our latest function signature)
-);
-    if (secretResult && secretResult.sharedSecret) {
-      const sharedSecret = secretResult.sharedSecret;
+    if (!currentUserId) {
+      console.warn("Could not determine current user for secret recalculation");
+      return; // Don't throw error, just return silently
+    }
 
-      // Update the shared secret for all members in the group
-      updatedGroup.members.forEach((member: string) => {
-        // Store or share the secret with all members (including the new one)
-        // This could involve sending the updated secret to the server or local state
-        useSharedSecrets.getState().setSharedSecret(member, sharedSecret);
-      });
+    // *Shared Secret Management*:
+    try {
+      // Convert the updatedGroup to Chat type expected by generateGroupSharedSecretForChat
+      const chatForSecret: Chat = {
+        id: updatedGroup.id,
+        name: updatedGroup.name,
+        members: (updatedGroup.members || []).map((member: string | any) => {
+          if (typeof member === 'string') {
+            return { id: member, email: member };
+          } else {
+            return { 
+              id: member.user_email || member.id || member.email, 
+              email: member.user_email || member.email 
+            };
+          }
+        })
+      };
+
+      const secretResult = await generateGroupSharedSecretForChat(
+        chatForSecret,
+        sessionStorage.getItem("authToken") || "",
+        currentUserId
+      );
+      
+      if (secretResult && secretResult.sharedSecret) {
+        const sharedSecret = secretResult.sharedSecret;
+        // Store the shared secret for the group (not per member)
+        useSharedSecrets.getState().setSharedSecret(updatedGroup.id, sharedSecret);
+        console.log("✅ Shared secret updated for group with new member");
+      }
+    } catch (secretError) {
+      console.warn("Failed to recalculate shared secret, but member was added:", secretError);
+      // no error toast for secret recalculation failure
+      // The member was already successfully added
     }
 
   } catch (err) {
-    console.error("Failed to add member:", err);
+    //console.error("Failed to add member:", err);
     toast.error("Something went wrong while adding the member");
   }
 };
-
-
-
 
 function asEmailList(members: unknown): string[] {
   if (!Array.isArray(members)) return [];

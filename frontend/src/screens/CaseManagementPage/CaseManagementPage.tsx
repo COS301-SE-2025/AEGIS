@@ -1,7 +1,6 @@
 import {
   Bell,
   FileText,
-  Filter,
   Paperclip,
   Folder,
   Home, 
@@ -333,19 +332,12 @@ useEffect(() => {
 
   //state declaration for filtering the timeline
   const [filterKeyword, setFilterKeyword] = useState('');
-  const [showFilterInput, setShowFilterInput] = useState(false);
+  const [showFilterInput,] = useState(false);
 
   const [filterDate, setFilterDate] = useState('');
 
 
   // ADD THESE NEW FUNCTIONS
-
-
-
-
-
-
-
 type Json = unknown;
 const isObj = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object";
@@ -435,6 +427,96 @@ const handleViewReport = async () => {
 
   // ];
 
+  // Add this state near your other state declarations
+  const [reportExists, setReportExists] = useState<boolean>(false);
+  const [checkingReport, setCheckingReport] = useState<boolean>(true);
+
+  // Add this useEffect to check if a report exists for the case
+  useEffect(() => {
+    const checkReportExists = async () => {
+      if (!caseId) {
+        setCheckingReport(false);
+        return;
+      }
+      
+      setCheckingReport(true);
+      try {
+        const token = sessionStorage.getItem("authToken") || "";
+        const headers = { 
+          Authorization: `Bearer ${token}`, 
+          "Content-Type": "application/json" 
+        };
+
+        const res = await fetch(`${API_URL}/reports/cases/${caseId}`, { headers });
+        if (res.ok) {
+          const payload = await res.json();
+          const list = extractList(payload);
+          setReportExists(list.length > 0);
+        } else {
+          setReportExists(false);
+        }
+      } catch (err) {
+        console.error("Error checking report existence:", err);
+        setReportExists(false);
+      } finally {
+        setCheckingReport(false);
+      }
+    };
+
+    checkReportExists();
+  }, [caseId]);
+
+  // Add this new function for creating a report
+  const [createReportBusy, setCreateReportBusy] = useState(false);
+
+  const handleCreateReport = async () => {
+    if (!caseId) return;
+    
+    setCreateReportBusy(true);
+    try {
+      const token = sessionStorage.getItem("authToken") || "";
+      const headers = { 
+        Authorization: `Bearer ${token}`, 
+        "Content-Type": "application/json" 
+      };
+
+      const createRes = await fetch(`${API_URL}/reports/cases/${caseId}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      });
+
+      if (!createRes.ok) {
+        throw new Error("Failed to create report");
+      }
+
+      const createPayload = await createRes.json();
+      let createdId = extractReportId(createPayload);
+      if (!createdId && isObj(createPayload) && isObj(createPayload.data)) {
+        createdId = extractReportId(createPayload.data);
+      }
+      
+      if (!createdId) {
+        throw new Error("Could not parse report ID from create response");
+      }
+
+      // Update the report exists state
+      setReportExists(true);
+      
+      // Navigate to the new report
+      navigate(`/report-editor/${createdId}`);
+      console.log("Created and navigating to new report:", createdId);
+
+    } catch (err) {
+      console.error("Error creating report:", err);
+      alert("Failed to create report for this case.");
+    } finally {
+      setCreateReportBusy(false);
+    }
+  };
+
+  // Replace the existing View Report button section with this updated version:
+  // In your JSX, replace the existing button section with:
   return (
     <div className="min-h-screen bg-background">
   <ToastContainer position="top-center" aria-label="Notification Toasts" />
@@ -583,7 +665,6 @@ const handleViewReport = async () => {
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-3xl font-bold text-foreground">Case Details & Timeline</h1>
             <div className="flex gap-4">
-
               <button className="flex items-center gap-2 px-4 py-2 bg-card border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-blue-500">
                 <Share2 className="w-4 h-4" />
                   {userRole === "admin" && (
@@ -592,21 +673,43 @@ const handleViewReport = async () => {
 
                 )}
               </button>
-              <button
-                onClick={handleViewReport}
-                disabled={!caseId || viewReportBusy}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                <FileText className="w-4 h-4" />
-                {viewReportBusy ? "Opening…" : "View Report"}
-              </button>
-              <button
-                onClick={() => setShowFilterInput(!showFilterInput)}
-                className="flex items-center gap-2 px-4 py-2 bg-card border rounded-lg pl-10 pr-4 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
-              >
-                <Filter className="w-4 h-4" />
-                Filter Timeline
-              </button>
+
+              {/* Create Report Button - Only for DFIR Admins and when no report exists */}
+              {isDFIRAdmin && !reportExists && !checkingReport && (
+                <button
+                  onClick={handleCreateReport}
+                  disabled={!caseId || createReportBusy}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  {createReportBusy ? "Creating..." : "Create Report"}
+                </button>
+              )}
+
+              {/* View Report Button - Only when report exists */}
+              {reportExists && !checkingReport && (
+                <button
+                  onClick={handleViewReport}
+                  disabled={!caseId || viewReportBusy}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  {viewReportBusy ? "Opening..." : "View Report"}
+                </button>
+              )}
+
+              {/* Loading state while checking report existence */}
+              {checkingReport && (
+                <button
+                  disabled
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg opacity-50"
+                >
+                  <FileText className="w-4 h-4" />
+                  Checking...
+                </button>
+              )}
+
+            
                     {/* Add IOC button */}
               <button
               onClick={() => navigate(`/cases/${caseId}/iocs`)}
@@ -634,16 +737,7 @@ const handleViewReport = async () => {
                 className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
 
-              {/* Clear Button */}
-              <button
-                onClick={() => {
-                  setFilterKeyword('');
-                  setFilterDate('');
-                }}
-                className="px-4 py-2 bg-primary text-foreground rounded-md hover:bg-primary/60 transition-colors"
-              >
-                Clear
-              </button>
+ 
             </div>
           )}
 

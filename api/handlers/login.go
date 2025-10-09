@@ -13,8 +13,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
 
 type AuthHandler struct {
@@ -22,6 +26,12 @@ type AuthHandler struct {
 	passwordResetService *reset_password.PasswordResetService
 	userRepo             registration.UserRepository
 	auditLogger          *auditlog.AuditLogger
+	validator            *validator.Validate
+}
+type ChangePasswordRequest struct {
+	OldPassword     string `json:"oldPassword" validate:"required"`
+	NewPassword     string `json:"newPassword" validate:"required,min=8"`
+	ConfirmPassword string `json:"confirmPassword" validate:"required"`
 }
 
 func NewAuthHandler(
@@ -35,6 +45,7 @@ func NewAuthHandler(
 		passwordResetService: resetService,
 		userRepo:             userRepo,
 		auditLogger:          auditLogger,
+		validator:            validator.New(),
 	}
 }
 
@@ -46,7 +57,7 @@ type Handler struct {
 	UserService               UserServiceInterface
 	CaseHandler               *CaseHandler
 	CaseDeletionHandler       *CaseDeletionHandler
-	CaseListHandler           *CaseListHandler
+	CaseListHandler           interface{} // TODO: Replace 'interface{}' with the actual CaseListHandler type when defined/imported
 	UploadHandler             *UploadHandler
 	DownloadHandler           *DownloadHandler
 	MetadataHandler           *MetadataHandler
@@ -79,6 +90,7 @@ type Handler struct {
 	EvidenceHandler       *EvidenceHandler
 	ChainOfCustodyHandler *ChainOfCustodyHandler
 	X3DHService           *x3dh.BundleService // Add this
+	VerificationHandler   *VerificationHandler
 }
 
 func NewHandler(
@@ -122,6 +134,7 @@ func NewHandler(
 	healthHandler *HealthHandler,
 
 	x3dhService *x3dh.BundleService,
+	verificationHandler *VerificationHandler,
 
 ) *Handler {
 	return &Handler{
@@ -163,7 +176,8 @@ func NewHandler(
 		ChainOfCustodyHandler: ChainOfCustodyHandler,
 		HealthHandler:         healthHandler,
 
-		X3DHService: x3dhService,
+		X3DHService:         x3dhService,
+		VerificationHandler: verificationHandler,
 	}
 }
 
@@ -252,6 +266,148 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 	})
 }
 
+// Add this method to your existing AuthHandler struct
+func (h *AuthHandler) LogoutHandler(c *gin.Context) {
+	// Get user ID from context (set by AuthMiddleware)
+	userIDInterface, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusOK, gin.H{"message": "Already logged out"})
+		return
+	}
+
+	userID, ok := userIDInterface.(string)
+	if !ok {
+		c.JSON(http.StatusOK, gin.H{"message": "Logged out"})
+		return
+	}
+
+	// Simple audit log (optional)
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "USER_LOGOUT",
+		Actor: auditlog.Actor{
+			ID: userID,
+		},
+		Target: auditlog.Target{
+			Type: "user",
+			ID:   userID,
+		},
+		Service:     "auth",
+		Status:      "SUCCESS",
+		Description: "User logged out",
+		Metadata: map[string]string{
+			"timestamp":  time.Now().Format(time.RFC3339),
+			"ip_address": c.ClientIP(),
+			"user_agent": c.GetHeader("User-Agent"),
+		},
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "Logged out successfully",
+		"timestamp": time.Now().UTC(),
+	})
+}
+
+// Add this method to your existing AuthHandler
+func (h *AuthHandler) ChangePasswordHandler(c *gin.Context) {
+	var req ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	// Validate request
+	if err := h.validator.Struct(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Validation failed"})
+		return
+	}
+
+	// Check if new passwords match
+	if req.NewPassword != req.ConfirmPassword {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "New passwords do not match"})
+		return
+	}
+
+	// Get user ID from context
+	userIDInterface, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userID, ok := userIDInterface.(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	// Get user from database
+	var user struct {
+		ID           string `db:"id"`
+		PasswordHash string `db:"password_hash"`
+		Email        string `db:"email"`
+		FullName     string `db:"full_name"`
+	}
+	// Replace lines 353-358:
+
+	query := `SELECT id, password_hash, email, full_name FROM users WHERE id = ?`
+	db := h.userRepo.GetDB()
+	err := db.Raw(query, userID).Scan(&user).Error
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Verify old password
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.OldPassword))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Current password is incorrect"})
+		return
+	}
+
+	// Hash new password
+	hashedNewPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Update password in database
+	updateQuery := `
+        UPDATE users 
+        SET password_hash = $1, updated_at = NOW() 
+        WHERE id = $2
+    `
+	result := h.userRepo.GetDB().Exec(updateQuery, string(hashedNewPassword), userID)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		return
+	}
+
+	// Audit log
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "PASSWORD_CHANGE",
+		Actor: auditlog.Actor{
+			ID: userID,
+		},
+		Target: auditlog.Target{
+			Type: "user",
+			ID:   userID,
+		},
+		Service:     "auth",
+		Status:      "SUCCESS",
+		Description: "User changed password",
+		Metadata: map[string]string{
+			"timestamp":  time.Now().Format(time.RFC3339),
+			"ip_address": c.ClientIP(),
+			"user_agent": c.GetHeader("User-Agent"),
+		},
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "Password changed successfully",
+		"timestamp": time.Now().UTC(),
+	})
+}
 func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 	var req struct {
 		Email string `json:"email" binding:"required,email"`

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"aegis-api/services_/auditlog"
 	timelineai "aegis-api/services_/timeline/timeline_ai"
 	"fmt"
 	"net/http"
@@ -9,12 +10,14 @@ import (
 )
 
 type TimelineAIHandler struct {
-	Service timelineai.AIService
+	Service     timelineai.AIService
+	auditLogger *auditlog.AuditLogger
 }
 
-func NewTimelineAIHandler(service timelineai.AIService) *TimelineAIHandler {
+func NewTimelineAIHandler(service timelineai.AIService, auditLogger *auditlog.AuditLogger) *TimelineAIHandler {
 	return &TimelineAIHandler{
-		Service: service,
+		Service:     service,
+		auditLogger: auditLogger,
 	}
 }
 
@@ -378,9 +381,34 @@ func (h *TimelineAIHandler) ExtractIOCs(c *gin.Context) {
 	var req struct {
 		Text string `json:"text" binding:"required"`
 	}
+	// Grab user details from context
+	userID, _ := c.Get("userID")
+	userRole, _ := c.Get("userRole")
+	email, _ := c.Get("email") // Optional, if you have this set
 
+	actor := auditlog.Actor{
+		ID:        userID.(string),
+		Role:      userRole.(string),
+		IPAddress: c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+		Email:     email.(string), // Optional, if you have this header set
+	}
 	// Parse input
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("[ExtractIOCs] Invalid JSON input: %v\n", err)
+
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "EXTRACT_IOCS",
+			Actor:  actor,
+			Target: auditlog.Target{
+				Type: "iocs",
+				ID:   "",
+			},
+			Service:     "timelineai",
+			Status:      "FAILED",
+			Description: "Invalid JSON input for extracting IOCs",
+		})
+
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid request body",
 		})
@@ -390,11 +418,39 @@ func (h *TimelineAIHandler) ExtractIOCs(c *gin.Context) {
 	// Call service
 	iocs, err := h.Service.ExtractIOCs(c.Request.Context(), req.Text)
 	if err != nil {
+		fmt.Printf("[ExtractIOCs] Failed to extract IOCs: %v\n", err)
+
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "EXTRACT_IOCS",
+			Actor:  actor,
+			Target: auditlog.Target{
+				Type: "iocs",
+				ID:   "",
+			},
+			Service:     "timelineai",
+			Status:      "FAILED",
+			Description: "Failed to extract IOCs: " + err.Error(),
+		})
+
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": fmt.Sprintf("Failed to extract IOCs: %v", err),
 		})
 		return
 	}
+
+	fmt.Printf("[ExtractIOCs] Successfully extracted IOCs: %+v\n", iocs)
+
+	h.auditLogger.Log(c, auditlog.AuditLog{
+		Action: "EXTRACT_IOCS",
+		Actor:  actor,
+		Target: auditlog.Target{
+			Type: "iocs",
+			ID:   "", // No specific ID for extraction
+		},
+		Service:     "timelineai",
+		Status:      "SUCCESS",
+		Description: "IOCs successfully extracted",
+	})
 
 	// Respond with extracted IOCs
 	c.JSON(http.StatusOK, gin.H{

@@ -1,11 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Shield,
   Lock,
   Eye,
   CheckCircle,
   Search,
-  User,
   Users,
   FileText,
   MessageSquare,
@@ -16,10 +15,67 @@ import {
   Calendar,
   Cpu,
   BarChart2,
+  X,
 } from "lucide-react";
 import { HelpMenu } from "../../components/ui/HelpMenu";
 
 export const LandingPage: React.FC = () => {
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<string[]>([]);
+
+  // Searchable content from the page
+  const searchableContent = [
+    { title: "Case Management", content: "Create and track cases with unique IDs, assign roles, and build visual timelines" },
+    { title: "Real-time Collaboration", content: "Multiple users can work on cases simultaneously with real-time commenting" },
+    { title: "Secure Communication", content: "End-to-end encrypted communication, secure file sharing" },
+    { title: "Chain of Custody", content: "Maintain immutable chain of custody with automated logging" },
+    { title: "Multi-Format Evidence", content: "Support for logs, images, packet captures, and disk images" },
+    { title: "Access Controls", content: "Role-based access control with customizable permissions" },
+    { title: "AI-Powered Analysis", content: "Automated metadata extraction, pattern recognition" },
+    { title: "Relationship Mapping", content: "Interactive graph-based visualization of relationships" },
+    { title: "Visual Timelines", content: "Generate comprehensive event timelines and sequence charts" },
+    { title: "AES-256 Encryption", content: "Data encrypted at rest and in transit" },
+    { title: "Audit Logging", content: "Comprehensive activity tracking" },
+    { title: "Legal Compliance", content: "Maintains chain of custody for legal requirements" },
+  ];
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim() === "") {
+      setSearchResults([]);
+      return;
+    }
+
+    const results = searchableContent
+      .filter(item => 
+        item.title.toLowerCase().includes(query.toLowerCase()) ||
+        item.content.toLowerCase().includes(query.toLowerCase())
+      )
+      .map(item => item.title);
+    
+    setSearchResults(results);
+  };
+
+  const openSearch = () => {
+    setIsSearchOpen(true);
+  };
+
+  const closeSearch = () => {
+    setIsSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
+  const scrollToSection = (sectionTitle: string) => {
+    // Simple scroll to section based on title
+    const element = document.querySelector(`h3:contains("${sectionTitle}")`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+    closeSearch();
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       
@@ -36,21 +92,93 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <div className="hidden md:flex space-x-6 text-sm">
-            {/*<a href="#" className="hover:text-blue-400">Products</a>*/}
-            {/*<a href="#" className="hover:text-blue-400">Solutions</a>*/}
             <a href="#" className="hover:text-blue-400">Demo</a>
             <a href="#" className="hover:text-blue-400">Company</a>
-            {/*<a href="#" className="hover:text-blue-400">Help</a>*/}
           </div>
         </div>
         <div className="flex items-center space-x-4">
-          <Search className="h-5 w-5 text-gray-400" />
+          <button 
+            onClick={openSearch}
+            className="hover:text-blue-400 transition-colors"
+            aria-label="Search"
+          >
+            <Search className="h-5 w-5 text-gray-400 hover:text-blue-400" />
+          </button>
           <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
             <a href="/login">Get Started</a>
           </button>
-          <User className="h-5 w-5 text-gray-400" />
         </div>
       </nav>
+
+      {/* Search Modal */}
+      {isSearchOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-20">
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Search AEGIS Features</h3>
+              <button
+                onClick={closeSearch}
+                className="text-gray-400 hover:text-white"
+                aria-label="Close search"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search for features, capabilities, or security..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                autoFocus
+              />
+            </div>
+
+            {/* Search Results */}
+            {searchQuery && (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {searchResults.length > 0 ? (
+                  searchResults.map((result, index) => (
+                    <button
+                      key={index}
+                      onClick={() => scrollToSection(result)}
+                      className="w-full text-left p-3 rounded hover:bg-gray-700 transition-colors"
+                    >
+                      <div className="font-medium text-blue-400">{result}</div>
+                      <div className="text-sm text-gray-300 mt-1">
+                        {searchableContent.find(item => item.title === result)?.content}
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="text-gray-400 text-center py-8">
+                    No results found for "{searchQuery}"
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Quick suggestions when no query */}
+            {!searchQuery && (
+              <div className="space-y-2">
+                <div className="text-sm text-gray-400 mb-3">Popular searches:</div>
+                {["Security", "Case Management", "Encryption", "AI Analysis"].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => handleSearch(suggestion)}
+                    className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-700 rounded-full text-sm hover:bg-gray-600 transition-colors"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Hero Section with Enhanced Animated Background */}
       <section className="relative px-6 py-20 text-center overflow-hidden">
@@ -410,9 +538,7 @@ export const LandingPage: React.FC = () => {
             <button className="bg-white text-blue-700 hover:bg-gray-100 px-8 py-3 rounded-lg text-lg font-medium transition-all transform hover:scale-105">
               Request a Demo
             </button>
-            <button className="bg-transparent border-2 border-white hover:bg-white/10 px-8 py-3 rounded-lg text-lg font-medium transition-all">
-              Contact Us
-            </button>
+            
           </div>
         </div>
       </section>

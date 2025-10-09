@@ -115,9 +115,12 @@ async getSentenceCompletions(partialText: string, maxCompletions = 2) {
 // Utility function for debouncing
 type DebouncedFunction<T extends (...args: any[]) => any> = (...args: Parameters<T>) => void;
 
+// eslint-disable-next-line no-unused-vars
 interface Debounce {
     <T extends (...args: any[]) => any>(func: T, wait: number): DebouncedFunction<T>;
 }
+
+/* eslint-disable no-unused-vars */
 
 const debounce: Debounce = <T extends (...args: any[]) => any>(func: T, wait: number): DebouncedFunction<T> => {
     let timeout: ReturnType<typeof setTimeout>;
@@ -130,6 +133,8 @@ const debounce: Debounce = <T extends (...args: any[]) => any>(func: T, wait: nu
         timeout = setTimeout(later, wait);
     };
 };
+
+/* eslint-enable no-unused-vars */
 
 
 

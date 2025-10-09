@@ -90,7 +90,9 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.PATCH("/cases/:case_id/archive", h.CaseDeletionHandler.ArchiveCaseHandler)
 		// List archived cases
 		protected.GET("/cases/archived", h.CaseHandler.ListArchivedCasesHandler)
-
+		protected.POST("/auth/verify-admin", h.VerificationHandler.VerifyAdminGin) // Move here
+		protected.POST("/auth/logout", h.AuthService.LogoutHandler)
+		protected.POST("/auth/change-password", h.AuthService.ChangePasswordHandler)
 		// ─── New List / Filter Cases ──────────────────
 		protected.GET("/cases/all", h.CaseHandler.GetAllCasesHandler)
 		protected.GET("/cases/user/:user_id", h.CaseHandler.GetCasesByUserHandler)
@@ -98,6 +100,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.GET("/cases/:case_id", h.CaseHandler.GetCaseByIDHandler)
 
 		protected.GET("/tenants/:tenantId/cases/:case_id/ioc-graph", middleware.AuthMiddleware(), h.IOCHandler.GetCaseIOCGraph)
+		protected.GET("tenants/:tenantId/ioc-graph", middleware.AuthMiddleware(), h.IOCHandler.GetTenantIOCGraph)
 		protected.POST("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.AddIOCToCase)
 		protected.GET("/cases/:case_id/iocs", middleware.AuthMiddleware(), h.IOCHandler.GetIOCsByCase)
 		// ______timeline routes______________
@@ -126,6 +129,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.GET("/users", h.AdminService.ListUsers)
 		protected.GET("tenants/:tenantId/users", middleware.AuthMiddleware(), h.AdminService.ListUsersByTenant)
 		protected.DELETE("/users/:userId", h.AdminService.DeleteUserHandler)
+		protected.GET("/audit-logs", h.AdminService.GetAuditLogs)
 
 		// ─── Profile Routes ──────────────────────────
 		protected.GET("/profile/:userID", h.ProfileHandler.GetProfileHandler)

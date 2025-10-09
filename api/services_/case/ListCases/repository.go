@@ -52,7 +52,8 @@ func (r *GormCaseQueryRepository) QueryCases(filter CaseFilter) ([]Case, error) 
 		query = query.Where("team_name = ?", filter.TeamName)
 	}
 	if filter.TitleTerm != "" {
-		query = query.Where("title ILIKE ?", "%"+filter.TitleTerm+"%")
+		// Use LIKE instead of ILIKE for SQLite compatibility
+		query = query.Where("title LIKE ?", "%"+filter.TitleTerm+"%")
 	}
 	if filter.UserID != "" && filter.TeamID != uuid.Nil {
 		query = query.Where(

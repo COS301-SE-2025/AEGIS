@@ -26,8 +26,9 @@ func NewGormCaseRepository(db *gorm.DB) *GormCaseRepository {
 // ArchiveCase sets status to 'archived' and updates UpdatedAt
 func (r *GormCaseRepository) ArchiveCase(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Model(&case_creation.Case{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"status":     "archived",
-		"updated_at": time.Now(),
+		"status":              "archived",
+		"investigation_stage": "Case Closure & Review",
+		"updated_at":          time.Now(),
 	}).Error
 }
 
