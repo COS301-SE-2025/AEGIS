@@ -331,6 +331,7 @@ export const ReportEditor = () => {
     const [aiLoading, setAiLoading] = useState(false);
 
   const [reportTitle, setReportTitle] = useState("");
+  const documentTitle = reportTitle; 
   const [incidentId, setIncidentId] = useState("");
   const [, setDateCreated] = useState("");
   const [, setAnalyst] = useState("");
@@ -1761,13 +1762,268 @@ const commitEditingTitle = useCallback(async () => {
                           </button>
                         </div>
                       )}
-                      {isPreviewMode ? (
-                        <div 
-                          className="prose prose-invert max-w-none bg-gray-800 p-6 rounded-lg border border-gray-700"
-                          dangerouslySetInnerHTML={{ __html: sections[activeSection]?.content || '<p class="text-gray-400 italic">No content yet...</p>' }}
-                          style={{ minHeight: '500px', color: '#e5e7eb', lineHeight: '1.6' }}
-                        />
-                      ) : (
+
+{isPreviewMode ? (
+  <div className="bg-gray-800 p-6 rounded-lg">
+    {/* Word Document Simulation */}
+    <div 
+      className="mx-auto bg-gray-900 text-gray-100 shadow-2xl rounded overflow-hidden"
+      style={{
+        width: '210mm', // A4 width
+        minHeight: '297mm', // A4 height
+        boxShadow: '0 0 25px rgba(0,0,0,0.7)'
+      }}
+    >
+      {/* Cover Page */}
+      <div 
+        className="flex flex-col items-center justify-center text-center border-b border-gray-700"
+        style={{
+          minHeight: '297mm',
+          background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+          padding: '80px 60px'
+        }}
+      >
+        {/* Company/Organization Logo Area */}
+        <div className="mb-12">
+          <Shield className="w-20 h-20 text-blue-500 mx-auto mb-4" />
+        </div>
+
+        {/* Document Title */}
+        <h1 
+          className="font-bold text-white mb-6"
+          style={{ 
+            fontSize: '36px', 
+            fontFamily: 'Calibri, sans-serif',
+            letterSpacing: '-0.5px'
+          }}
+        >
+          {reportTitle || 'Untitled Report'}
+        </h1>
+
+        {/* Decorative Line */}
+        <div className="w-32 h-1 bg-blue-600 mb-12"></div>
+
+        {/* Report Details */}
+        <div className="space-y-4 text-gray-300 mb-16" style={{ fontSize: '14pt', fontFamily: 'Calibri, sans-serif' }}>
+          {incidentId && (
+            <div>
+              <span className="text-gray-400">Incident ID:</span>
+              <div className="font-semibold text-white mt-1">{incidentId}</div>
+            </div>
+          )}
+          
+          {caseId && (
+            <div className="mt-4">
+              <span className="text-gray-400">Case ID:</span>
+              <div className="font-semibold text-white mt-1">{caseId}</div>
+            </div>
+          )}
+
+          {reportType && (
+            <div className="mt-4">
+              <span className="text-gray-400">Report Type:</span>
+              <div className="font-semibold text-white mt-1 capitalize">{reportType}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Date Information */}
+        <div className="mt-auto pt-16 text-gray-400" style={{ fontSize: '11pt', fontFamily: 'Calibri, sans-serif' }}>
+          {lastModified ? (
+            <div>
+              <div className="mb-2">Last Modified</div>
+              <div className="text-white">{formatIsoDateTime(lastModified)}</div>
+            </div>
+          ) : (
+            <div>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="mt-12 text-gray-500 text-xs">
+          <div>CONFIDENTIAL - INTERNAL USE ONLY</div>
+        </div>
+      </div>
+
+      {/* Document Content Pages */}
+      <div 
+        className="p-12 bg-gray-900"
+        style={{
+          background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+          minHeight: '297mm'
+        }}
+      >
+        {/* Combined Sections */}
+        <div className="space-y-8">
+          {sections.length > 0 ? (
+            sections.map((section, index) => (
+              <div 
+                key={section.id || index}
+                className="section-word-style"
+              >
+                {/* Section Header */}
+                {section.title && (
+                  <h2 
+                    className="text-blue-400 mb-4"
+                    style={{
+                      fontSize: '16pt',
+                      fontWeight: '600',
+                      fontFamily: 'Calibri, sans-serif',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '2px solid #374151'
+                    }}
+                  >
+                    {section.title}
+                  </h2>
+                )}
+                
+                {/* Section Content */}
+                <div 
+                  className="word-content-section"
+                  style={{
+                    fontFamily: 'Calibri, sans-serif',
+                    fontSize: '11pt',
+                    lineHeight: '1.5',
+                    color: '#e5e7eb'
+                  }}
+                  dangerouslySetInnerHTML={{ 
+                    __html: section.content || `
+                      <div style="color: #6b7280; font-style: italic; text-align: center; padding: 32px; border: 1px dashed #4b5563; border-radius: 4px;">
+                        <p style="margin: 0; font-size: 11pt;">No content added for this section</p>
+                      </div>
+                    `
+                  }}
+                />
+                
+                {/* Section Separator */}
+                {index < sections.length - 1 && (
+                  <div className="my-8 opacity-30">
+                    <div className="w-full h-px bg-gray-600"></div>
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-20 text-gray-400">
+              <div className="text-4xl mb-4">📄</div>
+              <h3 className="text-xl font-semibold mb-2" style={{ fontFamily: 'Calibri, sans-serif' }}>
+                No Sections Added
+              </h3>
+              <p style={{ fontFamily: 'Calibri, sans-serif' }}>Add sections to start building your document</p>
+            </div>
+          )}
+        </div>
+
+        {/* Page Footer */}
+        <div className="mt-16 pt-8 border-t border-gray-700 text-center">
+          <div className="text-xs text-gray-500">
+            Page 1 | {sections.reduce((total, section) => {
+              const text = section.content?.replace(/<[^>]*>/g, '') || '';
+              return total + (text.split(/\s+/).filter(word => word.length > 0).length);
+            }, 0)} words
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Word Document Styling */}
+    <style>{`
+      .word-content-section h1 {
+        color: #ffffff;
+        font-size: 16pt;
+        font-weight: bold;
+        margin: 20px 0 12px 0;
+        font-family: Calibri, sans-serif;
+      }
+
+      .word-content-section h2 {
+        color: #e5e7eb;
+        font-size: 14pt;
+        font-weight: bold;
+        margin: 18px 0 10px 0;
+        font-family: Calibri, sans-serif;
+      }
+
+      .word-content-section h3 {
+        color: #e5e7eb;
+        font-size: 12pt;
+        font-weight: bold;
+        margin: 16px 0 8px 0;
+        font-family: Calibri, sans-serif;
+      }
+
+      .word-content-section p {
+        margin-bottom: 12px;
+        text-align: left;
+        line-height: 1.5;
+      }
+
+      .word-content-section ul, 
+      .word-content-section ol {
+        margin: 12px 0;
+        padding-left: 36px;
+      }
+
+      .word-content-section li {
+        margin-bottom: 6px;
+        line-height: 1.5;
+      }
+
+      .word-content-section strong {
+        font-weight: bold;
+      }
+
+      .word-content-section em {
+        font-style: italic;
+      }
+
+      .word-content-section u {
+        text-decoration: underline;
+      }
+
+      .word-content-section s {
+        text-decoration: line-through;
+      }
+
+      .word-content-section blockquote {
+        border-left: 3px solid #2563eb;
+        background: rgba(37, 99, 235, 0.1);
+        padding: 12px 16px;
+        margin: 16px 0;
+        border-radius: 0 2px 2px 0;
+      }
+
+      .word-content-section table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+        background: rgba(55, 65, 81, 0.5);
+        border: 1px solid #4b5563;
+      }
+
+      .word-content-section th {
+        background: #374151;
+        color: #ffffff;
+        padding: 8px 12px;
+        text-align: left;
+        font-weight: 600;
+        border: 1px solid #4b5563;
+      }
+
+      .word-content-section td {
+        padding: 8px 12px;
+        border: 1px solid #4b5563;
+      }
+
+      @media print {
+        .section-word-style {
+          page-break-inside: avoid;
+        }
+      }
+    `}</style>
+  </div>
+) : (
                         <div style={{ position: "relative" }}>
                           <div
                             style={{ position: "relative" }}
