@@ -38,6 +38,7 @@ jobs:
             [ -f .env ] && cp .env .backup/.env.bak
             [ -f docker-compose.yml ] && cp docker-compose.yml .backup/docker-compose.yml.bak
             [ -f nginx.conf ] && cp nginx.conf .backup/nginx.conf.bak
+            [ -d api/certs ] && cp -r api/certs .backup/certs.bak 2>/dev/null || true
 
             # Initialize git repository if it doesn't exist
             if [ ! -d ".git" ]; then
@@ -65,8 +66,14 @@ jobs:
             echo "Restoring configuration files..."
             [ -f .backup/.env.bak ] && cp .backup/.env.bak .env
 
+            # Restore certificates if they exist in backup
+            if [ -d ".backup/certs.bak" ]; then
+              echo "Restoring SSL certificates..."
+              mkdir -p api/certs
+              cp -r .backup/certs.bak/* api/certs/ 2>/dev/null || true
+            fi
+
             # Only restore docker-compose.yml if it has custom configurations
-            # Otherwise use the version from git
             if [ -f .backup/docker-compose.yml.bak ]; then
               echo "Note: Using docker-compose.yml from repository"
               echo "Previous docker-compose.yml backed up at .backup/docker-compose.yml.bak"
@@ -83,6 +90,21 @@ jobs:
               echo "Creating .env from .env.example..."
               cp .env.example .env
               echo "WARNING: Please update .env with production values!"
+            fi
+
+            # Handle SSL certificates - generate self-signed if none exist
+            if [ ! -f "api/certs/localhost.pem" ] || [ ! -f "api/certs/localhost-key.pem" ]; then
+              echo "Generating self-signed SSL certificates..."
+              mkdir -p api/certs
+              
+              # Generate self-signed certificate valid for 365 days
+              openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout api/certs/localhost-key.pem \
+                -out api/certs/localhost.pem \
+                -subj "/C=US/ST=State/L=City/O=Organization/OU=OrgUnit/CN=localhost" \
+                2>/dev/null || echo "Certificate generation completed"
+              
+              echo "✓ Generated self-signed certificates"
             fi
 
             # Validate docker-compose.yml syntax
@@ -177,4 +199,5 @@ jobs:
             echo "============================================"
             echo "Deployed commit: $(git rev-parse --short HEAD)"
             echo "Backup location: $PROJECT_DIR/.backup"
+            echo "SSL certificates location: $PROJECT_DIR/api/certs"
             echo "============================================"
