@@ -266,26 +266,86 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 	})
 }
 
-// Add this method to your existing AuthHandler struct
+// Updated LogoutHandler with better audit logging
 func (h *AuthHandler) LogoutHandler(c *gin.Context) {
 	// Get user ID from context (set by AuthMiddleware)
 	userIDInterface, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusOK, gin.H{"message": "Already logged out"})
+		// Log anonymous logout attempt
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "USER_LOGOUT",
+			Actor:  auditlog.Actor{}, // anonymous
+			Target: auditlog.Target{
+				Type: "session",
+				ID:   "anonymous",
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Logout attempt without valid session",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"reason":     "no_user_context",
+			},
+		})
+
+		c.JSON(http.StatusOK, gin.H{
+			"message":   "Already logged out",
+			"timestamp": time.Now().UTC(),
+		})
 		return
 	}
 
 	userID, ok := userIDInterface.(string)
 	if !ok {
-		c.JSON(http.StatusOK, gin.H{"message": "Logged out"})
+		// Log invalid user ID
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "USER_LOGOUT",
+			Actor:  auditlog.Actor{}, // invalid actor
+			Target: auditlog.Target{
+				Type: "session",
+				ID:   "invalid",
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Logout attempt with invalid user ID format",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"reason":     "invalid_user_id_type",
+			},
+		})
+
+		c.JSON(http.StatusOK, gin.H{
+			"message":   "Logged out",
+			"timestamp": time.Now().UTC(),
+		})
 		return
 	}
 
-	// Simple audit log (optional)
+	// Get additional user context for better audit logging
+	userEmail, _ := c.Get("userEmail")
+	userRole, _ := c.Get("userRole")
+
+	userEmailStr := ""
+	userRoleStr := ""
+
+	if email, ok := userEmail.(string); ok {
+		userEmailStr = email
+	}
+	if role, ok := userRole.(string); ok {
+		userRoleStr = role
+	}
+
+	// Successful logout audit log
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action: "USER_LOGOUT",
 		Actor: auditlog.Actor{
-			ID: userID,
+			ID:    userID,
+			Email: userEmailStr,
+			Role:  userRoleStr,
 		},
 		Target: auditlog.Target{
 			Type: "user",
@@ -293,11 +353,13 @@ func (h *AuthHandler) LogoutHandler(c *gin.Context) {
 		},
 		Service:     "auth",
 		Status:      "SUCCESS",
-		Description: "User logged out",
+		Description: "User logged out successfully",
 		Metadata: map[string]string{
-			"timestamp":  time.Now().Format(time.RFC3339),
-			"ip_address": c.ClientIP(),
-			"user_agent": c.GetHeader("User-Agent"),
+			"timestamp":     time.Now().Format(time.RFC3339),
+			"ip_address":    c.ClientIP(),
+			"user_agent":    c.GetHeader("User-Agent"),
+			"session_type":  "web", // or determine from request
+			"logout_method": "manual",
 		},
 	})
 
@@ -307,22 +369,79 @@ func (h *AuthHandler) LogoutHandler(c *gin.Context) {
 	})
 }
 
-// Add this method to your existing AuthHandler
+// Updated ChangePasswordHandler with comprehensive audit logging
 func (h *AuthHandler) ChangePasswordHandler(c *gin.Context) {
 	var req ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		// Log invalid request
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "PASSWORD_CHANGE",
+			Actor:  auditlog.Actor{}, // unknown actor
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   "unknown",
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Invalid request body for password change",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"error":      err.Error(),
+			},
+		})
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
 	// Validate request
 	if err := h.validator.Struct(req); err != nil {
+		// Log validation failure
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "PASSWORD_CHANGE",
+			Actor:  auditlog.Actor{}, // unknown actor
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   "unknown",
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Password change validation failed",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"error":      "validation_failed",
+			},
+		})
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Validation failed"})
 		return
 	}
 
 	// Check if new passwords match
 	if req.NewPassword != req.ConfirmPassword {
+		// Log password mismatch
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "PASSWORD_CHANGE",
+			Actor:  auditlog.Actor{}, // unknown actor
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   "unknown",
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Password change failed: new passwords do not match",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"error":      "password_mismatch",
+			},
+		})
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": "New passwords do not match"})
 		return
 	}
@@ -330,12 +449,50 @@ func (h *AuthHandler) ChangePasswordHandler(c *gin.Context) {
 	// Get user ID from context
 	userIDInterface, exists := c.Get("userID")
 	if !exists {
+		// Log unauthorized attempt
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "PASSWORD_CHANGE",
+			Actor:  auditlog.Actor{}, // unauthorized
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   "unauthorized",
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Unauthorized password change attempt",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"error":      "no_user_context",
+			},
+		})
+
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	userID, ok := userIDInterface.(string)
 	if !ok {
+		// Log invalid user ID
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "PASSWORD_CHANGE",
+			Actor:  auditlog.Actor{}, // invalid actor
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   "invalid",
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Password change attempt with invalid user ID",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"error":      "invalid_user_id",
+			},
+		})
+
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
 		return
 	}
@@ -346,13 +503,34 @@ func (h *AuthHandler) ChangePasswordHandler(c *gin.Context) {
 		PasswordHash string `db:"password_hash"`
 		Email        string `db:"email"`
 		FullName     string `db:"full_name"`
+		Role         string `db:"role"`
 	}
-	// Replace lines 353-358:
 
-	query := `SELECT id, password_hash, email, full_name FROM users WHERE id = ?`
+	query := `SELECT id, password_hash, email, full_name, role FROM users WHERE id = ?`
 	db := h.userRepo.GetDB()
 	err := db.Raw(query, userID).Scan(&user).Error
 	if err != nil {
+		// Log user not found
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "PASSWORD_CHANGE",
+			Actor: auditlog.Actor{
+				ID: userID,
+			},
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   userID,
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Password change failed: user not found",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"error":      "user_not_found",
+			},
+		})
+
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -360,6 +538,30 @@ func (h *AuthHandler) ChangePasswordHandler(c *gin.Context) {
 	// Verify old password
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.OldPassword))
 	if err != nil {
+		// Log incorrect current password
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "PASSWORD_CHANGE",
+			Actor: auditlog.Actor{
+				ID:    userID,
+				Email: user.Email,
+				Role:  user.Role,
+			},
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   userID,
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Password change failed: incorrect current password",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"error":      "incorrect_current_password",
+				"attempt_by": user.Email,
+			},
+		})
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Current password is incorrect"})
 		return
 	}
@@ -367,6 +569,29 @@ func (h *AuthHandler) ChangePasswordHandler(c *gin.Context) {
 	// Hash new password
 	hashedNewPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
+		// Log password hashing failure
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "PASSWORD_CHANGE",
+			Actor: auditlog.Actor{
+				ID:    userID,
+				Email: user.Email,
+				Role:  user.Role,
+			},
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   userID,
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Password change failed: unable to hash new password",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"error":      "password_hashing_failed",
+			},
+		})
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
 		return
 	}
@@ -379,15 +604,40 @@ func (h *AuthHandler) ChangePasswordHandler(c *gin.Context) {
     `
 	result := h.userRepo.GetDB().Exec(updateQuery, string(hashedNewPassword), userID)
 	if result.Error != nil {
+		// Log database update failure
+		h.auditLogger.Log(c, auditlog.AuditLog{
+			Action: "PASSWORD_CHANGE",
+			Actor: auditlog.Actor{
+				ID:    userID,
+				Email: user.Email,
+				Role:  user.Role,
+			},
+			Target: auditlog.Target{
+				Type: "user",
+				ID:   userID,
+			},
+			Service:     "auth",
+			Status:      "FAILED",
+			Description: "Password change failed: database update error",
+			Metadata: map[string]string{
+				"timestamp":  time.Now().Format(time.RFC3339),
+				"ip_address": c.ClientIP(),
+				"user_agent": c.GetHeader("User-Agent"),
+				"error":      "database_update_failed",
+			},
+		})
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 		return
 	}
 
-	// Audit log
+	// Successful password change audit log
 	h.auditLogger.Log(c, auditlog.AuditLog{
 		Action: "PASSWORD_CHANGE",
 		Actor: auditlog.Actor{
-			ID: userID,
+			ID:    userID,
+			Email: user.Email,
+			Role:  user.Role,
 		},
 		Target: auditlog.Target{
 			Type: "user",
@@ -395,11 +645,13 @@ func (h *AuthHandler) ChangePasswordHandler(c *gin.Context) {
 		},
 		Service:     "auth",
 		Status:      "SUCCESS",
-		Description: "User changed password",
+		Description: "User successfully changed password",
 		Metadata: map[string]string{
-			"timestamp":  time.Now().Format(time.RFC3339),
-			"ip_address": c.ClientIP(),
-			"user_agent": c.GetHeader("User-Agent"),
+			"timestamp":     time.Now().Format(time.RFC3339),
+			"ip_address":    c.ClientIP(),
+			"user_agent":    c.GetHeader("User-Agent"),
+			"change_method": "self_service",
+			"user_email":    user.Email,
 		},
 	})
 
@@ -408,6 +660,7 @@ func (h *AuthHandler) ChangePasswordHandler(c *gin.Context) {
 		"timestamp": time.Now().UTC(),
 	})
 }
+
 func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 	var req struct {
 		Email string `json:"email" binding:"required,email"`

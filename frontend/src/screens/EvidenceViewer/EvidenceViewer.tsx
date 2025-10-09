@@ -10,22 +10,18 @@ import {
   // SlidersHorizontal,
   // ArrowUpDown,
   Download,
-  Share,
   Send,
   Info,
   MessageCircle,
   Shield,
-  Clock,
   Users,
   CheckCircle,
-  XCircle,
-  FileText,
   Hash,
   Calendar,
   MoreVertical} from "lucide-react";
 import axios from "axios";
 import { Link, useSearchParams } from "react-router-dom";
-import { SidebarToggleButton, useSidebar } from '../../context/SidebarToggleContext';
+import { SidebarToggleButton } from '../../context/SidebarToggleContext';
 //import { string } from "prop-types";
 import { useParams } from "react-router-dom";
 import { fetchEvidenceByCaseId } from "./api";
@@ -39,7 +35,8 @@ import { addReaction } from "./api";
 import { approveMessage } from "./api";
 import{MessageCard} from "../../components/ui/MessageCard";
 import { ClipboardList } from "lucide-react";
-
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Import Select components from your UI library
 import {
@@ -249,8 +246,8 @@ console.debug('Parsed custodyDetails:', custodyDetails);
 
 const [chainLoading] = useState(false);
 const [chainError] = useState<string | null>(null);
-const [integrityCheckStatus, setIntegrityCheckStatus] = useState<'passed' | 'failed' | 'pending' | string>('pending');
-const [integrityCheckDetails, setIntegrityCheckDetails] = useState<string>('');
+const [, setIntegrityCheckStatus] = useState<'passed' | 'failed' | 'pending' | string>('pending');
+const [, setIntegrityCheckDetails] = useState<string>('');
 
 useEffect(() => {
   async function fetchIntegrityCheck() {
@@ -559,8 +556,6 @@ const [profile] = useState({
     image: user?.image_url || null, // assuming you might store this too
   });
 
-  const recentThread = [...annotationThreads]
-  .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0]; // most recent
 
   // const getStatusColor = (status: string) => {
   //   switch (status) {
@@ -665,7 +660,87 @@ const handleApproveMessage = async (messageId: string) => {
     console.error("Failed to approve message:", err);
   }
 };
+// Add this function inside the EvidenceViewer component (after existing functions)
+const handleDownloadEvidence = async (file: FileItem | null) => {
+  if (!file) {
+    console.error('No file selected for download');
+    return;
+  }
 
+  try {
+    const token = sessionStorage.getItem('authToken');
+    const headers: any = {};
+    
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Show loading state (optional)
+    console.log(`Starting download for: ${file.filename}`);
+
+    // Make the download request
+    const response = await axios.get<Blob>(
+      `${BASE_URL}/download/${file.id}`,
+      {
+        headers,
+        responseType: 'blob', // Important: This tells axios to handle binary data
+        timeout: 300000, // 5 minute timeout for large files
+      }
+    );
+
+    // Create blob URL and trigger download
+    const blob = new Blob([response.data as Blob]);
+    const url = window.URL.createObjectURL(blob);
+    
+    // Create temporary link element and trigger download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.filename || `evidence-${file.id}`;
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+// In your handleDownloadEvidence function, after successful download:
+console.log(`Download completed: ${file.filename}`);
+
+// Add this success toast
+  toast.success(`Successfully downloaded ${file.filename}`, {
+    position: "top-right",
+    autoClose: 3000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+  });
+  } catch (error: any) {
+    console.error('Download failed:', error);
+    
+    let errorMessage = 'Download failed';
+    if (error.response?.status === 401) {
+      errorMessage = 'Unauthorized. Please log in again.';
+    } else if (error.response?.status === 404) {
+      errorMessage = 'Evidence file not found.';
+    } else if (error.response?.status === 403) {
+      errorMessage = 'You do not have permission to download this file.';
+    } else if (error.code === 'ECONNABORTED') {
+      errorMessage = 'Download timeout. The file may be too large.';
+    } else if (error.response?.data) {
+      errorMessage = `Download failed: ${error.response.data.error || error.message}`;
+    }
+    
+      toast.error(errorMessage, {
+    position: "top-right",
+    autoClose: 5000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+  });
+  }
+};
 const handleSendMessageWithParent = async (text: string, parentId?: string) => {
   if (!text.trim() || !selectedThread) return;
 
@@ -716,40 +791,6 @@ const handleSendMessageWithParent = async (text: string, parentId?: string) => {
 };
 
 
-//TO BE DELETED
-// function updateReplyApproval(replies: ThreadMessage[], replyId: string): ThreadMessage[] {
-//   return replies.map(reply => {
-//     if (reply.id === replyId) {
-//       return { ...reply, isApproved: true };
-//     } else if (reply.replies) {
-//       return {
-//         ...reply,
-//         replies: updateReplyApproval(reply.replies, replyId)
-//       };
-//     }
-//     return reply;
-//   });
-// }
-
-function timeAgo(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  const intervals: [number, string][] = [
-    [60, "seconds"],
-    [3600, "minutes"],
-    [86400, "hours"],
-    [604800, "days"]
-  ];
-
-  for (let [limit, label] of intervals.reverse()) {
-    const value = Math.floor(seconds / limit);
-    if (value >= 1) return `${value} ${label} ago`;
-  }
-
-  return "just now";
-}
 
 // Show loading only when we actually have a caseId and are loading
 if (loading && caseId && caseId !== "undefined") {
@@ -798,10 +839,24 @@ if (!caseId || caseId === "undefined") {
               <Link to="/secure-chat"><span className="text-sm">Secure chat</span></Link>
             </div>
                  {isDFIRAdmin && (
-               <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-colors cursor-pointer">
-              <ClipboardList className="w-5 h-5" />
-              <Link to="/report-dashboard"><span className="text-sm">Case Reports</span></Link>
+          <>
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+              <ClipboardList className="w-6 h-6" />
+              <Link to="/report-dashboard">
+                <span className="text-lg">Case Reports</span>
+              </Link>
             </div>
+            
+            {/* Add this new DFIR Audit Logs button */}
+            <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground hover:bg-muted p-3 rounded-lg transition-colors cursor-pointer">
+              <Shield className="w-6 h-6" />
+              <Link to="/dfir-audit-logs">
+                <span className="text-lg">Audit Logs</span>
+              </Link>
+            </div>
+          </>
+          
+            
           )}
           </nav>
         </div>
@@ -1154,9 +1209,14 @@ if (!caseId || caseId === "undefined") {
                       </div> */}
                     </div>
                     <div className="flex items-center gap-2">
-                      <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
-                        <Download className="w-5 h-5" />
-                      </button>
+                    <button 
+                      onClick={() => handleDownloadEvidence(selectedFile)}
+                      className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
+                      disabled={!selectedFile}
+                      title="Download Evidence File"
+                    >
+                      <Download className="w-5 h-5" />
+                    </button>
                       {/* <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg">
                         <FileText className="w-5 h-5" />
                       </button>
@@ -1347,53 +1407,6 @@ if (!caseId || caseId === "undefined") {
                           <div>
                             <span className="text-muted-foreground">Hash:</span>
                             <p className="text-muted-foreground font-mono text-xs break-all">{ getHashesFromMetadata(selectedFile.metadata).sha256|| "N/A"}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Recent Activity */}
-                      <div className="bg-card p-4 rounded-lg">
-                        <h3 className="font-semibold mb-4 flex items-center gap-2">
-                          <Clock className="w-5 h-5 text-yellow-400" />
-                          Recent Activity
-                        </h3>
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-3 text-sm">
-                              {recentThread && (
-                                <div className="flex items-center gap-3 text-sm">
-                                  <MessageCircle className="w-4 h-4 text-blue-400" />
-                                  <div className="flex-1">
-                                    <span className="text-muted-foreground">New discussion thread created</span>
-                                    <div className="text-xs text-muted-foreground">
-                                      by {recentThread.user} • {timeAgo(recentThread.time)}
-                                    </div>
-                                  </div>
-                                </div>
-                                )}
-                          </div>
-                          <div className="flex items-center gap-3 text-sm">
-                            {integrityCheckStatus === 'passed' ? (
-                              <CheckCircle className="w-4 h-4 text-green-400" />
-                            ) : integrityCheckStatus === 'failed' ? (
-                              <XCircle className="w-4 h-4 text-red-400" />
-                            ) : (
-                              <Shield className="w-4 h-4 text-yellow-400 animate-spin" />
-                            )}
-                            <div className="flex-1">
-                              {integrityCheckStatus === 'passed' ? (
-                                <span className="text-green-400">Integrity verified</span>
-                              ) : integrityCheckStatus === 'failed' ? (
-                                <span className="text-red-400">Integrity check failed</span>
-                              ) : (
-                                <span className="text-muted-foreground">Integrity verification in progress</span>
-                              )}
-                              <div className="text-xs text-muted-foreground">
-                                System
-                                {integrityCheckDetails && (
-                                  <span className="ml-2">• {integrityCheckDetails}</span>
-                                )}
-                              </div>
-                            </div>
                           </div>
                         </div>
                       </div>

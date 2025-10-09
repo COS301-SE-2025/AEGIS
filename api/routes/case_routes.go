@@ -54,7 +54,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 
 	// ─── Public Evidence Upload/Download ─────────────
 	api.POST("/upload", middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.UploadHandler.Upload)
-	api.GET("/download/:cid", middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.DownloadHandler.Download)
+	api.GET("/download/:id", middleware.IPThrottleMiddleware(20, time.Minute, granularLimits), h.DownloadHandler.Download)
 
 	//________AI Routes________
 	timelineAIGroup := api.Group("/ai")
@@ -130,6 +130,7 @@ func SetUpRouter(h *handlers.Handler) *gin.Engine {
 		protected.GET("tenants/:tenantId/users", middleware.AuthMiddleware(), h.AdminService.ListUsersByTenant)
 		protected.DELETE("/users/:userId", h.AdminService.DeleteUserHandler)
 		protected.GET("/audit-logs", h.AdminService.GetAuditLogs)
+		protected.GET("/audit-logs/export", h.AdminService.ExportAuditLogs) // Add this line
 
 		// ─── Profile Routes ──────────────────────────
 		protected.GET("/profile/:userID", h.ProfileHandler.GetProfileHandler)

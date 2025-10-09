@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -42,17 +43,15 @@ func (s *AuditLogService) GetAuditLogs(ctx context.Context, filter AuditLogFilte
 		"audit_logs_evidence",
 		"audit_logs_case",
 		"audit_logs_user",
-		//"audit_logs_admin",
-		//"audit_logs_chat",
-		//"audit_logs_annotation_threads",
-		//"audit_logs_annotation_messages",
-		"audit_logs_report",     // Add if you have report-specific
-		"audit_logs_timelineai", // Add for IOCs, etc.
-		//"audit_logs_general",
-		// Add more as needed
+		"audit_logs_report",
+		"audit_logs_timelineai",
 	}
 
 	var logs []AuditLog
+
+	// Get more logs from each collection to ensure we have enough to sort and limit properly
+	tempLimit := filter.Limit * 2 // Get 2x the requested amount initially
+
 	for _, collName := range collections {
 		coll := s.db.Collection(collName)
 
@@ -65,14 +64,13 @@ func (s *AuditLogService) GetAuditLogs(ctx context.Context, filter AuditLogFilte
 			query["action"] = filter.Action
 		}
 		if filter.Service != "" {
-			// Note: Service is per log, but collections are service-based; still filter if mismatch
 			query["service"] = filter.Service
 		}
 
-		// Sort by timestamp descending
+		// Sort by timestamp descending - get more logs per collection
 		opts := options.Find().
 			SetSort(bson.D{{Key: "timestamp", Value: -1}}).
-			SetLimit(int64(filter.Limit/len(collections) + 1)) // Distribute limit roughly
+			SetLimit(int64(tempLimit)) // Get more logs initially
 
 		cursor, err := coll.Find(ctx, query, opts)
 		if err != nil {
@@ -87,21 +85,35 @@ func (s *AuditLogService) GetAuditLogs(ctx context.Context, filter AuditLogFilte
 		logs = append(logs, temp...)
 	}
 
-	// Sort and limit final result
+	// Sort ALL logs by timestamp descending
 	sort.Slice(logs, func(i, j int) bool {
 		return logs[i].Timestamp.After(logs[j].Timestamp)
 	})
+
+	// Now apply the actual limit to get the most recent logs across all collections
 	if len(logs) > filter.Limit {
 		logs = logs[:filter.Limit]
 	}
 
 	// Optional: Enrich emails like in GetRecentUserActivities
 	for i, log := range logs {
-		user, err := s.userRepo.GetByID(ctx, log.Actor.ID)
-		if err == nil && user != nil {
-			logs[i].Actor.Email = user.Email
+		// Validate UUID format before querying
+		if log.Actor.ID != "" {
+			// Check if it's a valid UUID format
+			if _, err := uuid.Parse(log.Actor.ID); err == nil {
+				user, err := s.userRepo.GetByID(ctx, log.Actor.ID)
+				if err == nil && user != nil {
+					logs[i].Actor.Email = user.Email
+				} else {
+					logs[i].Actor.Email = "(unknown)"
+				}
+			} else {
+				// Invalid UUID format
+				logs[i].Actor.Email = "(invalid-id)"
+			}
 		} else {
-			logs[i].Actor.Email = "(unknown)"
+			// Empty actor ID
+			logs[i].Actor.Email = "(system)"
 		}
 	}
 

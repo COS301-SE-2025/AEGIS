@@ -112,7 +112,7 @@ func (h *VerificationHandler) VerifyAdminGin(c *gin.Context) {
 		return
 	}
 
-	if userRole != "DFIR Admin" {
+	if userRole != "DFIR Admin" && userRole != "System Admin" {
 		h.logger.Warn("Non-admin user attempted admin verification",
 			zap.String("user_id", userID),
 			zap.String("role", userRole))

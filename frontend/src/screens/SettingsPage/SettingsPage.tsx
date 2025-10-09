@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { toast, ToastContainer } from 'react-toastify';
+import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 // Simple toast implementation (replace with your UI lib if available)
 function showToast(message: string, type: 'success' | 'error' = 'success') {
@@ -37,7 +37,6 @@ import {
   AlertTriangle,
   X,
 } from "lucide-react";
-import { ColorPalettePicker } from "../../components/ui/ColorPalettePicker";
 
 // MFA Authentication Modal Component
 const MFAAuthModal = ({ 
@@ -250,37 +249,7 @@ const handlePasswordSubmit = async () => {
   );
 };
 
-// Section for toggling and displaying theme customization
-const ThemeCustomizationSection = () => {
-  const { theme } = useTheme();
-  const [customizing, setCustomizing] = useState(false);
-  const themeLabels: Record<string, string> = {
-    default: 'Default (Cool Greys)',
-    light: 'Light (Warmer Blues)',
-    dark: 'Dark',
-  };
-  return (
-    <div className="mt-6">
-      <label className="flex items-center gap-2 mb-4">
-        <input
-          type="checkbox"
-          checked={customizing}
-          onChange={e => setCustomizing(e.target.checked)}
-          className="accent-primary"
-        />
-        <span className="font-medium">Customize current theme palette</span>
-      </label>
-      {customizing && (
-        <>
-          <div className="mb-2 text-muted-foreground text-sm">
-            Customizing: <span className="font-semibold">{themeLabels[theme]}</span>
-          </div>
-          <ColorPalettePicker />
-        </>
-      )}
-    </div>
-  );
-};
+
 
 // ThemeToggle component for switching between themes
 const ThemeToggle = () => {
@@ -732,9 +701,7 @@ function SettingsPage() {
       )}
 
     <div className="p-8">
-      <h2 className="text-2xl font-bold mb-4">Customize Theme</h2>
       <ThemeToggle />
-      <ThemeCustomizationSection />
     </div>
 
     {/* MFA Authentication Modal */}
