@@ -27,8 +27,8 @@ interface AnnotationThread {
   messageCount: number;
   participantCount: number;
   isActive?: boolean;
-  status: 'open' | 'resolved' | 'pending_approval';
-  priority: 'high' | 'medium' | 'low';
+  //status: 'open' | 'resolved' | 'pending_approval';
+  //priority: 'high' | 'medium' | 'low';
   tags: any[];
   fileId: string;
   createdBy?: string;
