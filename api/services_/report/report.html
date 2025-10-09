@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{.Metadata.Name}}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+    header { text-align: center; margin-bottom: 30px; }
+    h1 { font-size: 24px; margin-bottom: 6px; }
+    .meta { font-size: 13px; color: #666; }
+    .row { margin: 6px 0; }
+    .section { margin-bottom: 24px; }
+    .section h2 { font-size: 18px; margin-bottom: 8px; color: #444; }
+    .section-content { font-size: 14px; line-height: 1.6; }
+    .no-content { font-style: italic; color: #999; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{{.Metadata.Name}}</h1>
+    <div class="meta">
+      {{with .Metadata.CreatedAt}}Generated on {{.Format "02 Jan 2006 15:04"}}{{end}}<br>
+      {{with .Metadata.UpdatedAt}}Last updated {{.Format "02 Jan 2006 15:04"}}{{end}}<br>
+      {{with .Metadata.ReportNumber}}Report Number: {{.}}{{end}}<br>
+      {{with .Metadata.Status}}Status: {{.}}{{end}}<br>
+      {{with .Metadata.Version}}Version: {{.}}{{end}}
+    </div>
+  </header>
+
+  <section class="section">
+    <h2>Details</h2>
+    <div class="section-content">
+      <p><strong>Report ID:</strong> {{.Metadata.ID}}</p>
+      <p><strong>Case ID:</strong> {{.Metadata.CaseID}}</p>
+      <p><strong>Examiner ID:</strong> {{.Metadata.ExaminerID}}</p>
+      <p><strong>Tenant ID:</strong> {{.Metadata.TenantID}}</p>
+      <p><strong>Team ID:</strong> {{.Metadata.TeamID}}</p>
+      <p><strong>Mongo ID:</strong> {{.Metadata.MongoID}}</p>
+      <p><strong>Date Examined:</strong> {{.Metadata.DateExamined.Format "02 Jan 2006"}}</p>
+      <p><strong>File Path:</strong> {{.Metadata.FilePath}}</p>
+    </div>
+  </section>
+
+  {{range .Content}}
+    <div class="section">
+      <h2>{{.Title}}</h2>
+      <div class="section-content">
+        {{if .Content}}
+          {{.Content | safeHTML}}
+        {{else}}
+          <p class="no-content">(No content provided)</p>
+        {{end}}
+      </div>
+    </div>
+  {{end}}
+</body>
+</html>

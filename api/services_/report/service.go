@@ -4,24 +4,33 @@ import (
 	reportshared "aegis-api/services_/report/shared"
 	"log"
 
-	// ...existing imports...
 	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"image/jpeg"
-	"image/png"
+
+	// "image/jpeg"
+	// "image/png"
 	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
-	"github.com/jung-kurt/gofpdf"
+	//"github.com/jung-kurt/gofpdf"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	//"github.com/SebastiaanKlippert/go-wkhtmltopdf"
+	//"golang.org/x/net/html"
+
+	"html/template"
+	"path/filepath"
+	"github.com/SebastiaanKlippert/go-wkhtmltopdf"
+	// "image"
+	//"strconv"
+	// "github.com/johnfercher/maroto/pkg/consts"
+	// "github.com/johnfercher/maroto/pkg/pdf"
 )
 
 // ReportService defines the business logic for managing reports.
@@ -300,94 +309,75 @@ func extractDataURLImages(html string) (cleanHTML string, imgs []embeddedImage) 
 	return out, imgs
 }
 
+
+
 func (s *ReportServiceImpl) DownloadReportAsPDF(ctx context.Context, reportID uuid.UUID) ([]byte, error) {
+	// Retrieve report data
 	rpt, err := s.DownloadReport(ctx, reportID)
 	if err != nil {
 		return nil, err
 	}
 
-	pdf := gofpdf.New("P", "mm", "A4", "")
-	pdf.SetMargins(15, 15, 15)
-	pdf.SetAutoPageBreak(true, 15)
-	pdf.AddPage()
-
-	pdf.SetFont("Arial", "B", 16)
-	pdf.Cell(0, 10, fmt.Sprintf("Report: %s", rpt.Metadata.Name))
-	pdf.Ln(12)
-
-	// If you’re using gofpdf’s HTML renderer:
-	html := pdf.HTMLBasicNew()
-
-	for _, sec := range rpt.Content {
-		// title...
-		pdf.SetFont("Arial", "B", 12)
-		pdf.Cell(0, 8, sec.Title)
-		pdf.Ln(8)
-
-		// (optional) sanitize first; otherwise use sec.Content directly
-		// sanitized := policy.Sanitize(sec.Content)
-		sanitized := sec.Content
-
-		// ⬇️ call the extractor so the function & regex are USED
-		cleaned, images := extractDataURLImages(sanitized)
-
-		// text rendering
-		pdf.SetFont("Arial", "", 11)
-		trimmed := strings.TrimSpace(strings.ToLower(strings.ReplaceAll(cleaned, " ", "")))
-		if trimmed == "" || trimmed == "<p><br></p>" || trimmed == "<p></p>" {
-			pdf.MultiCell(0, 6, "(No content provided)", "", "", false)
-		} else {
-			html.Write(5, cleaned)
-		}
-		pdf.Ln(4)
-
-		// image rendering (the block you already have)
-		for _, im := range images {
-			imgType := strings.ToUpper(strings.TrimPrefix(im.Mimetype, "image/"))
-			if imgType == "JPEG" {
-				imgType = "JPG"
-			}
-
-			r := bytes.NewReader(im.Data)
-			if imgType == "PNG" && len(im.Data) > 1_000_000 {
-				if pngImg, err := png.Decode(bytes.NewReader(im.Data)); err == nil {
-					var buf bytes.Buffer
-					_ = jpeg.Encode(&buf, pngImg, &jpeg.Options{Quality: 85})
-					r = bytes.NewReader(buf.Bytes())
-					imgType = "JPG"
-				}
-			}
-
-			name := fmt.Sprintf("sec-%v-%d", sec.ID, time.Now().UnixNano()) // use sec.ID or sec.ID.Hex()
-			opts := gofpdf.ImageOptions{ImageType: imgType, ReadDpi: true}
-			info := pdf.RegisterImageOptionsReader(name, opts, r)
-
-			w, h := info.Width(), info.Height()
-			maxW := 180.0
-			if w > maxW {
-				scale := maxW / w
-				w = maxW
-				h *= scale
-			}
-
-			x := (210.0 - w) / 2.0
-			y := pdf.GetY()
-			pdf.ImageOptions(name, x, y, w, 0, false, opts, 0, "")
-			pdf.Ln(h + 4)
-		}
-
-		if pdf.GetY() > 260 {
-			pdf.AddPage()
-		}
+	// Resolve template path
+	path, err := filepath.Abs("services_/report/report.html")
+	if err != nil {
+		log.Printf("Failed to resolve template path: %v", err)
+		return nil, fmt.Errorf("template path: %w", err)
 	}
 
-	var buf bytes.Buffer
-	if err := pdf.Output(&buf); err != nil {
-		return nil, fmt.Errorf("pdf output: %w", err)
+	// Define safeHTML function to prevent escaping of embedded HTML
+	funcMap := template.FuncMap{
+		"safeHTML": func(s string) template.HTML {
+			return template.HTML(s)
+		},
 	}
-	return buf.Bytes(), nil
+
+	// Parse template with function map
+	tmpl := template.New(filepath.Base(path)).Funcs(funcMap)
+	tmpl, err = tmpl.ParseFiles(path)
+	if err != nil {
+		log.Printf("Template parsing failed: %v", err)
+		return nil, fmt.Errorf("template parse: %w", err)
+	}
+
+	// Render HTML into buffer
+	var htmlBuf bytes.Buffer
+	if err := tmpl.Execute(&htmlBuf, rpt); err != nil {
+		log.Printf("Template execution failed: %v", err)
+		return nil, fmt.Errorf("template render: %w", err)
+	}
+
+	// Create PDF generator
+	pdfg, err := wkhtmltopdf.NewPDFGenerator()
+	if err != nil {
+		log.Printf("PDF generator creation failed: %v", err)
+		return nil, fmt.Errorf("pdf generator: %w", err)
+	}
+
+	// Set global options
+	pdfg.Dpi.Set(300)
+	pdfg.PageSize.Set(wkhtmltopdf.PageSizeA4)
+	pdfg.MarginLeft.Set(15)
+	pdfg.MarginRight.Set(15)
+	pdfg.MarginTop.Set(15)
+	pdfg.MarginBottom.Set(15)
+
+	// Create page from rendered HTML
+	page := wkhtmltopdf.NewPageReader(&htmlBuf)
+	page.EnableLocalFileAccess.Set(true)
+	page.PrintMediaType.Set(true)
+	page.NoBackground.Set(false)
+
+	pdfg.AddPage(page)
+
+	// Generate PDF
+	if err := pdfg.Create(); err != nil {
+		log.Printf("PDF creation failed: %v", err)
+		return nil, fmt.Errorf("pdf create: %w", err)
+	}
+
+	return pdfg.Bytes(), nil
 }
-
 
 
 func (s *ReportServiceImpl) UpdateCustomSectionContent(
@@ -485,46 +475,49 @@ func (s *ReportServiceImpl) GetReportsByTeamID(
 	return s.repo.GetReportsByTeamID(ctx, tenantID, teamID)
 }
 
+func (s *ReportServiceImpl) GeneratePDFFromHTML(ctx context.Context, html string) ([]byte, error) {
+	// Create new PDF generator
+	pdfg, err := wkhtmltopdf.NewPDFGenerator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create PDF generator: %w", err)
+	}
 
+	// Set global options
+	pdfg.Dpi.Set(300)
+	pdfg.NoCollate.Set(false)
+	pdfg.PageSize.Set(wkhtmltopdf.PageSizeA4)
+	pdfg.Orientation.Set(wkhtmltopdf.OrientationPortrait)
+	pdfg.MarginTop.Set(15)
+	pdfg.MarginBottom.Set(15)
+	pdfg.MarginLeft.Set(15)
+	pdfg.MarginRight.Set(15)
 
+	// Create a new page from HTML string
+	page := wkhtmltopdf.NewPageReader(strings.NewReader(html))
+	page.EnableLocalFileAccess.Set(true)
+	page.PrintMediaType.Set(true)
+	page.NoBackground.Set(false)
 
+	// Add page to PDF generator
+	pdfg.AddPage(page)
 
-// func (s *ReportServiceImpl) GeneratePDFFromHTML(ctx context.Context, html string) ([]byte, error) {
-// 	// Create new PDF generator
-// 	pdfg, err := wkhtmltopdf.NewPDFGenerator()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to create PDF generator: %w", err)
-// 	}
+	// Generate PDF
+	if err := pdfg.Create(); err != nil {
+		return nil, fmt.Errorf("failed to create PDF: %w", err)
+	}
 
-// 	// Set global options
-// 	pdfg.Dpi.Set(300)
-// 	pdfg.NoCollate.Set(false)
-// 	pdfg.PageSize.Set(wkhtmltopdf.PageSizeA4)
-// 	pdfg.Orientation.Set(wkhtmltopdf.OrientationPortrait)
-// 	pdfg.MarginTop.Set(0)
-// 	pdfg.MarginBottom.Set(0)
-// 	pdfg.MarginLeft.Set(0)
-// 	pdfg.MarginRight.Set(0)
+	return pdfg.Bytes(), nil
+}
 
-// 	// Create a new page from HTML string
-// 	page := wkhtmltopdf.NewPageReader(strings.NewReader(html))
-	
-// 	// Set page options
-// 	page.EnableLocalFileAccess.Set(true)
-// 	page.PrintMediaType.Set(true)
-	
-// 	// Try to enable background - if method exists
-// 	// Some versions use NoBackground instead
-// 	page.NoBackground.Set(false) // This enables backgrounds
+func safeHTML(s string) template.HTML {
+	return template.HTML(s)
+}
 
-// 	// Add page to PDF generator
-// 	pdfg.AddPage(page)
+func loadReportTemplate(path string) (*template.Template, error) {
+	funcMap := template.FuncMap{
+		"safeHTML": safeHTML,
+	}
 
-// 	// Generate PDF
-// 	err = pdfg.Create()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to create PDF: %w", err)
-// 	}
-
-// 	return pdfg.Bytes(), nil
-// }
+	tmpl := template.New("report_pdf.html").Funcs(funcMap)
+	return tmpl.ParseFiles(path)
+}
