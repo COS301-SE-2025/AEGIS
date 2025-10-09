@@ -1905,7 +1905,7 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
       return; // Don't throw error, just return silently
     }
 
-    // **Shared Secret Management**:
+    // *Shared Secret Management*:
     try {
       // Convert the updatedGroup to Chat type expected by generateGroupSharedSecretForChat
       const chatForSecret: Chat = {
@@ -1925,7 +1925,7 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
 
       const secretResult = await generateGroupSharedSecretForChat(
         chatForSecret,
-        token || "",
+        sessionStorage.getItem("authToken") || "",
         currentUserId
       );
       
@@ -1946,8 +1946,6 @@ const handleAddMember = async (e?: React.MouseEvent | React.KeyboardEvent) => {
     toast.error("Something went wrong while adding the member");
   }
 };
-
-
 
 function asEmailList(members: unknown): string[] {
   if (!Array.isArray(members)) return [];

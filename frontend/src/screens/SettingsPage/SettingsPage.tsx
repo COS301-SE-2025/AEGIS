@@ -59,33 +59,53 @@ const MFAAuthModal = ({
   const [step, setStep] = useState<'password' | 'mfa'>('password');
   const [error, setError] = useState('');
 
-  const handlePasswordSubmit = async () => {
-    if (!password.trim()) {
-      setError('Password is required');
+
+const handlePasswordSubmit = async () => {
+  if (!password.trim()) {
+    setError('Password is required');
+    return;
+  }
+
+  try {
+    const token = sessionStorage.getItem('authToken');
+    
+    if (!token) {
+      setError('Authentication token not found. Please log in again.');
       return;
     }
 
-    try {
-      // Verify admin password first
-      const token = sessionStorage.getItem('authToken');
-      const response = await axios.post('https://localhost/api/v1/auth/verify-admin', {
-        password: password
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+    console.log('Sending verify-admin request...');
 
-      const data = response.data as { requiresMFA?: boolean };
-      if (data.requiresMFA) {
-        setStep('mfa');
-        setError('');
-      } else {
-        // No MFA required, proceed with removal
-        onConfirm(password);
+    const response = await axios.post('https://localhost/api/v1/auth/verify-admin', {
+      password: password
+    }, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Invalid password');
+    });
+
+    const data = response.data as { valid: boolean; message?: string };
+    
+    if (data.valid) {
+      // Password is valid, proceed with user removal
+      onConfirm(password);
+      setError('');
+    } else {
+      setError(data.message || 'Invalid password');
     }
-  };
+  } catch (err: any) {
+    console.error('Admin verification error:', err);
+    
+    if (err.response?.status === 401) {
+      setError('Authentication failed. Please log in again.');
+    } else if (err.response?.status === 403) {
+      setError('Admin access required.');
+    } else {
+      setError(err?.response?.data?.error || err?.response?.data?.message || 'Verification failed');
+    }
+  }
+};
 
   const handleMFASubmit = () => {
     if (!mfaCode.trim()) {
@@ -546,10 +566,8 @@ function SettingsPage() {
           <Shield className="w-5 h-5 text-secondary-foreground" />
           Reset Password
         </button>
-      </div>
 
       {/* Logout */}
-      <div className="bg-card text-card-foreground rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-4">Logout</h2>
         <Link
           to="/login"

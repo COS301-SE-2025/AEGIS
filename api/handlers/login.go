@@ -79,6 +79,7 @@ type Handler struct {
 	EvidenceHandler       *EvidenceHandler
 	ChainOfCustodyHandler *ChainOfCustodyHandler
 	X3DHService           *x3dh.BundleService // Add this
+	VerificationHandler   *VerificationHandler
 }
 
 func NewHandler(
@@ -122,6 +123,7 @@ func NewHandler(
 	healthHandler *HealthHandler,
 
 	x3dhService *x3dh.BundleService,
+	verificationHandler *VerificationHandler,
 
 ) *Handler {
 	return &Handler{
@@ -163,7 +165,8 @@ func NewHandler(
 		ChainOfCustodyHandler: ChainOfCustodyHandler,
 		HealthHandler:         healthHandler,
 
-		X3DHService: x3dhService,
+		X3DHService:         x3dhService,
+		VerificationHandler: verificationHandler,
 	}
 }
 
